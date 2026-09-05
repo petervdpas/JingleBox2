@@ -256,7 +256,7 @@ public sealed class Sweep : ISoundEffectEngine
         double drive = _drive;
         bool even = _even;
         bool first = _filterFirst;
-        double makeup = even ? 1 : drive > 1 ? 1.0 / Math.Tanh(drive) : 1;
+        double makeup = even ? 1 : drive > 1 ? 1.0 / Audio.TangentSwitch.Now.Of(drive) : 1;
         int mode = (int)_mode;
 
         for (int frame = 0; frame < count; frame++)
@@ -336,7 +336,7 @@ public sealed class Sweep : ISoundEffectEngine
     {
         if (drive <= 1) return sample;
 
-        double bitten = Math.Tanh(sample * drive);
+        double bitten = Audio.TangentSwitch.Now.Of(sample * drive);
 
         if (even) _loudness.Saw(sample, bitten);
 

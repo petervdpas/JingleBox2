@@ -121,6 +121,14 @@
              the header already carries the chain's. -->
         <views:HelpBadge Topic="tracker.pattern" Margin="16,0,0,0" />
 
+        <!-- How long the transport has been running, drawn rather than bound to a string: a clock
+             with thousandths on it moves twenty times a second, and one piece of lettering in its
+             own box is the whole of what should be invalidated when it does. -->
+        <views:TimeReadout Time="{Binding Elapsed}"
+                           ReadingSize="15"
+                           Margin="16,0,0,0"
+                           VerticalAlignment="Center" />
+
       </WrapPanel>
 
       <!-- Where the instruments and the mixer live now. They are the tracker's own, so they are

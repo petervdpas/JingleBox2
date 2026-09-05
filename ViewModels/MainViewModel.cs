@@ -783,6 +783,31 @@ public sealed partial class MainViewModel : ObservableObject, IShortcutContext
         }
     }
 
+    /// <summary>
+    /// Whether the drive's curve is read off a table rather than worked out by the system.
+    /// </summary>
+    /// <remarks>
+    /// Nothing is reopened and no note is disturbed. The curve is asked for per sample, so the
+    /// switch lands inside the block being mixed, which is what makes this something to sit and
+    /// listen to both ways rather than something to restart for.
+    /// </remarks>
+    public bool FastDriveCurve
+    {
+        get => _cfg.FastDriveCurve;
+        set
+        {
+            if (_cfg.FastDriveCurve == value) return;
+
+            _cfg.FastDriveCurve = value;
+            _store.Save(_cfg);
+
+            Audio.TangentSwitch.Wants(value);
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(FastDriveCurveHint));
+        }
+    }
+
     /// <summary>The fader scale, so a level in decibels can be turned into what an engine wants.</summary>
     private readonly UI.Interfaces.IGainScale _gain = new UI.GainScale();
 
@@ -934,6 +959,19 @@ public sealed partial class MainViewModel : ObservableObject, IShortcutContext
               + "device, which is what this application has always done and what everything here "
               + "has been listened to on. Switch it on if you use an ASIO driver, or to hear the "
               + "arrangement the ASIO work is built on.";
+
+    /// <summary>What the switch means, said plainly enough to choose by.</summary>
+    public string FastDriveCurveHint =>
+        _cfg.FastDriveCurve
+            ? "Every drive in the application is reading its curve off a table drawn at startup. "
+              + "It is about six times cheaper a sample than asking the system, and at the mixer's "
+              + "own voice ceiling the drive is over half of what a rich patch costs. The two "
+              + "curves differ by 161 dB at worst, which is below what a sample can carry out of "
+              + "here, so this is a speed setting rather than a sound."
+            : "Every drive is asking the system for its curve, which is what this application has "
+              + "always done and what everything in it has been listened to on. Switch it on if "
+              + "notes break up on a busy song, and listen: nothing else here is on the audio path "
+              + "for every sample of every sounding voice.";
 
     /// <summary>What the switch means, said plainly enough to choose by.</summary>
     public string RealtimeHint =>

@@ -263,10 +263,16 @@ public sealed class Drive : ISoundEffectEngine
     /// <remarks>
     /// Worked out from the curve rather than measured, since what a tanh does to full scale is
     /// known exactly and measuring it would be arithmetic with a delay on it.
+    ///
+    /// Through <see cref="Audio.TangentSwitch"/> like the curve it is correcting, so the two are
+    /// never worked out from different shapes. Read there rather than handed in, since an effect
+    /// engine is made by whichever chain it lands on and has nowhere for a dependency to arrive
+    /// from; what the two curves are and how far apart they sit is
+    /// <see cref="Audio.Interfaces.ITangent"/>, which can be asked without an effect at all.
     /// </remarks>
     /// <param name="amount">How hard it is being pushed.</param>
     public static double Makeup(double amount) =>
-        amount <= LeastAmount ? 1 : 1.0 / Math.Tanh(amount);
+        amount <= LeastAmount ? 1 : 1.0 / Audio.TangentSwitch.Now.Of(amount);
 
     /// <summary>
     /// How much of the driven signal is used, at the bottom of the range.
@@ -334,7 +340,7 @@ public sealed class Drive : ISoundEffectEngine
             ? _low[side] * (1 - tilt * 0.75) + high * (1 + tilt)
             : _low[side] * (1 - tilt) + high * (1 + tilt * 0.75);
 
-        double bitten = Math.Tanh((leaned + bias) * amount);
+        double bitten = Audio.TangentSwitch.Now.Of((leaned + bias) * amount);
 
         double centred = Centre(side, bitten);
 

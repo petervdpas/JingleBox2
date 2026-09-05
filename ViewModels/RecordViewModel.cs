@@ -208,8 +208,14 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     [NotifyPropertyChangedFor(nameof(CanRecord))]
     private bool isRecording;
 
-    /// <summary>How long it has been running, written out for the clock.</summary>
-    [ObservableProperty] private string recordingTime = "00:00:00";
+    /// <summary>How long it has been running, for the clock on the page.</summary>
+    /// <remarks>
+    /// A span rather than a string, since the wording belongs to the control that draws it: two
+    /// pages show one of these and a format written out here would be the second spelling of it.
+    /// Read off the level poll, which already runs while a take is being made, so the clock costs
+    /// no timer of its own.
+    /// </remarks>
+    [ObservableProperty] private TimeSpan recordingTime;
 
     /// <summary>The loudest of the two sides, for a meter with one bar.</summary>
     [ObservableProperty] private float level;
@@ -1654,7 +1660,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
                 LevelRight = stereo.Right;
                 IsClipping = clipping;
 
-                if (recording) RecordingTime = _recordingTimer.Elapsed.ToString(@"hh\:mm\:ss");
+                if (recording) RecordingTime = _recordingTimer.Elapsed;
             });
         };
 
@@ -1762,7 +1768,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             Level = 0;
             LevelLeft = 0;
             LevelRight = 0;
-            RecordingTime = "00:00:00";
+            RecordingTime = TimeSpan.Zero;
             RecordingName = NextRecordingName(savedName);
         }
         catch (Exception ex)

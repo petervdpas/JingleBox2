@@ -837,9 +837,144 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   36%, worst 290% became 193%, and **blocks over budget went from nineteen to thirty two in every
   five seconds down to three to six**. Not nothing left, but the song sits at the engine's own
   voice ceiling in a Debug build on a laptop
-- What is left on that path is a hyperbolic tangent per sample when the drive is up, which cannot
-  go without changing the sound, and an interface call or two per sample, which is the price of
-  every rule on the audio path being something a test can stand in front of. Both are deliberate
+- **The two things left on that path were then chased, and they answered opposite ways.** They had
+  been written down here as deliberate costs, which is a way of saying nobody had measured them.
+  One of them was not a cost at all and the other was more than half the voice
+- **The interface call per sample is an artifact of the optimiser being off, and there is nothing
+  there.** Measured at the ceiling, a bare saw with the filter open and no drive costs 15.1% of
+  each block in Debug and **2.7% with the optimiser on**: five and a half times, which is the whole
+  of what a call that nothing inlines is worth. Typing the four shared statics in `SynthVoice`,
+  `SampleVoice`, `MonoSynthVoice` and the mixer's own curve as their sealed classes rather than as
+  their interfaces is bit for bit the same arithmetic, and it moved the plain patch from 18.3% to
+  18.1% and the rich one not at all. **Written, measured, and taken out again**, which is the
+  second time on this path that a change good enough to argue for was not good enough to keep
+- So the seams cost what this file always said they cost, which is nothing worth counting, and the
+  sentence that said otherwise was reasoning about a Debug build as though the arithmetic in it
+  were the arithmetic that ships. **A call that disappears under an optimiser is not a design
+  cost**, and a design contorted around one is work done for a number that is not there
+- **The hyperbolic tangent is the other half and it is most of a voice.** The same decomposition
+  at forty eight voices, each line the one above it plus one thing:
+
+  | | Debug | optimised |
+  |---|---|---|
+  | saw, filter open, no drive | 15.1% | 2.7% |
+  | with the resonant filter | 16.4% | 2.9% |
+  | with the drive instead | 23.4% | 7.2% |
+  | with both | 24.8% | 7.9% |
+
+- Which says something the Debug column alone hides. **The drive is a third of a rich voice in a
+  Debug build and 57% of one in the build that ships**, and it is twenty times the filter. The
+  reason is in one measurement: `Math.Tanh` costs 11.7 nanoseconds a call in Debug and **11.0 with
+  the optimiser on**, because it is a call into the system's maths library either way. Everything
+  around it got five times cheaper and it did not
+- **`ITangent` is that curve behind a contract, because there are two honest ways to work it out
+  and which one runs is a setting rather than a fact.** `Tangent` is the system's own and is what
+  off means. Everything that bends a signal here goes through it: a machine's drive, Roaster's and
+  Sweeper's, and the makeup each of them corrects with, so a curve and the correction for it can
+  never be worked out from two different shapes. `TableTangent` is the curve drawn once at even spacing and read off, with the two
+  terms of its own Taylor series filling in between the points: the derivative of a hyperbolic
+  tangent is `1 - t*t` and its second derivative is `-2t(1 - t*t)`, both of which are the value
+  already in hand, so a step off a grid point is one reading and three multiplies. Plain
+  interpolation between two entries of the same grid is a hundred times worse and reads twice
+- **Only the positive half is drawn and the sign is put back, which is not merely half the
+  memory.** It is what makes the thing exactly odd. A table running from one end to the other
+  works a point below nought and its mirror above out from different anchors, so the two disagree
+  in the last few digits, and **an odd curve that is not quite odd is a saturation that leans**,
+  which is a direct voltage in the mix that nothing downstream takes out again
+- Four thousand and ninety six points over the first twelve, which is thirty three kilobytes and
+  stays in the cache a mixing pass is already living in. Twelve rather than the drive knob's own
+  ten, since what reaches the curve is the signal times the drive and a resonant filter in front
+  can hand over more than full scale; past it the answer is flat one, which the curve is within
+  eight parts in a hundred thousand million of by then. **Worst difference from the system's own,
+  over the whole range: 161 dB.** A sample leaves here as a 32-bit float, whose own steps at full
+  scale are 144 dB down, so the difference is smaller than the rounding the output does anyway
+- Something that is not a number is answered before anything else, and that guard is the one line
+  in it that is not about accuracy. Every comparison against NaN is false, so a guard written as a
+  range test lets one through, and what it is let through into is an array index, on the audio
+  thread, which is the one place here where a fault is the process gone rather than a message on a
+  status bar
+- **Measured, best of seven, 441 frames into a 10 ms block, at the mixer's own ceiling:**
+
+  | | exact | drawn |
+  |---|---|---|
+  | rich 32 voices, optimised | 5.3% | 3.6% |
+  | rich 48 voices, optimised | **8.0%** | **5.4%** |
+  | rich 48 voices, Debug | 26.2% | 25.0% |
+
+- **A third off the whole voice in the build that ships, and a twentieth off in Debug**, which is
+  the honest shape of it and is said beside the numbers rather than after them, since a Debug
+  build is what `dotnet run` gives and is where this will first be heard. The two disagree because
+  the saving is the tangent and nothing else: optimised it is most of the voice, and in Debug it
+  is a small share of a loop that is five times slower everywhere
+- Folding on the sign is part of why. It is one absolute value, a compare and a negate, free
+  optimised and about a point of Debug, and it buys a curve that is odd exactly rather than
+  nearly. **A point of a build nobody ships is the right price for not putting a direct voltage
+  into somebody's mix**
+- The switch off costs 1.4 points of Debug and nothing at all optimised, which is the indirection
+  that was added to have a switch at all. That is the price of the thing being switchable, it is
+  paid where it does not matter, and it is smaller than what turning the switch on gives back
+- **The switch is a tick in SETTINGS, Engine, and that is a different answer from the last two
+  switches on this path.** `EvenDrive` and `FilterFirst` are parameters on the box because they
+  are facts about the sound: saved with the instrument, carried in the song and in the zip, and
+  worth pointing a knob at. This is a fact about how much time this computer has, which is where
+  the buffer sizes and the real-time switch already live. **A song that sounded different on two
+  machines for a reason nobody chose is exactly what a parameter here would have bought**, and
+  automating an accuracy setting means nothing
+- Off unless somebody says otherwise, like everything else on this path, and off is exactly what
+  happened before rather than nearly: `Tangent` is `Math.Tanh` and nothing else. It is read per
+  sample rather than taken when a voice starts, so throwing the tick lands inside the block being
+  mixed and a song can be sat with and heard both ways without stopping it. `Saturation` asks the
+  switch each time rather than holding an answer, deliberately, because the voices share one of
+  them in a static field built before any settings file has been read
+- **`TangentSwitch.Wants` writes a line, and the line is what makes the comparison possible.**
+  Reading the two curves against each other means running the same music twice and reading the
+  render cost either side, and the switch moves without stopping the transport, so the two halves
+  of that experiment land in one log file with nothing between them. Written in the switch rather
+  than at the tick, so the startup call marks it too and there is one place saying it
+- **And the first time it was written it landed nowhere**, which is worth keeping because nothing
+  about it looks like a fault. It was said at startup two lines *before* `Log.Open`, and a line
+  written into a log that is not open yet is dropped in silence: the experiment it exists for was
+  run, the file had every render cost in it and not one marker, and there was no way from inside
+  the log to tell that the line had ever been attempted. `MainWindow` says it after the log is
+  opened now, and `Tests/TangentTests.cs` reads the file back rather than trusting the call
+- `Tests/TangentTests.cs` pins the bound rather than the speed, since the bound is the whole of why
+  the drawn curve is allowed to exist. Walked at a step far finer than the table's own, so the
+  sweep lands between the grid points rather than on them, where the drawn curve is the system's
+  own answer read back and the test would be measuring nothing. Then the claim where it can be
+  heard: **a whole note at drive 8.1 through a resonant filter, rendered both ways, differs by less
+  than one 32-bit float step at the output**
+- The master's own soft clip is deliberately left alone. It is `MathF.Tanh` on floats and only runs
+  above the knee, so there is little to win, and putting it through a curve that deals in doubles
+  would move its last digit **with the switch off**, which is the one thing an off position may not
+  do
+- **There is one clock and both pages that show a time draw it.** `Views/TimeReadout.cs`, on the
+  tracker's bar after the pattern's help badge and in the middle of RECORD's row of buttons, where
+  the recorder's own clock already was. It is a drawn control rather than a text block bound to a
+  string, and the reason is the rate: **a clock with thousandths on it is a property that changes
+  many times a second**, which is the shape this codebase has already paid for twice, and one
+  piece of lettering in a box of its own is the whole of what should be invalidated when it moves
+- Monospaced, in the pattern's own face, since a proportional font makes the digits shuffle
+  sideways as they count. Measured against the widest reading it can hold rather than against the
+  one it has, which is the rule `NumericInput.Widest` already keeps for the mixer's faders and for
+  the same reason: a box that resized under its own reading would shove the whole bar along twenty
+  times a second. `Time` is in `AffectsRender` and deliberately never in `AffectsMeasure`
+- **Told the time rather than keeping it.** Both pages already run a timer at the rate their meters
+  want, so a clock that ran one of its own would be a third one ticking on a page nobody is
+  looking at. The recorder reads it off the level poll and the tracker off the meter poll, which
+  runs whenever the transport does
+- The recorder's clock was `hh:mm:ss` built as a string in the view model. Both halves of that were
+  wrong in the same way: the wording belonged to whatever draws it, and there was about to be a
+  second page wanting the same words. `RecordingTime` is a `TimeSpan` now and so is
+  `TrackerViewModel.Elapsed`
+- **An hour is sixty minutes rather than a field of its own**, so a long take reads 74:12.480. One
+  fewer thing to read, no hour sitting at nought through every ordinary use, and nothing that
+  appears halfway through a take and moves everything beside it
+- The tracker's is **wall time from the moment play was pressed** and not where the song has got
+  to. The two agree from the top of a song and part company the moment somebody starts halfway
+  down, and this is the one that answers what a clock is usually being asked, which is how long
+  this has been going. Where the music is is already on the screen twice, as the playhead and as
+  the order slot. It holds on a pause and goes to nought on a stop, since a pause is somewhere you
+  come back from and the next play starts from wherever the cursor is
 - **An effect has presets, and the page for them is a form rather than a file.** It said no for a
   while, on the reasoning that a machine's preset is an instrument file and an effect has no
   instrument. That was an argument about how presets happened to be stored here rather than about
@@ -1377,7 +1512,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-1697 of them, in about twenty five seconds, with no window and no hardware. They run in CI on every push
+1707 of them, in about twenty five seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody

@@ -225,6 +225,22 @@ public sealed class AppConfig
     public bool OutputBus { get; set; }
 
     /// <summary>
+    /// Whether the drive's curve is read off a table rather than worked out by the system.
+    /// </summary>
+    /// <remarks>
+    /// Off in a settings file that has never heard of it, which is every file written before it
+    /// existed, so nothing anybody already has starts sounding different for this being added.
+    ///
+    /// A setting rather than something on a machine, and the difference is worth being exact
+    /// about. <c>EvenDrive</c> and <c>FilterFirst</c> are parameters on the box because they are
+    /// facts about the sound, saved with the instrument and carried in the song; this is a fact
+    /// about how much time this computer has, which is where the buffer sizes and the real-time
+    /// switch live. A song that sounded different on two machines for a reason nobody chose is
+    /// exactly what a parameter here would have bought.
+    /// </remarks>
+    public bool FastDriveCurve { get; set; }
+
+    /// <summary>
     /// How much audio the sound card holds ahead of what you hear, in frames.
     /// </summary>
     /// <remarks>

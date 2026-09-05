@@ -35,11 +35,33 @@ Those four take effect at once: the output is closed and opened again as you cha
 them, so the right value can be found by listening rather than by restarting between
 guesses.
 
-Two switches sit under them and neither is about how much audio is held.
+Three switches sit under them and none is about how much audio is held.
 **Real-time audio** asks the machine to let the threads that must not be late take
 their turn ahead of everything else, so a browser laying out a page cannot delay the
 sound. **One output stream** sums the tracker, the pads and a take being auditioned
 into a single stream rather than handing the sound card one each.
+
+**Fast drive curve** is the third, and it is the only setting here that is about
+arithmetic. Every drive in this application, on a machine and inside an effect, bends
+its signal through the same curve, and asking the system for that curve is a call that
+stays a call however fast the rest of the mixing gets. At the mixer's own ceiling of
+forty eight voices it is over half of what a rich patch costs. With this on the curve
+is read off a table drawn once at startup, which is about six times cheaper for every
+sample of every sounding voice.
+
+The two curves are 161 decibels apart at worst, which is below the steps a sample has
+once it is written out, so a driven note rendered either way is the same note at the
+output. It is a speed setting rather than a sound, and it is off unless you turn it on,
+which is the rule everything on the audio path here keeps: what shipped is what you
+have until you have listened to the other thing. Turn it on if notes break up on a busy
+song. It lands inside the block being mixed, so you can sit with a song playing and
+throw it back and forth.
+
+It is here rather than on a machine's own face on purpose. A machine's **Drive keeps**
+and **Order** are facts about the sound, saved with the instrument and carried in the
+song; this is a fact about how much time this computer has, like the buffer sizes above
+it. A song that sounded different on two machines for a reason nobody chose is what a
+knob here would have bought.
 
 ## ASIO
 

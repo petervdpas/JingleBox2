@@ -171,6 +171,9 @@ public partial class MainWindow : Window
         Audio.BusSwitch.Wants(cfg.OutputBus);
 
         Diagnostics.Log.Open(new Files.AppFolder().Path(), cfg.WriteLog, Areas(cfg));
+
+        Audio.TangentSwitch.Wants(cfg.FastDriveCurve);
+
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App, () =>
             "settings read from " + _store.ConfigPath + ", " + cfg.Rows + " by " + cfg.Columns + " pads");
 

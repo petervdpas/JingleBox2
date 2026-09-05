@@ -644,6 +644,51 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     [NotifyPropertyChangedFor(nameof(CanPause))]
     private TrackerTransportState transport = TrackerTransportState.Stopped;
 
+    /// <summary>How long the transport has been running, for the clock on the bar.</summary>
+    /// <remarks>
+    /// A span rather than a string, since the wording belongs to the control that draws it, and
+    /// it is the same control the recorder's clock is.
+    ///
+    /// **Wall time from the moment play was pressed**, not where the song has got to. The two
+    /// agree from the top of a song and part company the moment somebody starts halfway down,
+    /// and this is the one that answers the question a clock is usually being asked: how long has
+    /// this been going. Where the music is is already on the screen twice, as the playhead and as
+    /// the order slot.
+    /// </remarks>
+    [ObservableProperty] private TimeSpan elapsed;
+
+    /// <summary>What the clock is counting, which pauses and resumes rather than restarting.</summary>
+    private readonly System.Diagnostics.Stopwatch _running = new();
+
+    /// <summary>
+    /// Starts, holds or zeroes the clock with the transport.
+    /// </summary>
+    /// <remarks>
+    /// Pause holds the reading rather than throwing it away, since a pause is somewhere you come
+    /// back from, and stop puts it to nought because the next play starts from wherever the
+    /// cursor is. The reading itself is taken on the meter poll rather than here: this is the
+    /// three moments it changes state, and the poll is already running whenever the transport is.
+    /// </remarks>
+    /// <param name="value">The state being moved to.</param>
+    partial void OnTransportChanged(TrackerTransportState value)
+    {
+        switch (value)
+        {
+            case TrackerTransportState.Playing:
+                _running.Start();
+                break;
+
+            case TrackerTransportState.Paused:
+                _running.Stop();
+                break;
+
+            default:
+                _running.Reset();
+                Elapsed = TimeSpan.Zero;
+                break;
+        }
+    }
+
     /// <summary>Typed notes are written into the pattern only while this is on.</summary>
     [ObservableProperty] private bool isRecording;
 
@@ -1624,6 +1669,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     private void ReadMeters()
     {
+        if (_running.IsRunning) Elapsed = _running.Elapsed;
+
         float loudest = 0;
 
         foreach (var strip in Strips)

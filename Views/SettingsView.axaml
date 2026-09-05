@@ -248,6 +248,17 @@
                         ToolTip.Tip="Sums the tracker, the pads and a take being auditioned into one stream. Required for ASIO, where the driver can only be handed one." />
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding OutputBusHint}" />
+
+              <!-- The third of the three that change the shape of the path rather than how much
+                   audio is held in it, and the only one that is about arithmetic: it is a fact
+                   about how much time this machine has, which is why it is here and not a
+                   parameter on a machine's own face. -->
+              <CheckBox Margin="0,6,0,0"
+                        Content="Fast drive curve"
+                        IsChecked="{Binding FastDriveCurve}"
+                        ToolTip.Tip="Reads the drive's curve off a table instead of asking the system for it. About six times cheaper a sample, and 161 dB from what it replaces." />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding FastDriveCurveHint}" />
             </StackPanel>
           </Border>
 

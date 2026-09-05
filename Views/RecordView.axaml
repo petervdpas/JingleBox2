@@ -71,10 +71,12 @@
                     ToolTip.Tip="Bring recordings onto the shelf. Anything that is not already a 16-bit WAV is converted into one on the way in." />
           </StackPanel>
 
-          <TextBlock Text="{Binding RecordingTime}"
-                     FontSize="24"
-                     Foreground="#FF6B7280"
-                     HorizontalAlignment="Center" />
+          <!-- Drawn rather than bound to a string, because a clock with thousandths on it moves
+               twenty times a second and a control that draws one piece of lettering is the whole
+               of what should be invalidated when it does. -->
+          <views:TimeReadout Time="{Binding RecordingTime}"
+                             ReadingSize="24"
+                             HorizontalAlignment="Center" />
 
         </StackPanel>
 

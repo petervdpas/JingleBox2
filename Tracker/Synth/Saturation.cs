@@ -1,11 +1,28 @@
 using System;
+using JingleBox2.Audio;
+using JingleBox2.Audio.Interfaces;
 using JingleBox2.Tracker.Synth.Interfaces;
 
 namespace JingleBox2.Tracker.Synth;
 
 /// <inheritdoc/>
-public sealed class Saturation : ISaturation
+/// <remarks>
+/// Every tangent in here goes through <see cref="ITangent"/> rather than through the system's own
+/// call, so which curve is being used is one decision taken in one place for the whole
+/// application. Handed one, this uses it and nothing else, which is what lets both answers be put
+/// a question to side by side; handed nothing, it asks <see cref="TangentSwitch"/> each time.
+///
+/// **Asked each time rather than taken once**, deliberately, because the voices share one of
+/// these in a static field that is built before a settings file has been read: one taken at
+/// construction would be the curve this application shipped with for the rest of the session,
+/// whatever anybody ticked.
+/// </remarks>
+/// <param name="tangent">The curve to bend with, or nothing to follow the application's switch.</param>
+public sealed class Saturation(ITangent? tangent = null) : ISaturation
 {
+    /// <summary>The curve this one bends with, which is the switch's unless it was handed one.</summary>
+    private ITangent Curve => tangent ?? TangentSwitch.Now;
+
     /// <summary>
     /// Over how much of the knob the curve is faded in, above the drive at which there is none.
     /// </summary>
@@ -21,7 +38,7 @@ public sealed class Saturation : ISaturation
     private const double FadeIn = 1.0;
 
     /// <inheritdoc/>
-    public double Makeup(double drive) => Driven(drive) ? 1.0 / Math.Tanh(drive) : 1.0;
+    public double Makeup(double drive) => Driven(drive) ? 1.0 / Curve.Of(drive) : 1.0;
 
     /// <inheritdoc/>
     /// <remarks>
@@ -46,7 +63,7 @@ public sealed class Saturation : ISaturation
         {
             if (!double.IsFinite(sample)) continue;
 
-            double driven = Math.Tanh(sample * drive);
+            double driven = Curve.Of(sample * drive);
 
             dry += sample * sample;
             wet += driven * driven;
@@ -72,7 +89,7 @@ public sealed class Saturation : ISaturation
     {
         if (sample == 0 || !Driven(drive)) return sample;
 
-        double wet = Math.Tanh(sample * drive) * makeup;
+        double wet = Curve.Of(sample * drive) * makeup;
 
         return sample + (wet - sample) * fade;
     }
