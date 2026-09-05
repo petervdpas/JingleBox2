@@ -237,6 +237,22 @@ internal sealed class PluginProcess : IDisposable
     /// Everything that can go wrong here ends as null: no executable to start, a plugin that
     /// will not load, a child that dies on the way up. None of them is worth a crash in the
     /// caller, and all of them mean the same thing, which is that there is no plugin.
+    ///
+    /// Both accepted sockets are given their own patience, and the control one has to be said
+    /// out loud rather than left alone. The listener is given <see cref="PluginBridge.StartTimeoutMilliseconds"/>
+    /// so a plugin that never connects cannot hold the caller for ever, and on Windows a socket
+    /// handed back by <c>Accept</c> carries a copy of the listening socket's options, timeout
+    /// included; on Linux it does not. Left as it arrives, a number meaning "how long to wait for
+    /// a plugin to turn up" becomes "how long a running plugin may go without speaking", and a
+    /// control socket is quiet by design, since it carries knob moves and window resizes rather
+    /// than audio. So a plugin doing its job perfectly said nothing for thirty seconds, the read
+    /// timed out, and <see cref="Bury"/> read that as the far end having gone: every plugin on
+    /// Windows was declared dead half a minute in, while alive and rendering.
+    ///
+    /// Nought is waiting for ever, which is what the reader thread wants and what Linux was
+    /// already doing. Nothing is lost by it: the reader is the only thing that reads this socket
+    /// and it has nowhere else to be, and a question that goes unanswered is already bounded by
+    /// <see cref="Answer"/>, which waits on the semaphore rather than on the socket.
     /// </remarks>
     /// <param name="plugin">Which plugin, and in which format.</param>
     /// <param name="sampleRate">What the audio is running at on this side.</param>
@@ -285,6 +301,7 @@ internal sealed class PluginProcess : IDisposable
                 return null;
             }
 
+            controlSocket.ReceiveTimeout = PluginBridge.WaitForEver;
             audioSocket.ReceiveTimeout = PluginBridge.FirstBlockTimeoutMilliseconds;
 
             var bridge = new PluginProcess(child, new BridgeLink(controlSocket), new BridgeLink(audioSocket), block, blockPath,

@@ -113,6 +113,19 @@ internal static class PluginBridge
     /// <summary>How long the child is given to start up and say hello.</summary>
     public const int StartTimeoutMilliseconds = 30000;
 
+    /// <summary>
+    /// No patience at all, which is a socket that waits until something arrives.
+    /// </summary>
+    /// <remarks>
+    /// Written down rather than left as a bare nought, because nought reads as no waiting
+    /// whatever and means the opposite. It is what the control socket is set to once it has been
+    /// accepted, and the reason is in <see cref="PluginProcess.Start"/>: on Windows an accepted
+    /// socket inherits the listener's timeout, and a control socket is quiet by design, so an
+    /// inherited patience meant for a plugin that never connects would fire on one that is
+    /// merely working.
+    /// </remarks>
+    public const int WaitForEver = 0;
+
     /// <summary>How big the shared block has to be for this many frames.</summary>
     /// <remarks>
     /// The header and the events, then the audio twice over: the input and the output are two

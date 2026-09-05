@@ -189,4 +189,17 @@
     <Copy SourceFiles="native\win-x64\bassasio.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bassasio.dll')" />
     <Copy SourceFiles="native\win-x64\bassmix.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bassmix.dll')" />
   </Target>
+  <!--
+    The bridge's own types are internal, since nothing outside this assembly loads a plugin, and
+    internal is not untested: the patience on the two sockets a plugin is spoken to over is the
+    one thing that made every plugin on Windows appear to crash after thirty seconds, and a
+    guard no test notices the absence of is a guard that is testing nothing. This line is the
+    whole of what it costs to test it without widening anything.
+  -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>JingleBox2.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>
