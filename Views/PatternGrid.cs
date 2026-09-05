@@ -37,6 +37,25 @@ public sealed class PatternGrid : ThemedControl
     public static readonly StyledProperty<PatternCursor> EditCursorProperty =
         AvaloniaProperty.Register<PatternGrid, PatternCursor>(nameof(EditCursor), PatternCursor.Start);
 
+    /// <summary>
+    /// Where the cursor box belongs, in the grid's own coordinates, for whoever draws it.
+    /// </summary>
+    /// <remarks>
+    /// The box is one rectangle and the grid is a wall of lettering, and while the two were
+    /// painted together every arrow key repainted the wall: sixty cursor moves allocated **25
+    /// megabytes a second** on the drawing thread, put a quarter of a second of stopped threads
+    /// into every five, and took one block of audio 149% past the time it had. That is the
+    /// transport's own fault said again in another key, and it takes the same answer.
+    ///
+    /// Published from here rather than worked out again by whoever draws it, because working out
+    /// where a cell is takes the whole of <see cref="PatternMetrics"/>: the character width the
+    /// font was measured at, the pad above line nought, and how many note columns every track to
+    /// the left of this one is showing. Two spellings of that would eventually disagree, and the
+    /// way that fails is a cursor box beside the cell it is about.
+    /// </remarks>
+    public static readonly StyledProperty<Rect> CursorBoxProperty =
+        AvaloniaProperty.Register<PatternGrid, Rect>(nameof(CursorBox));
+
     /// <summary>Which rows are shaded: every beat, and more strongly every fourth of them.</summary>
     public static readonly StyledProperty<int> LinesPerBeatProperty =
         AvaloniaProperty.Register<PatternGrid, int>(nameof(LinesPerBeat), TrackerTiming.DefaultLinesPerBeat);
@@ -80,7 +99,7 @@ public sealed class PatternGrid : ThemedControl
     /// </summary>
     static PatternGrid()
     {
-        AffectsRender<PatternGrid>(PatternProperty, EditCursorProperty,
+        AffectsRender<PatternGrid>(PatternProperty,
             LinesPerBeatProperty, RowHeightProperty, DropTargetTrackProperty,
             BeforeProperty, AfterProperty, HalfViewProperty);
         AffectsMeasure<PatternGrid>(PatternProperty, RowHeightProperty,
@@ -100,6 +119,13 @@ public sealed class PatternGrid : ThemedControl
     {
         get => GetValue(AfterProperty);
         set => SetValue(AfterProperty, value);
+    }
+
+    /// <inheritdoc cref="CursorBoxProperty"/>
+    public Rect CursorBox
+    {
+        get => GetValue(CursorBoxProperty);
+        private set => SetValue(CursorBoxProperty, value);
     }
 
     /// <inheritdoc cref="HalfViewProperty"/>
@@ -253,15 +279,40 @@ public sealed class PatternGrid : ThemedControl
     /// Patterns are edited in place, so watching the property alone is not enough: the same
     /// object grows tracks and gains notes without the reference ever changing.
     /// </remarks>
+    /// <remarks>
+    /// The cursor is the one property here that is answered rather than simply repainted for, and
+    /// why is in <see cref="CursorBoxProperty"/>. The track tint behind the pattern is all that is
+    /// left in the picture that follows the cursor, and it moves when the track does and at no
+    /// other time, so stepping down a column repaints one rectangle and stepping across the page
+    /// repaints the page. That is what the two gestures are actually worth.
+    /// </remarks>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
+
+        if (change.Property == EditCursorProperty)
+        {
+            PlaceCursor();
+
+            if (change.GetOldValue<PatternCursor>().Track != change.GetNewValue<PatternCursor>().Track)
+                InvalidateVisual();
+
+            return;
+        }
+
+        if (change.Property == RowHeightProperty || change.Property == HalfViewProperty)
+        {
+            PlaceCursor();
+
+            return;
+        }
 
         if (change.Property != PatternProperty) return;
 
         if (change.OldValue is Pattern previous) previous.Changed -= OnPatternChanged;
         if (change.NewValue is Pattern current) current.Changed += OnPatternChanged;
 
+        PlaceCursor();
         InvalidateMeasure();
         InvalidateVisual();
     }
@@ -269,6 +320,7 @@ public sealed class PatternGrid : ThemedControl
     /// <summary>The pattern said something: it may have grown, so the room is asked for again.</summary>
     private void OnPatternChanged(object? sender, EventArgs e)
     {
+        PlaceCursor();
         InvalidateMeasure();
         InvalidateVisual();
     }
@@ -347,7 +399,6 @@ public sealed class PatternGrid : ThemedControl
 
         DrawTrackSeparators(context, metrics, palette, pattern.TrackCount, contentHeight);
         DrawDropTarget(context, metrics, palette, contentHeight);
-        DrawCursor(context, metrics, palette, cursor);
     }
 
     /// <summary>One line: its number in the gutter, then every note column of every track.</summary>
@@ -512,16 +563,33 @@ public sealed class PatternGrid : ThemedControl
     /// The box round the one column typing goes into, a pixel wider each side than the column so
     /// the lettering inside it is not touched by its own outline.
     /// </summary>
-    private void DrawCursor(DrawingContext context, PatternMetrics metrics,
-        ThemePalette palette, PatternCursor cursor)
+    /// <summary>
+    /// Works out where the cursor box belongs and publishes it.
+    /// </summary>
+    /// <remarks>
+    /// Called for everything the answer depends on and not only for the cursor: the row height
+    /// and the pad move it down the page, and the pattern moves it across, since a track added to
+    /// the left of this one shifts every column after it.
+    /// </remarks>
+    private void PlaceCursor()
     {
-        double x = metrics.ColumnX(cursor.Track, cursor.Column, cursor.NoteColumn);
-        double width = metrics.ColumnWidth(cursor.Column);
-        double y = metrics.RowY(cursor.Line);
-        var area = new Rect(x - 1, y, width + 2, RowHeight);
+        if (Pattern is not { } pattern)
+        {
+            CursorBox = default;
 
-        context.FillRectangle(palette.AccentTint(48), area);
-        context.DrawRectangle(new Pen(palette.AccentBrush, 1), area);
+            return;
+        }
+
+        EnsureMetrics();
+
+        var metrics = Metrics;
+        var cursor = EditCursor.Clamp(pattern.Lines, pattern.TrackCount, metrics.Columns);
+
+        CursorBox = new Rect(
+            metrics.ColumnX(cursor.Track, cursor.Column, cursor.NoteColumn) - 1,
+            metrics.RowY(cursor.Line),
+            metrics.ColumnWidth(cursor.Column) + 2,
+            RowHeight);
     }
 
     /// <summary>

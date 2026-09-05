@@ -148,15 +148,27 @@
 
           <!-- The lane itself. Nothing to draw until there is a lane, and the room is left
                empty rather than filled with a picture of nothing. -->
-          <views:AutomationCurve Grid.Column="1" x:Name="Curve"
-                                 MinHeight="58"
-                                 IsVisible="{Binding Chosen.HasLane}"
-                                 Lane="{Binding Chosen.Lane}"
-                                 Zero="{Binding Chosen.Zero}"
-                                 Lines="{Binding Lines}"
-                                 LinesPerBeat="{Binding LinesPerBeat}"
-                                 PlayingLine="{Binding PlayingLine}"
-                                 ToolTip.Tip="Click to add a point or take hold of one, drag to move it, right click to take one away." />
+          <!-- The lane, and the transport's line laid over it rather than drawn into it. Two
+               controls because they change at completely different rates: the shape changes when
+               somebody edits it, the line moves several times a second, and while it was a
+               property on the curve that meant redrawing the ground, a grid line for every line
+               of the pattern and the whole shape to move one hair-wide rule. It takes no clicks,
+               so the lane under it still answers the mouse, which it has to: a point is added and
+               dragged by clicking on it. -->
+          <Panel Grid.Column="1">
+            <views:AutomationCurve x:Name="Curve"
+                                   MinHeight="58"
+                                   IsVisible="{Binding Chosen.HasLane}"
+                                   Lane="{Binding Chosen.Lane}"
+                                   Zero="{Binding Chosen.Zero}"
+                                   Lines="{Binding Lines}"
+                                   LinesPerBeat="{Binding LinesPerBeat}"
+                                   ToolTip.Tip="Click to add a point or take hold of one, drag to move it, right click to take one away." />
+
+            <views:AutomationPlayhead IsVisible="{Binding Chosen.HasLane}"
+                                      PlayingLine="{Binding PlayingLine}"
+                                      Lines="{Binding Lines}" />
+          </Panel>
 
           <!-- A gutter down the right, drawn the way the chain's blocks draw theirs: the way
                out as a red cross at the top, the setting under it. Words for both would be two

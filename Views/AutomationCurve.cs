@@ -49,10 +49,6 @@ public sealed class AutomationCurve : ThemedControl
         AvaloniaProperty.Register<AutomationCurve, int>(
             nameof(LinesPerBeat), TrackerTiming.DefaultLinesPerBeat);
 
-    /// <summary>Where the song has got to, or -1 when it is stopped.</summary>
-    public static readonly StyledProperty<int> PlayingLineProperty =
-        AvaloniaProperty.Register<AutomationCurve, int>(nameof(PlayingLine), -1);
-
     /// <summary>
     /// Where the parameter's own nought is, nought to one, which is what the shape rests on.
     /// </summary>
@@ -69,7 +65,7 @@ public sealed class AutomationCurve : ThemedControl
     static AutomationCurve()
     {
         AffectsRender<AutomationCurve>(
-            LaneProperty, LinesProperty, LinesPerBeatProperty, PlayingLineProperty, ZeroProperty);
+            LaneProperty, LinesProperty, LinesPerBeatProperty, ZeroProperty);
     }
 
     /// <inheritdoc cref="LaneProperty"/>
@@ -91,13 +87,6 @@ public sealed class AutomationCurve : ThemedControl
     {
         get => GetValue(LinesPerBeatProperty);
         set => SetValue(LinesPerBeatProperty, value);
-    }
-
-    /// <inheritdoc cref="PlayingLineProperty"/>
-    public int PlayingLine
-    {
-        get => GetValue(PlayingLineProperty);
-        set => SetValue(PlayingLineProperty, value);
     }
 
     /// <inheritdoc cref="ZeroProperty"/>
@@ -300,7 +289,6 @@ public sealed class AutomationCurve : ThemedControl
 
         if (Lane is not { } lane) return;
 
-        DrawPlaying(context, palette, size);
         DrawLane(context, palette, lane, size);
     }
 
@@ -338,17 +326,6 @@ public sealed class AutomationCurve : ThemedControl
             context.DrawLine(beat,
                 new Point(0, Math.Round(Y(Zero)) + 0.5),
                 new Point(size.Width, Math.Round(Y(Zero)) + 0.5));
-    }
-
-    /// <summary>Where the song has got to, so a curve can be watched as it plays.</summary>
-    private void DrawPlaying(DrawingContext context, ThemePalette palette, Size size)
-    {
-        if (PlayingLine < 0 || PlayingLine >= Math.Max(1, Lines)) return;
-
-        var pen = new Pen(new SolidColorBrush(ThemePalette.Alpha(palette.Text, 0x70)), 1);
-        double x = Math.Round(X(PlayingLine)) + 0.5;
-
-        context.DrawLine(pen, new Point(x, 0), new Point(x, size.Height));
     }
 
     /// <summary>The shape itself: what is under it, the line, and the points on it.</summary>

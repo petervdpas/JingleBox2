@@ -475,6 +475,8 @@
               <views:PlayingLineMark x:Name="Playhead" PlayingLine="{Binding PlayingLine}"
                                      RowHeight="{Binding #Grid.RowHeight}"
                                      TopPad="{Binding #Grid.HalfView}" />
+
+              <views:PatternCursorMark Box="{Binding #Grid.CursorBox}" />
               </Panel>
             </ScrollViewer>
 

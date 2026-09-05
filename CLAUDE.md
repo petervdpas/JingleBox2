@@ -692,9 +692,44 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - The shape is worth keeping because it is not about tracker grids. **A property that changes
   many times a second must not be on a control that is expensive to draw.** `AffectsRender` says
   nothing about how much work a repaint is, so the cheapest possible thing to say and the dearest
-  possible thing to draw end up on the same invalidation. `Views/AutomationCurve.cs` has
-  `PlayingLine` in its own `AffectsRender` and is the same shape waiting to happen; it is folded
-  away by default and draws a handful of points, so it is left alone knowingly rather than missed
+  possible thing to draw end up on the same invalidation
+- **The automation lane had the identical fault and got the identical answer.**
+  `Views/AutomationPlayhead.cs` is the line where the song has got to, over the curve rather than
+  in it, and `AutomationCurve` no longer knows what line is playing. Its bill was smaller, since a
+  line is cheaper than a piece of lettering, but it is the same arithmetic: the ground, a grid line
+  for every line of the pattern and the whole shape, redrawn several times a second to move one
+  hair-wide rule, and the longest pattern this application allows is 256 lines. Measured with a
+  lane open and the transport running: 0.7 MB/s, the same as with the strip folded away, and no
+  block over its budget
+- Both layers take no clicks, which is what lets them sit on top at all: the pattern is clicked to
+  put the cursor down and the lane is clicked to add and drag a point, and both still are. Checked
+  by clicking rather than by reading, since `IsHitTestVisible` on the wrong control is exactly the
+  kind of fault that looks fine in a screenshot
+- **And then the same question was put to the other half of it: typing.** With the transport no
+  longer repainting the page, what was left was the hand. The cursor was in `AffectsRender`, so
+  every arrow key repainted the wall: sixty cursor moves allocated **25 MB/s** on the drawing
+  thread, put 259 ms of stopped threads into every five seconds, and took one block of audio to
+  149% of the time it had. Somebody typing a part into a looping song was doing that to their own
+  playback, which is exactly when a tracker is used
+- `Views/PatternCursorMark.cs` is the third layer and the last of them. The grid works out where
+  the box goes and publishes it as `CursorBoxProperty`, because the geometry is the grid's:
+  finding a cell takes the character width the font was measured at, the pad above line nought,
+  and how many note columns every track to the left is showing. Two spellings of that would
+  disagree eventually, and the way that fails is a cursor box beside the cell it is about
+- **The track tint is the one thing left in the picture that follows the cursor**, and it moves
+  when the track does and at no other time, so the cursor is answered in `OnPropertyChanged`
+  rather than repainted for: stepping down a column repaints one rectangle, stepping across the
+  page repaints the page. Sixty vertical moves went from 25 MB/s to **0.8**, and sixty sideways
+  ones, which really do cross tracks, to 1.9. Nothing goes over budget in either
+- **A viewport cull was written, measured and taken out again, and that is worth keeping.** The
+  culling in `Render` never fires: it compares each row against the control's own height, which
+  inside a scroll viewer is the whole content, so every line of the pattern is drawn however few
+  are on screen. Fixing it needs the scroll offset, and an offset in `AffectsRender` means the
+  grid repaints on every scroll where before the scroll viewer simply moved an already-drawn
+  child. The transport scrolls the view to follow the playhead, so it took playback from 0.7 MB/s
+  back up to **9.6** to save half of an editing cost that the cursor layer then removed entirely.
+  **A cull is only a saving where the thing being culled is not redrawn more often because of
+  it**, and on a 64 line pattern the whole picture is barely two screens anyway
 - **An effect has presets, and the page for them is a form rather than a file.** It said no for a
   while, on the reasoning that a machine's preset is an instrument file and an effect has no
   instrument. That was an argument about how presets happened to be stored here rather than about
