@@ -1284,6 +1284,33 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public IRelayCommand RefreshSongsCommand => new RelayCommand(RefreshSavedSongs);
 
     /// <summary>
+    /// Brings a song file from anywhere on the machine into the songs folder and picks it.
+    /// </summary>
+    /// <remarks>
+    /// The other half of Pack, which wrote a song out to somewhere of your choosing and left no
+    /// way of reading one back: a song could leave an installation and could not arrive at one,
+    /// so a packed song carried to another machine was a file nothing would open.
+    ///
+    /// It is picked rather than opened, so the dialog it stands in behaves as it always did and
+    /// the arriving song is where the eye already is. Opening it is then the same press it is for
+    /// every other row, which is also what unpacks whatever it carried.
+    /// </remarks>
+    /// <param name="path">The file to bring in.</param>
+    /// <returns>Whether it was read as a song and copied.</returns>
+    public bool ImportSong(string path)
+    {
+        string? landed = _store.Import(path);
+
+        if (landed == null) return false;
+
+        RefreshSavedSongs();
+
+        SelectedSongFile = SavedSongs.FirstOrDefault(f => _paths.Same(f.Path, landed));
+
+        return true;
+    }
+
+    /// <summary>
     /// The songs on disc, for anything that has to ask them a question.
     /// </summary>
     /// <remarks>

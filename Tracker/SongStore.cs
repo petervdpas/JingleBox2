@@ -523,6 +523,58 @@ public sealed class SongStore : ISongStore
 
     /// <inheritdoc/>
     /// <remarks>
+    /// The reading is a real one through <see cref="Load(string)"/> rather than a look at the
+    /// name, since a file called <c>.jibx</c> is not a song and the list is not the place to find
+    /// that out. It costs opening the archive twice, once here and once when it is really opened,
+    /// which happens once per import and never on a path anybody is waiting on.
+    ///
+    /// The recordings it carries are deliberately not unpacked here. Copying the file is the
+    /// whole of the import; what it holds arrives when it is opened, which is the one path that
+    /// already does it and is the same path a song already in the folder takes.
+    /// </remarks>
+    public string? Import(string filePath)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return null;
+
+            if (Load(filePath) == null) return null;
+
+            string wanted = Free(Path.GetFileNameWithoutExtension(filePath));
+
+            File.Copy(filePath, wanted);
+
+            return wanted;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// A path in the songs folder under that name, or under the first number that is not taken.
+    /// </summary>
+    /// <remarks>
+    /// Stops at a hundred rather than counting for ever, since a folder holding a hundred songs
+    /// of one name is somebody's fault rather than something to work around, and a loop with no
+    /// end on it is worse than a refusal.
+    /// </remarks>
+    /// <param name="name">What the file arriving is called.</param>
+    /// <returns>Where it may be written.</returns>
+    private string Free(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) name = "song";
+
+        string path = PathFor(name);
+
+        for (int at = 2; File.Exists(path) && at < 100; at++) path = PathFor(name + " (" + at + ")");
+
+        return path;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
     /// Null for anything that will not read, whatever the reason: a missing file, something that
     /// is not a zip, a zip with no document in it, or a document that will not parse. There is
     /// nothing useful to tell the caller apart here, since none of them is a song.

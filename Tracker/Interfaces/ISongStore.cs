@@ -87,4 +87,30 @@ public interface ISongStore : ISampleUsage
     /// song twice adds nothing the second time.
     /// </remarks>
     Song? Load(string filePath, out IReadOnlyList<string> arrived);
+
+    /// <summary>
+    /// Takes a song file from anywhere on the machine and makes it one of yours.
+    /// </summary>
+    /// <remarks>
+    /// **Pack writes a song somewhere you choose and nothing could read one back**, which is half
+    /// a feature: a song could leave this installation and could not arrive at one. That is what
+    /// this is, and it is the same gesture the recordings and the rack already have, which is why
+    /// it is called Import in all three places.
+    ///
+    /// Copied into the songs folder rather than opened where it lies, because that folder is what
+    /// the list shows and what saving writes to: a song opened off somebody's desktop and then
+    /// saved would land somewhere else than it came from, with nothing saying so.
+    ///
+    /// **Nothing already there is overwritten.** A name that is taken gets a number after it, the
+    /// way a fresh recording does, since a song arriving from another machine under a name you
+    /// already use is the ordinary case rather than the strange one and losing the one you had to
+    /// it would be unforgivable.
+    ///
+    /// Read before it is copied, so a file that is not a song is refused rather than landing in
+    /// the folder and appearing in the list as a row that cannot be opened. What it carries is
+    /// unpacked on the way in like any other open, which is why there is no unpack of its own.
+    /// </remarks>
+    /// <param name="filePath">The file to bring in, from anywhere.</param>
+    /// <returns>Where it landed, or nothing when it could not be read as a song.</returns>
+    string? Import(string filePath);
 }

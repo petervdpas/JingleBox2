@@ -1862,6 +1862,32 @@ whole exercise and is worth writing down rather than summarising:
   rule, and the same reason for it. Opening a packed song puts what it carried on the shelf
   through `RecordingImport` and repoints the instruments, skipping anything already there byte
   for byte, so opening one twice adds nothing
+- **A song could be packed and could not be brought back, which is half a feature.** Pack writes a
+  `.jibx` with the recordings inside it to wherever you choose, and the Open song dialog is a list
+  of the songs folder rather than a file picker, so a packed song carried to another machine was a
+  file nothing in this application would open. Found by trying to move a song to another computer,
+  which is the one thing packing exists for
+- **Import... on that dialog is the other half**, and it is the same word the recordings and the
+  rack already use for the same act. `ISongStore.Import` copies the file into the songs folder,
+  because that folder is what the list shows and what saving writes to: a song opened off somebody's
+  desktop and then saved would land somewhere other than it came from with nothing saying so
+- Read before it is copied, through the ordinary `Load`, so a file that is not a song is refused at
+  the moment of asking rather than landing in the folder as a row that will not open and has to be
+  deleted. **Nothing already there is overwritten**: a name that is taken gets a number after it,
+  since a song arriving from another machine under a name you already use is the ordinary case and
+  losing the one you had to it would be unforgivable
+- **There is deliberately no unpack.** What a packed song carries is put on the shelf by
+  `SongStore.Load` on every open, which is the one path that already does it and is the same path a
+  song that never left takes. So the import is a copy and nothing else, and the button beside it
+  is the Open it always was
+- It sits on the left of that dialog rather than beside Cancel and Open, since it is not one of the
+  two answers the dialog is asking for: it brings a row into the list rather than closing on one.
+  The arriving song is picked, so Open is the next press
+- What a pack does not carry is somebody else's plugin, and the help says so now: a VST3 or a CLAP
+  has to be installed on the machine the song is going to. What the song does hold is the plugin's
+  own patch and its knob positions, and `PluginSlotConfig` is looked up **by id before path**, so
+  a bundle living somewhere else on the other machine is still found. That was already true and
+  nothing anywhere said it
 - RECORD asks the songs as well as the rack before deleting a take (`SampleUsers` over
   `SoundMachineRack` and `SongStore`). A song owns its instruments, so a recording nothing on the
   rack plays can still be the sound of three songs, and deleting it used to empty them with

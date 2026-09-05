@@ -1,5 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using JingleBox2.ViewModels;
+using Avalonia.Platform.Storage;
 using System.Threading.Tasks;
 using JingleBox2.Views.Interfaces;
 
@@ -94,6 +96,47 @@ public partial class SongDialog : Window
 
         Close(true);
     }
+
+    /// <summary>
+    /// Brings a song file in from anywhere and picks it, leaving the dialog open.
+    /// </summary>
+    /// <remarks>
+    /// It does not close on a successful import, deliberately. This dialog asks one question,
+    /// which song, and importing answers a different one: the arriving song is picked so that
+    /// Open is the next press, which is the same press every other row takes and is what unpacks
+    /// whatever the file carried.
+    ///
+    /// A file that will not read as a song is said out loud rather than passed over, since from
+    /// a chair a picker that closes and does nothing is a picker that failed silently.
+    /// </remarks>
+    private async void Import_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not TrackerViewModel tracker) return;
+
+        var storage = StorageProvider;
+
+        var picked = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import song",
+            AllowMultiple = false,
+            FileTypeFilter = new[] { PackedSong }
+        });
+
+        string? path = picked.Count > 0 ? picked[0].TryGetLocalPath() : null;
+
+        if (path == null) return;
+
+        if (!tracker.ImportSong(path))
+            await ConfirmDialog.ErrorAsync("Import song", "That file is not a song",
+                "It could not be read. A song is a .jibx written by this application, either saved " +
+                "or packed; a file that has been renamed to .jibx is not one.");
+    }
+
+    /// <summary>What a song looks like on disc once it has left here.</summary>
+    private static readonly FilePickerFileType PackedSong = new("Song")
+    {
+        Patterns = new[] { "*.jibx" }
+    };
 
     /// <summary>Closes with a no, leaving the song that is open open.</summary>
     private void Cancel_Click(object? sender, RoutedEventArgs e) => Close(false);

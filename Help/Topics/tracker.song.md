@@ -35,6 +35,19 @@ and are named rather than carried, and your own takes are carried. Opening a pac
 song puts what it carried on the shelf and repoints the instruments, skipping
 anything already there byte for byte, so opening one twice adds nothing.
 
+**Import...**, on the Open song dialog, is how one arrives. It takes a `.jibx` from
+anywhere on the machine and copies it into your songs, under a free name if that one
+is taken, so nothing you already have is overwritten. There is no unpack of its own:
+whatever the file carries arrives when you open it, which is the same press every
+other song in the list takes.
+
+**What a pack does not carry is somebody else's plugin.** A VST3 or a CLAP is another
+program and has to be installed on the machine you are carrying the song to. What the
+song does hold is that plugin's own patch and where its knobs stood, and a plugin is
+looked for by its own identity before its path, so a bundle living somewhere else on
+the other machine is still found. A plugin that is not installed there is named rather
+than passed over, and the rest of the song still plays.
+
 ## Machines a song needs
 
 A song carries its instruments but not the machines they are on. One that is not

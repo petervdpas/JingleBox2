@@ -77,10 +77,15 @@
       </ListBox.ItemTemplate>
     </ListBox>
 
-    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-      <Button Grid.Column="1" Name="CancelButton" Content="Cancel" Click="Cancel_Click"
+    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+      <!-- The other half of Pack, and on the left because it is not one of the two answers this
+           dialog is asking for: it brings a row into the list rather than closing on one. -->
+      <Button Grid.Column="0" Name="ImportButton" Content="Import..." Click="Import_Click"
+              MinWidth="88"
+              ToolTip.Tip="Bring a packed song in from anywhere. It is copied into your songs, under a free name if that one is taken, and whatever it carries arrives when you open it." />
+      <Button Grid.Column="2" Name="CancelButton" Content="Cancel" Click="Cancel_Click"
               MinWidth="88" IsCancel="True" />
-      <Button Grid.Column="2" Name="OpenButton" Content="Open" Click="Open_Click"
+      <Button Grid.Column="3" Name="OpenButton" Content="Open" Click="Open_Click"
               MinWidth="88" IsDefault="True"
               IsEnabled="{Binding SelectedSongFile, Converter={x:Static ObjectConverters.IsNotNull}}" />
     </Grid>
