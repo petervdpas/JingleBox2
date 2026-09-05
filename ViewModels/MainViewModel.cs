@@ -205,6 +205,17 @@ public sealed partial class MainViewModel : ObservableObject, IShortcutContext
     /// <summary>TRACKER: the song, its patterns, its mixer and the rack beside it.</summary>
     public TrackerViewModel Tracker { get; }
 
+    /// <summary>
+    /// Says the application is closing because somebody closed it.
+    /// </summary>
+    /// <remarks>
+    /// The one thing that has to hear it is the tracker, which keeps a copy of unsaved work for
+    /// a crash and has no other way of telling a crash from a Friday afternoon. Said through
+    /// here rather than reached for from the window, since the pages are this one's to know
+    /// about and there will be others one day.
+    /// </remarks>
+    public void Finished() => Tracker.Finished();
+
     /// <summary>The machines you have, as a list to pick from and to open one of.</summary>
     public RackViewModel Machines { get; }
 

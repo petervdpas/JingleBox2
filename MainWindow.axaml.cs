@@ -248,6 +248,8 @@ public partial class MainWindow : Window
 
         Closed += (_, __) =>
         {
+            vm.Finished();
+
             vm.MatrixSizeChanged -= OnMatrixSizeChanged;
             _midi.Dispose();
             _audio.Dispose();

@@ -2429,6 +2429,27 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>
+    /// Throws away the copy being kept for a crash, because this is not one.
+    /// </summary>
+    /// <remarks>
+    /// The keeping exists for the twenty minutes between two saves that a plugin taking the
+    /// application down would cost. Closing the window costs nothing of the sort: what was
+    /// unsaved then was left unsaved on purpose, and a rescue file sitting in the songs list the
+    /// next morning saying the last session never saved reads as a fault rather than as a
+    /// rescue. Closing the window on unsaved work is Cancel changes said another way, and this
+    /// is the half of Cancel changes that reaches the copy kept for a crash.
+    ///
+    /// The timer is stopped first, or a tick arriving while the window is going would write the
+    /// file back after it had been thrown away.
+    /// </remarks>
+    public void Finished()
+    {
+        _keeping.Stop();
+
+        Drop();
+    }
+
+    /// <summary>
     /// Throws away what was being kept, for work that is now saved or deliberately abandoned.
     /// </summary>
     private void Drop()
