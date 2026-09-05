@@ -62,8 +62,28 @@
         <TextBlock x:Name="VersionText" Text="" FontSize="15"
                    Foreground="#EBD7FF" Opacity="0.85" Margin="0,10,0,0" />
 
-        <TextBlock x:Name="DoingText" Text="Starting" FontSize="13"
+        <!-- The one line that changes, and it carries the names of the boxes on the rack as
+             well as the steps: what is being read is more worth saying than that something is
+             being read.
+
+             A width of its own rather than one the words decide. The window sizes itself to
+             what is in it, so a long name arriving would move the whole thing sideways while
+             somebody is reading it; at a fixed width the layout is settled by the first frame
+             and only the words inside it change. -->
+        <TextBlock x:Name="DoingText" Text="Starting" FontSize="13" Width="300"
+                   TextWrapping="Wrap"
                    Foreground="#EBD7FF" Opacity="0.65" Margin="0,2,0,0" />
+
+        <!-- And the one thing under it: the device being read, or the setting being applied.
+             Two lines because they answer two questions, what is going on and which one of them
+             this is, and a line doing both would be a sentence rebuilt for every name.
+
+             Always there, empty or not, so the block is the same height throughout and the
+             window does not grow the first time something is said under a heading. -->
+        <TextBlock x:Name="UnderText" Text="" FontSize="13" Width="288"
+                   TextWrapping="Wrap"
+                   Foreground="#EBD7FF" Opacity="0.9" Margin="12,1,0,0" />
+
       </StackPanel>
     </Grid>
   </Border>

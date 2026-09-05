@@ -12,6 +12,8 @@ using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.SoundDevices.SoundMachines;
 using JingleBox2.SoundDevices.Interfaces;
+using JingleBox2.UI.Interfaces;
+using System.Linq;
 
 namespace JingleBox2;
 
@@ -115,6 +117,16 @@ public partial class MainWindow : Window
     private static readonly TimeSpan WindowSaveDelay = TimeSpan.FromMilliseconds(500);
 
     /// <summary>
+    /// Builds the window with nobody watching it be built.
+    /// </summary>
+    /// <remarks>
+    /// What the XAML loader looks for, and not otherwise called: the application hands the
+    /// splash in, since a window built with nothing standing in for it has nowhere to say what
+    /// it is doing.
+    /// </remarks>
+    public MainWindow() : this(null) { }
+
+    /// <summary>
     /// Reads the settings, builds every service the application has, and puts the window on
     /// screen at the size it was last left at.
     /// </summary>
@@ -141,7 +153,11 @@ public partial class MainWindow : Window
     /// from a working tree names itself "1.0.12+abc123def" and a commit hash in a title bar is
     /// nothing anybody reading it can use.
     /// </remarks>
-    public MainWindow()
+    /// <param name="saying">
+    /// Where the window says what it is doing while it does it, which is the splash standing in
+    /// for it. Nothing where nobody is watching, and every line is then skipped.
+    /// </param>
+    public MainWindow(IStartupLines? saying)
     {
         InitializeComponent();
 
@@ -161,11 +177,15 @@ public partial class MainWindow : Window
         Diagnostics.CrashReport.Watch(new Files.AppFolder().Path());
         Diagnostics.CrashReport.Note("started, " + cfg.Rows + " by " + cfg.Columns + " pads");
 
+        saying?.Doing("Reading your devices");
+
         var machines = Registry.Load();
 
         var projects = new SoundDevices.SoundMachines.SoundMachineProjects();
 
         projects.Keep(machines);
+
+        saying?.Devices(machines.Select(machine => machine.Name));
 
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App,
             () => machines.Count + " machine" + (machines.Count == 1 ? "" : "s") + " read from disc");
@@ -176,15 +196,29 @@ public partial class MainWindow : Window
 
         made.Keep(effects);
 
+        saying?.Devices(effects.Select(effect => effect.Name));
+
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App,
             () => effects.Count + " effect" + (effects.Count == 1 ? "" : "s") + " read from disc");
+
+        saying?.Doing("Reading your settings");
+
+        SayEngine(saying, cfg);
+
+        saying?.Doing("Opening the audio output");
 
         _audio = new BassAudioEngine(
             padCount: cfg.Rows * cfg.Columns,
             deviceRate: cfg.EngineSampleRate);
 
+        saying?.Doing("Building the pages");
+
         var vm = new MainViewModel(_audio, _store, cfg, _midi, _recording, _waveform, _routing, projects, made);
         DataContext = vm;
+
+        saying?.Doing(vm.SelectedOutputDevice is { } output
+            ? "Playing through " + output.Name
+            : "No output to play through");
 
         var version = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
@@ -218,6 +252,51 @@ public partial class MainWindow : Window
             _midi.Dispose();
             _audio.Dispose();
         };
+    }
+
+    /// <summary>
+    /// Says what the audio engine is being opened on, one setting at a time under the step.
+    /// </summary>
+    /// <remarks>
+    /// The engine card in SETTINGS, read out while it is being applied. These are the settings
+    /// that decide whether the sound stutters on a given machine, and they are the ones somebody
+    /// changed six months ago and has since forgotten changing: a line apiece on the way up is
+    /// the cheapest answer there is to what it is actually running on.
+    ///
+    /// Read off the settings rather than out of the engine, because the engine is not open yet
+    /// and what these say is what it is about to be asked for. What it came up on is a separate
+    /// question and is said once there is something to ask.
+    ///
+    /// Nought means this machine's own answer everywhere it appears, and it is said in those
+    /// words rather than as a nought, which reads as nothing at all rather than as a default.
+    /// </remarks>
+    /// <param name="saying">Where the lines go, or nothing when nobody is watching.</param>
+    /// <param name="cfg">The settings the engine is about to be opened on.</param>
+    private static void SayEngine(IStartupLines? saying, AppConfig cfg)
+    {
+        if (saying == null) return;
+
+        const string Preferred = "as this machine prefers";
+
+        saying.Under("Sample rate " +
+            (cfg.EngineSampleRate > 0 ? cfg.EngineSampleRate + " Hz" : "as the output runs"));
+
+        saying.Under("Buffer " +
+            (cfg.OutputBufferSize > 0 ? cfg.OutputBufferSize + " frames" : Preferred));
+
+        saying.Under("Topped up " +
+            (cfg.OutputUpdatePeriodMs > 0 ? "every " + cfg.OutputUpdatePeriodMs + " ms" : Preferred));
+
+        saying.Under("Filled by " + (cfg.OutputUpdateThreads > 0
+            ? cfg.OutputUpdateThreads + (cfg.OutputUpdateThreads == 1 ? " thread" : " threads")
+            : "threads " + Preferred));
+
+        saying.Under("Rendering ahead " +
+            (cfg.RenderAheadMs > 0 ? cfg.RenderAheadMs + " ms" : "not at all"));
+
+        saying.Under("Realtime audio thread " + (cfg.RealtimeAudio ? "on" : "off"));
+
+        saying.Under("Output bus " + (cfg.OutputBus ? "on" : "off"));
     }
 
     /// <summary>

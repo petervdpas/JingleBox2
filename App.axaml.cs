@@ -92,9 +92,7 @@ public partial class App : Application
 
         try
         {
-            splash.Doing("Reading your settings and machines");
-
-            main = new MainWindow
+            main = new MainWindow(splash)
             {
                 Icon = new WindowIcon(AssetLoader.Open(new Uri("avares://JingleBox2/Assets/icon.ico")))
             };
