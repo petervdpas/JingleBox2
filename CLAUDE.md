@@ -883,14 +883,15 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   measured rather than listened to: where the repeat lands, how far each one falls, that no mix
   is bit for bit what went in, that the block size changes nothing, and what happens when it is
   handed NaN, a time of a million seconds, a block longer than the buffer, or no buffer at all
-- **The effect world is built and empty, and empty is the honest state of it.** `SoundEffectProject`
+- **The effect world was built empty on purpose, and it holds three now.** `SoundEffectProject`
   is the manifest, `effect.json`, deliberately not `machine.json` with a flag on it: a folder is
   one thing or the other, and a reader that had to open the file to find out which is a reader
   that can be wrong. `SoundEffectRegistry` reads `effects/` by the rack's rules, `SoundEffectProjects`
-  holds what was found for the run, and the rack's Effects tab is that list. `ISoundEffectEngines` is
-  the gate, and its table has nothing in it: an effect that could be had and makes no sound is
-  the box this codebase refuses to put on a rack, so the first entry arrives with the engine that
-  does the work rather than before it. There is deliberately no enum of effect engines with
+  holds what was found for the run, and the rack's Effects tab is that list. `ISoundEffectEngines`
+  is the gate, and its table was empty for exactly as long as there were no engines: an effect
+  that could be had and makes no sound is the box this codebase refuses to put on a rack, so the
+  first entry arrived with the engine that does the work rather than before it. EchoBox, Sweeper
+  and Roaster are in it now. There is deliberately no enum of effect engines with
   numbers in it, unlike `TrackerInstrumentKind`: a song says which engine an instrument is on, and
   a chain writes down an effect's id and never its engine, so nothing here is ever written to a
   file and there is no number to keep still
@@ -981,7 +982,8 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   passed over. What the two share is the drawing, which is why the panel types stopped being
   named for machines. An effect in use is a slot on a track's chain and takes no name of its own,
   the way two of the same plugin on one track already read. `docs/effects.md` is the design, the
-  rename, the six engines and the order they are being built in; nothing but the rename is built
+  rename, the six engines and the order they are built in. Three of the six are: the delay, the
+  filter and the drive. Reverb, EQ and the compressor are not
 - **The rack decides which machines a song can be given, so a machine can be taken off it.** It
   could not be, on the reasoning that a machine is not something you can be without, and that was
   the wrong shape: a machine you never reach for is one that should not be in the list a song
@@ -997,7 +999,8 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   ordinary case and is the truth: there is nothing to add. What it puts back is the machine's own
   box, under the machine's own slot id, because it is that machine's box and not a second one. A
   variant set up differently is a Duplicate, which is a different act with a different button.
-  The effects tab offers nothing yet, since there are no effect engines for one to be on
+  The effects tab has no picker at all, since an effect cannot be shelved: what is registered is
+  what is there
 - **A song picks its instrument from one list: the rack's machines and the instrument plugins on
   this computer.** `MachineRackViewModel.Offered`, drawn as a coloured dot and a name, since to a
   track those are one question with one answer: what plays this part. Instruments only, because
@@ -1374,7 +1377,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-1014 of them, in about five seconds, with no window and no hardware. They run in CI on every push
+1697 of them, in about twenty five seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -1868,8 +1871,9 @@ whole exercise and is worth writing down rather than summarising:
   way `Keys`, `Take`, `Preset` and `Zones` are already filled. It is not named after what it
   holds, because what it holds is going to grow
 - **Which options it drops down is chosen in the designer**, tick by tick, from
-  `MenuOptionWords.All`. Two today: `surfaces`, the control surfaces there is a template for
-  on this machine, and `learn`, which turns over the same mode Ctrl+Shift+M turns over. An option
+  `MenuOptionWords.All`. Three today: `help`, the device's own page, `surfaces`, the control
+  surfaces there is a template for on this machine, and `learn`, which turns over the same mode
+  Ctrl+Shift+M turns over. An option
   added later turns up on the ticks and in every machine that has never been near that page,
   because a Menu naming no options carries all of them. `IMenuOptions` is that rule on its own so
   it can be asked without a window: a machine naming an option this build has never heard of
@@ -2447,6 +2451,25 @@ whole exercise and is worth writing down rather than summarising:
   size and answers what a per-pad history could not: how many pads there are is an edit too, and
   it is about none of them. Hooked at `OnPadChanged`, the one place every pad edit already ended,
   and gathered by which pad and which setting so dragging a level is one step
+- **Closing the window is Cancel changes, and the copy kept for a crash goes with it.** The
+  tracker writes the open song into `<name> (recovered)` every twenty seconds while it is dirty,
+  which exists for the twenty minutes between two saves that a plugin taking the application down
+  would cost. Closing the window costs nothing of the sort: what was unsaved then was left unsaved
+  on purpose, and a rescue file in the songs list the next morning saying the last session never
+  saved reads as a fault rather than as a rescue. `TrackerViewModel.Finished` stops the timer
+  first, or the tick arriving while the window goes would write the file back after it had been
+  thrown away. The crash report is untouched: the run marker still comes off only on the way out
+  of the process, so a real crash still leaves one and still writes a report
+- **The splash says what is happening rather than that something is happening.** Every line it
+  writes is set from the drawing thread in the middle of the work it describes, so nothing would
+  be painted until that work was over and the line had already been replaced: `SplashWindow.Said`
+  runs the queue as far as the frame and then holds the line for `LineHold`, which is 250 ms.
+  Two lines, a heading and the thing under it, and `Doing` clears what was under it, since a
+  device name left standing beneath a new heading is the one thing on there that could say
+  something untrue. It reads the devices out by name, which on a first run is also the list of
+  what was just copied into the application folder, and then the engine settings one at a time
+  before the output is opened. `IStartupLines` is the seam, so a window built with nobody
+  watching hands in nothing and every line is skipped
 - Deleting a recording no longer deletes it. It moves into `deleted/` beside the recordings, so
   undo on RECORD fetches the last one back, and the confirmation stopped having to say "this
   cannot be undone". A move rather than a copy, because a take is the one thing here that can be
@@ -2509,14 +2532,38 @@ whole exercise and is worth writing down rather than summarising:
   those four lines and the file carries a `{keys}` hole they go into, so the prose around them is
   written where all the other prose is. It walks every action rather than naming four, so one
   added later turns up without anybody being told
-- **And writing that page is what found out that the settings page for shortcuts does not
-  exist.** Everything under it does: `ShortcutMap` sets, `AppConfig.Shortcuts` stores only what
+- **And writing that page is what found out that the settings page for shortcuts did not
+  exist.** Everything under it did: `ShortcutMap` sets, `AppConfig.Shortcuts` stores only what
   differs from the defaults so a default can still be improved, and `IShortcutActions.Everything`
-  says in its own remarks that a settings page builds itself from it. Nobody built the page, so
-  the four keys are what they ship as and there is nowhere to change them. The help said "in
-  SETTINGS under Shortcuts" for about an hour, which is the shape of fault worth naming: help
+  says in its own remarks that a settings page builds itself from it. Nobody had built the page,
+  so the keys were what they shipped as and there was nowhere to change them, while the help said
+  "in SETTINGS under Shortcuts" for about an hour. That is the shape of fault worth naming: help
   text is the one place in an application where a feature can be described into existence, since
-  nothing compiles it and nothing runs it
+  nothing compiles it and nothing runs it. The page exists now, and the bullets under this one are
+  what it turned out to need
+- **A device's help is the device's, and is not a topic in this application's.** What this
+  program does is written under `Help/Topics/` and changes when the program changes; what a
+  soundmachine's third knob does is written by whoever built the machine, and it has to travel to
+  somebody who has never seen this repository. So it is `help.md` in the device's own folder,
+  which means the zip carries it, Save as carries it, and a shipped device is brought up to date
+  with it file by file like everything else it has. `ISoundDeviceHelp` is the read and the write,
+  emptied means the file goes, and `IRackProject.Help` is what everything showing a device already
+  holds, so nothing looks it up by folder a second time
+- Written in DESIGNER on a **Helptext** tab, per world, with the writing on the left and the page
+  as it will be read on the right, drawn by the control the window uses so the preview cannot
+  disagree with the thing. Shown from the device's own Menu, which is `MenuOptionWords.Help` and
+  is therefore ticked per device like the other options; `SoundDeviceMenu` is the wrapper that
+  puts it above whatever the host was already offering, since what a thing is comes before which
+  knob is driving it. A device whose author wrote none keeps the line and loses the press: a line
+  that is not there says the host cannot do it, a grey one says this device has nothing to say
+- `Views/SoundDeviceHelpWindow.axaml` is the window, and it is deliberately not
+  `HelpWindow`: no topic list, no search, the device's name and its one line at the top, and the
+  page on a plate in the device's own colours. One window per device, so a page can be left open
+  beside the box while somebody works it. All eight devices that ship carry one, and
+  `Tests/ShippedHelpTests.cs` walks both rack folders and says so, including that a page starts
+  with its own device's name, which is how a copied file that was never edited fails.
+  `verify-rack.sh` refuses a release payload that lost one, since `help.md` is neither json nor
+  wav and nothing it counted would have noticed
 - **The help is markdown files, one to a topic, in `Help/Topics/` and linked into the output as
   `help/`.** Lowercase and linked out for the reason the controller profiles are: a folder called
   `help` beside the `Help` the code is in differs only in case, which is two folders here and one
@@ -2644,7 +2691,7 @@ whole exercise and is worth writing down rather than summarising:
   said plugin everywhere, after our own effects went on chains beside them
 - **Nine topics were missing altogether**, and the pages with the most explaining to do had the
   least: the pads, RECORD, the pattern, songs and packing, automation, the registry, the
-  templates page, and the output device. `Help/Topics/` is nineteen files now, and every one is
+  templates page, and the output device. `Help/Topics/` is twenty one files now, and every one is
   reachable from the page it explains: `Tests/HelpTopicTests.cs` reads every `HelpBadge` in every
   layout and says the topic it names exists, which is the only thing that would ever catch a
   badge pointing at a renamed topic, since XAML cannot reach a const
@@ -3491,11 +3538,30 @@ whole exercise and is worth writing down rather than summarising:
   per-block overhead worth naming, and allocation-free on the render path. Whatever is forcing a
   bigger buffer on Windows than another host needs, the mixer's own arithmetic is not it, and
   rewriting that arithmetic in another language would buy the sixth of a block it already uses
-- **What is not done is the pads.** With a driver picked, BASS is on its silent device, so the
-  tracker is heard and the pads are not: they are separate streams played the ordinary way and
-  the ordinary way now goes nowhere. Finishing it means one stream for everything, which is
-  BASSmix, another add-on and another restructuring of where the pads' audio goes. Until that is
-  built, ASIO is the tracker's alone and picking one silences FIRE
+- **The pads reach the driver too, and they do it through the output bus.** This paragraph said
+  for a long time that they did not, that ASIO was the tracker's alone and that picking a driver
+  silenced FIRE, and that stopped being true when `OutputBus` went in: it is a BASSmix stream,
+  which is the add-on this note said would have to be added, and the pad bus and the take bus are
+  plugged into it. `BassAudioEngine.OpenBussesLocked` hands **the bus** to the driver, so with one
+  picked the tracker, the pads and a take being auditioned all leave through it. Tested on Windows
+  on real hardware, which is the only place that can be tested
+- **What is left is a tick that decides it, and says nothing about deciding it.**
+  `AppConfig.OutputBus` is off in a settings file that has never heard of it, which is every file
+  written before the bus existed, and `OpenBussesLocked` returns at once when it is off. Then
+  `TrackerOutput` falls to `IAudioEngine.Feed`, which hands the driver the tracker's stream on its
+  own, and the pads go on playing the ordinary way into the silent device BASS was opened on. So
+  ASIO with the bus on is the whole application and ASIO with the bus off is the tracker alone.
+  The tick's own hint says so where it stands, in SETTINGS under Engine: with this off and a
+  driver picked, the pads and RECORD are silent and nothing says so. What does not say it is the
+  place somebody actually picks a driver, which is the Output card, and that is the gap. Either
+  picking a driver implies the bus, since a driver takes one stream and the bus is how everything
+  gets into one, or Output says it where the choice is made. Not decided here: it is an audio path
+  and it wants hearing before it lands
+- **The way that went stale is the one this file keeps warning about.** The note was written when
+  it was true, the bus was built afterwards, and nothing made the two meet: a paragraph describing
+  work still to do outlives the work. It cost a reading of this codebase that recommended building
+  something that already exists, which is exactly the failure mode named up in the help section,
+  and the tell was the same one: the document disagreed with the code, and only the code runs
 - **A folder that moves takes CI's checks with it, and a check counting nought is the only
   reason the release did not go out empty.** The rack moved from `machines/` at the top of the
   tree to `rack/machines` and `rack/effects` when the two worlds were split, and the release

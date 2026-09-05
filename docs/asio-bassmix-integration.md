@@ -1,10 +1,58 @@
 # One output stream, and BASSmix
 
-Not built. This is the design for the piece ASIO is missing, written after reading what is
-actually there, and it replaces a first draft that described a codebase this is not: it named
-`Audio/SynthOutput.cs`, `Audio/PadPlaybackEngine.cs` and `OutputKind`, none of which exist, and
-called BASSmix functions that do not exist either. What is below is checked against
-`ManagedBass.Mix` 4.0.2 and against the files it names.
+**Built.** This was the design for the piece ASIO was missing, and the piece exists now:
+`Audio/OutputBus.cs` is the BASSmix stream, the pads and the take preview go on sub-busses of
+it, and `BassAudioEngine.OpenBussesLocked` hands the bus to the driver rather than handing it the
+tracker's stream alone. It was tested on Windows on real hardware, which is the only place ASIO
+can be tested. The design is kept as it was written, with a status section under this line, since
+what it decided and why is still the reason the code looks the way it does.
+
+Read the status before the design. This document said "Not built" for long enough after the work
+landed that a reading of this codebase recommended building it again, which is the failure this
+repository already names about help text: prose goes stale silently, because nothing compiles it
+and nothing runs it.
+
+## Status
+
+What was built, against what this document asked for:
+
+- **The mixer stream.** `OutputBus`, through `ManagedBass.Mix`, guarded call by call because the
+  add-on may not be there at all.
+- **Three sources, and one more level than this design drew.** The tracker's stream goes on the
+  bus; the pads go on `PadBus` and the take preview on `TakeBus`, and those two are themselves
+  plugged into the bus. A sub-bus per world rather than everything flat, which is what lets the
+  mixer show PADS and PLAY as strips with their own level, pan, mute and solo without a pad ever
+  passing through the song's master chain. This document said no view would move, and that part
+  is what changed on the way: the strips are over the busses, not over the song.
+- **The driver branch,** which is `_asio.Open(device, _output.Handle, _deviceRate)` in
+  `OpenBussesLocked`, with `TrackerOutput` falling back to `IAudioEngine.Feed` when there is no
+  bus.
+- **Everything under "What has to ship".** `ManagedBass.Mix` 4.0.2, the three natives, all three
+  copy targets, the three rows in `check-natives.sh`, and the release workflow's own check that
+  `bassmix.dll` is in the payload.
+
+What is left, and it is one thing:
+
+- **The bus is behind a tick that is off by default.** `AppConfig.OutputBus` is off in a settings
+  file that has never heard of it, `JB_BUS=1` is the other way in, and `OpenBussesLocked` returns
+  at once when it is off. So ASIO with the bus on is the whole application and ASIO with the bus
+  off is the tracker alone with FIRE silent, which is the state the paragraphs below describe.
+  Either picking a driver implies the bus, since a driver takes one stream and the bus is how
+  everything gets into one, or the device picker says so where somebody is looking. It is an
+  audio path, so it wants hearing before it lands.
+
+What stayed open from "Not decided", and is still open: a pad's own meter on FIRE, which the
+mixer's PADS strip now shows in one place but a pad does not show on itself; the mixer as a
+detachable window; and whether the pads ever become a strip on the song's mixer, which they still
+should not.
+
+The tap on the mixer stream, which this document offered as a second `ILoopbackCapture`, is not
+built. RECORD still records through BASS for anything plugged in and through `WasapiLoopback` on
+Windows, so recording the mix while a driver is in use records nothing, exactly as written below.
+
+## The design as it was written
+
+
 
 ## What is wrong
 

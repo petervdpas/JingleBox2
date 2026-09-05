@@ -2,7 +2,9 @@
 
 Built: the lanes, the clock that plays them, recording one off a knob, the strip that holds them
 and the curve you draw on. What is not built is the typed view, which is a parameter column in
-the pattern and waits on the column axis.
+the pattern. It waited on the column axis when this was written; that axis exists now, since a
+track holds up to eight note columns and a cell's place is a walk along `NoteColumns`, so what is
+left is the column kind rather than the arithmetic under it.
 
 Checked against the Renoise 3.5.4 install on this machine on 2026-08-28, and revised where the
 first draft had guessed. What changed is at the end of each section.
@@ -30,7 +32,7 @@ menu arms the recorder, which is off by default and does nothing unless the song
 Not built: the typed view, which is a parameter column in the pattern and shares its foundation
 with note columns.
 
-Fifty four tests, in `Tests/AutomationTests.cs` and two in `Tests/TrackerHistoryTests.cs`. The
+Forty six tests, in `Tests/AutomationTests.cs`, and two in `Tests/TrackerHistoryTests.cs`. The
 file format is the half tested hardest, for the reason at the end of this page. The curve is not
 among them: it is a Render pass and three pointer handlers, and what it draws is either right in
 front of you or it is not.

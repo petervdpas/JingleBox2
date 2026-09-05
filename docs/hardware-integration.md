@@ -616,8 +616,16 @@ controls and its ports, a `.lua` per controller translating what the application
 both optional, both matched on the port's name, both reloaded from the folder rather than
 compiled in.
 
-Still not built: the default layout, matching on identity rather than on a port name, reading
-the device's settings back, and Mackie Control.
+Built since that line was written, and it named four: the default layout is `Midi/DefaultLayout.cs`,
+which points faders at the first tracks' levels and knobs at the face in front of you before
+anybody has learned anything; Mackie Control is read by `Midi/MidiMackieRouter.cs` and written by
+`Midi/MackieSurface.cs`, gated by `IControllerProfiles.SurfaceOn` so a device whose file describes
+plain controllers is not decoded twice; and a device's own settings were read back with
+`sysex-controls`, which is what filled `keylab-mkii.json` without anybody touching the hardware.
+
+Still not built: matching on identity rather than on a port name. The universal identity request
+is answered by the MPD218 and by nothing else here, which is why the port's name is still what a
+profile is matched on.
 
 The transport half needed nothing from profiles, which is the rule above holding up in practice.
 `MidiTransportRouter` reads whichever port is ticked for `MidiPortRole.Transport` and works the

@@ -18,4 +18,10 @@ and there is none on this system, or that ASIO is here and no driver is installe
 which is most Windows machines until a card's own driver or something like ASIO4ALL
 puts one there.
 
+Picking an ASIO driver needs one thing next door. A driver owns the card and can be handed one
+stream, so everything this application plays has to be summed before it leaves, which is the
+"sum everything onto one bus" tick under Engine. With it on, the tracker, the pads and a take
+being auditioned all go out of the driver. With it off, the tracker is heard and the pads and
+RECORD are silent, and nothing on this page would tell you why.
+
 The rate, the buffer and how the sound is kept fed are next door, under Engine.

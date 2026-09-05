@@ -1,11 +1,11 @@
 # Effects of our own
 
-Decided on 2026-09-02. The rack has had an empty Effects tab since it was split in two, and this
-is what goes in it. Of the five steps at the foot of this file, the first two are done and the
-other two are not, and they were swapped: the designer came before the first engine, so the first
-pedal is laid out in the tool rather than hand-written into a manifest. Nothing sounds yet, and
-nothing shows on the rack's Effects tab yet either, which is the gate working rather than a thing
-left out.
+Decided on 2026-09-02, and built since. Three effects of ours ship: **EchoBox** the delay,
+**Sweeper** the filter and **Roaster** the drive, with six presets apiece, and each is on the
+rack's Effects tab, on a track's chain, on the master and on a pad. They are registered, imported
+and thrown out by the same rules a machine is, laid out in the same designer, and pointed at by
+the same links. The rest of this file is the design that got there, and the list at the foot says
+which of the six planned engines are the three that are not written.
 
 ## An effect is not a machine
 
@@ -249,9 +249,6 @@ Reverb and the compressor are each a piece of work on their own and go last for 
    rack's Effects tab drawn from what is registered, with no picker beside it: an effect cannot be
    shelved, because there is no box of yours to shelve. `Tests/SoundEffectRackTests.cs` is eighteen
    tests and most of them are the refusals.
-3. **One engine end to end**: the delay. On the chain, saved and read back in a song, its face
-   drawn, bypass through the new part, pointable and automatable, with the tests including the
-   refusals.
 3. **The effects designer. Done**, and moved ahead of the engines so that a face is drawn in
    the tool rather than typed into a manifest by hand. One page told which world it is in:
    `IDesignWorld` is the handful of things that differ and `IDesignProject` is what the page
@@ -263,7 +260,7 @@ Reverb and the compressor are each a piece of work on their own and go last for 
    history, which asked the project what type it is instead of naming the machine's.
    `Tests/SoundEffectDesignerTests.cs` is the seam: which world makes which id, which pages are
    offered, and a folder of one kind refusing to open as the other.
-4. **The delay.** The engine and the face are **done**: `SoundDevices/SoundEffects/Delay.cs`, four knobs,
+4. **One engine end to end, which is the delay. Done.** The engine and the face: `SoundDevices/SoundEffects/Delay.cs`, four knobs,
    measured in `Tests/DelayTests.cs`, and `rack/effects/EchoBox/effect.json` on the rack's
    Effects tab, with its own section in SETTINGS, System: imported from a zip, added back and
    thrown out exactly as a machine is, through the same archive and the same page. What is left of

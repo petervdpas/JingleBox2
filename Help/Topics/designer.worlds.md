@@ -19,5 +19,6 @@ The two tabs are two pieces of work. Each keeps its own project, its own undo an
 own unsaved changes, so moving between them loses nothing.
 
 What the two share is everything else. Both are laid out here, both carry presets,
-and both travel as a zip that the other end reads under SETTINGS, System. New follows
-whichever tab you are on.
+both carry their own help page, written on the Helptext tab and read from the box's own
+Menu, and both travel as a zip that the other end reads under SETTINGS, System. New
+follows whichever tab you are on.

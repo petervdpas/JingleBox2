@@ -1,7 +1,9 @@
 # Shortcuts
 
-Built: the module, Save and Delete where they mean something, and undo in the two places that
-have a document. Not built: the settings page to edit the keys.
+Built: the module, Save and Delete where they mean something, undo in every context that has a
+document, and the settings page to edit the keys, which is SETTINGS, Shortcuts. What that page
+sets is the page keys and nothing else: the system keys are not yours to move, and why is at the
+foot of this document.
 
 ## The shape
 
@@ -186,41 +188,38 @@ often than there are edits, which is safe: a redraw where nothing about the mach
 the same as before and leaves no step. Over-telling costs a comparison; under-telling would be an
 edit that cannot be undone.
 
-## Undo everywhere else, which does not exist
+## Undo everywhere, which is what this section used to say did not exist
 
-There is no undo anywhere in this application. Not a stack, not a command history, not a single
-type with the word in it. So Ctrl+Z is a key that is delivered correctly to a page that correctly
-says it cannot, which is the honest state to be in and is not the state anybody wants.
-
-It is not one feature. Each context that wants it needs its own history, and they are different
-enough that a shared one would be a lie:
+It said, in as many words, that there is no undo anywhere in this application: not a stack, not a
+command history, not a single type with the word in it. That was true when it was written and is
+now false five times over, which is worth leaving in rather than quietly deleting, because the
+sentence outlived the work by longer than it took to do the work:
 
 ```
-a machine's      turning knobs, in a song. the unit is unclear: one knob move is not worth a
-settings         step and a hundred of them are, so it wants gathering by time or by which knob
-the pads         what a pad is pointed at
+Tracker/TrackerHistory.cs        the pattern and the song, one history with two kinds of step
+ViewModels/PadHistory.cs         every pad at once, since how many pads there are is an edit too
+ViewModels/DesignHistory.cs      the designer, a step being the device's own JSON
+ViewModels/InstrumentHistory.cs  an instrument's knobs, gathered by control and by moment
+RECORD                           a deleted take, which moves to deleted/ and comes back
 ```
 
-The knobs are the interesting one left, and the hard part is not the history. It is the
-gathering: a parameter driven by a controller or by automation produces a step per message, which
-is a history nobody can walk. "The same control, within a moment" is the usual answer, and it is
-the same shape as the coalescing already on the drawing thread.
+The prediction in it held. Each context really did want its own history, they really are
+different enough that a shared one would have been a lie, and the hard part on the knobs really
+was the gathering rather than the stack: `InstrumentHistory` gathers by the same control within
+half a second, deliberately not by "while the mouse is down", which is true of a mouse and false
+of a controller and of automation.
 
-Two things that are true whatever is built:
+Two things stay true whatever is built next:
 
-**It belongs to the context, not to the application.** Undo on the tracker should walk the
-tracker's edits and nothing else, and the shortcut layer above already delivers to whoever claims
-it, so a context that grows a history needs no change here at all.
+**It belongs to the context, not to the application.** Undo on the tracker walks the tracker's
+edits and nothing else, and the shortcut layer delivers to whoever claims it, so a context that
+grows a history needs no change here at all.
 
 **A history has to know what to gather.** Anything driven by a knob, a controller or automation
-produces a continuous stream, and a step per message is a history nobody can walk. Gathering by
-"the same control, within a moment" is the usual answer and is the same problem the coalescing on
-the drawing thread already solves for a different reason.
+produces a continuous stream, and a step per message is a history nobody can walk.
 
 ## Still open
 
-- The settings page. `ShortcutActions.Everything` exists so a page can build itself from it, the
-  way the log's areas page does, and nothing has been built yet.
 - Which pages should answer Delete. RECORD has takes and PADS has pads, and both would be
   destructive without asking, which is a decision rather than a wiring job.
 - Whether a shortcut should be shown anywhere it applies, in a tooltip or beside a button. A key

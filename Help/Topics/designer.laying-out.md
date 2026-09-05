@@ -8,6 +8,15 @@ than typed, and nothing is ever added to a face behind your back: **what a face 
 not draw, nobody draws**. A machine with no keyboard shows no keyboard, and a box with
 no name badge shows no name.
 
+## The pages under the header
+
+**Screen** is the face. **Presets** is what the box starts you from, and how much room each one
+leaves. **Helptext** is the page the box carries about itself: what it is, what its controls do,
+and anything somebody opening it for the first time would have to guess. It is written in
+markdown, saved as `help.md` beside the manifest, and it travels in the zip, so whoever you hand
+the box to gets the page with it. A device with nothing written there has no Help line on its
+Menu, which is the honest state rather than a line that opens an empty window.
+
 ## The two things a part needs
 
 A part is a control, and a control turns a parameter. So there are two lists and they
