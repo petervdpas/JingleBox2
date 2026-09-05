@@ -227,7 +227,8 @@ public class TangentTests
 
             Diagnostics.Log.Close();
 
-            string written = Settled(Path.Combine(folder, Diagnostics.Log.FileName));
+            string written = Settled(Path.Combine(folder, Diagnostics.Log.FileName),
+                "drive curve: drawn from the table", "drive curve: the system's own");
 
             Assert.Contains("drive curve: drawn from the table", written);
             Assert.Contains("drive curve: the system's own", written);
@@ -241,20 +242,45 @@ public class TangentTests
     }
 
     /// <summary>
-    /// Waits for the log's own thread to have written, then reads what it wrote.
+    /// Waits for the log's own thread to have written the lines being looked for, then reads them.
     /// </summary>
     /// <remarks>
     /// A line is queued and a thread writes it, so a file read the instant after the call can be
-    /// a file that is not there yet. Waited for rather than slept past, so this costs a moment
-    /// rather than a fixed pause, and given up on so a fault here is a failed assertion naming
-    /// what is missing rather than a test that never returns.
+    /// a file that is not there yet or one holding only the first of two lines. **Waiting for the
+    /// file to exist is not enough and this test flaked on exactly that**: the file was there and
+    /// one of the lines was still in the queue. So what is waited for is the content, which is
+    /// the only thing that says the writing is really done.
+    ///
+    /// Waited for rather than slept past, so this costs a moment rather than a fixed pause, and
+    /// given up on after a second so a real fault is a failed assertion naming what is missing
+    /// rather than a test that never returns.
     /// </remarks>
     /// <param name="path">The log file to wait for.</param>
-    private static string Settled(string path)
+    /// <param name="lines">What has to be in it before it counts as written.</param>
+    private static string Settled(string path, params string[] lines)
     {
-        for (int tries = 0; tries < 100 && !File.Exists(path); tries++) Thread.Sleep(10);
+        for (int tries = 0; tries < 100; tries++)
+        {
+            if (File.Exists(path))
+            {
+                string held = Read(path);
 
-        return File.Exists(path) ? File.ReadAllText(path) : "";
+                if (Array.TrueForAll(lines, held.Contains)) return held;
+            }
+
+            Thread.Sleep(10);
+        }
+
+        return File.Exists(path) ? Read(path) : "";
+    }
+
+    /// <summary>Reads the log while its own thread may still be appending to it.</summary>
+    private static string Read(string path)
+    {
+        using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(file);
+
+        return reader.ReadToEnd();
     }
 
     /// <summary>The switch is off until somebody says otherwise, and says which it is on.</summary>

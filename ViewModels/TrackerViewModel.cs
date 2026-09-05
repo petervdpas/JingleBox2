@@ -522,7 +522,24 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         foreach (var strip in Strips) strip.IsSelected = strip.Track == track;
 
+        LightInstrument();
+
         if (ShowsLanes) Lanes?.Show(track);
+    }
+
+    /// <summary>
+    /// Lights the row for whatever the track being worked on plays, and no other.
+    /// </summary>
+    /// <remarks>
+    /// Asked of the song rather than of the rows, so a track with nothing on it lights nothing
+    /// and two tracks on one instrument light the one row they share. It is also called after
+    /// the list is rebuilt, since a fresh row starts unlit and the cursor has not moved.
+    /// </remarks>
+    private void LightInstrument()
+    {
+        int playing = Song.GetTrackInstrument(Cursor.Track);
+
+        foreach (var slot in Instruments) slot.UnderCursor = slot.Index == playing;
     }
 
     /// <summary>
@@ -629,6 +646,27 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// so it is remembered between runs.
     /// </summary>
     [ObservableProperty] private bool ignoreVelocity;
+
+    /// <summary>
+    /// Whether a note typed on the letter rows writes a velocity, the way a played one does.
+    /// </summary>
+    /// <remarks>
+    /// Off unless somebody says otherwise, which is exactly what happened before it existed and
+    /// is also Renoise's own default. <see cref="IgnoreVelocity"/> still wins over it: that one
+    /// says no velocity is written into this pattern at all, whatever produced the note, and two
+    /// switches disagreeing about one column is the fault this codebase keeps naming.
+    /// </remarks>
+    [ObservableProperty] private bool typedVelocity;
+
+    /// <summary>What a letter key sends when it sends anything at all.</summary>
+    /// <remarks>
+    /// **A key at full strength, which is 0x7F and not 0x80.** The column runs to 0x80 and that
+    /// top step is the one level above anything a key can produce, typed rather than played; a
+    /// letter row standing in for a keyboard is producing a key press, so it writes what the
+    /// hardest possible key press writes. Renoise's own number for this is 127, which is the
+    /// same value said in decimal.
+    /// </remarks>
+    public const int TypedLevel = 0x7F;
 
     /// <summary>
     /// Stopped, playing or paused, which is what the transport bar's three buttons read off.
@@ -757,6 +795,34 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// The octave notes are typed and auditioned at, which is the song's and not the view's.
     /// </summary>
     [ObservableProperty] private int octave = 4;
+
+    /// <summary>The lowest and highest the octave goes, which is what the field beside it allows.</summary>
+    /// <remarks>
+    /// Said here as well as in the layout because the keyboard reaches it too now, and a limit
+    /// written in one place and enforced in another is how the two come to disagree.
+    /// </remarks>
+    public const int LeastOctave = 0;
+
+    /// <inheritdoc cref="LeastOctave"/>
+    public const int MostOctave = 9;
+
+    /// <summary>
+    /// Moves the octave a step, which is what the keyboard's own octave keys do.
+    /// </summary>
+    /// <remarks>
+    /// **A part is typed with both hands on the letter rows**, so the octave has to be reachable
+    /// without going to the mouse: a phrase that crosses an octave otherwise means stopping,
+    /// reaching for the field in the bar, and finding the place in the music again. Every tracker
+    /// has this and this one had nothing at all, which is a gap nobody could see because there
+    /// was no key that did the wrong thing.
+    ///
+    /// Held at the ends rather than coming round. An octave that wrapped from nine to nought
+    /// would put a part eight octaves out for one keystroke too many, and the note is written as
+    /// soon as it is typed.
+    /// </remarks>
+    /// <param name="by">How far, which is one either way.</param>
+    public void StepOctave(int by) =>
+        Octave = Math.Clamp(Octave + by, LeastOctave, MostOctave);
 
     /// <summary>
     /// The octave is the song's, not the view's: a song reopens where it was left, and every
@@ -974,6 +1040,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         MasterEffect.Changed += MarkDirty;
 
         ignoreVelocity = config?.IgnoreKeyVelocity ?? false;
+        typedVelocity = config?.TypedVelocity ?? false;
         recordNoteOffs = config?.RecordNoteOffs ?? false;
 
         _player = new TrackerPlayer(audio, machines);
@@ -2196,6 +2263,22 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// The same for how hard a key was hit. Nothing is stored in a test or a headless run,
     /// where there is no settings file to write to.
     /// </summary>
+    /// <summary>
+    /// The same for whether the letter rows send a velocity of their own.
+    /// </summary>
+    partial void OnTypedVelocityChanged(bool value)
+    {
+        Status = value
+            ? "Typed notes carry a velocity: the letter rows write " + TypedLevel.ToString("X2") +
+              " like a keyboard played at full strength"
+            : "Typed notes carry no velocity: the volume column is left blank and the instrument's own level plays";
+
+        if (_configStore == null || _config == null) return;
+
+        _config.TypedVelocity = value;
+        _configStore.Save(_config);
+    }
+
     partial void OnIgnoreVelocityChanged(bool value)
     {
         Status = value
@@ -2635,8 +2718,19 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     private readonly Dictionary<int, TrackerInstrument> _sounding = new();
 
-    /// <summary>Types a note at the instrument's own level, which is what a letter key sends.</summary>
-    public void EnterNote(Note note) => EnterNote(note, TrackerCell.NoVolume);
+    /// <summary>
+    /// Types a note from a key that has no velocity sensor, which is the letter rows and a
+    /// drawn keyboard being clicked.
+    /// </summary>
+    /// <remarks>
+    /// **What such a key sends is a decision rather than an absence.** Nothing written leaves the
+    /// column blank, which the sequencer reads as the instrument's own level and is a consistent
+    /// answer; a fixed level written in says the same thing out loud, and reads back as what a
+    /// keyboard that always plays at one strength would have sent. <see cref="TypedVelocity"/>
+    /// picks, off by default, which is what happened before and is Renoise's own default too.
+    /// </remarks>
+    public void EnterNote(Note note) =>
+        EnterNote(note, TypedVelocity ? TypedLevel : TrackerCell.NoVolume);
 
     /// <summary>
     /// Sounds a note and, while record is armed, writes it into the pattern.
@@ -4155,6 +4249,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
                 _machines.Has(Song.Instruments[i].Kind)));
 
         SelectedInstrument = Math.Clamp(selected, 0, Math.Max(0, Instruments.Count - 1));
+
+        LightInstrument();
 
         OnPropertyChanged(nameof(HasInstruments));
     }

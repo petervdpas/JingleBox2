@@ -5,6 +5,9 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using JingleBox2.Shortcuts.Interfaces;
+using JingleBox2.Shortcuts.Enums;
+using JingleBox2.Shortcuts;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -919,6 +922,54 @@ public partial class TrackerView : UserControl
         ViewModel?.LetNote(note);
     }
 
+    /// <summary>
+    /// Which keys the pattern answers and what each asks for, said in one place.
+    /// </summary>
+    /// <remarks>
+    /// Holds nothing, so one serves the whole application. The table is
+    /// <see cref="IPatternKeys"/> rather than a run of cases here, because the same keys have to
+    /// be listed on the shortcuts card and in the help, and a key written in a switch statement
+    /// and described in a list somewhere else is two places that drift apart.
+    /// </remarks>
+    private static readonly IPatternKeys Keys = new PatternKeys();
+
+    /// <summary>
+    /// Does whatever the pattern was asked for.
+    /// </summary>
+    /// <remarks>
+    /// The one thing left in the view, and it is not a second spelling of the keys: which key
+    /// asks for what is the table's, and this is only which method each answer calls. Shift is
+    /// handed in rather than looked up again, since on the cursor keys it says how far a block
+    /// reaches rather than which key was pressed.
+    /// </remarks>
+    /// <param name="vm">The tracker being worked.</param>
+    /// <param name="asked">What the key asked for.</param>
+    /// <param name="extend">Whether shift was held, which the cursor keys read as marking.</param>
+    private void Answer(TrackerViewModel vm, PatternAction asked, bool extend)
+    {
+        switch (asked)
+        {
+            case PatternAction.CursorUp: vm.MoveCursor(-1, 0, 0, extend); break;
+            case PatternAction.CursorDown: vm.MoveCursor(1, 0, 0, extend); break;
+            case PatternAction.CursorLeft: vm.MoveCursor(0, extend ? -1 : 0, extend ? 0 : -1, extend); break;
+            case PatternAction.CursorRight: vm.MoveCursor(0, extend ? 1 : 0, extend ? 0 : 1, extend); break;
+            case PatternAction.PageUp: vm.MoveCursor(-vm.LinesPerBeat * PageBeats, 0, 0, extend); break;
+            case PatternAction.PageDown: vm.MoveCursor(vm.LinesPerBeat * PageBeats, 0, 0, extend); break;
+            case PatternAction.NextTrack: vm.MoveCursor(0, extend ? -1 : 1, 0); break;
+            case PatternAction.SelectAll: vm.SelectAll(); break;
+            case PatternAction.Copy: vm.CopySelection(); break;
+            case PatternAction.Cut: vm.CutSelection(); break;
+            case PatternAction.Paste: vm.Paste(); break;
+            case PatternAction.ClearSelection: vm.ClearSelection(); break;
+            case PatternAction.ClearCell: vm.ClearAtCursor(); break;
+            case PatternAction.InsertLine: vm.InsertLine(); break;
+            case PatternAction.DeleteLine: vm.DeleteLine(); break;
+            case PatternAction.OctaveUp: vm.StepOctave(1); break;
+            case PatternAction.OctaveDown: vm.StepOctave(-1); break;
+            case PatternAction.TypedVelocity: vm.TypedVelocity = !vm.TypedVelocity; break;
+        }
+    }
+
     private void OnGridKeyDown(object? sender, KeyEventArgs e)
     {
         var vm = ViewModel;
@@ -926,38 +977,13 @@ public partial class TrackerView : UserControl
 
         bool extend = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
-        switch (e.Key)
+var asked = Keys.Find(e.Key, e.KeyModifiers);
+
+        if (asked != PatternAction.None)
         {
-            case Key.Up: vm.MoveCursor(-1, 0, 0, extend); e.Handled = true; return;
-            case Key.Down: vm.MoveCursor(1, 0, 0, extend); e.Handled = true; return;
-            case Key.Left: vm.MoveCursor(0, extend ? -1 : 0, extend ? 0 : -1, extend); e.Handled = true; return;
-            case Key.Right: vm.MoveCursor(0, extend ? 1 : 0, extend ? 0 : 1, extend); e.Handled = true; return;
-            case Key.PageUp: vm.MoveCursor(-vm.LinesPerBeat * PageBeats, 0, 0, extend); e.Handled = true; return;
-            case Key.PageDown: vm.MoveCursor(vm.LinesPerBeat * PageBeats, 0, 0, extend); e.Handled = true; return;
-            case Key.Tab:
-                vm.MoveCursor(0, extend ? -1 : 1, 0);
-                e.Handled = true;
-                return;
-            case Key.A when e.KeyModifiers.HasFlag(KeyModifiers.Control):
-                vm.SelectAll();
-                e.Handled = true;
-                return;
-            case Key.C when e.KeyModifiers.HasFlag(KeyModifiers.Control):
-                vm.CopySelection();
-                e.Handled = true;
-                return;
-            case Key.X when e.KeyModifiers.HasFlag(KeyModifiers.Control):
-                vm.CutSelection();
-                e.Handled = true;
-                return;
-            case Key.V when e.KeyModifiers.HasFlag(KeyModifiers.Control):
-                vm.Paste();
-                e.Handled = true;
-                return;
-            case Key.Escape: vm.ClearSelection(); e.Handled = true; return;
-            case Key.Delete: vm.ClearAtCursor(); e.Handled = true; return;
-            case Key.Insert: vm.InsertLine(); e.Handled = true; return;
-            case Key.Back: vm.DeleteLine(); e.Handled = true; return;
+            Answer(vm, asked, extend);
+            e.Handled = true;
+            return;
         }
 
         string key = e.Key.ToString();

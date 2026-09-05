@@ -452,6 +452,14 @@
                               IsChecked="{Binding IgnoreVelocity}"
                               ToolTip.Tip="How hard you play stops being written into the pattern. Remembered between runs." />
 
+                    <!-- A computer key has no velocity sensor, so what it sends is a decision
+                         rather than an absence. Off by default, which is what happened before it
+                         existed and is Renoise's own default as well. -->
+                    <MenuItem Header="Typed notes carry a velocity"
+                              ToggleType="CheckBox"
+                              IsChecked="{Binding TypedVelocity}"
+                              ToolTip.Tip="The letter rows and a clicked key write 7F into the volume column, the way a keyboard played at full strength would. Off, they leave it blank and the instrument's own level plays. Remembered between runs." />
+
                     <!-- And what the other half of a key press does. Off by default: at a step
                          of one, every release writing a note-off fills a pattern quickly. -->
                     <MenuItem Header="Record note-offs"

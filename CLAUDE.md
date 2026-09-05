@@ -1888,6 +1888,55 @@ whole exercise and is worth writing down rather than summarising:
   own patch and its knob positions, and `PluginSlotConfig` is looked up **by id before path**, so
   a bundle living somewhere else on the other machine is still found. That was already true and
   nothing anywhere said it
+- **The letter rows had no octave key and no velocity, and both were absences rather than
+  decisions.** The octave could only be changed by the number field in the bar, so a phrase that
+  crossed one meant stopping, reaching for the mouse and finding the place in the music again.
+  Every tracker has a key for it and this one had nothing at all, which is a gap nobody could see
+  because no key did the wrong thing
+- Read off Renoise's own `KeyBindings.xml` rather than invented, since it is on this machine and
+  is what this file already says to do: `*` and `/` on the numeric keypad, with `Ctrl+]` and
+  `Ctrl+[` as the second pair, which is the one that matters on a keyboard with no numpad. Held at
+  the ends rather than coming round, because an octave that wrapped from nine to nought would put
+  a part eight octaves out for one keystroke too many and the note is written as it is typed
+- **What a key with no velocity sensor sends is a decision.** Nothing written leaves the volume
+  column blank, which the sequencer reads as the instrument's own level and is consistent; a fixed
+  level says the same thing out loud and reads back as what a keyboard that always plays at one
+  strength would have sent. Renoise keeps both and so does this: `TypedVelocity` is off by default,
+  which is exactly what happened before and is Renoise's own `ComputerKeyboardVelocityEnabled`
+- **0x7F and not 0x80**, which is the whole of why the column runs to 128. The top step is the one
+  level no key can produce, typed rather than played; a letter row standing in for a keyboard is
+  producing a key press, so it writes what the hardest possible key press writes. Renoise's
+  `ComputerKeyboardVelocity` is 127, which is the same number said in decimal
+- `IgnoreVelocity` still wins over it, deliberately: that switch says no velocity is written into
+  this pattern at all, whatever produced the note, and two switches disagreeing about one column
+  is the fault this codebase keeps naming
+- `Ctrl+Shift+V` turns it over, and it had to go **above** the paste in the same switch statement:
+  `Ctrl+V` is matched by asking whether Control is held, which Shift does not stop being true, so
+  written underneath it the new key would have pasted instead. Both keys are in
+  `Help/Topics/app.shortcuts.md`, since a key nobody can find is a key that is not there
+- **And a test that waited for the log file to exist was waiting for the wrong thing.** It flaked
+  once in a full run: the file was there and one of the two lines it was looking for was still in
+  the log's own queue. It waits for the content now. Worth keeping because the shape is general,
+  which is that **the existence of a file written by another thread says nothing about what is in
+  it**, and a test that asserts on the difference passes almost every time
+- **The instrument list stays in instrument order and lights the row the cursor's track plays.**
+  Asked for the other way round, sorted by track, and that could not be had: **the number on a row
+  is what the pattern writes into every cell**, so sorting the rows would leave the numbers running
+  02, 00, 01, 03 down the page, and renumbering them to match would mean rewriting the instrument
+  column of every cell of every pattern. It also has no answer for the two ordinary cases, an
+  instrument on no track and two tracks sharing one
+- So nothing moves and one row is marked, which is what the chain and the automation strip under
+  the pattern already do with the cursor's track. `InstrumentSlot.UnderCursor`, set from
+  `Song.GetTrackInstrument` rather than from the rows, so a track with nothing on it lights nothing
+  and two tracks on one instrument light the row they share
+- Accent and bold together, which is the pair the tab strip settled on and for the reason written
+  there: on a light theme the accent alone is near enough the ordinary lettering that nothing reads
+  as chosen. The track badge is filled in rather than washed at the same time, so the row is legible
+  from the badge column as well as from the name
+- **It also answers the question that led to it.** A note typed into a track carries that track's
+  own instrument number, and blank means the track has none pointed at it, which was invisible: the
+  badges said which track each instrument was on and nothing said what the track under your hand
+  was playing. Now a track with no instrument lights no row
 - RECORD asks the songs as well as the rack before deleting a take (`SampleUsers` over
   `SoundMachineRack` and `SongStore`). A song owns its instruments, so a recording nothing on the
   rack plays can still be the sound of three songs, and deleting it used to empty them with
@@ -2622,6 +2671,25 @@ whole exercise and is worth writing down rather than summarising:
   the guard inside `Log.Write` is checked after the caller has already allocated it. Everywhere
   else still writes without asking, because a line written when something is decided costs
   nothing worth counting
+- **The log was quietly losing lines, and it was in the one part of it that is deliberately not
+  behind an interface.** The rules came out into `ILogAreas`, `ILogLine` and `ILogFile` and each
+  can be asked without a process; what the door was left holding is a queue, a thread and a file,
+  and nothing stood in front of the handover between those three. `Flush` drained the queue and
+  appended, with no lock, and **there is always more than one flusher**: the writing thread runs
+  on its own clock and anything may flush by hand, which the way out of the process does and
+  `Clear` does. Two of them inside at once each took a share of the queue and then opened the same
+  file, and the one that lost the open had its share swallowed with the exception, since a log may
+  not throw in the thing it is a log of
+- So the symptom was **a line that was written and is not in the file**, at random and under load,
+  which is the worst thing there is to be chasing with a log. Found by a test of something else:
+  the tangent switch's own line, written twice and read back once
+- An interface would not have caught it and it is worth saying why, since the obvious lesson is
+  the wrong one. `ILogFile.Append` is already a seam and did exactly what it promised; the fault
+  was two threads in one method of the door. What was missing was a test of the door's own
+  concurrency, and `Tests/LogFlushTests.cs` is that: two thousand numbered lines written while
+  three threads flush by hand beside the log's own. **Checked by taking the lock out**, which
+  loses lines 0, 2, 3, 9 and 14 of the first fifteen, because a guard that no test notices the
+  absence of is a guard that is testing nothing
 - **The log is kept between runs and is cleared on purpose, in SETTINGS.** Never on start: the
   run you most often want is the one that already ended badly, and a log cleared on start has
   thrown away the crash you restarted because of. It rolls over at four megabytes keeping one
@@ -2900,6 +2968,27 @@ whole exercise and is worth writing down rather than summarising:
   page builds itself from it. Nobody had built the page, and the help said where it was for about
   an hour. That is a shape worth naming: **help text is the one place in an application where a
   feature can be described into existence**, since nothing compiles it and nothing runs it
+- **The keys the pattern answers are one table, and were three places.** The view's own switch
+  statement decided what each key did, a list beside it filled the card in SETTINGS, and the help
+  page said them again in prose. So a key added to the pattern appeared on neither the card nor
+  the help, and a key changed quietly disagreed with the two descriptions of it. That is the
+  fault `ISystemKeys` was made to end, arrived at again from the other direction: **the answer to
+  a key being missing from the card is one list of what the application answers, not a second
+  list beside the first**
+- `IPatternKeys` is that table: the key, what has to be held with it, what it asks for and what it
+  is called, one row apiece. `PatternAction` is the closed list of what it may ask for, and what
+  is left in the view is which method each answer calls, which is not a second spelling of
+  anything. `SystemKeys` reads `Listed` off it, so the card and the help fill themselves and a key
+  added is a row added
+- **A table cannot be got wrong the way an ordered switch can**, which is not theory: `Ctrl+V` is
+  matched by asking whether control is held, and holding shift as well does not stop that being
+  true, so `Ctrl+Shift+V` written underneath it pasted instead of doing its own job. It was found
+  and fixed by reordering the cases, which is a fix that depends on nobody ever adding a case in
+  the wrong place. `Find` takes the most particular row instead, and `Tests/PatternKeyTests.cs`
+  pins that, along with every action having a key and words, every key answering, and a key the
+  pattern does not own being left alone, which is what keeps the letter rows a keyboard
+- One line per action rather than per key, so the octave reads as `Numpad * or Ctrl+]` on one row
+  instead of two rows saying nearly the same thing
 - **There are two kinds of shortcut and the difference is who decides.** System shortcuts are
   what the application does rather than where it goes, and they are not yours to move: the
   transport's `Space` and `Ctrl+R`, the pointing mode's `Ctrl+Shift+M`, the help's `Ctrl+H`, and

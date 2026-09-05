@@ -363,21 +363,44 @@ public static class Log
 
         if (folder.Length == 0) return;
 
-        var batch = new StringBuilder(4096);
+        lock (Appending)
+        {
+            var batch = new StringBuilder(4096);
 
-        while (Waiting.TryDequeue(out var line)) batch.Append(line);
+            while (Waiting.TryDequeue(out var line)) batch.Append(line);
 
-        int lost = Interlocked.Exchange(ref _lost, 0);
+            int lost = Interlocked.Exchange(ref _lost, 0);
 
-        if (lost > 0) batch.Append(Shape.Lost(lost));
+            if (lost > 0) batch.Append(Shape.Lost(lost));
 
-        if (batch.Length == 0) return;
+            if (batch.Length == 0) return;
 
-        string path = System.IO.Path.Combine(folder, FileName);
+            string path = System.IO.Path.Combine(folder, FileName);
 
-        Store.Roll(path, RollBytes);
-        Store.Append(path, batch.ToString());
+            Store.Roll(path, RollBytes);
+            Store.Append(path, batch.ToString());
+        }
     }
+
+    /// <summary>
+    /// Held by whoever is emptying the queue into the file, so only one of them is.
+    /// </summary>
+    /// <remarks>
+    /// **There is always more than one flusher**, which is what this is for and is easy to miss:
+    /// the writing thread flushes on its own clock, and anything may call <see cref="Flush"/> by
+    /// hand, which the way out of the process does and <see cref="Clear"/> does. Two of them
+    /// inside at once each take a share of the queue and then open the same file, and the one
+    /// that loses the open has its share swallowed along with the exception, since a log is not
+    /// worth throwing in the thing it is a log of. **So the symptom is a line that was written
+    /// and is not in the file**, at random and under load, which is the hardest thing to be
+    /// chasing with a log.
+    ///
+    /// Found by a test that wrote two lines and read back one. Its own lock rather than
+    /// <see cref="Gate"/>, which guards the settings and is taken by callers who are not writing
+    /// anything. Not on any path anything waits on: <see cref="Put"/> is what the audio thread
+    /// reaches and it only enqueues.
+    /// </remarks>
+    private static readonly object Appending = new();
 
     /// <inheritdoc cref="ILogAreas.Everywhere"/>
     public static IReadOnlyDictionary<LogArea, string> Everywhere => Switch.Everywhere;

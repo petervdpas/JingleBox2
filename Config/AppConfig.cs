@@ -154,6 +154,24 @@ public sealed class AppConfig
     public bool IgnoreKeyVelocity { get; set; }
 
     /// <summary>
+    /// Whether a note typed on the letter rows writes a velocity, the way a played one does.
+    /// </summary>
+    /// <remarks>
+    /// **A computer key has no velocity sensor**, so nothing was written and the volume column
+    /// stayed blank, which the sequencer reads as the instrument's own level. That is a
+    /// consistent answer and it is not the only one: a letter row standing in for a keyboard is
+    /// a keyboard that always plays at the same strength, and a keyboard that always plays at
+    /// the same strength still sends a number.
+    ///
+    /// Off unless somebody says otherwise, and off is exactly what happened before. Renoise's
+    /// own arrangement, read out of its settings file rather than remembered:
+    /// <c>ComputerKeyboardVelocityEnabled</c> is false there too and
+    /// <c>ComputerKeyboardVelocity</c> is 127, which is a key at full strength and is what this
+    /// writes.
+    /// </remarks>
+    public bool TypedVelocity { get; set; }
+
+    /// <summary>
     /// Whether letting a key go writes a note-off into the pattern.
     /// </summary>
     /// <remarks>

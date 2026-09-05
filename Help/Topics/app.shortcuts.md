@@ -49,18 +49,13 @@ on the screen to explain it.
 
 ## The pattern
 
-- The arrow keys move the cursor: up and down a line, left and right a column.
-- Holding `Shift` marks a block as you go, and there `Left` and `Right` take a
-  whole track at a time rather than a column.
-- `Tab` and `Shift+Tab` go to the next track and the one before.
-- `Page Up` and `Page Down` move four beats, which is however many lines that is
-  in the song you have open.
-- `Ctrl+A` marks the whole pattern, `Ctrl+C` copies, `Ctrl+X` cuts and `Ctrl+V`
-  pastes.
-- `Escape` lets a marked block go.
-- `Delete` empties the cell under the cursor.
-- `Insert` pushes a line in and `Backspace` pulls one out.
+The keys the pattern answers are in the list at the top of this page, with the
+application's own: moving the cursor, marking and pasting a block, the octave the
+letters play in, and whether a typed note carries a velocity. They are there rather
+than written out again here because they come off the same table the pattern itself
+reads, so a key added arrives on that list without anybody being told.
 
+What is not on it is the half of the pattern's keyboard that is not a shortcut at all.
 In the note column the letters are a keyboard, two rows of one: `Z` is C of the
 octave shown in the bar, `S` and `D` are the black keys above it, and the row from
 `Q` is the octave over that. The two rows overlap by five keys where they join, so

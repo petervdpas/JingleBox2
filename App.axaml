@@ -156,6 +156,28 @@
             </Setter>
         </Style>
 
+        <!-- The badge on the row the track being worked on plays: the same chip filled in
+             rather than washed, so which of a song's instruments is under the cursor is read
+             at a glance without the list moving. -->
+        <Style Selector="Border.badge.playing">
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" Opacity="0.75" />
+            </Setter>
+            <Setter Property="BorderBrush">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" />
+            </Setter>
+        </Style>
+
+        <!-- Colour and weight together, which is the pair the tab strip settled on: on a light
+             theme the accent alone is near enough the ordinary lettering that nothing reads as
+             chosen. -->
+        <Style Selector="TextBlock.playing">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" />
+            </Setter>
+        </Style>
+
         <!-- The same chip said more quietly, for something every row has. A category in the
              accent colour beside a usage badge in the accent colour is two alarms and no
              information. -->
@@ -664,10 +686,16 @@
                            VerticalAlignment="Center"
                            Opacity="0.7" />
 
+                <!-- The instrument the track being worked on plays is said in the accent and in
+                     bold, which is the pair the tab strip already uses and for the same reason:
+                     on a light theme the accent alone is near enough the ordinary lettering that
+                     a row reads as unmarked. The list itself does not move, since the number on a
+                     row is what the pattern writes into every cell. -->
                 <TextBlock Grid.Column="3" Grid.Row="0"
                            Text="{Binding Name}"
                            LineHeight="16"
-                           TextTrimming="CharacterEllipsis" />
+                           TextTrimming="CharacterEllipsis"
+                           Classes.playing="{Binding UnderCursor}" />
 
                 <TextBlock Grid.Column="3" Grid.Row="2"
                            Classes="cardHint"
@@ -676,6 +704,7 @@
 
                 <Border Grid.Column="4" Grid.Row="0"
                         Classes="badge"
+                        Classes.playing="{Binding UnderCursor}"
                         IsVisible="{Binding HasTrack}">
                     <TextBlock Text="{Binding TrackBadge}" />
                 </Border>

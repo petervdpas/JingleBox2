@@ -102,6 +102,21 @@ public sealed partial class InstrumentSlot : ObservableObject
         ? "TR-" + (Track + 1).ToString("00", CultureInfo.InvariantCulture)
         : "";
 
+    /// <summary>
+    /// Whether the track being worked on is the one that plays this instrument.
+    /// </summary>
+    /// <remarks>
+    /// **What a track plays and what is picked in this list are two different questions**, and
+    /// this is the first one drawn on the second one's rows. The list is in instrument order and
+    /// stays in it, since the number on a row is what the pattern writes into every cell: sorting
+    /// the rows by track would have the numbers running 02, 00, 01 down the page, and renumbering
+    /// them would mean rewriting every cell of the song.
+    ///
+    /// So nothing moves and one row is lit instead. Which one changes as the cursor crosses
+    /// tracks, the same thing the chain and the automation strip under the pattern already do.
+    /// </remarks>
+    [ObservableProperty] private bool underCursor;
+
     /// <summary>Redraws the row after the editor changed the instrument behind it.</summary>
     public void Refresh()
     {
