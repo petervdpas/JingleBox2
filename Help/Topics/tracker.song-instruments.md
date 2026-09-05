@@ -14,6 +14,10 @@ missing as the song opens. Adding one is SETTINGS, System.
 called what the machine is called, and an instrument off it is not. "Remove from
 song" takes the slot out of this song and leaves the rack alone.
 
+A machine can carry a page about itself, written by whoever built it. Where it does, the
+hamburger in the corner of its face has **Help** on it, and what opens is that machine's own
+page rather than anything of this application's.
+
 The rack itself is beside the pattern, under RACK. A machine is a fixture there while
 it is registered, and taking one off the rack is not losing it: the picker underneath
 offers it back, and losing one for good is unregistering it in SETTINGS, System.

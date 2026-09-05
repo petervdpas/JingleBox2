@@ -1,10 +1,21 @@
 # Mixer
 
-One strip per track: level, placement, mute, solo and ducking.
+Everything this application plays, in strips: level, placement, mute, solo and ducking.
 
-One strip per track. Solo silences every track that is not soloed, and mute beats
-solo on the same strip. Touching a strip anywhere picks its track, so the pattern,
-the chain and the automation follow what your hand is on.
+## Three groups, and they are not the same kind of thing
+
+**TRACKER** is one strip per song track. Solo silences every track that is not soloed,
+and mute beats solo on the same strip. Touching a strip anywhere picks its track, so
+the pattern, the chain and the automation follow what your hand is on.
+
+**RECORDER** is two: **IN**, what is coming in to be recorded, and **PLAY**, a take
+being auditioned on RECORD against the rest of the mix. **PADS** is every pad
+together.
+
+The difference matters when you pull a fader down. A track is the song's, so moving it
+changes the song and is saved with it. RECORDER and PADS are this installation's, so
+moving one changes how this machine sounds and not what anybody else would hear from
+your `.jibx`.
 
 The side chain at the bottom of a strip ducks that track while another one sounds:
 pick the track to listen to, how far down this one goes, and how long it takes to

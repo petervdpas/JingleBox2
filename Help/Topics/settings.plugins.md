@@ -18,9 +18,12 @@ Windows plugins are not Linux plugins. A Windows VST3 holds a .dll and needs win
 and yabridge to run at all; what is listed here is what runs natively.
 
 A plugin draws its own interface where it has one, in a window of its own that you
-can leave open while you work. The host's knobs are the fallback for a plugin that
-draws nothing, and are what a plugin gets on a platform where its window will not
-open. Plugin windows are X11 only so far.
+can leave open while you work. That works on Windows and on Linux under X11: the
+plugin's window belongs to the process the plugin runs in and is put inside one of
+ours, which on Windows also means sharing the keyboard with it, so a preset name
+typed into a plugin arrives in the plugin. The host's knobs are the fallback for a
+plugin that draws nothing, and for anywhere a window will not open, such as Wayland
+without XWayland.
 
 Every plugin runs in a process of its own, and so does the scan. A plugin that
 falls over takes nothing with it: the effect passes its audio through untouched or

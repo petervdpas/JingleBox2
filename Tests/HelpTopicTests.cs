@@ -22,6 +22,16 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class HelpTopicTests
 {
+    /// <summary>
+    /// How a badge is found in a layout: the part before the topic it names.
+    /// </summary>
+    /// <remarks>
+    /// Written once and used by both directions, since two spellings of one pattern would
+    /// eventually disagree about what counts as a badge, and the way that fails is a test that
+    /// quietly stops seeing half of them.
+    /// </remarks>
+    private const string Badge = @"HelpBadge[^>]*?Topic=""([^""]+)""";
+
     /// <summary>Everything the app explains about itself, as it ships.</summary>
     private readonly IHelpText _help = new HelpText();
 
@@ -87,8 +97,7 @@ public class HelpTopicTests
         Assert.True(Directory.Exists(views), "no Views folder at " + views);
 
         var asked = Directory.GetFiles(views, "*.axaml", SearchOption.AllDirectories)
-            .SelectMany(file => Regex.Matches(File.ReadAllText(file), @"HelpBadge[^>]*?Topic=""([^""]+)""",
-                RegexOptions.Singleline)
+            .SelectMany(file => Regex.Matches(File.ReadAllText(file), Badge, RegexOptions.Singleline)
                 .Select(found => (File: Path.GetFileName(file), Id: found.Groups[1].Value)))
             .ToList();
 
@@ -96,6 +105,60 @@ public class HelpTopicTests
 
         foreach (var one in asked)
             Assert.True(_help.Find(one.Id) != null, one.File + " asks for '" + one.Id + "', which is not a topic");
+    }
+
+    /// <summary>
+    /// Every page along the top has a badge somewhere on it.
+    /// </summary>
+    /// <remarks>
+    /// The other direction from the test above, and it is the one that was missing. That one
+    /// catches a badge pointing at nothing; this one catches a page pointing at nothing, which
+    /// is quieter: the help is complete, the topic exists, and there is no way to it from the
+    /// page it is about. Two pages had gone that way before this test existed, FIRE and the
+    /// rack, and both were found by reading the layouts by hand rather than by anything failing.
+    ///
+    /// The pages rather than every view, since a strip, a dialog and a window are reached from a
+    /// page that has one. Named here rather than read off the tab strip, because what counts as
+    /// a page is a decision, and a list somebody has to edit is exactly the reminder wanted: a
+    /// page added along the top has to be added here, and the way that fails is this going red
+    /// rather than a page shipping with no way into the help.
+    ///
+    /// SETTINGS is left out and is the one exception. It is a page of cards and every card
+    /// carries its own badge, so a rule of one per page would be met by a page answering for a
+    /// tenth of itself.
+    /// </remarks>
+    [Fact]
+    public void Every_page_has_a_way_into_the_help()
+    {
+        string views = Path.Combine(Sources(), "Views");
+
+        string[] pages =
+        {
+            "MixerView.axaml",
+            "RecordView.axaml",
+            "PadsView.axaml",
+            "UseView.axaml",
+            "TrackerView.axaml",
+            "RackView.axaml",
+            "DesignerView.axaml",
+            "ControlLinksView.axaml"
+        };
+
+        foreach (string page in pages)
+        {
+            string file = Path.Combine(views, page);
+
+            Assert.True(File.Exists(file), page + " is not in " + views + " any more");
+
+            var badges = Regex.Matches(File.ReadAllText(file), Badge, RegexOptions.Singleline);
+
+            Assert.True(badges.Count > 0,
+                page + " has no help badge on it, so the topic it is about cannot be reached from it");
+
+            foreach (Match badge in badges)
+                Assert.True(_help.Find(badge.Groups[1].Value) != null,
+                    page + " asks for '" + badge.Groups[1].Value + "', which is not a topic");
+        }
     }
 
     /// <summary>The keyboard page really does have the two holes its live half goes into.</summary>

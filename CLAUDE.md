@@ -1502,7 +1502,9 @@ whole exercise and is worth writing down rather than summarising:
 
 - Configurable pad matrix size (rows x columns) via SETTINGS tab
   - Minimum: 4 pads total (e.g., 2x2, 1x4, 4x1)
-  - Maximum: 16 pads total (e.g., 4x4, 2x8, 8x2)
+  - Maximum: 16 pads total (e.g., 4x4, 2x8, 8x2), or 32 with the extended switch on, which is
+    `PadMatrix.Usual` against `PadMatrix.Most` and is a switch of its own because a grid of 32 is
+    a different instrument from a grid of 8
   - Default: 4 rows x 2 columns = 8 pads (backward compatible)
 - Two source types per pad: a recording off the shelf (picked from RECORD's takes, so the
   app owns every file a pad depends on) or an HTTP stream. A pad still plays a path

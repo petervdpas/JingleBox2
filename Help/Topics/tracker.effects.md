@@ -33,6 +33,10 @@ box to move it earlier or later, or to remove it. Each box prints its first few
 controls and what they read, so the row tells you the order and the settings without
 opening anything.
 
+An effect of ours carries a page about itself the way a machine does: the hamburger in the
+corner of its face has **Help** on it where its author wrote one, and the three that ship all
+have one.
+
 The mixer's master has a chain of its own, and so does a pad. The same effect on two
 tracks is two sets of knob positions.
 

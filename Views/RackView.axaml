@@ -94,9 +94,16 @@
 
                 <!-- Which is the ordinary state: every registered machine is given its box
                      when the rack is read, so there is nothing left to add. -->
-                <TextBlock Classes="cardHint" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Every machine you have is on the rack. SETTINGS, System is where machines are added and taken away."
-                           IsVisible="{Binding !HasAvailableMachines}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" Margin="0,4,0,0"
+                      IsVisible="{Binding !HasAvailableMachines}">
+                  <TextBlock Grid.Column="0" Classes="cardHint" TextWrapping="Wrap"
+                             Text="Every machine you have is on the rack. SETTINGS, System is where machines are added and taken away." />
+
+                  <!-- The page's own badge. It sits beside the line that already says where a
+                       box comes from, since that is where somebody is looking when the list is
+                       not what they expected. -->
+                  <views:HelpBadge Grid.Column="1" Topic="rack.devices" VerticalAlignment="Top" />
+                </Grid>
 
                 <Button Content="Delete" HorizontalAlignment="Stretch" Classes="danger"
                         Margin="0,6,0,0"
@@ -122,9 +129,12 @@
                      an effect has nothing of the sort, since one in use is a slot on a track's
                      chain. Registered and here are the same fact, and SETTINGS, System is where
                      that changes. -->
-                <TextBlock Classes="cardHint" TextWrapping="Wrap"
-                           Text="Every effect you have is here. Drop one on a track's chain, under the pattern."
-                           IsVisible="{Binding HasEffects}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding HasEffects}">
+                  <TextBlock Grid.Column="0" Classes="cardHint" TextWrapping="Wrap"
+                             Text="Every effect you have is here. Drop one on a track's chain, under the pattern." />
+
+                  <views:HelpBadge Grid.Column="1" Topic="rack.devices" VerticalAlignment="Top" />
+                </Grid>
 
                 <!-- There are none, and this says why rather than showing an empty list with no
                      explanation. An effect is a face over an engine, the engine is compiled in,

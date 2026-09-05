@@ -58,10 +58,12 @@ An empty list means one of two things and the page says which: no ASIO on this s
 at all, or ASIO present with no driver installed, which is most Windows machines until
 a card's own driver or something like ASIO4ALL puts one there.
 
-**With a driver picked, the pads are silent.** The driver owns the card, so the
-tracker is handed to it and the pads, which are separate streams played the ordinary
-way, have nowhere to go. Finishing that means one stream for everything and it is not
-built yet, so ASIO is the tracker's alone for now.
+**A driver needs One output stream, the switch above.** The driver owns the card and
+can be handed one thing, so everything this application plays has to be summed before
+it leaves. With the switch on, the tracker, the pads and a take being auditioned all
+go out of the driver. With it off, the tracker is handed to the driver on its own and
+the pads and RECORD play into a device that is not connected to anything, which is
+silence with nothing to explain it.
 
 **If the sound goes strange after changing one, restart the app.** Reopening the
 output while everything else is still running is not the same as starting clean:

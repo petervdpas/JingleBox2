@@ -20,8 +20,9 @@ marked. **Silence** is the other half of the same idea: it empties the marked pa
 and leaves the length alone, for a cough in the middle of a good take.
 
 The magnifying glasses take you closer and further out, about the middle of what is
-on screen; the wheel does the same, about the pointer. Drag with `Ctrl` held to move
-a zoomed picture sideways rather than marking a new region.
+on screen; the wheel does the same, about the pointer. To move a zoomed picture
+sideways rather than mark a new region, drag with `Ctrl` or `Shift` held, or drag with
+the middle button.
 
 It goes in a long way: at the far end a sixteen second take shows about forty
 milliseconds across the window, which is close enough to find a click and mark it

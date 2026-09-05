@@ -61,6 +61,8 @@ public sealed class HelpText : IHelpText
     public const string TrackerAutomation = "tracker.automation";
     /// <summary>What your hardware is pointed at, and how a template travels.</summary>
     public const string MidiTemplates = "midi.templates";
+    /// <summary>What this installation has on its rack, and what a box on it is.</summary>
+    public const string RackDevices = "rack.devices";
 
     /// <summary>
     /// Where the topics are: <c>help/</c> beside the program.

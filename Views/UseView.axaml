@@ -72,17 +72,23 @@
           RowSpacing="14">
 
       <Border Grid.Row="0" Classes="profileBar">
-        <Grid ColumnDefinitions="*,Auto">
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
           <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
             <TextBlock Classes="muted" Text="Profile:"/>
             <TextBlock Classes="primary" FontWeight="SemiBold" Text="{Binding SelectedProfileName}"/>
           </StackPanel>
 
+          <!-- The one badge on the page somebody runs a show from, and it is in the bar rather
+               than anywhere near a pad: what is under your hand here is the performance, and the
+               help is next to the profile, which is the only other thing on this page that is
+               not a pad. -->
+          <views:HelpBadge Grid.Column="1" Topic="pads.laying-out" VerticalAlignment="Center" />
+
           <!-- The same button a machine's face carries and the mixer's card has in its own
                corner, for the same reason: the pads are pointed at by resting the pointer on one
                and touching the hardware, and a page you can do that on should say so out loud
                rather than leaving the keystroke to be known. -->
-          <ui:PushButton Grid.Column="1" x:Name="PadsMenuButton"
+          <ui:PushButton Grid.Column="2" x:Name="PadsMenuButton"
                          Mark="Bars" CapWidth="30" CapHeight="20"
                          Pressed="PadsMenu_Pressed"
                          ToolTip.Tip="What your controllers do to the pads. Point one at a template you have already made, or start learning." />
