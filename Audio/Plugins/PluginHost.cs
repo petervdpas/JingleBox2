@@ -43,9 +43,29 @@ public sealed class PluginHost : IPluginHost
     /// None of that applies on the normal path, where the plugin gets a process of its own:
     /// nothing is written down beforehand because nothing in this process is at risk.
     /// </remarks>
-    private object? Open(PluginInfo? plugin, int sampleRate, int maxFrames, bool asInstrument)
+    /// <summary>
+    /// Which plugin on this machine a song is asking for. Holds nothing, so one serves them all.
+    /// </summary>
+    /// <remarks>
+    /// **The one place a song's plugin is turned into a plugin on this computer**, which is why
+    /// it is here and not at either of the two places that name one. Both the instrument a track
+    /// plays and a slot on a chain reach loading through this method, and both used to hand over
+    /// the path they had written down: on another machine that path has never existed, so a song
+    /// carried across found its plugins installed and scanned and asked for a file that was not
+    /// there. The identity is what travels and every song has always written it down.
+    /// </remarks>
+    private static readonly IPluginsHere Here = new PluginsHere();
+
+    private object? Open(PluginInfo? asked, int sampleRate, int maxFrames, bool asInstrument)
     {
-        if (plugin == null) return null;
+        if (asked == null) return null;
+
+        var plugin = Here.Same(asked, PluginShelf.Known, !SongOrigin.Travelled);
+
+        if (!ReferenceEquals(plugin, asked))
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
+                $"{asked.Name} was found here by its {(plugin.Id == asked.Id ? "id" : "name")}: " +
+                $"{plugin.Path} rather than {asked.Path}");
 
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
             $"Opening {plugin.Name} ({plugin.FormatName}), Isolated={Isolated}, InstrumentMode={asInstrument}");

@@ -59,6 +59,8 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
             if (!string.IsNullOrWhiteSpace(folder)) Folders.Add(folder);
         }
 
+        Audio.Plugins.PluginShelf.Wants(config?.KnownPlugins);
+
         Remember(config?.KnownPlugins);
     }
 
@@ -150,8 +152,15 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     }
 
     /// <summary>Keeps what was found, so the next start does not have to look again.</summary>
+    /// <remarks>
+    /// The shelf is told at the same moment, since it is what a song's plugin is looked up in and
+    /// a scan is the only thing that changes the answer. Told rather than left to read the
+    /// settings, so nothing on the loading path opens a file.
+    /// </remarks>
     private void Save(List<PluginInfo> found)
     {
+        Audio.Plugins.PluginShelf.Wants(found);
+
         if (_store == null || _config == null) return;
 
         _config.KnownPlugins = found;

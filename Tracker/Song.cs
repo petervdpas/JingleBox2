@@ -52,6 +52,19 @@ public sealed class Song
     /// </remarks>
     public string Description { get; set; } = "";
 
+    /// <summary>
+    /// Which kind of machine this song was last written on, in one word.
+    /// </summary>
+    /// <remarks>
+    /// Set on every save rather than kept from where the song began, since what anything wants to
+    /// know is whether the paths **in this file** could mean anything here, and the paths were
+    /// written by whoever saved it last.
+    ///
+    /// Empty in every song written before it existed, which reads back as unknown and behaves
+    /// exactly as before. See <see cref="Interfaces.IMachineWord"/> for what the word is for.
+    /// </remarks>
+    public string MadeOn { get; set; } = "";
+
     /// <summary>Beats a minute. Held to its range by <see cref="Normalize"/> on the way in.</summary>
     public double Bpm { get; set; } = TrackerTiming.DefaultBpm;
 

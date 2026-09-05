@@ -1937,6 +1937,49 @@ whole exercise and is worth writing down rather than summarising:
   own instrument number, and blank means the track has none pointed at it, which was invisible: the
   badges said which track each instrument was on and nothing said what the track under your hand
   was playing. Now a track with no instrument lights no row
+- **A song named its plugins by where they were, and where they were is the one thing about them
+  that does not travel.** Both places a song names one, the instrument a track plays and a slot on
+  a chain, built what the host loads straight out of the stored path. So Gruber carried to a
+  Windows machine found Serum installed, scanned and listed, and asked the host for
+  `/home/peter/.vst3/Serum2.vst3`. Reported as the plugins being there and not working, which is
+  exactly what it was
+- **The identity was written down all along and nothing read it.** The song holds
+  `56534558667350736572756D20320000` for Serum 2 beside the path, and the field documentation on
+  the chain's own id said in as many words that it was tried first. It was not, and **this file
+  had already recorded that shape once**: a paragraph describing work still to do outliving the
+  work, with the tell being that the document disagreed with the code. It cost the same mistake
+  again, since the prose was read out as fact twice before anybody opened the reader
+- `IPluginsHere` is the one lookup and `PluginHost.Open` is where it goes, since that is the
+  single funnel both an instrument and a chain slot reach loading through. Three comparisons,
+  first one wins: **the id, then the name, then the path and only where exactly one plugin has
+  it.** What was asked for comes back unchanged when nothing matches, which is not a failure: a
+  plugin this machine has not got keeps its name so it can be reported as missing
+- **The path is last because of a fault that has nothing to do with travelling**, and this
+  repository's own test song is the proof: Serum 2 and Serum 2 FX have different class ids and
+  **the same path**, since they are two classes in one bundle. Matched by path a song could be
+  handed the synthesiser where it asked for the effect, on the machine it was saved on. So a path
+  shared by more than one of them decides nothing and the answer falls through
+- The name is second and it is the step that will carry the load. Whether a VST3 class id really
+  is the same bytes on two platforms cannot be settled from one of them: `Vst3Abi.HexId` reads the
+  sixteen raw bytes of the class id out of the plugin's own factory and hexes them in order, with
+  no GUID formatting and no byte swapping, so it is whatever the developer compiled in. **A step
+  that can only ever be right or silent is worth keeping even when you doubt it fires**, and the
+  log says which one found it, so the first run on another machine answers the question rather
+  than either of us being right in advance
+- **And a song says which kind of machine wrote it now.** `Song.MadeOn` is one word, stamped on
+  every save rather than kept from where the song began, since what anybody wants to know is
+  whether the paths in the file in front of them mean anything on this computer and those were
+  written by whoever saved it last. Empty in every song already on anybody's disc, which reads
+  back as unknown, and unknown behaves exactly as before
+- Which lets the path comparison be skipped rather than merely failing. That looked like it bought
+  nothing, since two paths from two operating systems cannot match anyway, and there is one case
+  where it does: **a settings file carried between machines** puts the other computer's paths into
+  the list of what was scanned, and then a path match succeeds and hands back a plugin that is not
+  on this disc. A question that can only answer no is not worth asking; one that can answer yes
+  and be wrong is worth refusing
+- It is said out loud rather than only acted on, because a song quietly behaving differently
+  because of where it was made is worse than one that says so: opening a travelled song writes a
+  line naming both machines and what it means
 - RECORD asks the songs as well as the rack before deleting a take (`SampleUsers` over
   `SoundMachineRack` and `SongStore`). A song owns its instruments, so a recording nothing on the
   rack plays can still be the sound of three songs, and deleting it used to empty them with

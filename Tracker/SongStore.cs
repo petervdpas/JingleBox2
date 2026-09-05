@@ -34,6 +34,41 @@ public sealed class SongStore : ISongStore
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
     private static readonly ISongSamples Carried = new SongSamples();
 
+    /// <summary>
+    /// Says whether the song just read came from a different kind of machine, and writes it down.
+    /// </summary>
+    /// <remarks>
+    /// The paths in a song are the one thing in it that does not travel, and everything that has
+    /// to know is downstream of here: what a plugin is looked up by, and what a reader of the log
+    /// needs when a recording or a plugin does not turn up. Said out loud rather than only acted
+    /// on, since **a song quietly behaving differently because of where it was made is worse than
+    /// one that says so**.
+    /// </remarks>
+    /// <param name="song">The song that was just read.</param>
+    private static void Travelled(Song song)
+    {
+        bool travelled = Machine.Travelled(song.MadeOn);
+
+        Audio.Plugins.SongOrigin.Wants(travelled);
+
+        if (!travelled) return;
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Tracker, () =>
+            $"'{song.Name}' was written on {song.MadeOn} and this is {Machine.Here}: " +
+            "the paths in it are not compared here, so plugins and recordings are found by name");
+    }
+
+    /// <summary>
+    /// Which kind of machine this one is, stamped into every song written here.
+    /// </summary>
+    /// <remarks>
+    /// Holds nothing, so one serves them all. **Written on every save rather than kept from where
+    /// the song began**, since what anybody wants to know is whether the paths in the file that
+    /// is in front of them could mean anything on this computer, and those paths were written by
+    /// whoever saved it last.
+    /// </remarks>
+    private static readonly Interfaces.IMachineWord Machine = new MachineWord();
+
     /// <summary>Which instruments play a given recording.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
     private static readonly ISampleUsers Usage = new SampleUsers();
@@ -606,6 +641,9 @@ public sealed class SongStore : ISongStore
             arrived = Carried.Read(container, song);
 
             song.Normalize();
+
+            Travelled(song);
+
             return song;
         }
         catch (Exception)
@@ -704,6 +742,10 @@ public sealed class SongStore : ISongStore
         public int Version { get; set; } = 1;
         public string Name { get; set; } = "";
         public string Description { get; set; } = "";
+
+        /// <inheritdoc cref="Song.MadeOn"/>
+        public string MadeOn { get; set; } = "";
+
         public double Bpm { get; set; } = TrackerTiming.DefaultBpm;
         public int LinesPerBeat { get; set; } = TrackerTiming.DefaultLinesPerBeat;
 
@@ -773,6 +815,7 @@ public sealed class SongStore : ISongStore
             Version = Current,
             Name = song.Name,
             Description = song.Description,
+            MadeOn = Machine.Here,
             Bpm = song.Bpm,
             LinesPerBeat = song.LinesPerBeat,
             PlayMode = song.PlayMode,
@@ -903,6 +946,7 @@ public sealed class SongStore : ISongStore
             {
                 Name = Name,
                 Description = Description,
+                MadeOn = MadeOn,
                 Bpm = Bpm,
                 LinesPerBeat = LinesPerBeat,
                 PlayMode = PlayMode,
