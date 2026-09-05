@@ -46,6 +46,16 @@ public interface IDesignProject
     /// <summary>The folder it lives in, or empty for one that has never been saved.</summary>
     string Folder { get; set; }
 
+    /// <summary>
+    /// The page it carries about itself, written in the designer and saved beside the manifest.
+    /// </summary>
+    /// <remarks>
+    /// Settable here and read-only on <see cref="IRackProject"/>, the same as everything else on
+    /// this interface: the designer is where a device's prose is typed and the rack is where it
+    /// is read.
+    /// </remarks>
+    string Help { get; set; }
+
     /// <summary>How its face is put together.</summary>
     Panel Panel { get; set; }
 

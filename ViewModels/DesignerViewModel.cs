@@ -185,12 +185,14 @@ public sealed partial class DesignerViewModel : ObservableObject
             if (e.PropertyName == nameof(SoundMachinePresetTools.HasWork)) OnPropertyChanged(nameof(ShowsPresetTools));
         };
 
-        PreviewMenu = new Midi.ControlMenu(
-            () => Project?.Id ?? "",
-            () => Project?.Name ?? "")
-        {
-            Told = said => Status = said
-        };
+        PreviewMenu = new SoundDeviceMenu(
+            new Midi.ControlMenu(
+                () => Project?.Id ?? "",
+                () => Project?.Name ?? "")
+            {
+                Told = said => Status = said
+            },
+            () => Project as SoundDevices.Interfaces.IRackProject);
     }
 
     /// <summary>

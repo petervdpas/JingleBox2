@@ -399,11 +399,14 @@ public class SoundEffectRackTests : IDisposable
 
     /// <summary>And it carries the same menu a machine's face does, keyed by the effect.</summary>
     /// <remarks>
-    /// With no desk behind it there is nothing to offer, not even the learning line, which is
-    /// the rule <c>ControlMenu</c> already keeps and <c>Tests/SoundMachineMenuTests.cs</c> says in
-    /// full: a page with no hardware to point at offers nothing rather than a line that would do
-    /// nothing. What is worth saying here is that the row has one at all and hands the same one
-    /// back, since the panel is redrawn when it is given a different menu.
+    /// With no desk behind it there is nothing about hardware to offer, not even the learning
+    /// line, which is the rule <c>ControlMenu</c> already keeps and
+    /// <c>Tests/SoundMachineMenuTests.cs</c> says in full: a page with no hardware to point at
+    /// offers nothing rather than a line that would do nothing.
+    ///
+    /// What is left is the effect's own page, which is about the box rather than about anybody's
+    /// desk and is therefore there whatever is plugged in. Greyed here, since this effect was
+    /// made in a test and its author wrote none.
     /// </remarks>
     [Fact]
     public void A_row_carries_a_menu_of_its_own()
@@ -411,7 +414,11 @@ public class SoundEffectRackTests : IDisposable
         var row = new ViewModels.RackSoundEffect(new SoundEffectProject { Id = "effect.echo", Name = "Echo" });
 
         Assert.NotNull(row.Menu);
-        Assert.Empty(row.Menu.Read());
+
+        var line = Assert.Single(row.Menu.Read());
+
+        Assert.Equal(Rack.SoundDevices.Faces.MenuOptionWords.Help, line.Option);
+        Assert.False(line.Live);
     }
 
     /// <summary>The list is what was last read, not everything ever read.</summary>

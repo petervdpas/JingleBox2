@@ -39,6 +39,16 @@ public interface IRackProject : ISoundDevice
     /// <summary>The folder it was read from, or empty for one that has never been saved.</summary>
     string Folder { get; }
 
+    /// <summary>
+    /// The page it carries about itself, or nothing where its author wrote none.
+    /// </summary>
+    /// <remarks>
+    /// Read off the folder rather than out of the manifest, since it is prose somebody edits and
+    /// prose inside a JSON string is prose nobody edits. See <see cref="ISoundDeviceHelp"/> for
+    /// why a device's help is the device's rather than the application's.
+    /// </remarks>
+    string Help { get; }
+
     /// <summary>Whether it has a folder yet, which is what everything touching the disc holds against.</summary>
     /// <remarks>
     /// Asked rather than worked out from <see cref="Folder"/> at each call site, since one of

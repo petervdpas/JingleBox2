@@ -61,6 +61,10 @@ public sealed class SoundMachineProject : IRackProject, IDesignProject
     /// </remarks>
     public const string ManifestName = "machine.json";
 
+    /// <summary>The page a device carries about itself, which is a file in its folder.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly SoundDevices.Interfaces.ISoundDeviceHelp Pages = new SoundDeviceHelp();
+
     /// <summary>Where the samples a machine ships with go.</summary>
     public const string SoundsFolder = "sounds";
 
@@ -101,6 +105,17 @@ public sealed class SoundMachineProject : IRackProject, IDesignProject
     /// </remarks>
     [JsonIgnore]
     public string Folder { get; set; } = "";
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Not in the manifest and deliberately so: it is a page of prose, it is edited as a page,
+    /// and it is read and written as <c>help.md</c> beside this file by
+    /// <see cref="SoundDeviceHelp"/>. Held here all the same, because everything that shows a
+    /// device already holds one of these and a second lookup by folder at every call site is a
+    /// second way of answering one question.
+    /// </remarks>
+    [JsonIgnore]
+    public string Help { get; set; } = "";
 
     /// <summary>
     /// What this machine is called in files, forever.
@@ -198,6 +213,7 @@ public sealed class SoundMachineProject : IRackProject, IDesignProject
             if (read == null) return null;
 
             read.Folder = folder;
+            read.Help = Pages.Read(folder);
 
             return read;
         }
@@ -230,6 +246,8 @@ public sealed class SoundMachineProject : IRackProject, IDesignProject
         Directory.CreateDirectory(Path.Combine(Folder, ImagesFolder));
 
         File.WriteAllText(Path.Combine(Folder, ManifestName), JsonSerializer.Serialize(this, Layout));
+
+        Pages.Write(Folder, Help);
     }
 
     /// <summary>What the picker on a panel calls the thing it browses.</summary>

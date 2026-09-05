@@ -7,7 +7,7 @@ namespace JingleBox2.Rack.SoundDevices.Faces;
 /// </summary>
 /// <remarks>
 /// A Menu is a generic part: the sound device says it wants one and which options are on it, and
-/// the host fills those options in. Two today and there will be more, which is the whole reason the
+/// the host fills those options in. Three today and there will be more, which is the whole reason the
 /// part is not called after either of them and the words live here rather than being built into the
 /// drawing.
 ///
@@ -31,12 +31,23 @@ public static class MenuOptionWords
     /// <summary>Start or stop learning, which is the same mode Ctrl+Shift+M turns over.</summary>
     public const string Learn = "learn";
 
+    /// <summary>
+    /// The page this sound device carries about itself, opened in a window of its own.
+    /// </summary>
+    /// <remarks>
+    /// Written by whoever built the device and kept in its folder, so it travels with the box
+    /// and says nothing about the application it happens to be plugged into. Greyed on a device
+    /// whose author wrote none, rather than left out: a line that is not there says the host
+    /// cannot do it, and a line that is there and grey says this device has nothing to say.
+    /// </remarks>
+    public const string Help = "help";
+
     /// <summary>What a Menu carries when it names no options, which is all of them.</summary>
     /// <remarks>
     /// In the order they are offered, so a designer listing them and a panel drawing them agree
     /// without either being told about the other.
     /// </remarks>
-    public static readonly IReadOnlyList<string> All = new[] { Surfaces, Learn };
+    public static readonly IReadOnlyList<string> All = new[] { Help, Surfaces, Learn };
 
     /// <summary>What the property naming them is called in a sound device's file.</summary>
     public const string Property = "options";

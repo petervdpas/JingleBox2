@@ -719,6 +719,7 @@ public sealed partial class MenuOptionViewModel : ObservableObject
     /// <summary>What each option is called on the page, against the word the file uses.</summary>
     private static readonly Dictionary<string, string> Words = new(StringComparer.Ordinal)
     {
+        [MenuOptionWords.Help] = "Its own help page",
         [MenuOptionWords.Surfaces] = "The control surfaces pointed at this",
         [MenuOptionWords.Learn] = "Learn a control"
     };

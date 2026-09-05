@@ -178,7 +178,10 @@ public class MenuOptionsTests
 
         picked.Options.First(one => one.Said.Contains("Learn", StringComparison.Ordinal)).On = false;
 
-        Assert.Equal(MenuOptionWords.Surfaces, element.Properties[MenuOptionWords.Property]);
+        Assert.Equal(
+            string.Join(MenuOptionWords.Between,
+                MenuOptionWords.All.Where(one => one != MenuOptionWords.Learn)),
+            element.Properties[MenuOptionWords.Property]);
 
         foreach (var one in picked.Options) one.On = false;
 
@@ -221,7 +224,7 @@ public class MenuOptionsTests
         var picked = new ViewModels.PanelElementViewModel(element);
 
         Assert.All(picked.Options, one => Assert.NotEqual("", one.Said));
-        Assert.True(picked.Options.First().On);
+        Assert.True(picked.Options.First(one => one.Said.Contains("surfaces", StringComparison.Ordinal)).On);
     }
 
     /// <summary>A menu sits in the upper right unless somebody says otherwise.</summary>

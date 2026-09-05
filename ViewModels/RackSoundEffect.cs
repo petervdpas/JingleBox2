@@ -117,14 +117,15 @@ public sealed partial class RackSoundEffect : ObservableObject, IRackRow
     private ObservableCollection<ParameterViewModel>? _knobs;
 
     /// <summary>
-    /// What its own Menu drops down: the control surfaces pointed at this effect, and learning.
+    /// What its own Menu drops down: this effect's page, the surfaces pointed at it, and learning.
     /// </summary>
     /// <remarks>
     /// The same menu a machine's face carries and the same code behind it, keyed by this effect's
     /// id rather than a machine's. So a template made on one is a template on the other, and the
     /// MIDI CC page cuts its cards by the same rule.
     /// </remarks>
-    public IPanelMenu Menu => _menu ??= new Midi.ControlMenu(() => Id, () => Name);
+    public IPanelMenu Menu => _menu ??=
+        new SoundDeviceMenu(new Midi.ControlMenu(() => Id, () => Name), () => Effect);
 
     /// <inheritdoc cref="Menu"/>
     private IPanelMenu? _menu;

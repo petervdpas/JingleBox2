@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:JingleBox2.Views"
+        x:Class="JingleBox2.Views.SoundDeviceHelpWindow"
+        Width="620"
+        Height="540"
+        MinWidth="380"
+        MinHeight="260"
+        WindowStartupLocation="CenterOwner">
+
+  <!-- A device's own page, and deliberately not the application's help window: there is no
+       topic list, no search and nothing else of this program's around it, because what is in
+       here was written by whoever built the box and is about that box alone.
+
+       Drawn on the device's own plate, in the device's own colours, for the same reason its
+       face is: a page that came with the machine should look like it came with the machine, and
+       from across the room the colour is what says which of the open windows this belongs to. -->
+  <Border x:Name="Plate"
+          Background="{DynamicResource BgBrush}"
+          BorderBrush="{DynamicResource BorderBrush}"
+          BorderThickness="1"
+          CornerRadius="6"
+          Padding="14">
+    <DockPanel>
+      <TextBlock x:Name="NameText" DockPanel.Dock="Top" Classes="cardTitle" Margin="0,0,0,2" />
+
+      <!-- The one line the device says about itself, which is the same line the rack lists it
+           by: the page below is whatever its author wrote, and this is what the box is. -->
+      <TextBlock x:Name="SummaryText" DockPanel.Dock="Top" Classes="cardHint"
+                 TextWrapping="Wrap" Margin="0,0,0,12" />
+
+      <Button DockPanel.Dock="Bottom" Content="Close" Click="OnClose"
+              HorizontalAlignment="Right" Margin="0,12,0,0" />
+
+      <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <views:MarkdownView x:Name="Page" />
+      </ScrollViewer>
+    </DockPanel>
+  </Border>
+
+</Window>

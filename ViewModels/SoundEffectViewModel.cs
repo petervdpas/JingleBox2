@@ -222,8 +222,12 @@ public sealed partial class SoundEffectViewModel : ObservableObject, IChainSlot,
         return values;
     }
 
-    /// <summary>What its own Menu drops down: the surfaces pointed at this effect, and learning.</summary>
-    public IPanelMenu Menu => _menu ??= new Midi.ControlMenu(() => Effect.Id, () => Name);
+    /// <summary>
+    /// What its own Menu drops down: this effect's own page, the surfaces pointed at it, and
+    /// learning.
+    /// </summary>
+    public IPanelMenu Menu => _menu ??=
+        new SoundDeviceMenu(new Midi.ControlMenu(() => Effect.Id, () => Name), () => Effect);
 
     /// <inheritdoc cref="Menu"/>
     private IPanelMenu? _menu;

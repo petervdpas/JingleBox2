@@ -960,6 +960,51 @@
     </Grid>
     </TabItem>
 
+    <TabItem Header="Helptext" IsVisible="{Binding HasProject}">
+    <!-- The page this device carries about itself, which travels in its folder and is nothing to
+         do with the application's own help. Written here because this is where the box is made:
+         whoever laid the face out is the only person who knows what the third knob does.
+
+         Written and shown side by side. It is markdown, and markdown is one of those things
+         nobody gets right without seeing it: the page on the right is drawn by the same control
+         the window on a track's machine draws it with, so what is on this screen is what a
+         person opening the box will see. It catches up when the writing loses the focus, the
+         same as the name and the summary do, since a page redrawn per keystroke is a page
+         flickering under the hand that is writing it. -->
+    <Grid Margin="0,8,0,0" ColumnDefinitions="*,Auto,*" ColumnSpacing="2">
+
+      <DockPanel Grid.Column="0">
+        <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="The page" Margin="0,0,0,6" />
+
+        <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" Margin="0,6,0,0" TextWrapping="Wrap"
+                   Text="Markdown: # for a heading, - for a list, **bold**, `a key`. Saved as help.md beside the manifest and carried in the zip. A device with nothing written here has no Help line on its Menu." />
+
+        <TextBox Text="{Binding Project.Help}"
+                 LostFocus="Machine_Changed"
+                 AcceptsReturn="True" TextWrapping="Wrap"
+                 FontFamily="Consolas,Menlo,monospace"
+                 VerticalContentAlignment="Top"
+                 PlaceholderText="What this device is, what its controls do, and anything somebody opening it for the first time would have to guess."
+                 ScrollViewer.VerticalScrollBarVisibility="Auto" />
+      </DockPanel>
+
+      <GridSplitter Grid.Column="1" Classes="handle" ResizeDirection="Columns" Width="10"
+                    ToolTip.Tip="Drag to give the writing or the page more room." />
+
+      <Border Grid.Column="2" Classes="inset">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="As it will be read"
+                     Margin="0,0,0,10" />
+
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <views:MarkdownView Markdown="{Binding Project.Help}" />
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+
+    </Grid>
+    </TabItem>
+
     <TabItem Header="Utilities" IsVisible="{Binding ShowsPresetTools}">
     <!-- The jobs somebody would otherwise do in a file manager and an audio editor. A list of
          them, and one of them open: two tools side by side already filled the width, and the
