@@ -82,7 +82,41 @@ public sealed class SynthVoice : IVoice
     /// </remarks>
     private readonly double _driveMakeup;
 
+    /// <summary>How much of the curve this drive uses, worked out once beside the makeup.</summary>
+    private readonly double _driveFade;
+
     private readonly ToneFilter _filter;
+
+    /// <summary>
+    /// Whether anything at all moves this note off the pitch it was given.
+    /// </summary>
+    /// <remarks>
+    /// **A note that is not being bent is at one frequency for its whole life, and working that
+    /// out again for every sample is a `Math.Pow` for an answer of exactly one.** At the mixer's
+    /// ceiling of forty eight voices that is two million of them a second, which measured out at
+    /// most of the difference between a rich patch and a plain one.
+    ///
+    /// Asked of the patch once, because neither the vibrato nor the pitch envelope can be switched
+    /// on while a note sounds: the voice owns its own copy of the patch.
+    /// </remarks>
+    private readonly bool _bends;
+
+    /// <summary>
+    /// Whether this voice needs a random number at all, which only the noise wave does.
+    /// </summary>
+    /// <remarks>
+    /// The generator was being turned for every sample of every voice and the number thrown away
+    /// by five of the six waves, since it was worked out as an argument before the oscillator was
+    /// asked which wave it is. Nothing about the sound changes: what a saw does with a random
+    /// number is ignore it.
+    /// </remarks>
+    private readonly bool _hisses;
+
+    /// <summary>
+    /// Whether the level wobbles at all, which is the tremolo's own two settings asked once.
+    /// </summary>
+    /// <remarks><inheritdoc cref="_bends" path="/remarks/para[last()]"/></remarks>
+    private readonly bool _wobbles;
 
     /// <summary>Whether the filter runs before the drive, off the patch.</summary>
     /// <remarks>
@@ -159,7 +193,12 @@ public sealed class SynthVoice : IVoice
 
         _drive = _patch.Drive;
         _driveMakeup = _patch.EvenDrive ? EvenMakeup(noiseSeed) : Shaper.Makeup(_drive);
+        _driveFade = Shaper.Fade(_drive);
         _filterFirst = _patch.FilterFirst;
+        _hisses = _patch.Wave == SynthWave.Noise;
+        _wobbles = _patch.TremoloDepth > 0 && _patch.TremoloRateHz > 0;
+        _bends = (_patch.VibratoDepthCents > 0 && _patch.VibratoRateHz > 0)
+            || (_patch.PitchEnvSemitones != 0 && _patch.PitchEnvMs > 0);
         _filter = new ToneFilter(_patch.FilterCutoffHz, _patch.FilterResonance, _sampleRate);
         _noise = new Random(noiseSeed);
 
@@ -256,12 +295,14 @@ public sealed class SynthVoice : IVoice
 
             Level = (float)(level * Gain);
 
-            double frequency = _baseFrequency * Motion.Ratio(Motion.MotionAt(_patch, _time));
+            double bend = _bends ? Motion.MotionAt(_patch, _time) : 0;
+            double frequency = bend == 0 ? _baseFrequency : _baseFrequency * Motion.Ratio(bend);
 
             _phase = Shapes.Wrap(_phase + frequency * step);
 
-            double sample = Shapes.Sample(_patch.Wave, _phase, _patch.Duty, _noise.NextDouble() * 2.0 - 1.0);
-            double value = Shaped(sample) * level * TremoloAt(_time) * Gain;
+            double random = _hisses ? _noise.NextDouble() * 2.0 - 1.0 : 0;
+            double sample = Shapes.Sample(_patch.Wave, _phase, _patch.Duty, random);
+            double value = Shaped(sample) * level * (_wobbles ? TremoloAt(_time) : 1.0) * Gain;
 
             int index = frame * 2;
             buffer[index] += (float)(value * left);
@@ -287,7 +328,7 @@ public sealed class SynthVoice : IVoice
     /// Rounds the wave off into itself. Applied before the envelope, so a note keeps its shape
     /// as it decays instead of losing its edge along with its level.
     /// </summary>
-    private double Drive(double sample) => Shaper.Apply(sample, _drive, _driveMakeup);
+    private double Drive(double sample) => Shaper.Apply(sample, _drive, _driveMakeup, _driveFade);
 
     /// <summary>
     /// The makeup that leaves this patch's own wave as loud as it arrived.

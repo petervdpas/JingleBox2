@@ -60,14 +60,21 @@ public sealed class Saturation : ISaturation
     }
 
     /// <inheritdoc/>
-    public double Apply(double sample, double drive, double makeup)
+    public double Fade(double drive) =>
+        Driven(drive) ? Math.Clamp((drive - 1.0) / FadeIn, 0, 1) : 0;
+
+    /// <inheritdoc/>
+    public double Apply(double sample, double drive, double makeup) =>
+        Apply(sample, drive, makeup, Fade(drive));
+
+    /// <inheritdoc/>
+    public double Apply(double sample, double drive, double makeup, double fade)
     {
         if (sample == 0 || !Driven(drive)) return sample;
 
         double wet = Math.Tanh(sample * drive) * makeup;
-        double amount = Math.Clamp((drive - 1.0) / FadeIn, 0, 1);
 
-        return sample + (wet - sample) * amount;
+        return sample + (wet - sample) * fade;
     }
 
     /// <inheritdoc/>

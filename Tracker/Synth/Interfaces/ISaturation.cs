@@ -44,6 +44,27 @@ public interface ISaturation
     /// </param>
     double Evenly(double drive, System.ReadOnlySpan<double> shape);
 
+    /// <summary>
+    /// How much of the curve is used at this drive, which is the fade over the bottom of the knob.
+    /// </summary>
+    /// <remarks>
+    /// Worked out once per voice for the reason <see cref="Makeup"/> is: it depends on the drive
+    /// alone, and the drive cannot move while a note lasts, so working it out per sample is a
+    /// subtract, a divide and a clamp for an answer that was already known. One at any drive of
+    /// two or more, which is most of the knob.
+    /// </remarks>
+    /// <param name="drive">How hard the wave is pushed into the curve. One or less is no drive.</param>
+    double Fade(double drive);
+
+    /// <summary>
+    /// The same with the fade handed in as well, for a voice that has both worked out already.
+    /// </summary>
+    /// <param name="sample">The value going in, which is expected to be in -1..1.</param>
+    /// <param name="drive">How hard the wave is pushed into the curve. One or less is no drive.</param>
+    /// <param name="makeup">What the drive costs in level, from <see cref="Makeup"/>.</param>
+    /// <param name="fade">How much of the curve is used, from <see cref="Fade"/>.</param>
+    double Apply(double sample, double drive, double makeup, double fade);
+
     /// <summary>Rounds the wave off into itself. A drive of one or less leaves it untouched.</summary>
     /// <param name="sample">The value going in, which is expected to be in -1..1.</param>
     /// <param name="drive">How hard the wave is pushed into the curve. One or less is no drive.</param>

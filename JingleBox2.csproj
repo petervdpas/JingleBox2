@@ -9,6 +9,26 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+
+    <!--
+      Background collection is on by default and is written down here because this application
+      cannot survive it being off, and a default is not a decision anybody can see.
+
+      The tracker page while the transport runs allocates a little under a megabyte a second,
+      and on the machine this was measured on the runtime answers that with about three full
+      collections a second whatever the gen0 budget is set to. Concurrently they cost between a
+      third and one and a third of a millisecond each, some forty milliseconds in every five
+      seconds, which is a percent of the clock and nothing anybody hears. The same collections
+      with gcConcurrent=0 cost forty to fifty milliseconds each and 720 ms in every five: worse
+      than the fault that started this, since a stopped thread is a block of audio that does not
+      get filled.
+
+      Workstation rather than server, also deliberately. Server collection gives every core a
+      heap and a collecting thread, which is right for a machine answering requests and wrong
+      for one where a single audio thread must never wait.
+    -->
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
     <Version>0.0.0-local</Version>
     <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64</RuntimeIdentifiers>
 

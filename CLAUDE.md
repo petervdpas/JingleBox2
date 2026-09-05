@@ -730,6 +730,116 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   back up to **9.6** to save half of an editing cost that the cursor layer then removed entirely.
   **A cull is only a saving where the thing being culled is not redrawn more often because of
   it**, and on a 64 line pattern the whole picture is barely two screens anyway
+- **The gen-2 collections were chased and are not a fault, but what keeps them harmless is.** On
+  the tracker page with the transport running the runtime does about three or four full
+  collections a second on a heap that never grows: 26 to 30 MB, gen 2 flat at 22, the large object
+  heap flat at 3.2, nothing leaking anywhere. Ruled out one at a time by measuring rather than
+  reasoning: not memory pressure (the load was 6.2 GB against the runtime's own 6.9 GB threshold),
+  not the gen-0 budget (raising it to 16 MB took 20 collections to 17), not the transport's band
+  (hiding it changed nothing), and not the finalizer queue (it reaches a thousand on the mixer
+  page with no collection at all). What is left is the residual allocation itself, a little under
+  a megabyte a second, about half of it the drawing thread's per-line work
+- **They cost nothing only because collection runs in the background, and that was a default
+  rather than a decision.** Concurrently each one pauses between a third and one and a third of a
+  millisecond, some forty in every five thousand, which is a percent of the clock. The identical
+  collections under `gcConcurrent=0` cost forty to fifty milliseconds each and **720 ms in every
+  five seconds**, which is worse than the stumble this whole exercise started with. So the csproj
+  says `ConcurrentGarbageCollection` and `ServerGarbageCollection` out loud now, with the
+  measurement as the reason: a publish profile or a later hand can turn either of them over
+  without ever touching audio code, and the way that fails is an application that stutters on
+  somebody else's machine for no reason anybody can see
+- **And then a busy song was built rather than argued about, and it says something the empty one
+  hid.** Eight tracks, twenty note columns, four patterns of 128 lines, 6624 filled cells with
+  notes, instruments, volumes and pan commands, eight OddSkillas, at 140 to the minute in song
+  mode: about a hundred and twenty notes a second and twenty voices sounding. Everything measured
+  before this was an empty four track pattern, which exercises the drawing and nothing else
+- On that song blocks **do** go over: mean 25 to 32% of the time each block has, worst 106 to 227%,
+  and one to nine blocks over budget in every five seconds. That is the first of the two fault
+  shapes rather than the second, and the two want opposite answers: **the mean is the mixing
+  itself**, twenty voices costing a quarter of every block in a Debug build, where the empty
+  pattern's mean was one per cent
+- Where the allocation is was settled by measuring each thread rather than reasoning about it.
+  `GC.GetAllocatedBytesForCurrentThread` on the audio thread: **0.01 MB/s**, so the render path is
+  allocation-free exactly as its own remarks claim. On the tracker's clock thread, which starts a
+  hundred and twenty notes a second: **0.12**. On the drawing thread: **2.7**. The process total is
+  six to fourteen, so the rest is the toolkit's own compositing, which on this machine is software
+  rendered with no GPU at all
+- Ruled out on the way past, each with a measurement: not the pattern being drawn, since the mixer
+  page with the same song playing is the same or worse; not the logging, since turning every area
+  but Audio off changed nothing; and not the transport merely running, since the same song loaded
+  and stopped is 0.1 MB/s with nothing collected
+- **What cannot be concluded from any of it is what happens on somebody's real machine**, and that
+  is worth writing down beside the numbers. This was a Debug build on a software renderer with no
+  GPU and no sound card, where both the mixing and the compositing are inflated. The song is kept
+  out of the way rather than put on anybody's shelf, and the answer to whether it matters is the
+  one line the log now prints on the machine that is actually playing it
+- **Then a complex one: sixteen tracks across and sixteen patterns down**, 44 note columns, 53984
+  notes scattered through every pattern, 64 automation lanes and eight effect chains. It reaches
+  48 voices, which is `MaxVoices` and therefore the ceiling, and blocks go over between nineteen
+  and thirty two times in every five seconds. Thinned to a density somebody would actually write,
+  13704 notes rather than 53984, it is **the same**: 39 to 48 voices and the same mean. That is the
+  finding. **The voice count is set by how many note columns are sounding, not by how many notes
+  are written**, so sixteen tracks of two to four columns is 44 voices whether the part is busy or
+  sparse
+- Which made it worth measuring the mixer on its own, with no window and no song, at 441 frames
+  into a 10 ms block. Two patches, because the patch turns out to matter as much as the count:
+
+  | voices | plain, filter open | saw, drive 2, resonance 0.5 |
+  |---|---|---|
+  | 8 | 6.8% | 6.6% |
+  | 16 | 8.4% | 13.2% |
+  | 24 | 12.6% | 20.3% |
+  | 32 | **17.2%** | 31.0% |
+  | 40 | 21.8% | 31.4% |
+  | 48 | 27.1% | **41.4%** |
+
+- The 17.2% at 32 voices is the measurement this file already recorded as "15 to 16%", so the old
+  number stands and what it was measured on is now clear: a plain patch. **A saw through a drive
+  into a resonant filter costs about twice as much per voice**, which is a filter and a hyperbolic
+  tangent per sample per voice and is exactly where it should be. The mixer's 41% at the ceiling
+  is also the whole of the 40 to 50% mean the complex song shows through the application, so the
+  mean really is the mixing and nothing else is hiding in it
+- Debug, on a laptop, with no GPU and no sound card, which is half the story and has to be said
+  beside the numbers rather than after them. What they are good for is the shape: the cost is
+  linear in voices, it doubles with a rich patch, and the ceiling the engine sets itself is where
+  it lands at about forty per cent of a block here
+- **And then the mixing was made cheaper, which is what that measurement was for.** Three things
+  were worked out for every sample of every voice that had been settled before the note started,
+  and all three are the same mistake in different clothes:
+  - **the frequency, through a power.** `Ratio(MotionAt(...))` is `Math.Pow(2, x/12)`, and with
+    nothing bending the pitch it answers exactly one, every sample, on every voice. At the
+    ceiling that is two million powers a second computing nothing
+  - **a random number**, worked out as an argument before the oscillator was asked which wave it
+    is, and thrown away by five of the six waves
+  - **the drive's fade**, a subtract, a divide and a clamp derived from a knob that cannot move
+    while a note lasts. The makeup beside it was already handed in for exactly this reason, so
+    the fade was the one term that had been left behind
+- Plus the mixer reading each track's peak in the same pass that sums it rather than walking the
+  same buffer twice
+- **Not one sample changes**, and that is arithmetic rather than hope: `Ratio(0)` is exactly 1.0
+  so the multiply it replaces is exactly nothing, a saw ignores the random number it is handed,
+  and the fade is the same number whether it is worked out per sample or once.
+  `Tests/VoiceShortcutTests.cs` pins each of those facts rather than the speed, since the facts
+  are the whole of why this is a shortcut and not a change to the sound
+- Measured best of seven runs, 441 frames into a 10 ms block, Debug:
+
+  | voices | plain before | plain after | rich before | rich after |
+  |---|---|---|---|---|
+  | 16 | 9.0% | 6.4% | 16.5% | 9.6% |
+  | 32 | 18.3% | 12.3% | 24.4% | 18.0% |
+  | 48 | **27.1%** | **17.1%** | **35.3%** | **26.0%** |
+
+- Best of seven and not one run, because the first attempt at this reported the change as a
+  regression: the same code measured 30.6% and then 34.7% five minutes apart on a laptop with six
+  gigabytes in use. **A single timing on a loaded machine is not a measurement**, and the way that
+  fails is a real improvement being thrown away or a real regression being shipped
+- End to end on the complex song, which is the number that matters: mean 40 to 46% became 33 to
+  36%, worst 290% became 193%, and **blocks over budget went from nineteen to thirty two in every
+  five seconds down to three to six**. Not nothing left, but the song sits at the engine's own
+  voice ceiling in a Debug build on a laptop
+- What is left on that path is a hyperbolic tangent per sample when the drive is up, which cannot
+  go without changing the sound, and an interface call or two per sample, which is the price of
+  every rule on the audio path being something a test can stand in front of. Both are deliberate
 - **An effect has presets, and the page for them is a form rather than a file.** It said no for a
   while, on the reasoning that a machine's preset is an instrument file and an effect has no
   instrument. That was an argument about how presets happened to be stored here rather than about

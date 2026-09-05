@@ -1730,7 +1730,36 @@ public sealed class TrackMixer : ITrackMixer
     {
         var source = _sounding[track] ? _busses[track] : null;
 
+        bool ducked = setting.Depth > 0
+            && setting.Key >= 0
+            && setting.Key < MaxTracks
+            && setting.Key != track;
+
         float peak = 0f;
+
+        if (!ducked)
+        {
+            _duckGain[track] = 1f;
+            _duckers[track]?.Reset();
+
+            if (source != null)
+            {
+                for (int i = 0; i < samples; i++)
+                {
+                    float value = source[i];
+                    float abs = Math.Abs(value);
+
+                    if (abs > peak) peak = abs;
+
+                    buffer[i] += value;
+                }
+            }
+
+            _trackLevels[track] = peak;
+
+            return;
+        }
+
         if (source != null)
         {
             for (int i = 0; i < samples; i++)
@@ -1739,23 +1768,8 @@ public sealed class TrackMixer : ITrackMixer
                 if (abs > peak) peak = abs;
             }
         }
+
         _trackLevels[track] = peak;
-
-        bool ducked = setting.Depth > 0
-            && setting.Key >= 0
-            && setting.Key < MaxTracks
-            && setting.Key != track;
-
-        if (!ducked)
-        {
-            _duckGain[track] = 1f;
-            _duckers[track]?.Reset();
-
-            if (source == null) return;
-
-            for (int i = 0; i < samples; i++) buffer[i] += source[i];
-            return;
-        }
 
         var ducker = _duckers[track] ??= new Ducker(setting.ReleaseMs, SampleRate);
         ducker.ReleaseMs = setting.ReleaseMs;
