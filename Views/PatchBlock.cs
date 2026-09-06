@@ -138,11 +138,22 @@ public sealed class PatchBlock : ThemedControl
     /// </remarks>
     public event Action<PatchPort, PointerPressedEventArgs>? PortPressed;
 
-    /// <summary>Raised while the title bar is dragged, with how far the pointer has moved.</summary>
+    /// <summary>Raised while the block is dragged, with how far the pointer has moved.</summary>
     public event Action<Vector>? Dragged;
+
+    /// <summary>Raised when the hand lets go of a block it really moved.</summary>
+    /// <remarks>
+    /// Once per drag rather than per movement, which is what makes remembering where a block was
+    /// left one line written to the settings instead of a hundred. A press that moved nothing
+    /// says nothing, so picking a block out to read its details does not write anything at all.
+    /// </remarks>
+    public event Action? Settled;
 
     /// <summary>Where the pointer was when the block was taken hold of, or nothing.</summary>
     private Point? _held;
+
+    /// <summary>Whether the hand has actually moved the block since it took hold of it.</summary>
+    private bool _moved;
 
     /// <summary>Takes no focus: the keyboard belongs to the page, and a block is pointed at.</summary>
     public PatchBlock() => Focusable = false;
@@ -232,6 +243,7 @@ public sealed class PatchBlock : ThemedControl
         }
 
         _held = at;
+        _moved = false;
         e.Pointer.Capture(this);
         e.Handled = true;
     }
@@ -250,6 +262,8 @@ public sealed class PatchBlock : ThemedControl
 
         var at = e.GetPosition(this);
 
+        _moved = true;
+
         Dragged?.Invoke(at - from);
         e.Handled = true;
     }
@@ -259,8 +273,14 @@ public sealed class PatchBlock : ThemedControl
     {
         base.OnPointerReleased(e);
 
+        bool moved = _held != null && _moved;
+
         _held = null;
+        _moved = false;
+
         e.Pointer.Capture(null);
+
+        if (moved) Settled?.Invoke();
     }
 
     /// <summary>Draws the plate, the title bar, the name and every dot with its own name.</summary>

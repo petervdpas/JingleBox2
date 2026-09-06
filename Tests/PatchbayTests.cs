@@ -342,6 +342,7 @@ public class PatchbayTests
     {
         var scene = _graph.Read(Array.Empty<AudioRoute>(), null);
 
+        Assert.Contains(scene.Links, l => l.From.Node == "record" && l.To.Node == "mixer");
         Assert.Contains(scene.Links, l => l.From.Node == "tracker" && l.To.Node == "mixer");
         Assert.Contains(scene.Links, l => l.From.Node == "fire" && l.To.Node == "mixer");
         Assert.Contains(scene.Links, l => l.From.Node == "mixer" && l.To.Node == "output");
@@ -528,19 +529,40 @@ public class PatchbayTests
         }
     }
 
-    /// <summary>A source gives out and the recorder takes in, never the other way about.</summary>
+    /// <summary>A source gives out and nothing on the machine takes in but the output.</summary>
     [Fact]
-    public void Sources_give_out_and_the_recorder_takes_in()
+    public void A_source_only_gives_out()
     {
         var scene = _graph.Read(new[] { new AudioRoute("mic", "Built-in", AudioRouteKind.Input) }, null);
 
-        var recorder = scene.Nodes.Single(n => n.Id == _graph.OwnNode);
         var source = scene.Nodes.Single(n => n.Id == "mic");
 
-        Assert.Single(recorder.Ins);
-        Assert.Empty(recorder.Outs);
         Assert.Single(source.Outs);
         Assert.Empty(source.Ins);
+    }
+
+    /// <summary>
+    /// The recorder takes the capture in and gives takes out, and only the second reaches the desk.
+    /// </summary>
+    /// <remarks>
+    /// The two halves of RECORD are not the same signal. A take being auditioned is played
+    /// through the desk and comes out of the master; what is arriving at the input reaches
+    /// nothing, since that fader sets what a take will hold rather than what anybody hears. A
+    /// picture that ran the capture into the mixer would be saying you can hear yourself, which
+    /// you cannot.
+    /// </remarks>
+    [Fact]
+    public void The_take_reaches_the_desk_and_the_capture_does_not()
+    {
+        var scene = _graph.Read(Array.Empty<AudioRoute>(), null);
+
+        var recorder = scene.Nodes.Single(n => n.Id == _graph.OwnNode);
+
+        Assert.Single(recorder.Ins);
+        Assert.Single(recorder.Outs);
+
+        Assert.Contains(scene.Links, l => l.From == recorder.Outs[0] && l.To.Node == "mixer");
+        Assert.DoesNotContain(scene.Links, l => l.From == _graph.OwnInput);
     }
 
     /// <summary>A cable made by the rules may be drawn by the rules.</summary>

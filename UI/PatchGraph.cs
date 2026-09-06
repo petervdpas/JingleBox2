@@ -62,6 +62,23 @@ public sealed class PatchGraph : IPatchGraph
     /// <inheritdoc/>
     public PatchPort OwnInput => new(RecordNode, CaptureName, PatchSide.In, PatchChannels.Stereo);
 
+    /// <summary>
+    /// A take being auditioned, on its way to the desk.
+    /// </summary>
+    /// <remarks>
+    /// **The take goes through the mixer and the capture does not**, which is why the recorder
+    /// has one point of each kind. Auditioning a take is played through the take bus and comes
+    /// out of the master like anything else, so it has a strip on the desk; what is arriving at
+    /// the input has a strip too and that strip reaches nothing, since its fader sets what a take
+    /// will hold rather than what anybody hears.
+    /// </remarks>
+    private static readonly PatchPort RecordOut =
+        new(RecordNode, "takes", PatchSide.Out, PatchChannels.Stereo, Fixed: true);
+
+    /// <summary>Where a take arrives on the desk.</summary>
+    private static readonly PatchPort MixerTakes =
+        new(MixerNode, "takes", PatchSide.In, PatchChannels.Stereo, Fixed: true);
+
     /// <summary>The tracker's mix, on its way to the desk.</summary>
     private static readonly PatchPort TrackerOut =
         new(TrackerNode, "mix", PatchSide.Out, PatchChannels.Stereo, Fixed: true);
@@ -116,7 +133,7 @@ public sealed class PatchGraph : IPatchGraph
         }
 
         nodes.Add(new PatchNode(
-            RecordNode, "RECORD", new[] { OwnInput }, Array.Empty<PatchPort>(), true, OwnX, TopY));
+            RecordNode, "RECORD", new[] { OwnInput }, new[] { RecordOut }, true, OwnX, TopY));
 
         nodes.Add(new PatchNode(
             TrackerNode, "TRACKER", Array.Empty<PatchPort>(), new[] { TrackerOut }, true, OwnX, PlayY));
@@ -125,7 +142,13 @@ public sealed class PatchGraph : IPatchGraph
             FireNode, "FIRE", Array.Empty<PatchPort>(), new[] { FireOut }, true, OwnX, PlayY + Apart));
 
         nodes.Add(new PatchNode(
-            MixerNode, "MIXER", new[] { MixerTracker, MixerPads }, new[] { MixerOut }, true, MixX, PlayY));
+            MixerNode,
+            "MIXER",
+            new[] { MixerTracker, MixerPads, MixerTakes },
+            new[] { MixerOut },
+            true,
+            MixX,
+            PlayY));
 
         nodes.Add(new PatchNode(
             OutputNode,
@@ -136,6 +159,7 @@ public sealed class PatchGraph : IPatchGraph
             OutX,
             PlayY));
 
+        links.Add(new PatchLink(RecordOut, MixerTakes));
         links.Add(new PatchLink(TrackerOut, MixerTracker));
         links.Add(new PatchLink(FireOut, MixerPads));
         links.Add(new PatchLink(MixerOut, OutputIn));

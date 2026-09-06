@@ -116,9 +116,11 @@ public partial class MixerView : UserControl
 
         bay.Wired -= patch.Plug;
         bay.Unwired -= patch.Unplug;
+        bay.Moved -= patch.Place;
 
         bay.Wired += patch.Plug;
         bay.Unwired += patch.Unplug;
+        bay.Moved += patch.Place;
 
         patch.Refresh();
     }

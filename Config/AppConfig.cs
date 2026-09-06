@@ -228,6 +228,17 @@ public sealed class AppConfig
     public Audio.Plugins.PluginChainConfig? RecordEffects { get; set; }
 
     /// <summary>
+    /// Where the patchbay's blocks have been dragged to, one entry per block that was moved.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than in a song, because the patchbay is about this machine: what is on it is
+    /// the programs running on this computer and this application's own path through them, and
+    /// none of that travels with a piece of music. A block nobody has moved is not in the list,
+    /// so a fresh installation reads nothing and the graph's own arrangement stands.
+    /// </remarks>
+    public System.Collections.Generic.List<Records.PatchbayPlace> PatchbayPlaces { get; set; } = new();
+
+    /// <summary>
     /// Whether the threads that must not be late are scheduled as audio threads.
     /// </summary>
     /// <remarks>

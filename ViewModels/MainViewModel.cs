@@ -876,7 +876,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, ISh
     /// the recorder because that is what the picture is about: every block on it either feeds
     /// this application or is this application.
     /// </remarks>
-    public PatchbayViewModel Patchbay => patchbay ??= new PatchbayViewModel(Record, this);
+    public PatchbayViewModel Patchbay => patchbay ??= new PatchbayViewModel(Record, this, new Config.PatchPlaces(_cfg, _store));
 
     /// <summary>Backing field for <see cref="RecorderPlay"/>.</summary>
     private SourceStripViewModel? recorderPlay;

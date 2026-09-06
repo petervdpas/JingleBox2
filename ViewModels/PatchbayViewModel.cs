@@ -33,6 +33,9 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// <summary>What turns those into blocks and cables.</summary>
     private readonly IPatchGraph _graph;
 
+    /// <summary>Where the blocks were left, or nothing where nobody is keeping that.</summary>
+    private readonly IPatchPlaces? _places;
+
     /// <summary>Where the mix leaves, or nothing where nobody has said.</summary>
     /// <remarks>
     /// Optional, so a patchbay can be built and put a question to without an engine: what it
@@ -49,11 +52,17 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// </remarks>
     /// <param name="input">The sources, and the one being taken.</param>
     /// <param name="output">Where the mix leaves through, for the block at the end of the path.</param>
+    /// <param name="places">Where the blocks were left last time, or nothing to use the graph's own.</param>
     /// <param name="graph">What blocks and cables those make.</param>
-    public PatchbayViewModel(IInputSource input, IOutputChosen? output = null, IPatchGraph? graph = null)
+    public PatchbayViewModel(
+        IInputSource input,
+        IOutputChosen? output = null,
+        IPatchPlaces? places = null,
+        IPatchGraph? graph = null)
     {
         _input = input;
         _output = output;
+        _places = places;
         _graph = graph ?? new PatchGraph();
 
         _input.Routes.CollectionChanged += Changed;
@@ -85,7 +94,7 @@ public sealed partial class PatchbayViewModel : ObservableObject
     {
         var scene = _graph.Read(_input.Routes, _input.SelectedRoute, _output?.SelectedOutputDevice?.Name);
 
-        Nodes = scene.Nodes;
+        Nodes = Laid(scene.Nodes);
         Links = scene.Links;
 
         if (Selected is not { } picked) return;
@@ -95,6 +104,42 @@ public sealed partial class PatchbayViewModel : ObservableObject
 
     /// <summary>Asks the routing to read the graph again, for a page that has just been opened.</summary>
     public void Refresh() => _input.RefreshRoutes();
+
+    /// <summary>
+    /// Puts each block where it was left, where anybody has moved it.
+    /// </summary>
+    /// <remarks>
+    /// Over the graph's own arrangement rather than instead of it, so a block that has never
+    /// been touched opens where it was meant to and one that has opens where you put it. A
+    /// block added to this application later needs no entry and no migration.
+    /// </remarks>
+    /// <param name="read">The blocks as the graph laid them out.</param>
+    private IReadOnlyList<PatchNode> Laid(IReadOnlyList<PatchNode> read)
+    {
+        if (_places == null) return read;
+
+        var laid = new List<PatchNode>(read.Count);
+
+        foreach (var node in read)
+        {
+            laid.Add(_places.Placed(node.Id, out double x, out double y)
+                ? node with { X = x, Y = y }
+                : node);
+        }
+
+        return laid;
+    }
+
+    /// <summary>Writes down where a block has been left, so it is there again tomorrow.</summary>
+    /// <remarks>
+    /// Told by the surface once the hand has let go, so a drag is one line written. The picture
+    /// is not read again afterwards: the block is already where it was put, and rebuilding it
+    /// under the pointer would be a page that jumps as you let go of it.
+    /// </remarks>
+    /// <param name="node">Which block, by its id.</param>
+    /// <param name="x">How far across it was left.</param>
+    /// <param name="y">How far down.</param>
+    public void Place(string node, double x, double y) => _places?.Place(node, x, y);
 
     /// <summary>
     /// A cable was dropped on our own input, so that source is what the recorder takes.

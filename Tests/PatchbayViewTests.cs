@@ -232,6 +232,100 @@ public class PatchbayViewTests
         Assert.Equal(1, bench.Refreshed);
     }
 
+    /// <summary>A block put somewhere opens there next time.</summary>
+    /// <remarks>
+    /// The whole point of keeping it: the arrangement is somebody's work and this application
+    /// throwing it away on every start would be worse than never having remembered it.
+    /// </remarks>
+    [Fact]
+    public void A_block_opens_where_it_was_left()
+    {
+        var kept = new Shelf();
+
+        kept.Place("firefox", 640, 480);
+
+        var bench = new Bench();
+        bench.Routes.Add(Route("firefox"));
+
+        var bay = new PatchbayViewModel(bench, null, kept);
+
+        var block = Assert.Single(bay.Nodes, n => n.Id == "firefox");
+
+        Assert.Equal(640, block.X);
+        Assert.Equal(480, block.Y);
+    }
+
+    /// <summary>A block nobody moved opens where the graph put it.</summary>
+    [Fact]
+    public void A_block_nobody_moved_opens_where_it_was_meant_to()
+    {
+        var bench = new Bench();
+        bench.Routes.Add(Route("firefox"));
+
+        var plain = new PatchbayViewModel(bench);
+        var kept = new PatchbayViewModel(bench, null, new Shelf());
+
+        Assert.Equal(
+            Assert.Single(plain.Nodes, n => n.Id == "firefox").X,
+            Assert.Single(kept.Nodes, n => n.Id == "firefox").X);
+    }
+
+    /// <summary>Letting go of a block writes down where it was left.</summary>
+    [Fact]
+    public void Letting_go_writes_it_down()
+    {
+        var kept = new Shelf();
+        var bay = new PatchbayViewModel(new Bench(), null, kept);
+
+        bay.Place("mixer", 30, 40);
+
+        Assert.True(kept.Placed("mixer", out double x, out double y));
+        Assert.Equal(30, x);
+        Assert.Equal(40, y);
+    }
+
+    /// <summary>A patchbay built with nothing keeping places still works.</summary>
+    /// <remarks>
+    /// Which is what a test, and any page built without a settings file, is: the cost is that
+    /// nothing is remembered, and nothing else changes.
+    /// </remarks>
+    [Fact]
+    public void A_patchbay_with_nowhere_to_keep_places_is_fine()
+    {
+        var bay = new PatchbayViewModel(new Bench());
+
+        bay.Place("mixer", 30, 40);
+
+        Assert.NotEmpty(bay.Nodes);
+    }
+
+    /// <summary>Somewhere to keep places, holding them in memory.</summary>
+    private sealed class Shelf : IPatchPlaces
+    {
+        /// <summary>What has been put where.</summary>
+        private readonly System.Collections.Generic.Dictionary<string, (double X, double Y)> _places = new();
+
+        /// <inheritdoc/>
+        public bool Placed(string node, out double x, out double y)
+        {
+            if (_places.TryGetValue(node, out var at))
+            {
+                x = at.X;
+                y = at.Y;
+
+                return true;
+            }
+
+            x = 0;
+            y = 0;
+
+            return false;
+        }
+
+        /// <inheritdoc/>
+        public void Place(string node, double x, double y) => _places[node] = (x, y);
+    }
+
     /// <summary>The cable a hand would have drawn from that source into us.</summary>
     private static PatchLink Cable(PatchbayViewModel bay, string node)
     {

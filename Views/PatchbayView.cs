@@ -84,6 +84,13 @@ public sealed class PatchbayView : Panel
     /// <summary>Raised when a cable has been pulled out and dropped on nothing.</summary>
     public event Action<PatchLink>? Unwired;
 
+    /// <summary>Raised once a block has been dragged and let go of, with where it was left.</summary>
+    /// <remarks>
+    /// Where a block sits is the surface's own answer while the page is open, and somebody
+    /// else's business between one run and the next: this is how it leaves.
+    /// </remarks>
+    public event Action<string, double, double>? Moved;
+
     /// <summary>The block for each node, by id, so a list read again reuses what is on screen.</summary>
     private readonly Dictionary<string, PatchBlock> _blocks = new(StringComparer.Ordinal);
 
@@ -150,6 +157,7 @@ public sealed class PatchbayView : Panel
                 block.PortPressed += (port, e) => Grab(port, e);
                 block.Dragged += moved => Move(node.Id, moved);
                 block.Touched += () => Selected = Find(block.Node);
+                block.Settled += () => Left(node.Id);
 
                 _blocks[node.Id] = block;
                 Children.Add(block);
@@ -177,6 +185,14 @@ public sealed class PatchbayView : Panel
         Mark();
         InvalidateArrange();
         _cables.InvalidateVisual();
+    }
+
+    /// <summary>Says where a block was left, once the hand has finished with it.</summary>
+    private void Left(string id)
+    {
+        if (!_places.TryGetValue(id, out var at)) return;
+
+        Moved?.Invoke(id, at.X, at.Y);
     }
 
     /// <summary>Tells each block whether it is the one picked out.</summary>
