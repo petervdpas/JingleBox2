@@ -865,6 +865,19 @@ public sealed partial class MainViewModel : ObservableObject, IShortcutContext
             () => (Record.LevelLeft, Record.LevelRight),
             source: Record);
 
+    /// <summary>Backing field for <see cref="Patchbay"/>.</summary>
+    private PatchbayViewModel? patchbay;
+
+    /// <summary>
+    /// The patchbay under the mixer, over the same sources the IN strip picks from.
+    /// </summary>
+    /// <remarks>
+    /// Made once and kept, so where somebody has dragged a block survives leaving the page. Over
+    /// the recorder because that is what the picture is about: every block on it either feeds
+    /// this application or is this application.
+    /// </remarks>
+    public PatchbayViewModel Patchbay => patchbay ??= new PatchbayViewModel(Record);
+
     /// <summary>Backing field for <see cref="RecorderPlay"/>.</summary>
     private SourceStripViewModel? recorderPlay;
 

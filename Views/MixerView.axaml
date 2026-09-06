@@ -5,6 +5,7 @@
              xmlns:ui="clr-namespace:JingleBox2.Rack.Controls;assembly=JingleBox2.Rack.Controls"
              xmlns:midi="clr-namespace:JingleBox2.Midi"
              xmlns:routing="clr-namespace:JingleBox2.Audio.Routing.Records"
+             xmlns:rec="clr-namespace:JingleBox2.UI.Records"
              x:Class="JingleBox2.Views.MixerView"
              x:DataType="vm:TrackerViewModel">
 
@@ -443,18 +444,77 @@
         </Border>
       </TabItem>
 
-      <!-- Nothing is drawn here yet, and it says so where the picture will be, which is the
-           rule the rack's empty tab already keeps: a tab left to itself shows whatever was
-           last drawn, and a blank one reads as broken rather than as empty. -->
+      <!-- The picture, and a sidebar saying what the block you touched is. Every block on it
+           either feeds this application or is this application, and every cable has us at one
+           end, which is what makes it a patchbay somebody can use rather than a picture of the
+           whole machine: there is no gesture on it that can unplug the speakers. -->
       <TabItem Header="Patchbay">
-        <Border Classes="card">
-          <TextBlock Classes="cardHint"
-                     TextAlignment="Center"
-                     TextWrapping="Wrap"
-                     HorizontalAlignment="Center"
-                     VerticalAlignment="Center"
-                     Text="Nothing here yet. This is where what feeds JingleBox2 and where it plays out will be drawn, with everything else on the machine left alone." />
-        </Border>
+        <ContentControl Content="{Binding $parent[views:MixerView].Patchbay}">
+          <ContentControl.ContentTemplate>
+            <DataTemplate x:DataType="vm:PatchbayViewModel">
+              <Grid ColumnDefinitions="*,12,260">
+
+                <Border Grid.Column="0" Classes="card">
+                  <views:PatchbayView Loaded="Bay_Loaded"
+                                      Nodes="{Binding Nodes}"
+                                      Links="{Binding Links}"
+                                      Selected="{Binding Selected, Mode=TwoWay}" />
+                </Border>
+
+                <!-- What the block in hand is. It says nothing rather than the last thing when
+                     nothing is picked, since a sidebar describing a block nobody touched reads
+                     as the picture having chosen for you. -->
+                <Border Grid.Column="2" Classes="card">
+                  <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Block" />
+
+                    <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" TextWrapping="Wrap"
+                               Margin="0,8,0,0"
+                               Text="{Binding Says}" />
+
+                    <StackPanel Spacing="10" IsVisible="{Binding Selected, Converter={x:Static ObjectConverters.IsNotNull}}">
+                      <StackPanel Spacing="2">
+                        <TextBlock Text="{Binding Selected.Title}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                        <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding Selected.Id}" />
+                      </StackPanel>
+
+                      <StackPanel Spacing="4" IsVisible="{Binding Selected.HasIns}">
+                        <TextBlock Classes="cardHint" Text="Takes in" />
+                        <ItemsControl ItemsSource="{Binding Selected.Ins}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="rec:PatchPort">
+                              <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock FontFamily="{x:Static ui:PatternFont.Family}" FontSize="11"
+                                           Text="{Binding Name}" />
+                                <TextBlock Classes="cardHint" FontSize="11" Text="{Binding Shape}" />
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+
+                      <StackPanel Spacing="4" IsVisible="{Binding Selected.HasOuts}">
+                        <TextBlock Classes="cardHint" Text="Gives out" />
+                        <ItemsControl ItemsSource="{Binding Selected.Outs}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="rec:PatchPort">
+                              <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock FontFamily="{x:Static ui:PatternFont.Family}" FontSize="11"
+                                           Text="{Binding Name}" />
+                                <TextBlock Classes="cardHint" FontSize="11" Text="{Binding Shape}" />
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+
+              </Grid>
+            </DataTemplate>
+          </ContentControl.ContentTemplate>
+        </ContentControl>
       </TabItem>
 
     </TabControl>

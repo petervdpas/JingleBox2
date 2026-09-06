@@ -495,6 +495,7 @@ public partial class MainWindow : Window
         if (DataContext is not ViewModels.MainViewModel main || Mixer == null) return;
 
         Mixer.RecorderInput = main.RecorderInput;
+        Mixer.Patchbay = main.Patchbay;
         Mixer.Input = main.Record;
         Mixer.RecorderPlay = main.RecorderPlay;
         Mixer.PadsStrip = main.PadsStrip;

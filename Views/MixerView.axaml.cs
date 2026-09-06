@@ -83,6 +83,46 @@ public partial class MixerView : UserControl
     /// </remarks>
     private readonly Avalonia.Threading.DispatcherTimer _meters;
 
+    /// <summary><inheritdoc cref="Patchbay" path="/summary"/></summary>
+    public static readonly StyledProperty<object?> PatchbayProperty =
+        AvaloniaProperty.Register<MixerView, object?>(nameof(Patchbay));
+
+    /// <summary>
+    /// What the Patchbay tab draws, handed in like the strips are.
+    /// </summary>
+    /// <remarks>
+    /// The page is bound to the song and a patchbay is about the machine rather than about any
+    /// song, which is the same reason the three strips and the input watch are handed in rather
+    /// than read off the data context.
+    /// </remarks>
+    public object? Patchbay
+    {
+        get => GetValue(PatchbayProperty);
+        set => SetValue(PatchbayProperty, value);
+    }
+
+    /// <summary>
+    /// Hangs the surface's two answers on the patchbay that is behind it.
+    /// </summary>
+    /// <remarks>
+    /// Hooked as the control appears rather than in the constructor, since it is built by a
+    /// template and does not exist until the tab is first looked at. Taken off again first, or a
+    /// tab looked at twice would plug everything twice.
+    /// </remarks>
+    private void Bay_Loaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not PatchbayView bay) return;
+        if (bay.DataContext is not ViewModels.PatchbayViewModel patch) return;
+
+        bay.Wired -= patch.Plug;
+        bay.Unwired -= patch.Unplug;
+
+        bay.Wired += patch.Plug;
+        bay.Unwired += patch.Unplug;
+
+        patch.Refresh();
+    }
+
     /// <summary>Where the IN strip is fed from, or nothing where the page was built without it.</summary>
     /// <remarks>
     /// Read off the strip rather than handed to the page a second time: the strip is what the
