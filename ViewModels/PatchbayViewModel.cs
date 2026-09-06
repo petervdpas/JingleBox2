@@ -33,6 +33,12 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// <summary>What turns those into blocks and cables.</summary>
     private readonly IPatchGraph _graph;
 
+    /// <summary>What is carrying audio, or nothing where nobody can say.</summary>
+    private readonly IAudioFlowing? _flowing;
+
+    /// <summary>Which cables that makes live.</summary>
+    private readonly IPatchFlow _flow;
+
     /// <summary>Where the blocks were left, or nothing where nobody is keeping that.</summary>
     private readonly IPatchPlaces? _places;
 
@@ -53,17 +59,23 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// <param name="input">The sources, and the one being taken.</param>
     /// <param name="output">Where the mix leaves through, for the block at the end of the path.</param>
     /// <param name="places">Where the blocks were left last time, or nothing to use the graph's own.</param>
+    /// <param name="flowing">What is carrying audio, for the cables that are drawn solid.</param>
     /// <param name="graph">What blocks and cables those make.</param>
+    /// <param name="flow">Which cables that makes live.</param>
     public PatchbayViewModel(
         IInputSource input,
         IOutputChosen? output = null,
         IPatchPlaces? places = null,
-        IPatchGraph? graph = null)
+        IAudioFlowing? flowing = null,
+        IPatchGraph? graph = null,
+        IPatchFlow? flow = null)
     {
         _input = input;
         _output = output;
         _places = places;
+        _flowing = flowing;
         _graph = graph ?? new PatchGraph();
+        _flow = flow ?? new PatchFlow();
 
         _input.Routes.CollectionChanged += Changed;
 
@@ -78,6 +90,13 @@ public sealed partial class PatchbayViewModel : ObservableObject
 
     /// <summary>The cables, swapped with them.</summary>
     [ObservableProperty] private IReadOnlyList<PatchLink> links = Array.Empty<PatchLink>();
+
+    /// <summary>The cables that are carrying audio right now, out of the ones drawn.</summary>
+    /// <remarks>
+    /// Its own list rather than a mark on each cable, because this moves many times a second and
+    /// the cables do not: swapped whole, the picture redraws its wires and nothing else.
+    /// </remarks>
+    [ObservableProperty] private IReadOnlyList<PatchLink> live = Array.Empty<PatchLink>();
 
     /// <summary>Which block the sidebar is about, or nothing while none is picked.</summary>
     [ObservableProperty] private PatchNode? selected;
@@ -97,6 +116,8 @@ public sealed partial class PatchbayViewModel : ObservableObject
         Nodes = Laid(scene.Nodes);
         Links = scene.Links;
 
+        Pulse();
+
         if (Selected is not { } picked) return;
 
         Selected = Find(picked.Id);
@@ -104,6 +125,22 @@ public sealed partial class PatchbayViewModel : ObservableObject
 
     /// <summary>Asks the routing to read the graph again, for a page that has just been opened.</summary>
     public void Refresh() => _input.RefreshRoutes();
+
+    /// <summary>
+    /// Works out which cables are carrying audio, for the page's own meter clock to call.
+    /// </summary>
+    /// <remarks>
+    /// Told rather than keeping a clock of its own: the mixer already runs one at the rate its
+    /// meters want, and a second timer on a page nobody is looking at is exactly what this
+    /// codebase took off the master's meter once already. With nothing able to say what is
+    /// sounding, every cable is drawn as it always was.
+    /// </remarks>
+    public void Pulse()
+    {
+        if (_flowing == null) return;
+
+        Live = _flow.Live(Links, _flowing.Signals);
+    }
 
     /// <summary>
     /// Puts each block where it was left, where anybody has moved it.

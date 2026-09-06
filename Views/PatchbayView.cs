@@ -36,6 +36,9 @@ public sealed class PatchbayView : Panel
     /// <summary>What may be joined to what, and how the channels line up.</summary>
     private static readonly IPatchWiring Wiring = new PatchWiring();
 
+    /// <summary>What the two kinds of wire are painted in.</summary>
+    private static readonly Interfaces.IPatchColours Colours = new PatchColours();
+
     /// <summary>The blocks to draw.</summary>
     public static readonly StyledProperty<IReadOnlyList<PatchNode>> NodesProperty =
         AvaloniaProperty.Register<PatchbayView, IReadOnlyList<PatchNode>>(
@@ -45,6 +48,16 @@ public sealed class PatchbayView : Panel
     public static readonly StyledProperty<IReadOnlyList<PatchLink>> LinksProperty =
         AvaloniaProperty.Register<PatchbayView, IReadOnlyList<PatchLink>>(
             nameof(Links), Array.Empty<PatchLink>());
+
+    /// <summary>Which of those are carrying audio at this moment.</summary>
+    /// <remarks>
+    /// A live cable is drawn solid and a quiet one dashed, so the page says what the application
+    /// is doing rather than only how it is wired. Its own list, since this changes many times a
+    /// second and the cables do not.
+    /// </remarks>
+    public static readonly StyledProperty<IReadOnlyList<PatchLink>> LiveProperty =
+        AvaloniaProperty.Register<PatchbayView, IReadOnlyList<PatchLink>>(
+            nameof(Live), Array.Empty<PatchLink>());
 
     /// <inheritdoc cref="NodesProperty"/>
     public IReadOnlyList<PatchNode> Nodes
@@ -58,6 +71,13 @@ public sealed class PatchbayView : Panel
     {
         get => GetValue(LinksProperty);
         set => SetValue(LinksProperty, value);
+    }
+
+    /// <inheritdoc cref="LiveProperty"/>
+    public IReadOnlyList<PatchLink> Live
+    {
+        get => GetValue(LiveProperty);
+        set => SetValue(LiveProperty, value);
     }
 
     /// <summary>Which block is picked out, whose details the sidebar beside this shows.</summary>
@@ -100,6 +120,17 @@ public sealed class PatchbayView : Panel
     /// <summary>The layer the cables are painted on, under every block.</summary>
     private readonly PatchCables _cables;
 
+    /// <summary>How far the whole surface has been pushed about, in its own coordinates.</summary>
+    /// <remarks>
+    /// The blocks keep their own places and the page moves under them, so panning changes
+    /// nothing anybody has arranged: what is stored is where a block was put, and this is only
+    /// where the window is looking.
+    /// </remarks>
+    private Point _pan;
+
+    /// <summary>Where the pointer was when the surface was taken hold of, or nothing.</summary>
+    private Point? _panning;
+
     /// <summary>The end of the cable in the hand that is not moving, or nothing.</summary>
     private PatchPort? _anchor;
 
@@ -131,6 +162,7 @@ public sealed class PatchbayView : Panel
 
         if (change.Property == NodesProperty) Rebuild();
         if (change.Property == LinksProperty) _cables.InvalidateVisual();
+        if (change.Property == LiveProperty) _cables.InvalidateVisual();
         if (change.Property == SelectedProperty) Mark();
     }
 
@@ -221,7 +253,7 @@ public sealed class PatchbayView : Panel
             var at = _places.TryGetValue(id, out var place) ? place : default;
 
             block.Measure(size);
-            block.Arrange(new Rect(at, block.DesiredSize));
+            block.Arrange(new Rect(at + _pan, block.DesiredSize));
         }
 
         return size;
@@ -232,10 +264,7 @@ public sealed class PatchbayView : Panel
     {
         if (!_places.TryGetValue(id, out var at)) return;
 
-        double x = Math.Clamp(at.X + by.X, 0, Math.Max(0, Bounds.Width - PatchBlock.Across));
-        double y = Math.Clamp(at.Y + by.Y, 0, Math.Max(0, Bounds.Height - 40));
-
-        _places[id] = new Point(x, y);
+        _places[id] = new Point(at.X + by.X, at.Y + by.Y);
 
         InvalidateArrange();
         _cables.InvalidateVisual();
@@ -282,10 +311,46 @@ public sealed class PatchbayView : Panel
         _cables.InvalidateVisual();
     }
 
+    /// <summary>
+    /// Ctrl and Shift together take hold of the whole surface, which is then dragged about.
+    /// </summary>
+    /// <remarks>
+    /// The same two keys the waveform is panned with, and for the same reason: every plain press
+    /// on this page already means something, since a block is dragged and a dot starts a cable,
+    /// so the gesture that moves the page has to be one that cannot be made by accident. It
+    /// works anywhere, blocks included, because the whole point of it is to reach a part of the
+    /// picture that is off the page.
+    /// </remarks>
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+
+        if (!Grabbing(e.KeyModifiers)) return;
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        _panning = e.GetPosition(this);
+
+        e.Pointer.Capture(this);
+        e.Handled = true;
+    }
+
     /// <inheritdoc/>
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
+
+        if (_panning is { } from)
+        {
+            var now = e.GetPosition(this);
+
+            _pan += now - from;
+            _panning = now;
+
+            InvalidateArrange();
+            _cables.InvalidateVisual();
+
+            return;
+        }
 
         if (_anchor is null) return;
 
@@ -293,6 +358,10 @@ public sealed class PatchbayView : Panel
 
         _cables.InvalidateVisual();
     }
+
+    /// <summary>Whether the two keys that mean take hold of the page are both down.</summary>
+    private static bool Grabbing(KeyModifiers keys) =>
+        keys.HasFlag(KeyModifiers.Control) && keys.HasFlag(KeyModifiers.Shift);
 
     /// <summary>
     /// Lets go of the cable: onto a point that will take it, or out.
@@ -306,6 +375,12 @@ public sealed class PatchbayView : Panel
         base.OnPointerReleased(e);
 
         e.Pointer.Capture(null);
+
+        if (_panning != null)
+        {
+            _panning = null;
+            return;
+        }
 
         if (_anchor is not { } anchor) return;
 
@@ -351,7 +426,7 @@ public sealed class PatchbayView : Panel
         {
             if (!_places.TryGetValue(id, out var place)) continue;
 
-            var inside = at - place;
+            var inside = at - place - _pan;
 
             if (inside.X < -Shape.GrabRadius || inside.Y < -Shape.GrabRadius) continue;
             if (inside.X > block.Bounds.Width + Shape.GrabRadius) continue;
@@ -376,6 +451,21 @@ public sealed class PatchbayView : Panel
     /// <param name="link">The cable in question.</param>
     private bool Inside(PatchLink link) => IsOurs(link.From.Node) && IsOurs(link.To.Node);
 
+    /// <summary>Whether a cable is carrying audio at this moment.</summary>
+    /// <remarks>
+    /// Read off the list rather than asked of anything, since what is live is worked out where
+    /// the meters are and handed over: a picture that measured audio would be a second set of
+    /// meters on a page that is not about levels.
+    /// </remarks>
+    /// <param name="link">The cable in question.</param>
+    private bool Carrying(PatchLink link)
+    {
+        foreach (var one in Live)
+            if (one == link) return true;
+
+        return false;
+    }
+
     /// <summary>Whether a block is one of ours, by its id.</summary>
     private bool IsOurs(string node)
     {
@@ -391,7 +481,7 @@ public sealed class PatchbayView : Panel
         if (!_blocks.TryGetValue(port.Node, out var block)) return null;
         if (!_places.TryGetValue(port.Node, out var place)) return null;
 
-        return place + block.Dot(port, channel);
+        return place + _pan + block.Dot(port, channel);
     }
 
     /// <summary>
@@ -422,15 +512,24 @@ public sealed class PatchbayView : Panel
         {
             var palette = ThemePalette.From(this);
 
-            var patched = new Pen(new SolidColorBrush(ThemePalette.Alpha(palette.Accent, 0xC0)), 2);
-            var inside = new Pen(
-                new SolidColorBrush(ThemePalette.Alpha(palette.Muted, 0xC0)), 2,
-                new DashStyle(new double[] { 5, 4 }, 0));
+            var dashes = new DashStyle(new double[] { 5, 4 }, 0);
+
+            var patched = ThemePalette.Alpha(palette.Accent, 0xC0);
+            var inside = ThemePalette.Alpha(Colours.Counter(palette.Accent), 0xC0);
+
+            var pens = new Dictionary<(bool Inside, bool Live), IPen>
+            {
+                [(false, true)] = new Pen(new SolidColorBrush(patched), 2),
+                [(false, false)] = new Pen(new SolidColorBrush(patched), 2, dashes),
+                [(true, true)] = new Pen(new SolidColorBrush(inside), 2),
+                [(true, false)] = new Pen(new SolidColorBrush(inside), 2, dashes)
+            };
+
             var hand = new Pen(new SolidColorBrush(palette.Text), 2, new DashStyle(new double[] { 3, 3 }, 0));
 
             foreach (var link in _bay.Links)
             {
-                var wire = _bay.Inside(link) ? inside : patched;
+                var wire = pens[(_bay.Inside(link), _bay.Carrying(link))];
 
                 foreach (var (from, to) in Wiring.Pairs(link.From.Channels, link.To.Channels))
                 {
@@ -449,7 +548,7 @@ public sealed class PatchbayView : Panel
         }
 
         /// <summary>Draws one wire, bent so it leaves and arrives horizontally.</summary>
-        private static void Draw(DrawingContext context, Pen pen, Point from, Point to)
+        private static void Draw(DrawingContext context, IPen pen, Point from, Point to)
         {
             var (x1, y1, x2, y2) = Shape.Curve(from.X, from.Y, to.X, to.Y);
 

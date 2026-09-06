@@ -152,6 +152,8 @@ public partial class MixerView : UserControl
         (RecorderInput as ViewModels.SourceStripViewModel)?.ReadMeter();
         (RecorderPlay as ViewModels.SourceStripViewModel)?.ReadMeter();
         (PadsStrip as ViewModels.SourceStripViewModel)?.ReadMeter();
+
+        (Patchbay as ViewModels.PatchbayViewModel)?.Pulse();
     }
 
     /// <summary><inheritdoc cref="Input" path="/summary"/></summary>

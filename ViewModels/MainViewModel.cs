@@ -42,7 +42,7 @@ namespace JingleBox2.ViewModels;
 /// than on a page view model of their own, because two pages show them: PADS is where they are
 /// laid out and FIRE is where they are played.
 /// </remarks>
-public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IShortcutContext
+public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAudioFlowing, IShortcutContext
 {
     /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
     /// <summary>
@@ -865,6 +865,28 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, ISh
             () => (Record.LevelLeft, Record.LevelRight),
             source: Record);
 
+    /// <summary>
+    /// Quiet enough to be nothing. A meter that has just fallen still reads a hair above nought.
+    /// </summary>
+    private const double Hearable = 0.0005;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Off the strips the mixer is already reading, so nothing is measured twice and a patchbay
+    /// costs one comparison per path rather than a second poll. The song is asked whether it is
+    /// playing rather than measured, since a pattern between two notes is silent and is not over.
+    /// </remarks>
+    public UI.Records.PatchSignals Signals => new(
+        Input: Loud(RecorderInput),
+        Takes: Loud(RecorderPlay),
+        Pads: Loud(PadsStrip),
+        Tracker: Tracker.IsPlaying,
+        Output: Loud(RecorderPlay) || Loud(PadsStrip) || Tracker.IsPlaying);
+
+    /// <summary>Whether a strip's meter is showing anything worth calling sound.</summary>
+    private static bool Loud(SourceStripViewModel strip) =>
+        Math.Max(strip.Left, strip.Right) > Hearable;
+
     /// <summary>Backing field for <see cref="Patchbay"/>.</summary>
     private PatchbayViewModel? patchbay;
 
@@ -876,7 +898,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, ISh
     /// the recorder because that is what the picture is about: every block on it either feeds
     /// this application or is this application.
     /// </remarks>
-    public PatchbayViewModel Patchbay => patchbay ??= new PatchbayViewModel(Record, this, new Config.PatchPlaces(_cfg, _store));
+    public PatchbayViewModel Patchbay => patchbay ??= new PatchbayViewModel(Record, this, new Config.PatchPlaces(_cfg, _store), this);
 
     /// <summary>Backing field for <see cref="RecorderPlay"/>.</summary>
     private SourceStripViewModel? recorderPlay;

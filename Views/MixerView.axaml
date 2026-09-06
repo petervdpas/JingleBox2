@@ -458,6 +458,7 @@
                   <views:PatchbayView Loaded="Bay_Loaded"
                                       Nodes="{Binding Nodes}"
                                       Links="{Binding Links}"
+                                      Live="{Binding Live}"
                                       Selected="{Binding Selected, Mode=TwoWay}" />
                 </Border>
 
