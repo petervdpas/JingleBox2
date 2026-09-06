@@ -163,9 +163,14 @@ public partial class MainWindow : Window
 
         DataContextChanged += (_, _) => HandMixerItsStrips();
 
-        _routing = new AudioRoutingFactory().Create(_recording);
-
         var cfg = _store.LoadOrCreateDefault();
+
+        // The routing is made after the settings rather than before, because taking a source
+        // aside on a machine with no graph needs somewhere to send it and that is a choice
+        // stored here. On a graph it is not asked for at all.
+        var silent = new Config.SilentOutput(cfg, _store);
+
+        _routing = new AudioRoutingFactory().Create(_recording, silent);
 
         Audio.RealtimeThread.Wants(cfg.RealtimeAudio);
         Audio.BusSwitch.Wants(cfg.OutputBus);
@@ -218,6 +223,10 @@ public partial class MainWindow : Window
         saying?.Doing("Building the pages");
 
         var vm = new MainViewModel(_audio, _store, cfg, _midi, _recording, _waveform, _routing, projects, made);
+
+        // The same object the routing was given, so the picker on the mixer and what actually
+        // sends a source away cannot disagree about which output is the quiet one.
+        vm.Record.UseSilentOutput(silent);
         DataContext = vm;
 
         saying?.Doing(vm.SelectedOutputDevice is { } output

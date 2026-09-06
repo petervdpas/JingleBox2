@@ -36,4 +36,44 @@ public interface IAudioRouting
     /// recorder is not listening, since there is nothing to connect to until it is.
     /// </summary>
     bool Connect(AudioRoute route);
+
+    /// <summary>
+    /// Whether a source can be taken off everything else, so it reaches this application alone.
+    /// </summary>
+    /// <remarks>
+    /// **Capturing a source and taking it aside are two different acts**, and only the first is
+    /// what every program that records does. A browser captured is still playing out of the
+    /// speakers, which is right for streaming and wrong on air: what is wanted here is the sound
+    /// coming through the desk and nowhere else.
+    ///
+    /// False is an ordinary answer and says the machine cannot do it, not that this application
+    /// will not: on a graph the links are moved, and on a machine with no graph a program can
+    /// only be pointed at another output, so there has to be one to point it at.
+    /// </remarks>
+    bool CanTakeAside { get; }
+
+    /// <summary>
+    /// Takes a source off everything but this application, and remembers where it was.
+    /// </summary>
+    /// <remarks>
+    /// One source at a time, since it is the one feeding the input: taking a second aside puts
+    /// the first back first, or a machine would be left with two programs unplugged from their
+    /// own outputs and nothing saying so.
+    ///
+    /// **What it changes is somebody else's machine**, so it is undone deliberately rather than
+    /// left to a process ending: see <see cref="GiveBack"/>.
+    /// </remarks>
+    /// <param name="route">The source to take aside, as the picker offers it.</param>
+    /// <returns>False where the machine cannot, or where nothing was there to move.</returns>
+    bool TakeAside(AudioRoute route);
+
+    /// <summary>
+    /// Puts back whatever was taken aside, and does nothing where nothing was.
+    /// </summary>
+    /// <remarks>
+    /// Called when another source is chosen and on the way out of the application. What was
+    /// unplugged is somebody's own machine rather than ours, so leaving a browser silent after
+    /// this program has closed is the worst thing this feature could do.
+    /// </remarks>
+    void GiveBack();
 }

@@ -8,6 +8,8 @@ using System.Threading;
 using JingleBox2.Audio.Routing.Enums;
 using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Audio.Routing.Records;
+using JingleBox2.Diagnostics;
+using JingleBox2.Diagnostics.Enums;
 
 namespace JingleBox2.Audio.Routing;
 
@@ -175,6 +177,83 @@ public sealed class PipeWireRouting : IAudioRouting
             }
 
             return linked;
+        });
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// True wherever the tools are, since taking a link off is the same call that puts one on.
+    /// </remarks>
+    public bool CanTakeAside => IsAvailable;
+
+    /// <summary>What was unplugged to take a source aside, so it can be put back.</summary>
+    /// <remarks>
+    /// Held rather than read again on the way back, because by then the links are gone and the
+    /// graph cannot be asked what used to be there. One source at a time, which is the contract.
+    /// </remarks>
+    private readonly List<PipeWireLink> _moved = new();
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Every link out of that node that is not into our own capture, which is the whole of it:
+    /// the source keeps whatever brought it here and loses everything else. Its own links are
+    /// remembered first, so a run that breaks half of them can still put that half back.
+    /// </remarks>
+    public bool TakeAside(AudioRoute route)
+    {
+        if (route == null) return false;
+
+        GiveBack();
+
+        return Guarded(false, deadline =>
+        {
+            var away = _graph.LinksAway(
+                _graph.ParseLinks(Run(LinkTool, "-l")), route.Node, CapturePorts());
+
+            if (away.Count == 0) return false;
+
+            foreach (var link in away)
+            {
+                if (Expired(deadline)) break;
+
+                _moved.Add(link);
+
+                Run(LinkTool, $"-d {Quote(link.From)} {Quote(link.To)}");
+            }
+
+            Log.Write(LogArea.Audio, () =>
+                "routing: took " + route.Node + " off " + _moved.Count + " link(s)");
+
+            return _moved.Count > 0;
+        });
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The list is emptied whatever happens, since a link that will not go back is one the
+    /// machine has already changed under us: trying again for the rest of the session would be
+    /// this application arguing with the graph on every source change.
+    /// </remarks>
+    public void GiveBack()
+    {
+        if (_moved.Count == 0) return;
+
+        var back = _moved.ToArray();
+
+        _moved.Clear();
+
+        Guarded(false, deadline =>
+        {
+            foreach (var link in back)
+            {
+                if (Expired(deadline)) break;
+
+                Run(LinkTool, $"{Quote(link.From)} {Quote(link.To)}");
+            }
+
+            Log.Write(LogArea.Audio, () => "routing: put " + back.Length + " link(s) back");
+
+            return true;
         });
     }
 

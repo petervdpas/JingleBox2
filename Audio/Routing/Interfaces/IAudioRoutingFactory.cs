@@ -27,5 +27,9 @@ public interface IAudioRoutingFactory
     /// The recorder, which the Windows side points at a device or an output. The PipeWire side
     /// never touches it: it patches the graph underneath and the recorder knows nothing about it.
     /// </param>
-    IAudioRouting Create(IRecordingService recording);
+    /// <param name="silent">
+    /// Where a source is sent so nobody hears it, on a machine with no graph. Nothing where
+    /// nobody has chosen one, which leaves a source unable to be taken aside there.
+    /// </param>
+    IAudioRouting Create(IRecordingService recording, ISilentOutput? silent = null);
 }

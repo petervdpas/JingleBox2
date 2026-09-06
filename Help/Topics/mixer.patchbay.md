@@ -55,6 +55,8 @@ is not something this application measures or can silence.
 
 ## Moving about
 
+The plane has no edges: drag a block anywhere, and zoom or pan to reach it again.
+
 Drag a block by its middle to move it, and where you leave it is remembered between
 sessions. A block you have never moved opens where it was meant to.
 

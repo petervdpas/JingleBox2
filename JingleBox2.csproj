@@ -107,6 +107,12 @@
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
+    <!-- Per-application capture on Windows, and nothing else. Pinned rather than left to
+         float, because NuGet's newest NAudio.Wasapi is 22.0.0, which is the old 2.x code under
+         a larger number and has no process loopback in it at all. Windows only at runtime, so
+         every call into it sits behind a platform test; the package itself restores and builds
+         everywhere. -->
+    <PackageReference Include="NAudio.Wasapi" Version="3.0.1" />
     <PackageReference Include="ManagedBass.Asio" Version="4.0.2" />
     <PackageReference Include="ManagedBass.Mix" Version="4.0.2" />
     <PackageReference Include="ManagedBass.Wasapi" Version="4.0.2" />

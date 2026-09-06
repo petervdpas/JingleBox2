@@ -359,6 +359,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     public void Finished()
     {
         StopPreview();
+        GiveRoutesBack();
         _scratch.Sweep();
     }
 
@@ -1839,6 +1840,115 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         _preferredRoute = value;
         ApplyRoute(value, announce: true);
+
+        Aside();
+    }
+
+    /// <summary>Whether this machine can take a source off everything but this application.</summary>
+    public bool CanTakeAside => _routing.CanTakeAside;
+
+    /// <summary>Where a source is sent so nobody hears it, or nothing on a machine with a graph.</summary>
+    private ISilentOutput? _silent;
+
+    /// <summary>
+    /// Tells the page where a source can be sent to be unheard.
+    /// </summary>
+    /// <remarks>
+    /// Handed in rather than made here, because it is the same object the routing was given: two
+    /// of them over one setting would be two answers to which output is the quiet one, and the
+    /// picker would then be setting something the routing never reads.
+    /// </remarks>
+    /// <param name="silent">The choice and the list it comes from.</param>
+    public void UseSilentOutput(ISilentOutput silent)
+    {
+        _silent = silent;
+
+        OnPropertyChanged(nameof(NeedsSilentOutput));
+        OnPropertyChanged(nameof(SilentOutputs));
+        OnPropertyChanged(nameof(SilentOutput));
+        OnPropertyChanged(nameof(CanTakeAside));
+    }
+
+    /// <inheritdoc/>
+    public bool NeedsSilentOutput => _silent is { } silent && silent.Outputs.Count > 0;
+
+    /// <inheritdoc/>
+    public IReadOnlyList<Audio.Records.AudioEndpoint> SilentOutputs =>
+        _silent?.Outputs ?? Array.Empty<Audio.Records.AudioEndpoint>();
+
+    /// <inheritdoc/>
+    public Audio.Records.AudioEndpoint? SilentOutput
+    {
+        get
+        {
+            if (_silent?.Chosen is not { } chosen) return null;
+
+            foreach (var output in SilentOutputs)
+                if (string.Equals(output.Id, chosen, StringComparison.Ordinal)) return output;
+
+            return null;
+        }
+        set
+        {
+            if (_silent == null) return;
+
+            _silent.Chosen = value?.Id;
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanTakeAside));
+
+            Aside();
+        }
+    }
+
+    /// <summary>Backing field for <see cref="TakeAside"/>.</summary>
+    private bool takeAside;
+
+    /// <summary>
+    /// Whether the chosen source is taken off everything else, so it is heard through here alone.
+    /// </summary>
+    /// <remarks>
+    /// **Off unless somebody says so**, because it changes somebody else's program rather than
+    /// this one: a browser that went silent everywhere the moment it was picked as a source
+    /// would read as this application having broken it. On is the radio case, where what is on
+    /// air must not also be coming out of the desk speakers a buffer later.
+    ///
+    /// Kept for the session rather than in the settings, deliberately. What it does is undone on
+    /// the way out, so a switch that came back on at the next start would take a source aside
+    /// before anybody had asked for anything.
+    /// </remarks>
+    public bool TakeAside
+    {
+        get => takeAside;
+        set
+        {
+            if (takeAside == value) return;
+
+            takeAside = value;
+
+            OnPropertyChanged();
+            Aside();
+        }
+    }
+
+    /// <summary>
+    /// Makes the machine agree with the switch and the source.
+    /// </summary>
+    /// <remarks>
+    /// Whatever was taken aside is put back first, whichever way the switch went: a source that
+    /// is no longer the one being recorded has no business staying unplugged from its own
+    /// output, and that is the same call either way.
+    /// </remarks>
+    private void Aside()
+    {
+        _routing.GiveBack();
+
+        if (!TakeAside || SelectedRoute is not { } source) return;
+
+        if (_routing.TakeAside(source))
+            Status = $"{source.Display} is coming here and nowhere else.";
+        else
+            Status = $"{source.Display} could not be taken off its own output.";
     }
 
     /// <summary>Whether the first reading of the graph has already been answered.</summary>
@@ -2055,6 +2165,16 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         StopRouteWatch();
     }
+
+    /// <summary>
+    /// Puts back anything this application unplugged, on the way out.
+    /// </summary>
+    /// <remarks>
+    /// **The one call in here that has to happen.** What was taken aside is somebody's own
+    /// machine, so a browser left silent after this program has closed is the worst thing this
+    /// feature could do, and there is nothing on the screen by then to say what happened.
+    /// </remarks>
+    private void GiveRoutesBack() => _routing.GiveBack();
 
     /// <summary>How many pages carrying the source picker are on screen.</summary>
     /// <remarks>

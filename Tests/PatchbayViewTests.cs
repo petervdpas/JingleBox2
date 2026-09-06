@@ -66,6 +66,22 @@ public class PatchbayViewTests
         public void LetRoutesGo() => Watching--;
 
         /// <inheritdoc/>
+        public bool CanTakeAside => true;
+
+        /// <inheritdoc/>
+        public bool TakeAside { get; set; }
+
+        /// <inheritdoc/>
+        public bool NeedsSilentOutput => false;
+
+        /// <inheritdoc/>
+        public System.Collections.Generic.IReadOnlyList<JingleBox2.Audio.Records.AudioEndpoint> SilentOutputs =>
+            System.Array.Empty<JingleBox2.Audio.Records.AudioEndpoint>();
+
+        /// <inheritdoc/>
+        public JingleBox2.Audio.Records.AudioEndpoint? SilentOutput { get; set; }
+
+        /// <inheritdoc/>
         public event PropertyChangedEventHandler? PropertyChanged;
     }
 

@@ -27,4 +27,14 @@ public sealed class NoAudioRouting : IAudioRouting
     /// <inheritdoc/>
     /// <remarks>Refuses everything, since there is no graph in which to make the connection.</remarks>
     public bool Connect(AudioRoute route) => false;
+
+    /// <inheritdoc/>
+    /// <remarks>Nothing is wired here, so there is nothing to take off anything.</remarks>
+    public bool CanTakeAside => false;
+
+    /// <inheritdoc/>
+    public bool TakeAside(AudioRoute route) => false;
+
+    /// <inheritdoc/>
+    public void GiveBack() { }
 }

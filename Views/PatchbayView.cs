@@ -200,7 +200,11 @@ public sealed class PatchbayView : Panel
     /// </remarks>
     public PatchbayView()
     {
-        ClipToBounds = true;
+        // Deliberately not clipped here. A clip is taken in the control's own coordinates, which
+        // are the ones the zoom scales, so clipping the surface makes the page a window the size
+        // of the viewport whatever the zoom: drawing it smaller then showed less of it rather
+        // than more, and a block dragged off the edge could not be zoomed back into view. The
+        // card around it does the clipping, once, in coordinates the zoom does not touch.
 
         // A panel with no background is invisible to the pointer, so every press on the empty
         // part of the surface went to whatever was behind it and the page could not be taken

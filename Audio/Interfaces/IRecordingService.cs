@@ -138,6 +138,28 @@ public interface IRecordingService
     /// <summary>The outputs whose playback can be captured. Empty where the system cannot.</summary>
     IReadOnlyList<LoopbackDevice> GetLoopbackDevices();
 
+    /// <summary>Every program on this machine that is playing something. Empty where it cannot be asked.</summary>
+    /// <remarks>
+    /// A program is in the list while it holds an audio session and not otherwise, which is the
+    /// same rule the PipeWire side keeps: a browser with nothing playing is not there, and it
+    /// turns up the moment it makes a sound.
+    /// </remarks>
+    IReadOnlyList<AudioProgram> GetPrograms();
+
+    /// <summary>
+    /// The program to record, or null to record a device or an output instead.
+    /// </summary>
+    /// <remarks>
+    /// **The third of the three ways to listen, and the one that makes Windows behave the way
+    /// Linux does**: a PipeWire machine points the input at one program through the graph, and
+    /// this is what stands in for that where there is no graph. It wins over
+    /// <see cref="LoopbackDevice"/>, since a program is the narrower answer and setting one is a
+    /// deliberate act.
+    ///
+    /// Setting it while the input is open reopens it on the other path.
+    /// </remarks>
+    int? LoopbackProgram { get; set; }
+
     /// <summary>
     /// Closes and reopens the input if anything is listening, for a change that only takes
     /// effect on a fresh capture. Does nothing when nothing is open.

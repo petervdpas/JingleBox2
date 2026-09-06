@@ -64,6 +64,16 @@ public sealed class RecordingService : IRecordingService, IDisposable
     private readonly ILoopbackCapture _loopback = new WasapiLoopback();
 
     /// <summary>
+    /// The third capture path: one program on this machine, where the machine can do it.
+    /// </summary>
+    /// <remarks>
+    /// Asked for once, since what a machine can do does not change while it is running, and
+    /// held rather than made per take: the one that says no costs nothing at all and the other
+    /// holds a capture that has to be stopped.
+    /// </remarks>
+    private readonly IProgramCapture _programs = new AudioCapture().Programs();
+
+    /// <summary>
     /// What the current capture is running at. A loopback comes in at whatever the output mixes
     /// at, usually 48k, and the take is written at that rate rather than being resampled.
     /// </summary>
@@ -74,6 +84,9 @@ public sealed class RecordingService : IRecordingService, IDisposable
 
     /// <summary>Which output is being captured, or null for a device that is plugged in.</summary>
     private int? _loopbackDevice;
+
+    /// <summary>Which program is being captured, or nothing on either of the other two paths.</summary>
+    private int? _loopbackProgram;
 
     /// <inheritdoc/>
     public int Channels => _channels;
@@ -90,6 +103,23 @@ public sealed class RecordingService : IRecordingService, IDisposable
             if (_loopbackDevice == value) return;
 
             _loopbackDevice = value;
+
+            ReopenInput();
+        }
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<AudioProgram> GetPrograms() => _programs.Programs();
+
+    /// <inheritdoc/>
+    public int? LoopbackProgram
+    {
+        get => _loopbackProgram;
+        set
+        {
+            if (_loopbackProgram == value) return;
+
+            _loopbackProgram = value;
 
             ReopenInput();
         }
@@ -300,6 +330,18 @@ public sealed class RecordingService : IRecordingService, IDisposable
     /// <exception cref="InvalidOperationException">It would not open.</exception>
     private void StartOnDevice(int deviceIndex)
     {
+        if (_loopbackProgram is int program)
+        {
+            if (!_programs.Start(program, OnLoopbackData))
+                throw new InvalidOperationException("That program could not be captured.");
+
+            _sampleRate = _programs.SampleRate;
+            _channels = _programs.Channels;
+            _capturing = true;
+
+            return;
+        }
+
         if (_loopbackDevice is int loopback)
         {
             if (!_loopback.Start(loopback, OnLoopbackData))
@@ -370,6 +412,13 @@ public sealed class RecordingService : IRecordingService, IDisposable
     private void CloseInput()
     {
         if (!_capturing) return;
+
+        if (_programs.IsRunning)
+        {
+            _programs.Stop();
+            _capturing = false;
+            return;
+        }
 
         if (_loopback.IsRunning)
         {

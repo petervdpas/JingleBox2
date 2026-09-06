@@ -239,6 +239,20 @@ public sealed class AppConfig
     public System.Collections.Generic.List<Records.PatchbayPlace> PatchbayPlaces { get; set; } = new();
 
     /// <summary>
+    /// The output a source is sent to so that nobody hears it, by the system's own id for it.
+    /// </summary>
+    /// <remarks>
+    /// A fact about this machine rather than about a song: a virtual cable or a spare socket is
+    /// still the right answer tomorrow. Empty on every machine that has never been asked, which
+    /// leaves the switch that uses it grey rather than failing when it is pressed.
+    ///
+    /// Windows only in practice, since on a graph a source is unplugged rather than sent
+    /// somewhere else. It is stored on both, because a settings file that travels should not
+    /// lose a choice made on the machine it came from.
+    /// </remarks>
+    public string SilentOutput { get; set; } = "";
+
+    /// <summary>
     /// Whether the threads that must not be late are scheduled as audio threads.
     /// </summary>
     /// <remarks>

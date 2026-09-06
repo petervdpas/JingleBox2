@@ -63,6 +63,28 @@ public interface IPipeWireGraph
     string Channel(string port);
 
     /// <summary>
+    /// Every link taking audio out of one node to somewhere that is not this application.
+    /// </summary>
+    /// <remarks>
+    /// **What has to come off for a source to reach us and nowhere else.** Breaking those is
+    /// what turns a copy into a move: the browser stops going to the speakers and arrives only
+    /// here, which is what a patchbay is for and what no amount of capturing can do on its own.
+    ///
+    /// A rule rather than a walk written where the tools are run, because it decides what gets
+    /// unplugged on somebody's machine and the awkward cases are all ordinary: the same source
+    /// feeding two places, our own capture among them, and a node that is not there at all.
+    /// Nothing that reaches our capture is ever in the answer, or taking a source aside would
+    /// unplug the very link that brought it.
+    /// </remarks>
+    /// <param name="links">Every link on the machine, as the tool prints them.</param>
+    /// <param name="node">The source being taken aside.</param>
+    /// <param name="capture">This application's own input ports, which are never broken.</param>
+    IReadOnlyList<PipeWireLink> LinksAway(
+        IEnumerable<PipeWireLink> links,
+        string node,
+        IEnumerable<PipeWirePort> capture);
+
+    /// <summary>
     /// Everything with stereo audio to give, one entry per node. A node is judged by its name:
     /// PipeWire's own devices are prefixed, and anything else is a program.
     /// </summary>

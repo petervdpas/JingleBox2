@@ -82,6 +82,33 @@ public sealed class PipeWireGraph : IPipeWireGraph
         port.EndsWith("_FR", StringComparison.Ordinal) ? "FR" : "FL";
 
     /// <inheritdoc/>
+    /// <inheritdoc/>
+    public IReadOnlyList<PipeWireLink> LinksAway(
+        IEnumerable<PipeWireLink>? links,
+        string? node,
+        IEnumerable<PipeWirePort>? capture)
+    {
+        var away = new List<PipeWireLink>();
+
+        if (links == null || string.IsNullOrEmpty(node)) return away;
+
+        var ours = new HashSet<(string Node, string Port)>();
+
+        if (capture != null)
+            foreach (var port in capture) ours.Add((port.Node, port.Port));
+
+        foreach (var link in links)
+        {
+            if (!string.Equals(link.From.Node, node, StringComparison.Ordinal)) continue;
+            if (ours.Contains((link.To.Node, link.To.Port))) continue;
+
+            away.Add(link);
+        }
+
+        return away;
+    }
+
+    /// <inheritdoc/>
     public IReadOnlyList<AudioRoute> RoutesFrom(
         IEnumerable<PipeWirePort> outputs,
         IReadOnlyDictionary<string, string>? names = null,

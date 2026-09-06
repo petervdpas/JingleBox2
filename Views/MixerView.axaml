@@ -6,6 +6,7 @@
              xmlns:midi="clr-namespace:JingleBox2.Midi"
              xmlns:routing="clr-namespace:JingleBox2.Audio.Routing.Records"
              xmlns:rec="clr-namespace:JingleBox2.UI.Records"
+             xmlns:arec="clr-namespace:JingleBox2.Audio.Records"
              x:Class="JingleBox2.Views.MixerView"
              x:DataType="vm:TrackerViewModel">
 
@@ -110,6 +111,42 @@
                 </DataTemplate>
               </ComboBox.ItemTemplate>
             </ComboBox>
+
+            <!-- Capturing a source and taking it off everything else are two different acts, so
+                 this is a switch of its own under the picker rather than something choosing a
+                 source implies. Off unless somebody says so: a browser that went silent
+                 everywhere the moment it was picked would read as this application having
+                 broken it. Grey where the machine cannot rather than gone, the rule every other
+                 switch on this page keeps. -->
+            <!-- Only drawn where a source has to be sent somewhere rather than simply
+                 unplugged, which is a machine with no graph. A cable is the usual answer and a
+                 spare socket is as good; picking one here is what makes the switch under it
+                 something that can be pressed. -->
+            <StackPanel Spacing="2" IsVisible="{Binding Source.NeedsSilentOutput}">
+              <TextBlock Classes="cardHint" HorizontalAlignment="Center" Text="Send it to" />
+
+              <ComboBox Width="118"
+                        HorizontalAlignment="Center"
+                        FontSize="11"
+                        ItemsSource="{Binding Source.SilentOutputs}"
+                        SelectedItem="{Binding Source.SilentOutput, Mode=TwoWay}"
+                        PlaceholderText="Nothing yet"
+                        ToolTip.Tip="Where a source goes when it is taken off its own output. A cable, or an output nobody is listening to.">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="arec:AudioEndpoint">
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                               ToolTip.Tip="{Binding Name}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </StackPanel>
+
+            <CheckBox Content="Only here"
+                      FontSize="11"
+                      HorizontalAlignment="Center"
+                      IsEnabled="{Binding Source.CanTakeAside}"
+                      IsChecked="{Binding Source.TakeAside, Mode=TwoWay}"
+                      ToolTip.Tip="Take this source off its own output, so it is heard through JingleBox2 and nowhere else. Put back when you close the application." />
           </StackPanel>
         </Grid>
       </Border>
