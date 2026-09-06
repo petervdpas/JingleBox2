@@ -500,7 +500,9 @@
                  left, so a grip on one of them moves that one and nothing else. Both rows are
                  Auto for the same reason: a strip that was given a share of a row would be
                  taking its room off its neighbour rather than off the music. -->
-            <views:FoldStrip Grid.Row="1" Title="chain"
+            <!-- The upper of the two, so this is the one that carries the room above the pair:
+                 the automation sits under it and wants nothing between them. -->
+            <views:FoldStrip Grid.Row="1" Title="chain" Margin="0,10,0,0"
                              IsOpen="{Binding ShowsChain, Mode=TwoWay}"
                              StripHeight="{Binding ChainHeight, Mode=TwoWay}">
               <views:PluginStrip DataContext="{Binding TrackEffect}" />

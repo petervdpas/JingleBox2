@@ -351,6 +351,12 @@
              and whatever it folds away underneath. Only the line is here; the room the open
              one gets belongs to the grid it stands in, since only a grid can share it out. -->
         <Style Selector="views|FoldStrip">
+            <!-- No room of its own. What separates one strip from the next is the air under
+                 the open one's card, which is in the template; what separates the topmost from
+                 the thing they are folded under is set by the layout, since only the layout
+                 knows which strip is on top and a folded strip has no grip to hang it on.
+                 See MixerView and TrackerView. -->
+            <Setter Property="Margin" Value="0" />
             <Setter Property="Template">
                 <ControlTemplate>
                     <Grid RowDefinitions="Auto,Auto,Auto">
@@ -363,7 +369,11 @@
 
                         <!-- Air on both sides of the name. Without it the word sits against
                              whatever line is above it and reads as that thing's caption rather
-                             than as the lid of what is under it. -->
+                             than as the lid of what is under it. The room in front of the whole
+                             strip is on the strip itself, above the grip: put here it would sit
+                             between the grip and the tab, which is inside the strip and pushes
+                             the strip's own parts apart rather than setting the strip away from
+                             what is over it. -->
                         <ToggleButton Grid.Row="1" Classes="fold" Margin="0,4"
                                       HorizontalAlignment="Left"
                                       IsChecked="{Binding IsOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
@@ -381,8 +391,20 @@
                             </Border>
                         </ToggleButton>
 
-                        <ContentPresenter Grid.Row="2"
+                        <!-- The height the grip set, and never less than what is in it: the
+                             room here is given rather than scrolled, so a strip shorter than
+                             its contents cuts the bottom off them.
+
+                             The air under it is where the room between two strips lives. It
+                             belongs to the card rather than to the next strip's grip, because
+                             a card is only there while the strip is open and that is the only
+                             time the gap is wanted: folded, two strips are two tabs and stack
+                             tight. Put on the grip instead it doubled with the room the layout
+                             leaves in front of the topmost strip. -->
+                        <ContentPresenter Grid.Row="2" x:Name="PART_ContentPresenter"
+                                          Margin="0,0,0,8"
                                           Height="{TemplateBinding StripHeight}"
+                                          MinHeight="{TemplateBinding ContentLeast}"
                                           Content="{TemplateBinding Content}"
                                           IsVisible="{TemplateBinding IsOpen}" />
                     </Grid>

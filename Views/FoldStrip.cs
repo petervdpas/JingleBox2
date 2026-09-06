@@ -2,6 +2,10 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Layout;
+using Avalonia.VisualTree;
+using JingleBox2.UI;
+using JingleBox2.UI.Interfaces;
 using System;
 
 namespace JingleBox2.Views;
@@ -73,11 +77,61 @@ public sealed class FoldStrip : ContentControl
     /// Held between <see cref="Least"/> and <see cref="Most"/> on the way in rather than in the
     /// drag, since a height also arrives from whatever remembered it between one visit and the
     /// next and a stored nonsense would be as bad as a dragged one.
+    ///
+    /// **And never under what is inside it**, since the room here is given rather than scrolled:
+    /// a strip shorter than its contents does not hide the bottom of them, it cuts them off.
+    /// See <see cref="ContentLeast"/>.
     /// </remarks>
     public double StripHeight
     {
         get => GetValue(StripHeightProperty);
-        set => SetValue(StripHeightProperty, Math.Clamp(value, Least, Most));
+        set => SetValue(StripHeightProperty, Math.Clamp(value, Math.Max(Least, ContentLeast), Most));
+    }
+
+    /// <summary>
+    /// How tall what is inside it needs to be, so the grip cannot cut it off.
+    /// </summary>
+    /// <remarks>
+    /// **A strip dragged shorter than what it holds does not hide the bottom of it, it cuts it
+    /// off**, since the room inside is given rather than scrolled: the automation's own picker
+    /// came out with half its second row missing and nothing anywhere saying why. So the least a
+    /// strip can be is what is in it, measured rather than guessed at, because the chain and the
+    /// automation hold different things and one number for both would be the larger of the two
+    /// forced on the smaller.
+    ///
+    /// Held to <see cref="Most"/> as well, or a strip holding something very tall could not be
+    /// folded down at all and would take the page.
+    /// </remarks>
+    public static readonly StyledProperty<double> ContentLeastProperty =
+        AvaloniaProperty.Register<FoldStrip, double>(nameof(ContentLeast));
+
+    /// <inheritdoc cref="ContentLeastProperty"/>
+    public double ContentLeast
+    {
+        get => GetValue(ContentLeastProperty);
+        set => SetValue(ContentLeastProperty, value);
+    }
+
+    /// <summary>
+    /// Asks what is inside how tall it wants to be, before the room is shared out.
+    /// </summary>
+    /// <remarks>
+    /// Measured with no ceiling, which is the only way to be told what something wants rather
+    /// than what it was given: the presenter is handed the strip's own height, so asking it
+    /// answers that height back.
+    /// </remarks>
+    protected override Size MeasureOverride(Size available)
+    {
+        if (IsOpen && Presenter?.Child is Layoutable inside)
+        {
+            inside.Measure(new Size(available.Width, double.PositiveInfinity));
+
+            ContentLeast = Math.Min(Most, inside.DesiredSize.Height);
+
+            if (StripHeight < ContentLeast) StripHeight = ContentLeast;
+        }
+
+        return base.MeasureOverride(available);
     }
 
     /// <summary>The bar along the top edge, once the template has been applied and there is one.</summary>
@@ -101,6 +155,59 @@ public sealed class FoldStrip : ContentControl
         if (_grip is not null) _grip.DragDelta += Dragged;
     }
 
-    /// <summary>Up is taller, which is the way round a hand expects when it is pulling a lid.</summary>
-    private void Dragged(object? sender, VectorEventArgs e) => StripHeight -= e.Vector.Y;
+    /// <summary>How tall a strip may be given the room. Holds nothing, so one serves them all.</summary>
+    private static readonly IStripRoom Room = new StripRoom();
+
+    /// <summary>
+    /// Up is taller, which is the way round a hand expects when it is pulling a lid, and it
+    /// stops where the thing above it would start to disappear.
+    /// </summary>
+    /// <remarks>
+    /// A strip takes its room off whatever it is folded under, and the grid it is in gives an
+    /// Auto row exactly what it asks for, so nothing else in that grid can refuse: without this
+    /// the pattern goes to nothing and the strips fill the page. Shrinking is never refused,
+    /// since the way back from a page full of strips has to be the same grip.
+    /// </remarks>
+    private void Dragged(object? sender, VectorEventArgs e)
+    {
+        double wanted = StripHeight - e.Vector.Y;
+
+        if (wanted > StripHeight)
+        {
+            double tallest = Room.Tallest(
+                (this.GetVisualParent() as Visual)?.Bounds.Height ?? 0,
+                Siblings(),
+                StripRoom.DefaultLeast,
+                ContentLeast);
+
+            if (StripHeight >= tallest) return;
+
+            wanted = Math.Min(wanted, tallest);
+        }
+
+        StripHeight = wanted;
+    }
+
+    /// <summary>How much room the other strips beside this one are taking.</summary>
+    /// <remarks>
+    /// Read off what they were actually given rather than off what they asked for, since a
+    /// folded strip is a line and an open one is a line and a card, and only the layout knows
+    /// which of those each of them is right now.
+    /// </remarks>
+    private double Siblings()
+    {
+        double taken = 0;
+
+        if (this.GetVisualParent() is not Visual parent) return taken;
+
+        foreach (var child in parent.GetVisualChildren())
+        {
+            if (ReferenceEquals(child, this)) continue;
+            if (child is not FoldStrip strip) continue;
+
+            taken += strip.Bounds.Height;
+        }
+
+        return taken;
+    }
 }

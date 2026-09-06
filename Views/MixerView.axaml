@@ -199,7 +199,10 @@
             <!-- What the whole mix goes through, under the strips it is the sum of. The same strip
                  the pattern page puts under a track, because a chain is a chain: what differs is
                  only which of them it is about. -->
-            <views:FoldStrip DockPanel.Dock="Bottom" Title="master effects"
+            <!-- The topmost of the two, so this is the one that carries the room above the pair:
+             docked from the bottom the automation goes lowest and this stands over it, against
+             the row of faders. -->
+        <views:FoldStrip DockPanel.Dock="Bottom" Title="master effects" Margin="0,10,0,0"
                              IsOpen="{Binding ShowsMasterChain, Mode=TwoWay}"
                              StripHeight="{Binding MasterChainHeight, Mode=TwoWay}">
               <views:PluginStrip DataContext="{Binding MasterEffect}" />
