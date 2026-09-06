@@ -149,6 +149,21 @@ public interface IAudioEngine : IDisposable
     /// </remarks>
     IOutputBus TakeBus { get; }
 
+    /// <summary>What is coming in on the recording input, as one source on <see cref="Output"/>.</summary>
+    /// <remarks>
+    /// The IN strip's own, so its mute, its placement and a solo somewhere else mean the same
+    /// thing there as on every other strip. Silent until somebody asks to hear the input, since
+    /// nothing is pushed into it until then.
+    /// </remarks>
+    IOutputBus MonitorBus { get; }
+
+    /// <summary>The path the capture takes onto <see cref="MonitorBus"/>.</summary>
+    /// <remarks>
+    /// Handed to whatever is capturing rather than reached for: the engine owns everything that
+    /// is a stream here, and the recorder owns the bytes.
+    /// </remarks>
+    IMonitorFeed Monitor { get; }
+
     /// <summary>Plays a file on that pad, from the beginning, at that level.</summary>
     void PlaySample(int padIndex, string filePath, float volume);
 

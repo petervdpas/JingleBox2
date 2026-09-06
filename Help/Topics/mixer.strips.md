@@ -12,6 +12,13 @@ the pattern, the chain and the automation follow what your hand is on.
 being auditioned on RECORD against the rest of the mix. **PADS** is every pad
 together.
 
+IN is the desk's input channel and its fader is the input's own gain, so it decides
+what a take holds. At the foot of it are the source it is listening to, **Hear it**,
+which puts what is coming in through the Recording Effects chain and out of the
+master, and **Only here**, which takes that source off its own output so it is heard
+through this application and nowhere else. Its mute, its placement and a solo are
+about what Hear it is sending; with that off, nothing of it is in the mix.
+
 The difference matters when you pull a fader down. A track is the song's, so moving it
 changes the song and is saved with it. RECORDER and PADS are this installation's, so
 moving one changes how this machine sounds and not what anybody else would hear from

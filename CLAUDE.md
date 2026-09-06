@@ -4329,6 +4329,58 @@ whole exercise and is worth writing down rather than summarising:
   on, and a pad catches and puts the message on itself: better than pads that play a different
   way and lose solo, pan, mute and ASIO in silence. `SaySoloable` already asked `Output.IsOpen`
   rather than the switch, so it needed nothing
+- **The recording input is heard through its own chain now, which is what an insert on a desk's
+  input channel has always meant.** A microphone through a pitch effect is heard as the pitched
+  thing while you play it. Every piece of it existed and none of them were joined: the chain ran
+  in `TakeEffects.Through` after a take was stopped, `StartMonitoring` only opened the input so
+  the meter could read it, and the IN strip's own documentation said **on the desk and not in the
+  mix**. So a chain on the input was a post-process on a file and nothing else
+- **`IMonitorFeed` is the path and it is a push stream on a bus of its own.** `MonitorBus` is the
+  fourth strip beside the pads and the takes, so the IN strip's mute, placement and solo are the
+  bus's like every other strip's, and a solo anywhere on the row pauses it with everything else.
+  Its own bus rather than the take bus, although both are RECORD's: a take being auditioned is a
+  file playing and this is the input arriving, and one fader over both would be one fader for two
+  jobs
+- **The capture thread only ever copies, and that is the whole architecture.** It hands the block
+  over and returns; the chain runs where the bus is pulled, which is the same thread a pad's chain
+  already runs on. This file already refused the other arrangement in as many words, that there is
+  no reason whatever to put a plugin on the capture callback since a crossing is a fixed cost per
+  block and a late block there is a hole in the only copy of a performance. **The take is still
+  written from the captured bytes and nothing on this path can reach them**, so the refusal
+  stands and the monitor is beside it rather than in front of it
+- **`IInsertPass` came out of the pad path, where it had been written once and could not be
+  reached.** A block through an effect is four things and each was got wrong somewhere before it
+  was written down: the audio is worked through in pieces and never skipped, since the first block
+  BASS asks for is the whole playback buffer; a mono channel is widened and folded back, because an
+  effect is a stereo thing; an effect that throws costs the rest of that block only; and what comes
+  back goes through `IOutputCurve`, because an effect handing back a NaN writes it out of the card.
+  `Tests/InsertPassTests.cs` is the first test that path has ever had, and it covers the pads as
+  much as the input
+- **`IStereoFloats` is the other new rule and it is the one that goes wrong quietly.** A capture
+  hands over 16 bit samples and a bus and an effect deal in interleaved stereo floats, and every
+  way that conversion fails is inaudible as a fault: the two halves of a sample the wrong way round
+  is noise that reads as a broken cable, an unsigned read is a signal sitting half a scale off
+  nought, and the wrong divisor is a monitor that is very nearly right and always a hair too loud.
+  32768 and not 32767, the same number `SixteenBit` multiplies by on the way out, or a take heard
+  going in and written coming out would differ by something nobody could account for
+- **What an output is playing cannot be heard this way, and that is the case the picker defaults
+  to.** That source is the output's own monitor, so hearing it through the output feeds it back
+  into itself at full scale through whatever the chain is doing. `IInputSource.CanHear` is the
+  rule and it is asked from both directions: the switch is grey for such a source, and choosing
+  one while the switch is already on turns it off and says why, since grey arrives at the moment
+  the source changes and by then the audio is already going round. A program is fine either way,
+  heard twice if it is still playing out of its own output and heard here alone if it has been
+  taken aside
+- **Off unless somebody says so, and not kept between runs**, which is the rule `TakeAside`
+  already keeps and for a sharper reason: a switch that came back on at the next start would make
+  a loop, or point a microphone at the speakers, before anybody had asked for anything
+- **What it cannot do is be quick.** What is heard is a capture buffer plus an output buffer late.
+  A desk avoids that by not going near a computer and the only thing that moves it here is the
+  sizes in SETTINGS, which is said in the help rather than left to be discovered
+- The cable out of RECORD carries two things now, a take being auditioned and the input being
+  listened to, and `PatchSignals.Takes` is either of them: it is one cable because there is one,
+  and it is solid while either is sounding. The port on that block is still called `takes`, which
+  is now half the truth and is the smaller of two evils until somebody decides to rename it
 - **What the switch left behind was a whole seam, and no warning would have found it.**
   `IAudioEngine.ReopenOutput` and `BassAudioEngine.ReopenOutput` existed for one caller,
   `MainViewModel.ReopenDevice`, which existed for one tick: opening the device again is what made

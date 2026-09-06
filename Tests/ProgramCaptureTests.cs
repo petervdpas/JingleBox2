@@ -90,6 +90,12 @@ public class ProgramCaptureTests
 
         /// <inheritdoc/>
         public void ReopenInput() => Reopened++;
+
+        /// <inheritdoc/>
+        public void HearThrough(JingleBox2.Audio.Interfaces.IMonitorFeed monitor) { }
+
+        /// <inheritdoc/>
+        public bool Hearing { get; set; }
     }
 
     /// <summary>A machine with no per-process capture offers none and says so.</summary>

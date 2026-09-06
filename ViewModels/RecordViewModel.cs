@@ -1842,6 +1842,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         ApplyRoute(value, announce: true);
 
         Aside();
+
+        Listening();
     }
 
     /// <summary>Whether this machine can take a source off everything but this application.</summary>
@@ -1899,6 +1901,59 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             Aside();
         }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Kept on the recorder rather than here, since the capture is what pushes the audio and the
+    /// switch has to survive this page being built again. Setting it while nothing is captured is
+    /// not refused: the path opens with the capture.
+    /// </remarks>
+    public bool Hearing
+    {
+        get => _recordingService.Hearing;
+
+        set
+        {
+            if (_recordingService.Hearing == value) return;
+
+            if (value && !CanHear) return;
+
+            _recordingService.Hearing = value;
+
+            OnPropertyChanged();
+
+            Status = value
+                ? "What is coming in is being heard through the desk."
+                : "The input is no longer being heard.";
+        }
+    }
+
+    /// <inheritdoc/>
+    public bool CanHear =>
+        SelectedRoute is not { } source ||
+        source.Kind != Audio.Routing.Enums.AudioRouteKind.Monitor;
+
+    /// <summary>
+    /// Turns listening off where the source that has just been chosen cannot be listened to.
+    /// </summary>
+    /// <remarks>
+    /// Picking what an output is playing while the input is being heard would make a loop out of
+    /// a switch that was already on, which is the one case the switch being grey cannot cover: it
+    /// is grey from the moment the source changes and by then the audio is already going round.
+    /// So the source decides, and the switch follows it.
+    /// </remarks>
+    private void Listening()
+    {
+        OnPropertyChanged(nameof(CanHear));
+
+        if (CanHear || !_recordingService.Hearing) return;
+
+        _recordingService.Hearing = false;
+
+        OnPropertyChanged(nameof(Hearing));
+
+        Status = "What an output is playing cannot be heard through the desk, since that is a loop.";
     }
 
     /// <summary>Backing field for <see cref="TakeAside"/>.</summary>

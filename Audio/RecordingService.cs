@@ -317,6 +317,8 @@ public sealed class RecordingService : IRecordingService, IDisposable
             StartOnDevice(DefaultDevice);
             LastStartWarning = $"'{SelectedDevice}' could not be opened ({ex.Message}); recording from the default input instead.";
         }
+
+        OpenMonitor();
     }
 
     /// <summary>Opens one device and starts the audio arriving.</summary>
@@ -413,6 +415,8 @@ public sealed class RecordingService : IRecordingService, IDisposable
     {
         if (!_capturing) return;
 
+        _monitor?.Close();
+
         if (_programs.IsRunning)
         {
             _programs.Stop();
@@ -461,8 +465,72 @@ public sealed class RecordingService : IRecordingService, IDisposable
         return _heard.Recent(maxBytes, BytesPerFrame);
     }
 
+    /// <summary>Backing field for <see cref="Effect"/>.</summary>
+    private Plugins.Interfaces.IAudioInsert? _effect;
+
     /// <inheritdoc/>
-    public Plugins.Interfaces.IAudioInsert? Effect { get; set; }
+    /// <remarks>
+    /// Told to the monitor as well as kept, so what is heard while a level is set is what the
+    /// take will hold. One chain and two moments: live on the way past, and again over the whole
+    /// take once it is stopped.
+    /// </remarks>
+    public Plugins.Interfaces.IAudioInsert? Effect
+    {
+        get => _effect;
+
+        set
+        {
+            _effect = value;
+
+            if (_monitor != null) _monitor.Insert = value;
+        }
+    }
+
+    /// <summary>Where what is coming in is heard, or nothing until it has been said.</summary>
+    private Interfaces.IMonitorFeed? _monitor;
+
+    /// <inheritdoc/>
+    public void HearThrough(Interfaces.IMonitorFeed monitor)
+    {
+        _monitor = monitor;
+        _monitor.Insert = _effect;
+    }
+
+    /// <summary>Backing field for <see cref="Hearing"/>.</summary>
+    private volatile bool _hearing;
+
+    /// <inheritdoc/>
+    public bool Hearing
+    {
+        get => _hearing;
+
+        set
+        {
+            if (_hearing == value) return;
+
+            _hearing = value;
+
+            if (value) OpenMonitor();
+            else _monitor?.Close();
+        }
+    }
+
+    /// <summary>
+    /// Opens the path onto the input's bus, where there is a capture to open it at.
+    /// </summary>
+    /// <remarks>
+    /// Called both ways round, since the switch and the capture can arrive in either order:
+    /// somebody can ask to hear the input before a page has opened it, and a page can open it
+    /// while the switch is already on. Nothing happens where there is no capture yet, and the
+    /// capture calls this itself once it knows what it is running at.
+    /// </remarks>
+    private void OpenMonitor()
+    {
+        if (!_hearing || _monitor == null || !_capturing) return;
+
+        _monitor.Insert = _effect;
+        _monitor.Open(_sampleRate, _channels);
+    }
 
     /// <inheritdoc/>
     public int SampleRate => _sampleRate;
@@ -569,6 +637,8 @@ public sealed class RecordingService : IRecordingService, IDisposable
         }
 
         _heard.Add(data);
+
+        if (_hearing) _monitor?.Push(data, data.Length);
     }
 
     /// <summary>Audio from a capture device, on BASS's own thread.</summary>
@@ -597,6 +667,8 @@ public sealed class RecordingService : IRecordingService, IDisposable
             }
 
             _heard.Add(data);
+
+            if (_hearing) _monitor?.Push(data, data.Length);
         }
         return true;
     }

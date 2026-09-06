@@ -117,6 +117,22 @@
                  everywhere the moment it was picked would read as this application having
                  broken it. Grey where the machine cannot rather than gone, the rule every other
                  switch on this page keeps. -->
+            <!-- The desk's input channel: what is coming in goes through the recording chain and
+                 out of the master, which is what an insert on an input has always meant. Grey
+                 for what an output is playing, since hearing that through the output is a loop
+                 rather than a monitor.
+
+                 **As wide as the picker rather than as wide as its own words.** Centred on
+                 itself, a switch sits where the length of its label puts it, so two of them
+                 under one picker have their boxes on two different lines down the strip. Given
+                 the picker's width they all start on the picker's own left edge, which is the
+                 one edge this column has. -->
+            <CheckBox Content="Hear it"
+                      Classes="strip"
+                      IsEnabled="{Binding Source.CanHear}"
+                      IsChecked="{Binding Source.Hearing, Mode=TwoWay}"
+                      ToolTip.Tip="Hear what is coming in, through the Recording Effects chain, out of the master. It arrives a buffer or two late, and what an output is playing cannot be heard this way because that is a loop." />
+
             <!-- Only drawn where a source has to be sent somewhere rather than simply
                  unplugged, which is a machine with no graph. A cable is the usual answer and a
                  spare socket is as good; picking one here is what makes the switch under it
@@ -141,8 +157,7 @@
             </StackPanel>
 
             <CheckBox Content="Only here"
-                      FontSize="11"
-                      HorizontalAlignment="Center"
+                      Classes="strip"
                       IsEnabled="{Binding Source.CanTakeAside}"
                       IsChecked="{Binding Source.TakeAside, Mode=TwoWay}"
                       ToolTip.Tip="Take this source off its own output, so it is heard through JingleBox2 and nowhere else. Put back when you close the application." />
@@ -175,6 +190,18 @@
       <Setter Property="Padding" Value="0" />
       <Setter Property="FontSize" Value="11" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+
+    <!-- The switches under the IN strip's picker. As wide as the picker rather than as wide as
+         their own words, so their boxes stand on the picker's own left edge: centred on
+         themselves, two labels of different lengths put their boxes on two different lines and
+         the column reads as ragged. The number is the picker's, said again because a picker
+         measured against a route's name would be wider than the strip. -->
+    <Style Selector="CheckBox.strip">
+      <Setter Property="Width" Value="118" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="FontSize" Value="11" />
     </Style>
 
     <!-- The two caps over the patchbay. Square rather than the mute button's shape, since what

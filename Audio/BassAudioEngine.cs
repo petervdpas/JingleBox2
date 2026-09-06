@@ -48,6 +48,20 @@ public sealed class BassAudioEngine : IAudioEngine
     /// <inheritdoc cref="_output"/>
     private readonly Interfaces.IOutputBus _takeBus = new OutputBus();
 
+    /// <summary>
+    /// The recording input's own bus, which is the fourth strip and the newest of them.
+    /// </summary>
+    /// <remarks>
+    /// It carries what is coming in while somebody is listening to it, through the recording
+    /// chain. Its own bus rather than the take bus, although both are RECORD's, because they are
+    /// two different things at two different moments: a take being auditioned is a file playing
+    /// and this is the input arriving, and a fader over both would be one fader for two jobs.
+    /// </remarks>
+    private readonly Interfaces.IOutputBus _monitorBus = new OutputBus();
+
+    /// <summary>The path from the capture onto that bus.</summary>
+    private Interfaces.IMonitorFeed? _monitor;
+
     /// <summary>Held for anything that touches a pad's state or calls into BASS.</summary>
     private readonly object _lock = new();
 
@@ -337,8 +351,13 @@ public sealed class BassAudioEngine : IAudioEngine
             throw new InvalidOperationException(
                 "The pad and take busses could not be opened, so nothing can be played.");
 
+        if (!_monitorBus.Open(_deviceRate, BusChannels, true))
+            throw new InvalidOperationException(
+                "The input's bus could not be opened, so nothing can be played.");
+
         _output.Add(_padBus.Handle);
         _output.Add(_takeBus.Handle);
+        _output.Add(_monitorBus.Handle);
 
         if (pulled)
         {
@@ -361,6 +380,7 @@ public sealed class BassAudioEngine : IAudioEngine
     /// </remarks>
     private void CloseBussesLocked()
     {
+        _monitorBus.Close();
         _takeBus.Close();
         _padBus.Close();
         _output.Close();
@@ -447,6 +467,18 @@ public sealed class BassAudioEngine : IAudioEngine
 
     /// <inheritdoc/>
     public Interfaces.IOutputBus TakeBus => _takeBus;
+
+    /// <inheritdoc/>
+    public Interfaces.IOutputBus MonitorBus => _monitorBus;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Made once and kept, since it holds the stream the capture is pushing into and a second
+    /// one would be a second stream on the same bus with nothing pushing to it. The bus under it
+    /// is made again whenever the output changes, which the feed answers by looking each block
+    /// rather than by being told.
+    /// </remarks>
+    public Interfaces.IMonitorFeed Monitor => _monitor ??= new MonitorFeed(_monitorBus);
 
     /// <inheritdoc/>
     public void SetPadSource(int padIndex, PadSourceKind kind, string? source)
@@ -1059,101 +1091,22 @@ public sealed class BassAudioEngine : IAudioEngine
 
         int channels = Math.Max(1, counts[padIndex]);
 
-        int samples = length / sizeof(float);
-        if (samples <= 0) return;
-
-        int frames = samples / channels;
-        if (frames <= 0) return;
-
         var scratch = scratchpads[padIndex];
         if (scratch == null) return;
 
-        int most = scratch.Length / 2;
-
-        for (int start = 0; start < frames; start += most)
-        {
-            int take = Math.Min(most, frames - start);
-            if (!ProcessPadBlock(insert, scratch, buffer, start, take, channels)) return;
-        }
+        Passing.Run(insert, scratch, buffer, length, channels);
     }
 
     /// <summary>
-    /// The curve everything leaving this engine goes through, the same one the master uses.
+    /// A block through whatever effect is on it, which is the same act the recording input's
+    /// chain is.
     /// </summary>
     /// <remarks>
-    /// A pad's audio never touches the tracker's mixer, so the guard on the master reached none
-    /// of it: an effect on a pad's chain handing back a NaN wrote it straight back into the
-    /// sound library's own buffer and out of the card. One rule and both ways out.
+    /// It was written out here, inside the pad path, where nothing else could reach it. The
+    /// second thing that wanted it is the monitor, and a second spelling of the widening, the
+    /// piece size and the curve would be two answers to one question.
     /// </remarks>
-    private static readonly Interfaces.IOutputCurve Leaving = new OutputCurve();
-
-    /// <summary>
-    /// One piece of a block: out of the channel's buffer, through the effect, and back in.
-    /// Returns false when the effect fell over, which costs the rest of that block only.
-    /// </summary>
-    /// <remarks>
-    /// More than two channels on a pad is unusual and the ones past the second are left alone.
-    /// </remarks>
-    /// <param name="insert">The effect.</param>
-    /// <param name="scratch">The stereo buffer to work in, which is the pad's own.</param>
-    /// <param name="buffer">The channel's samples.</param>
-    /// <param name="start">Which frame of them this piece begins at.</param>
-    /// <param name="frames">How many frames this piece holds.</param>
-    /// <param name="channels">How many channels the pad's stream carries.</param>
-    private static unsafe bool ProcessPadBlock(
-        Plugins.Interfaces.IAudioInsert insert,
-        float[] scratch,
-        IntPtr buffer,
-        int start,
-        int frames,
-        int channels)
-    {
-        float* audio = (float*)buffer + start * channels;
-
-        if (channels == 1)
-        {
-            for (int frame = 0; frame < frames; frame++)
-            {
-                scratch[frame * 2] = audio[frame];
-                scratch[frame * 2 + 1] = audio[frame];
-            }
-        }
-        else
-        {
-            for (int frame = 0; frame < frames; frame++)
-            {
-                scratch[frame * 2] = audio[frame * channels];
-                scratch[frame * 2 + 1] = audio[frame * channels + 1];
-            }
-        }
-
-        try
-        {
-            insert.Process(scratch, frames);
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-
-        Leaving.Bend(scratch, frames * 2);
-
-        if (channels == 1)
-        {
-            for (int frame = 0; frame < frames; frame++)
-                audio[frame] = (scratch[frame * 2] + scratch[frame * 2 + 1]) * 0.5f;
-        }
-        else
-        {
-            for (int frame = 0; frame < frames; frame++)
-            {
-                audio[frame * channels] = scratch[frame * 2];
-                audio[frame * channels + 1] = scratch[frame * 2 + 1];
-            }
-        }
-
-        return true;
-    }
+    private static readonly Interfaces.IInsertPass Passing = new InsertPass();
 
     /// <inheritdoc/>
     public void Resize(int newPadCount)

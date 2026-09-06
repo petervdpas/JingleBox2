@@ -77,6 +77,35 @@ public interface IInputSource
     /// </remarks>
     bool TakeAside { get; set; }
 
+    /// <summary>
+    /// Whether what is coming in is heard through the desk while it comes in.
+    /// </summary>
+    /// <remarks>
+    /// **This is an insert on the desk's input channel and it is what a chain on the input is
+    /// for.** A microphone through a pitch effect is heard as the pitched thing, and what is
+    /// heard is what a take would hold, since it is the same chain and the same input gain.
+    ///
+    /// Off unless somebody says so, and not kept between runs. What is heard arrives a capture
+    /// buffer and an output buffer late, which is what monitoring through a computer costs.
+    /// </remarks>
+    bool Hearing { get; set; }
+
+    /// <summary>
+    /// Whether the chosen source is one this can be done with at all.
+    /// </summary>
+    /// <remarks>
+    /// **No for what an output is playing, which is a loop and nothing else.** That source is the
+    /// output's own monitor, so hearing it through the output feeds it back into itself, and the
+    /// first thing anybody would know about it is the noise. It is the ordinary source here,
+    /// since it is what the picker defaults to, so this is a case that would be met on the first
+    /// press rather than an awkward one.
+    ///
+    /// A microphone and a program are both fine: a program that is still playing out of its own
+    /// output is merely heard twice, which is a doubling somebody can hear and undo, and one
+    /// that has been taken aside is heard here alone.
+    /// </remarks>
+    bool CanHear { get; }
+
     /// <summary>Whether a source has to be sent somewhere rather than simply unplugged.</summary>
     /// <remarks>
     /// True on a machine with no graph, where the only way to take a source off its own output

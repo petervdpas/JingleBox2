@@ -38,10 +38,22 @@ The two are the same length to the frame, so they lie on top of each other. That
 also why a delay still ringing at the last frame is cut off with it rather than
 running on.
 
-The chain is applied once the take has been made rather than while it is being made,
-and nothing is heard through it while you record. That is deliberate: a plugin taking
-a moment longer than usual would be a hole in the only copy of a performance, and
-offline it can take as long as it likes and makes exactly the same sound.
+**The take is made from what arrived and nothing else**, and the chain is run over it
+once it has been stopped. That is deliberate: a plugin taking a moment longer than
+usual on the way past would be a hole in the only copy of a performance, and offline
+it can take as long as it likes and makes exactly the same sound.
+
+You can still hear it while you play. **Hear it**, at the foot of the IN strip on the
+mixer, puts what is coming in through this same chain and out of the master, so a
+microphone through a pitch effect is heard as the pitched thing. That is a second run
+of the chain on its own path and it cannot reach the take: what is written is still
+the capture as it arrived, worked on afterwards.
+
+Two things to know before you use it. What you hear is a capture buffer and an output
+buffer late, which is what monitoring through a computer costs and is why the sizes in
+SETTINGS matter. And what an output is playing cannot be heard this way at all, which
+is why the switch is grey for it: that source is the output's own monitor, so hearing
+it through the output would feed it back into itself.
 
 ## Trimming
 

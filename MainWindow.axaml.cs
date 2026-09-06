@@ -219,6 +219,10 @@ public partial class MainWindow : Window
             padCount: cfg.Rows * cfg.Columns,
             deviceRate: cfg.EngineSampleRate);
 
+        // What is coming in is heard through the engine's own bus, so the recorder is told where
+        // that is rather than making a stream of its own beside the ones the engine owns.
+        _recording.HearThrough(_audio.Monitor);
+
         saying?.Doing("Building the pages");
 
         var vm = new MainViewModel(_audio, _store, cfg, _midi, _recording, _waveform, _routing, projects, made);

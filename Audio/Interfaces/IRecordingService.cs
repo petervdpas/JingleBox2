@@ -161,6 +161,29 @@ public interface IRecordingService
     int? LoopbackProgram { get; set; }
 
     /// <summary>
+    /// Says where what is coming in is heard, which is the desk's own input channel.
+    /// </summary>
+    /// <remarks>
+    /// Handed in rather than made here, because the stream it holds is a source on a bus and the
+    /// busses belong to the engine. Told once, at startup, since there is one of each.
+    /// </remarks>
+    /// <param name="monitor">The path onto the input's bus.</param>
+    void HearThrough(IMonitorFeed monitor);
+
+    /// <summary>
+    /// Whether what is coming in is played out of the desk while it comes in.
+    /// </summary>
+    /// <remarks>
+    /// **Off unless somebody says so, and never remembered**, since the ordinary source is what
+    /// an output is playing and hearing that through the output is a loop. What is heard is what
+    /// a take would hold, chain and input gain included, which is the point of listening at all.
+    ///
+    /// Setting it while nothing is captured is not refused: the path is opened when the capture
+    /// is, at whatever rate it turns out to be running.
+    /// </remarks>
+    bool Hearing { get; set; }
+
+    /// <summary>
     /// Closes and reopens the input if anything is listening, for a change that only takes
     /// effect on a fresh capture. Does nothing when nothing is open.
     /// </summary>

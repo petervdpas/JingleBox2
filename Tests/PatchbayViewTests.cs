@@ -72,6 +72,12 @@ public class PatchbayViewTests
         public bool TakeAside { get; set; }
 
         /// <inheritdoc/>
+        public bool Hearing { get; set; }
+
+        /// <inheritdoc/>
+        public bool CanHear => true;
+
+        /// <inheritdoc/>
         public bool NeedsSilentOutput => false;
 
         /// <inheritdoc/>

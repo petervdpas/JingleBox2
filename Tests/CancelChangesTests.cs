@@ -68,6 +68,10 @@ public class CancelChangesTests
         /// <inheritdoc/>
         public IOutputBus TakeBus { get; } = new Nowhere();
         /// <inheritdoc/>
+        public IOutputBus MonitorBus { get; } = new Nowhere();
+        /// <inheritdoc/>
+        public JingleBox2.Audio.Interfaces.IMonitorFeed Monitor { get; } = new JingleBox2.Audio.NoMonitorFeed();
+        /// <inheritdoc/>
         public void PlaySample(int padIndex, string filePath, float volume) { }
         /// <inheritdoc/>
         public void PlayStream(int padIndex, string url, float volume) { }

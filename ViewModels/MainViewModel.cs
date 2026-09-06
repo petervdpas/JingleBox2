@@ -819,10 +819,15 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// The recording input, as a strip on the mixer.
     /// </summary>
     /// <remarks>
-    /// **On the desk and not in the mix.** Its fader is what RECORD is listening at and its meter
-    /// is what is coming in, so neither reaches the output bus: turning it down changes what a
-    /// take will hold rather than what you hear. It is on the page for the reason a hardware desk
-    /// puts its input channels on the desk, which is that this is where levels are set.
+    /// **The desk's input channel, and in the mix while somebody is listening to it.** Its fader
+    /// is the input's own gain rather than a level on the bus, which is what an input channel's
+    /// gain has always been: it decides what a take holds, and therefore what is heard as well.
+    /// Its meter is what is coming in, read before the bus, so it says what is arriving whether
+    /// or not anybody is listening.
+    ///
+    /// Its mute, its placement and a solo are the bus's, like every other strip's, and they are
+    /// about the one thing the bus carries, which is what is coming in being heard here. With
+    /// Hear it off nothing is on that bus and they are a channel with nothing plugged into it.
     ///
     /// Its own range rather than a track's, since a recording input's useful travel is not a
     /// fader's: the recorder says what it will take.
@@ -830,12 +835,14 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     public SourceStripViewModel RecorderInput =>
         recorderInput ??= new SourceStripViewModel(
             "IN",
-            "What RECORD is listening at, and what is coming in. This one sets what a take holds rather than what you hear.",
+            "What RECORD is listening at, and what is coming in. The fader is the input's gain, so it sets what a take holds as well as what you hear.",
             Record.MinGainDb,
             Record.MaxGainDb,
             () => Record.RecordGainDb,
             value => Record.RecordGainDb = value,
             () => (Record.LevelLeft, Record.LevelRight),
+            _audio.MonitorBus,
+            ApplySolo,
             source: Record);
 
     /// <summary>
@@ -851,10 +858,18 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// </remarks>
     public UI.Records.PatchSignals Signals => new(
         Input: Loud(RecorderInput),
-        Takes: Loud(RecorderPlay),
+        Takes: Loud(RecorderPlay) || Heard(),
         Pads: Loud(PadsStrip),
         Tracks: Sounding(),
-        Output: Loud(RecorderPlay) || Loud(PadsStrip) || Tracker.IsPlaying);
+        Output: Loud(RecorderPlay) || Loud(PadsStrip) || Heard() || Tracker.IsPlaying);
+
+    /// <summary>Whether what is coming in is being heard, which is RECORD feeding the desk.</summary>
+    /// <remarks>
+    /// The cable out of RECORD carries two things and this is the second: a take being auditioned
+    /// and the input being listened to both leave that block for the mixer. Drawn as one cable
+    /// because there is one, and it is solid while either of them is sounding.
+    /// </remarks>
+    private bool Heard() => Record.Hearing && Loud(RecorderInput);
 
     /// <summary>Which of the song's tracks are sounding, by the name their strip wears.</summary>
     /// <remarks>
@@ -1042,6 +1057,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     {
         var heard = new List<int>();
 
+        if (RecorderInput.Solo && _audio.MonitorBus.Handle != 0) heard.Add(_audio.MonitorBus.Handle);
         if (RecorderPlay.Solo && _audio.TakeBus.Handle != 0) heard.Add(_audio.TakeBus.Handle);
         if (PadsStrip.Solo && _audio.PadBus.Handle != 0) heard.Add(_audio.PadBus.Handle);
 
@@ -1064,6 +1080,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     {
         bool can = _audio.Output.IsOpen;
 
+        RecorderInput.CanSolo = can;
         RecorderPlay.CanSolo = can;
         PadsStrip.CanSolo = can;
 
@@ -1074,6 +1091,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             return;
         }
 
+        RecorderInput.Solo = false;
         RecorderPlay.Solo = false;
         PadsStrip.Solo = false;
     }

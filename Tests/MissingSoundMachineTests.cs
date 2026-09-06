@@ -60,6 +60,10 @@ public class MissingSoundMachineTests
         /// <inheritdoc/>
         public JingleBox2.Audio.Interfaces.IOutputBus TakeBus => throw Asked();
         /// <inheritdoc/>
+        public JingleBox2.Audio.Interfaces.IOutputBus MonitorBus => throw Asked();
+        /// <inheritdoc/>
+        public JingleBox2.Audio.Interfaces.IMonitorFeed Monitor => throw Asked();
+        /// <inheritdoc/>
         public void PlaySample(int padIndex, string filePath, float volume) => throw Asked();
         /// <inheritdoc/>
         public void PlayStream(int padIndex, string url, float volume) => throw Asked();
