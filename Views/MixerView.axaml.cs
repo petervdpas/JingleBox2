@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -124,6 +125,33 @@ public partial class MixerView : UserControl
 
         patch.Refresh();
     }
+
+    /// <summary>Draws the patchbay larger.</summary>
+    /// <remarks>
+    /// Found by name rather than bound, since how far in the picture is drawn is the control's
+    /// own business: it is not remembered, it is not in a song, and nothing else on the page has
+    /// any use for it.
+    /// </remarks>
+    private void ZoomIn_Click(object? sender, RoutedEventArgs e) => Bay(sender)?.ZoomIn();
+
+    /// <summary>And smaller.</summary>
+    private void ZoomOut_Click(object? sender, RoutedEventArgs e) => Bay(sender)?.ZoomOut();
+
+    /// <summary>
+    /// The picture one of the zoom caps is sitting over.
+    /// </summary>
+    /// <remarks>
+    /// From the card down rather than from the button up. The buttons stand in a StackPanel,
+    /// which is itself a Panel, so asking for the nearest Panel ancestor answered the panel they
+    /// are in and the search for the picture found nothing: the presses did nothing at all and
+    /// said nothing about it.
+    /// </remarks>
+    private static PatchbayView? Bay(object? sender) =>
+        (sender as Control)?
+            .FindAncestorOfType<Border>()?
+            .GetVisualDescendants()
+            .OfType<PatchbayView>()
+            .FirstOrDefault();
 
     /// <summary>Where the IN strip is fed from, or nothing where the page was built without it.</summary>
     /// <remarks>

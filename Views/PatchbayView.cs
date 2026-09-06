@@ -92,6 +92,46 @@ public sealed class PatchbayView : Panel
         set => SetValue(LiveProperty, value);
     }
 
+    /// <summary>How far in the picture is drawn, one being the size it is written at.</summary>
+    /// <remarks>
+    /// **The picture is scaled, not the layout.** Where a block sits is what somebody arranged
+    /// and what is written down between sessions, so zooming must not move it: at half size the
+    /// same arrangement is simply smaller, and a block dragged at that size lands where the
+    /// pointer is because everything a hand does is worked out before the scaling.
+    /// </remarks>
+    public static readonly StyledProperty<double> ZoomProperty =
+        AvaloniaProperty.Register<PatchbayView, double>(nameof(Zoom), 1);
+
+    /// <summary>As far out as it goes, where a large arrangement fits on one screen.</summary>
+    /// <remarks>
+    /// Past this a block's own lettering is smaller than anybody can read, so what is left is a
+    /// diagram of coloured rectangles: a picture nobody can use is not a smaller picture.
+    /// </remarks>
+    public const double Least = 0.4;
+
+    /// <summary>And as far in, which is where a dot is a comfortable target on a dense page.</summary>
+    public const double Most = 2;
+
+    /// <summary>What one press of the buttons is worth.</summary>
+    /// <remarks>
+    /// A ratio rather than an amount, so each press is the same change to the eye: a tenth
+    /// added at half size is a fifth of the picture and at double size a twentieth.
+    /// </remarks>
+    private const double Step = 1.2;
+
+    /// <inheritdoc cref="ZoomProperty"/>
+    public double Zoom
+    {
+        get => GetValue(ZoomProperty);
+        set => SetValue(ZoomProperty, Math.Clamp(value, Least, Most));
+    }
+
+    /// <summary>Draws it larger by one press.</summary>
+    public void ZoomIn() => Zoom *= Step;
+
+    /// <summary>And smaller.</summary>
+    public void ZoomOut() => Zoom /= Step;
+
     /// <summary>Which block is picked out, whose details the sidebar beside this shows.</summary>
     /// <remarks>
     /// The node rather than its id, since what a sidebar wants is everything about the block and
@@ -188,6 +228,12 @@ public sealed class PatchbayView : Panel
         if (change.Property == LinksProperty) _cables.InvalidateVisual();
         if (change.Property == LiveProperty) _cables.InvalidateVisual();
         if (change.Property == SelectedProperty) Mark();
+
+        if (change.Property == ZoomProperty)
+        {
+            RenderTransform = new ScaleTransform(Zoom, Zoom);
+            RenderTransformOrigin = RelativePoint.TopLeft;
+        }
     }
 
     /// <summary>

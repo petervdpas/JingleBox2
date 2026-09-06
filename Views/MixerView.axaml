@@ -141,6 +141,22 @@
       <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
 
+    <!-- The two caps over the patchbay. Square rather than the mute button's shape, since what
+         is on them is one mark rather than a letter: a wide cap with a hyphen in the middle of
+         it reads as a button whose word did not load. The mark is set large and heavy for the
+         same reason, and the cap carries the picture's own ground so it stands off the page
+         rather than floating on it. -->
+    <Style Selector="Button.zoom">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Width" Value="26" />
+      <Setter Property="Height" Value="26" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="FontSize" Value="17" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
     <Style Selector="ToggleButton.strip:checked">
       <Setter Property="Background">
         <SolidColorBrush Color="{DynamicResource Color.Accent}" />
@@ -462,12 +478,27 @@
                    help window use shares the two out. -->
               <Grid RowDefinitions="*,12,Auto">
 
-                <Border Grid.Row="0" Classes="card" MinHeight="180">
-                  <views:PatchbayView Loaded="Bay_Loaded"
-                                      Nodes="{Binding Nodes}"
-                                      Links="{Binding Links}"
-                                      Live="{Binding Live}"
-                                      Selected="{Binding Selected, Mode=TwoWay}" />
+                <Border Grid.Row="0" Classes="card" MinHeight="180" ClipToBounds="True">
+                  <Panel>
+                    <views:PatchbayView x:Name="Bay" Loaded="Bay_Loaded"
+                                        Nodes="{Binding Nodes}"
+                                        Links="{Binding Links}"
+                                        Live="{Binding Live}"
+                                        Selected="{Binding Selected, Mode=TwoWay}" />
+
+                    <!-- Over the picture rather than in a bar above it, since the picture is the
+                         page: a row of its own would cost a strip of height on every song for
+                         two buttons most of them never need. The corner opposite where the
+                         blocks start, so they are not under the hand that is arranging them. -->
+                    <StackPanel Orientation="Horizontal" Spacing="4"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Margin="0,4,4,0">
+                      <Button Classes="zoom" Content="-" Click="ZoomOut_Click"
+                              ToolTip.Tip="Draw the picture smaller." />
+                      <Button Classes="zoom" Content="+" Click="ZoomIn_Click"
+                              ToolTip.Tip="Draw it larger." />
+                    </StackPanel>
+                  </Panel>
                 </Border>
 
                 <GridSplitter Grid.Row="1" Classes="handle rows" ResizeDirection="Rows"

@@ -63,4 +63,6 @@ the blocks. That is the same press every picture in this application is panned w
 Panning changes nothing you have arranged; it only changes where the window is
 looking.
 
-The handle between the picture and the details gives either of them more room.
+The handle between the picture and the details gives either of them more room, and the
+two caps in the picture's own corner draw it larger or smaller. Zooming moves nothing:
+the same arrangement is simply drawn at another size.
