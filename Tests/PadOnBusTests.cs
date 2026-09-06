@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Threading;
 using JingleBox2.Audio;
-using JingleBox2.Audio.Interfaces;
 using Xunit;
 
 namespace JingleBox2.Tests;
@@ -20,23 +19,14 @@ namespace JingleBox2.Tests;
 ///
 /// It runs on BASS's no-sound device against the real add-on, so it needs no card and no window.
 /// Where the add-on is not in this checkout, each test leaves rather than fails.
+///
+/// The bus was behind a setting while it was new, and both the setting and the path it guarded
+/// are gone: a pad is a source on the bus and there is no other way for one to sound. A machine
+/// where the bus will not open says so when the output is opened rather than playing the pads a
+/// different way, which is what the third test here is about.
 /// </remarks>
 public sealed class PadOnBusTests : IDisposable
 {
-    /// <summary>Says yes, so the engine sums onto a bus without the environment being touched.</summary>
-    private sealed class BusOn : IBusSwitch
-    {
-        /// <inheritdoc/>
-        public bool Wanted => true;
-    }
-
-    /// <summary>Says no, which is what every run does until somebody asks for the bus.</summary>
-    private sealed class BusOff : IBusSwitch
-    {
-        /// <inheritdoc/>
-        public bool Wanted => false;
-    }
-
     /// <summary>A folder of its own, so a take written here is nobody else's.</summary>
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "jb-padbus-" + Guid.NewGuid().ToString("N"));
 
@@ -80,7 +70,7 @@ public sealed class PadOnBusTests : IDisposable
     {
         if (!Available()) return;
 
-        using var engine = new BassAudioEngine(padCount: 4, bus: new BusOn());
+        using var engine = new BassAudioEngine(padCount: 4);
 
         engine.EnsureInitialized();
 
@@ -113,7 +103,7 @@ public sealed class PadOnBusTests : IDisposable
     {
         if (!Available()) return;
 
-        using var engine = new BassAudioEngine(padCount: 4, bus: new BusOn());
+        using var engine = new BassAudioEngine(padCount: 4);
 
         engine.EnsureInitialized();
 
@@ -128,25 +118,25 @@ public sealed class PadOnBusTests : IDisposable
         Assert.False(engine.IsPadPlaying(0), "a stopped pad still called itself playing");
     }
 
-    /// <summary>With the switch off not a thing about the old path is different.</summary>
+    /// <summary>A pad fired on a cold engine opens the output and lands on the bus.</summary>
     /// <remarks>
-    /// This is the whole promise of the switch, and it is worth a test rather than a reading of
-    /// the code: no bus is opened, no sub-bus is opened, and a pad still plays and still says so.
+    /// **There is no second path, and this is what makes sure there is no window either.**
+    /// Playing a pad opens BASS on its way in and the busses are opened in the same breath, so
+    /// there is no moment where a pad exists and the bus does not. That mattered while the bus
+    /// was a setting somebody could turn off, since a pad then played at the card on its own;
+    /// with the setting gone, a pad that missed the bus would be a pad that makes no sound.
     /// </remarks>
     [Fact]
-    public void With_the_switch_off_there_is_no_bus_at_all_and_a_pad_still_plays()
+    public void A_pad_on_a_cold_engine_opens_the_bus_and_lands_on_it()
     {
-        using var engine = new BassAudioEngine(padCount: 4, bus: new BusOff());
+        if (!Available()) return;
 
-        engine.EnsureInitialized();
-
-        Assert.False(engine.Output.IsOpen);
-        Assert.False(engine.PadBus.IsOpen);
-        Assert.False(engine.TakeBus.IsOpen);
+        using var engine = new BassAudioEngine(padCount: 4);
 
         engine.PlaySample(0, Tone(), 1f);
 
-        Assert.True(engine.IsPadPlaying(0));
+        Assert.True(engine.PadBus.IsOpen, "playing a pad did not open the bus under it");
+        Assert.True(engine.IsPadPlaying(0), "the pad did not land on the bus it had just opened");
 
         engine.StopSample(0);
 

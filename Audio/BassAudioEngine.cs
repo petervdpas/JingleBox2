@@ -30,11 +30,8 @@ public sealed class BassAudioEngine : IAudioEngine
     /// <summary>How a device number names one out of two lists. Holds nothing.</summary>
     private readonly Interfaces.IAudioOutputs _outputs = new AudioOutputs();
 
-    /// <summary>Whether the summing is asked for at all. Off until it has been listened to.</summary>
-    private readonly Interfaces.IBusSwitch _wantsBus;
-
     /// <summary>
-    /// Everything this application plays, summed. Nought of it is used while the switch is off.
+    /// Everything this application plays, summed, which is the only way anything leaves.
     /// </summary>
     /// <remarks>
     /// Three of them because there are three things that make sound and each is one strip: the
@@ -119,14 +116,11 @@ public sealed class BassAudioEngine : IAudioEngine
     /// <param name="padCount">How many pads there are, which <see cref="Resize"/> can change.</param>
     /// <param name="deviceRate">What to open the card at, or nought for the default.</param>
     /// <param name="rate">The rule that decides, handed in so it can be asked without a card.</param>
-    /// <param name="bus">Whether to sum onto one bus, handed in so it can be asked without a process.</param>
     public BassAudioEngine(
         int padCount = 8,
         int deviceRate = 0,
-        Interfaces.IOutputRate? rate = null,
-        Interfaces.IBusSwitch? bus = null)
+        Interfaces.IOutputRate? rate = null)
     {
-        _wantsBus = bus ?? new BusSwitch();
         _deviceRate = (rate ?? new OutputRate()).Chosen(deviceRate);
 
         _padStreams = new int[padCount];
@@ -337,27 +331,33 @@ public sealed class BassAudioEngine : IAudioEngine
     /// routes.
     ///
     /// A driver that will not take the bus leaves everything open and silent rather than half
-    /// wired, and says so. The caller cannot usefully do anything about it, and tearing the bus
-    /// down here would put the application back on a path this run has already left.
+    /// wired, and says so.
+    ///
+    /// **A bus that will not open throws rather than being worked around.** There was a second
+    /// path once, where a pad played at the card on its own, and it was reached by a setting
+    /// somebody could turn off; the setting is gone and so is the path. What is left that can
+    /// fail is BASSmix not being beside the program, and on that machine nothing can be summed
+    /// at all: saying so where the output is opened reaches the pad that was pressed, which
+    /// puts it on that pad. Playing the pads a different way and losing solo, pan, mute and
+    /// ASIO in silence is the alternative, and it is worse.
     /// </remarks>
     /// <param name="pulled">Whether an ASIO driver drives the output rather than BASS playing it.</param>
     /// <param name="device">Which ASIO driver, where one is being used.</param>
     private void OpenBussesLocked(bool pulled, int device)
     {
-        if (!_wantsBus.Wanted) return;
-
         _output.BufferMs = StartingBufferMs();
 
         if (!_output.Open(_deviceRate, BusChannels, pulled))
-        {
-            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
-                "bus: asked for and not available, so every source plays on its own as before");
+            throw new InvalidOperationException(
+                "The mixer stream could not be opened, so nothing can be played. " +
+                "This needs BASSmix beside the program.");
 
-            return;
-        }
+        if (!_padBus.Open(_deviceRate, BusChannels, true) || !_takeBus.Open(_deviceRate, BusChannels, true))
+            throw new InvalidOperationException(
+                "The pad and take busses could not be opened, so nothing can be played.");
 
-        if (_padBus.Open(_deviceRate, BusChannels, true)) _output.Add(_padBus.Handle);
-        if (_takeBus.Open(_deviceRate, BusChannels, true)) _output.Add(_takeBus.Handle);
+        _output.Add(_padBus.Handle);
+        _output.Add(_takeBus.Handle);
 
         if (pulled)
         {
@@ -649,8 +649,7 @@ public sealed class BassAudioEngine : IAudioEngine
                     "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n" +
                     "Referer: https://www.mixcloud.com/\r\n";
 
-                var flags = PadFlagsLocked(BassFlags.StreamDownloadBlocks | BassFlags.Float)
-                    | (_padBus.IsOpen ? BassFlags.Default : BassFlags.AutoFree);
+                var flags = PadFlagsLocked(BassFlags.StreamDownloadBlocks | BassFlags.Float);
 
                 handle = Bass.CreateStream(urlWithHeaders, 0, flags, null);
                 if (handle == 0)
@@ -824,38 +823,31 @@ public sealed class BassAudioEngine : IAudioEngine
 
 
     /// <summary>
-    /// Starts a pad sounding, which is two different acts depending on where the audio goes.
+    /// Starts a pad sounding, which on the bus is plugging it in rather than playing it.
     /// </summary>
     /// <remarks>
-    /// On the bus a pad is a decoding channel and sounding it is plugging it in; off the bus it
-    /// is an ordinary playing channel and sounding it is <c>ChannelPlay</c>. Every place that
-    /// starts, stops or asks about a pad goes through these three, so the difference between the
-    /// two paths is here and nowhere else. Written out at each call site it would be a dozen
-    /// chances for one of them to be forgotten, and a pad that quietly never joins the bus is
-    /// exactly the fault the bus exists to end.
+    /// A pad is a decoding channel, so nothing plays it: it is a source on the bus and sounding
+    /// it is being added. Every place that starts, stops or asks about a pad goes through these
+    /// four, because written out at each call site they would be a dozen chances for one of them
+    /// to be forgotten, and a pad that quietly never joins the bus is exactly the fault the bus
+    /// exists to end.
+    ///
+    /// **There is no second path any more.** Each of these used to fork on whether the bus was
+    /// open, because the bus was a setting somebody could turn off; it is the only path now, and
+    /// a machine where it cannot be opened says so at the moment the output is opened rather
+    /// than playing pads a different way and losing solo, pan, mute and ASIO in silence.
     /// </remarks>
     /// <param name="handle">The pad's stream.</param>
     /// <returns>False where it would not start.</returns>
-    private bool SoundLocked(int handle) =>
-        _padBus.IsOpen ? _padBus.Add(handle) : Bass.ChannelPlay(handle);
+    private bool SoundLocked(int handle) => _padBus.Add(handle);
 
     /// <inheritdoc cref="SoundLocked"/>
     /// <param name="handle">The pad's stream.</param>
-    private void SilenceLocked(int handle)
-    {
-        if (_padBus.IsOpen)
-        {
-            _padBus.Remove(handle);
-
-            return;
-        }
-
-        Bass.ChannelStop(handle);
-    }
+    private void SilenceLocked(int handle) => _padBus.Remove(handle);
 
     /// <inheritdoc cref="SoundLocked"/>
     /// <remarks>
-    /// On the bus this cannot be asked of the channel. A decoding channel answers
+    /// This cannot be asked of the channel. A decoding channel answers
     /// <see cref="PlaybackState.Playing"/> for as long as it has data in it, whether or not
     /// anything is pulling it, so a pad that has been stopped would go on reporting itself as
     /// playing until its stream was let go. Being plugged in is the question, and the bus is what
@@ -863,16 +855,13 @@ public sealed class BassAudioEngine : IAudioEngine
     /// </remarks>
     /// <param name="handle">The pad's stream.</param>
     /// <returns>Whether it is sounding now.</returns>
-    private bool SoundingLocked(int handle) =>
-        _padBus.IsOpen
-            ? _padBus.Holds(handle)
-            : Bass.ChannelIsActive(handle) is PlaybackState.Playing or PlaybackState.Stalled;
+    private bool SoundingLocked(int handle) => _padBus.Holds(handle);
 
     /// <summary>
     /// How loud a pad is, 0 to 1, and nought for one that is not sounding.
     /// </summary>
     /// <remarks>
-    /// **The two paths need different calls and picking the wrong one costs the audio itself.**
+    /// **It has to be the add-on's own call, and the plain one costs the audio itself.**
     /// <c>Bass.ChannelGetLevel</c> measures by decoding data out of the channel, which is
     /// harmless where the channel is being played by the library and is theft where it is a
     /// source on a bus: every block it measured is a block the bus never got, so a meter would eat
@@ -884,9 +873,7 @@ public sealed class BassAudioEngine : IAudioEngine
     {
         if (!SoundingLocked(handle)) return 0;
 
-        int raw = _padBus.IsOpen
-            ? ManagedBass.Mix.BassMix.ChannelGetLevel(handle)
-            : Bass.ChannelGetLevel(handle);
+        int raw = ManagedBass.Mix.BassMix.ChannelGetLevel(handle);
 
         if (raw == -1) return 0;
 
@@ -896,15 +883,15 @@ public sealed class BassAudioEngine : IAudioEngine
     }
 
     /// <summary>
-    /// What a pad's stream is made with, which gains <see cref="BassFlags.Decode"/> on the bus.
+    /// What a pad's stream is made with, which is what it asked for plus
+    /// <see cref="BassFlags.Decode"/>.
     /// </summary>
     /// <remarks>
     /// A source has to be a decoding channel or the bus refuses it, and the refusal would be a pad
     /// that presses and makes no sound.
     /// </remarks>
     /// <param name="flags">What the pad wanted anyway.</param>
-    private BassFlags PadFlagsLocked(BassFlags flags) =>
-        _padBus.IsOpen ? flags | BassFlags.Decode : flags;
+    private BassFlags PadFlagsLocked(BassFlags flags) => flags | BassFlags.Decode;
 
     /// <summary>Watches a pad for its end, whichever path its audio takes.</summary>
     /// <remarks>
@@ -921,17 +908,8 @@ public sealed class BassAudioEngine : IAudioEngine
     /// </remarks>
     /// <param name="handle">The pad's stream.</param>
     /// <param name="padIndex">Which pad it is.</param>
-    private void WatchEndLocked(int handle, int padIndex)
-    {
-        if (!_padBus.IsOpen)
-        {
-            Bass.ChannelSetSync(handle, SyncFlags.End, 0, _endSync, new IntPtr(padIndex));
-
-            return;
-        }
-
+    private void WatchEndLocked(int handle, int padIndex) =>
         ManagedBass.Mix.BassMix.ChannelSetSync(handle, SyncFlags.End, 0, _mixEndSync, new IntPtr(padIndex));
-    }
 
     /// <summary>
     /// A pad reached its end while on the bus, on the thread that renders the audio.

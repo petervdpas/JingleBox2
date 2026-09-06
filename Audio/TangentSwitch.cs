@@ -14,10 +14,10 @@ namespace JingleBox2.Audio;
 /// are and how far apart they are is <see cref="ITangent"/> and its two implementations, either
 /// of which can be put a question to without a process, a sound card or a settings file.
 ///
-/// **Not an environment variable, which is how the other two engine switches are read.**
-/// <see cref="BusSwitch"/> and the real-time one are asked when an output is opened, which is
-/// when somebody picks a device; this is asked for every sample of every sounding voice, and a
-/// dictionary lookup there would cost more than the curve it is choosing between.
+/// **Not an environment variable, which is how the real-time switch is read.** That one is asked
+/// when an output is opened, which is when somebody picks a device; this is asked for every
+/// sample of every sounding voice, and a dictionary lookup there would cost more than the curve
+/// it is choosing between.
 ///
 /// Both curves are made when this is first touched, so the table is drawn at startup rather than
 /// on the audio thread. Throwing the switch is one reference write and takes effect within the

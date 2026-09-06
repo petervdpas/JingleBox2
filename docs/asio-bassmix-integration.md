@@ -31,15 +31,21 @@ What was built, against what this document asked for:
   copy targets, the three rows in `check-natives.sh`, and the release workflow's own check that
   `bassmix.dll` is in the payload.
 
-What is left, and it is one thing:
+What was left is closed, and this is what happened to it:
 
-- **The bus is behind a tick that is off by default.** `AppConfig.OutputBus` is off in a settings
-  file that has never heard of it, `JB_BUS=1` is the other way in, and `OpenBussesLocked` returns
-  at once when it is off. So ASIO with the bus on is the whole application and ASIO with the bus
-  off is the tracker alone with FIRE silent, which is the state the paragraphs below describe.
-  Either picking a driver implies the bus, since a driver takes one stream and the bus is how
-  everything gets into one, or the device picker says so where somebody is looking. It is an
-  audio path, so it wants hearing before it lands.
+- **The bus was behind a tick and is not any more.** `AppConfig.OutputBus` was off in a settings
+  file that had never heard of it and `OpenBussesLocked` returned at once, so ASIO with the bus
+  on was the whole application and ASIO with the bus off was the tracker alone with FIRE silent,
+  which is the state the paragraphs below were written against. Off bought nothing and cost four
+  things: solo went grey on the PLAY and PADS strips, their pan and mute went with it, ASIO
+  silenced the pads and RECORD, and the patchbay drew cables for audio that was not going there.
+  `IBusSwitch`, `BusSwitch`, the tick and the setting are gone and the bus is the only path.
+
+  The switch existed for a reason and the reason expired: it shipped off because the last
+  rearrangement of the summing arrived beside five other changes and the whole lot went back, so
+  this went in behind one switch over one change, off until it had been listened to. It has been.
+  **A switch that says "until this has been heard" is finished when it has**, and leaving it is
+  leaving a way to silence half the application by accident.
 
 What stayed open from "Not decided", and is still open: a pad's own meter on FIRE, which the
 mixer's PADS strip now shows in one place but a pad does not show on itself; the mixer as a

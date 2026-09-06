@@ -173,7 +173,6 @@ public partial class MainWindow : Window
         _routing = new AudioRoutingFactory().Create(_recording, silent);
 
         Audio.RealtimeThread.Wants(cfg.RealtimeAudio);
-        Audio.BusSwitch.Wants(cfg.OutputBus);
 
         Diagnostics.Log.Open(new Files.AppFolder().Path(), cfg.WriteLog, Areas(cfg));
 
@@ -311,7 +310,6 @@ public partial class MainWindow : Window
 
         saying.Under("Realtime audio thread " + (cfg.RealtimeAudio ? "on" : "off"));
 
-        saying.Under("Output bus " + (cfg.OutputBus ? "on" : "off"));
     }
 
     /// <summary>

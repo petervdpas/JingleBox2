@@ -43,11 +43,10 @@ Those four take effect at once: the output is closed and opened again as you cha
 them, so the right value can be found by listening rather than by restarting between
 guesses.
 
-Three switches sit under them and none is about how much audio is held.
+Two switches sit under them and neither is about how much audio is held.
 **Real-time audio** asks the machine to let the threads that must not be late take
 their turn ahead of everything else, so a browser laying out a page cannot delay the
-sound. **One output stream** sums the tracker, the pads and a take being auditioned
-into a single stream rather than handing the sound card one each.
+sound.
 
 **Fast drive curve** is the third, and it is the only setting here that is about
 arithmetic. Every drive in this application, on a machine and inside an effect, bends
@@ -88,12 +87,11 @@ An empty list means one of two things and the page says which: no ASIO on this s
 at all, or ASIO present with no driver installed, which is most Windows machines until
 a card's own driver or something like ASIO4ALL puts one there.
 
-**A driver needs One output stream, the switch above.** The driver owns the card and
-can be handed one thing, so everything this application plays has to be summed before
-it leaves. With the switch on, the tracker, the pads and a take being auditioned all
-go out of the driver. With it off, the tracker is handed to the driver on its own and
-the pads and RECORD play into a device that is not connected to anything, which is
-silence with nothing to explain it.
+**A driver is handed one stream and only one.** It owns the card, so everything this
+application plays is summed before it leaves: the tracker, the pads and a take being
+auditioned all go out of the driver together. That used to be a switch, and it is not
+one any more, since a driver picked with it off left the pads and RECORD silent with
+nothing to explain it.
 
 **If the sound goes strange after changing one, restart the app.** Reopening the
 output while everything else is still running is not the same as starting clean:

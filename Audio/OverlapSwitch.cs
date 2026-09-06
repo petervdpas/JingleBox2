@@ -13,9 +13,9 @@ namespace JingleBox2.Audio;
 /// how one is driven is <see cref="Plugins.Interfaces.IOverlappable"/>, which can be put a
 /// question to without a plugin, a process or a settings file.
 ///
-/// **Not an environment variable**, unlike <see cref="BusSwitch"/> and the real-time one. Those
-/// are asked when an output is opened, which is when somebody picks a device; this is asked once
-/// a block on the thread the sound card is waiting on.
+/// **Not an environment variable**, unlike the real-time one. That is asked when an output is
+/// opened, which is when somebody picks a device; this is asked once a block on the thread the
+/// sound card is waiting on.
 ///
 /// Off unless somebody says otherwise. The audio is identical either way, since the change is
 /// when a plugin is asked rather than what it is asked, but it is the audio path in a program

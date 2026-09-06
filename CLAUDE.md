@@ -4295,18 +4295,40 @@ whole exercise and is worth writing down rather than summarising:
   plugged into it. `BassAudioEngine.OpenBussesLocked` hands **the bus** to the driver, so with one
   picked the tracker, the pads and a take being auditioned all leave through it. Tested on Windows
   on real hardware, which is the only place that can be tested
-- **What is left is a tick that decides it, and says nothing about deciding it.**
-  `AppConfig.OutputBus` is off in a settings file that has never heard of it, which is every file
-  written before the bus existed, and `OpenBussesLocked` returns at once when it is off. Then
-  `TrackerOutput` falls to `IAudioEngine.Feed`, which hands the driver the tracker's stream on its
-  own, and the pads go on playing the ordinary way into the silent device BASS was opened on. So
-  ASIO with the bus on is the whole application and ASIO with the bus off is the tracker alone.
-  The tick's own hint says so where it stands, in SETTINGS under Engine: with this off and a
-  driver picked, the pads and RECORD are silent and nothing says so. What does not say it is the
-  place somebody actually picks a driver, which is the Output card, and that is the gap. Either
-  picking a driver implies the bus, since a driver takes one stream and the bus is how everything
-  gets into one, or Output says it where the choice is made. Not decided here: it is an audio path
-  and it wants hearing before it lands
+- **It was a tick and it is not one any more, which is the whole answer to the gap this used to
+  describe.** `AppConfig.OutputBus` was off in every settings file that had never heard of it and
+  `OpenBussesLocked` returned at once, so ASIO with the bus on was the whole application and ASIO
+  with the bus off was the tracker alone: the pads and RECORD played into the silent device BASS
+  had been opened on, and nothing anywhere said so. The tick's own hint said it, in SETTINGS under
+  Engine, which is not where anybody picks a driver
+- **Off bought nothing and cost four things**, which is what settled it. Solo went grey on the
+  PLAY and PADS strips, since a solo silences everything else and only the one bus knows what
+  everything else is; their pan and mute went with it, being the bus's; ASIO silenced the pads and
+  RECORD; and the patchbay drew cables into the desk for audio that was not going there.
+  `IBusSwitch`, `BusSwitch`, the tick and `AppConfig.OutputBus` are gone and the bus is the only
+  path
+- **The switch existed for a reason and the reason expired.** It shipped off because the last time
+  the summing was rearranged it arrived beside five other changes, the sound came apart, and the
+  whole lot went back rather than the one that did it; so the bus went in behind one switch over
+  one change, off until it had been listened to. It has been. **That is the shape to keep: a
+  switch that says "until this has been heard" is finished when it has, and leaving it is leaving
+  a way to silence half the application by accident**
+- **And the second path went with it, which was seven forks rather than the one fallback it
+  looked like.** Whether a pad's stream got `Decode`, whether it got `AutoFree`, whether sounding
+  it was `_padBus.Add` or `ChannelPlay`, the same for silencing, whether "is it playing" asked the
+  bus or the channel, whether the level was read with the add-on's call or the plain one, and
+  which end sync it got: every one asked `_padBus.IsOpen`. All seven are gone
+- **"Before an output is opened" was never one of the cases**, which is worth writing down because
+  it was said out loud here and was wrong. `PlaySample` calls `EnsureInitLocked`, which opens BASS
+  and then the busses, so a pad fired on a cold engine opens the output on its way in and finds
+  the bus already there. `A_pad_on_a_cold_engine_opens_the_bus_and_lands_on_it` pins exactly that,
+  since with no second path a pad that missed the bus would be a pad that makes no sound
+- What could really reach it was one thing: **no BASSmix**. Both natives are in `native/`, three
+  targets copy them and the release workflow greps the payload for them, so it takes a checkout
+  with the library missing. `OpenBussesLocked` throws there now rather than logging and carrying
+  on, and a pad catches and puts the message on itself: better than pads that play a different
+  way and lose solo, pan, mute and ASIO in silence. `SaySoloable` already asked `Output.IsOpen`
+  rather than the switch, so it needed nothing
 - **The way that went stale is the one this file keeps warning about.** The note was written when
   it was true, the bus was built afterwards, and nothing made the two meet: a paragraph describing
   work still to do outlives the work. It cost a reading of this codebase that recommended building
