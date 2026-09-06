@@ -329,6 +329,33 @@ public sealed partial class PluginChainViewModel : ObservableObject
         NotifyChanged();
     }
 
+    /// <summary>
+    /// Puts a device at a place in the chain, which is what dragging one there means.
+    /// </summary>
+    /// <remarks>
+    /// The same act as <see cref="Move(IChainSlot, int)"/> said the other way round: a button
+    /// knows which way to go and a hand knows where it landed, and the chain underneath only
+    /// ever hears an offset. Written here rather than worked out at the drop, so the view does no
+    /// arithmetic about an order it does not own.
+    ///
+    /// A device dropped on itself, or on a place it is already at, does nothing at all rather
+    /// than leaving a step behind: letting go where you picked up is how a drag is abandoned.
+    /// </remarks>
+    /// <param name="device">The row being moved.</param>
+    /// <param name="index">Where it should end up, counting from nought.</param>
+    public void MoveTo(IChainSlot device, int index)
+    {
+        int from = Devices.IndexOf(device);
+
+        if (from < 0) return;
+
+        int to = Math.Clamp(index, 0, Devices.Count - 1);
+
+        if (to == from) return;
+
+        Move(device, to - from);
+    }
+
     /// <summary>Reads the chain back out of its host, after something else has changed it.</summary>
     /// <remarks>
     /// An undo is the case this exists for: the song's description of a chain is put back and

@@ -44,6 +44,14 @@
       <Setter Property="CornerRadius" Value="4" />
       <Setter Property="Padding" Value="0" />
 
+      <!-- **A border with no background takes no clicks**, which is the rule this application
+           has already paid for once on the patchbay. Without this a press on the face of a
+           block falls straight through to the card behind it, so only the buttons on a block
+           ever heard one and there was nowhere to take hold of it. Transparent, so it looks
+           exactly as it did. -->
+      <Setter Property="Background" Value="Transparent" />
+
+
       <!-- The same size whatever is in it. An effect carries a power button and a row of
            readings, an instrument carries neither, and without this they are two different
            shapes in one row. Tall enough for three of a plugin's controls, which is what makes
@@ -114,8 +122,41 @@
       </Setter>
     </Style>
 
+    <!-- Where the device in the hand would land. A line down the edge it would go in at rather
+         than a wash over the whole block: what is being decided is a place between two devices,
+         and a block that lights up says "onto this one", which is not a thing a chain has. -->
+    <Style Selector="Border.device.before">
+      <Setter Property="BorderThickness" Value="3,1,1,1" />
+      <Setter Property="BorderBrush">
+        <SolidColorBrush Color="{DynamicResource Color.Accent}" />
+      </Setter>
+    </Style>
+
+    <Style Selector="Border.device.after">
+      <Setter Property="BorderThickness" Value="1,1,3,1" />
+      <Setter Property="BorderBrush">
+        <SolidColorBrush Color="{DynamicResource Color.Accent}" />
+      </Setter>
+    </Style>
+
     <Style Selector="Border.device.off">
       <Setter Property="Opacity" Value="0.45" />
+    </Style>
+
+    <!-- What a block does when it is dragged, said by the pointer: a chain is a row and a
+         device moves along it. Only the effects, since the instrument is where it is and the
+         same cursor over it would be a promise nothing keeps. The buttons put the arrow back,
+         because what they do when they are pressed is not moving anything. -->
+    <Style Selector="Border.device.moves">
+      <Setter Property="Cursor" Value="SizeWestEast" />
+    </Style>
+
+    <Style Selector="Border.device.moves Button">
+      <Setter Property="Cursor" Value="Arrow" />
+    </Style>
+
+    <Style Selector="Border.device.moves ToggleButton">
+      <Setter Property="Cursor" Value="Arrow" />
     </Style>
 
     <!-- A device's name, which is also the way in to its controls. -->
@@ -219,12 +260,21 @@
     it. So the room is taken once and kept, whether the track has a chain or nothing at all.
   -->
   <Border Classes="inset" MinHeight="96">
+    <!-- The picture in the hand is drawn on a layer over the row rather than by the toolkit,
+         which draws nothing at all on X11. It takes no clicks, so what is underneath still
+         answers the pointer while something is being carried across it. -->
+    <Panel>
     <StackPanel Spacing="6" VerticalAlignment="Center">
 
-      <StackPanel Orientation="Horizontal" Spacing="6">
+      <StackPanel x:Name="Row" Orientation="Horizontal" Spacing="6">
         <!-- The instrument the track plays, at the head of the row because that is where it is
              in the audio: it makes the sound and everything after works on what it made. Ours
-             or a plugin's, it is the same box; only what opens differs. -->
+             or a plugin's, it is the same box; only what opens differs.
+
+             **It is not in the row of devices and so cannot be dragged or dropped onto.** An
+             instrument is what makes the sound and everything after it works on what it made,
+             so first is the only place it has; the effects are dragged among themselves and
+             letting go over the instrument means in front of the first effect. -->
         <Border Classes="device" Classes.open="{Binding Instrument.IsOpen}"
                 IsVisible="{Binding HasInstrument}"
                 ToolTip.Tip="The instrument this track plays. Click its name to open its panel.">
@@ -282,7 +332,7 @@
 
         <!-- Away entirely when there is nothing in it. An empty items control still takes a
              place in the row, and the two gaps either side of nothing read as a gap. -->
-        <ItemsControl ItemsSource="{Binding Devices}" VerticalAlignment="Stretch"
+        <ItemsControl x:Name="Slots" ItemsSource="{Binding Devices}" VerticalAlignment="Stretch"
                       IsVisible="{Binding !IsEmpty}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
@@ -292,9 +342,10 @@
 
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vmi:IChainSlot">
-              <Border Classes="device"
+              <Border Classes="device moves"
                       Classes.open="{Binding IsOpen}"
-                      Classes.off="{Binding IsBypassed}">
+                      Classes.off="{Binding IsBypassed}"
+                      ToolTip.Tip="Drag it along the row to move it in the chain. Right click for a step at a time.">
                 <Grid>
                 <!-- Room kept down the right for the corner button, so nothing runs under it:
                      the readings are as wide as the block and the button is not only over the
@@ -427,5 +478,8 @@
         <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Status}" />
       </StackPanel>
     </StackPanel>
+
+      <Canvas x:Name="GhostLayer" IsHitTestVisible="False" />
+    </Panel>
   </Border>
 </UserControl>

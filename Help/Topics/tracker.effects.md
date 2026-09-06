@@ -28,10 +28,16 @@ Three ship at the moment, each with presets to start from:
   are comparing the sound and not the loudness.
 
 A block opens that effect's controls in a window of its own, and its power button
-switches it off without taking it out, so it can be heard in and out. Right click a
-block to move it earlier or later, or to remove it. Each block prints its first few
-controls and what they read, so the row tells you the order and the settings without
-opening anything.
+switches it off without taking it out, so it can be heard in and out. Each block
+prints its first few controls and what they read, so the row tells you the order and
+the settings without opening anything.
+
+**Drag a block along the row to change where it is in the chain.** A line down the
+edge of a block says which side of it the one in your hand would go in at, and letting
+go over the instrument at the head of the row means in front of the first effect. The
+instrument itself does not move: it makes the sound and everything after works on what
+it made, so first is the only place it has. Right click still has Move earlier and
+Move later, a step at a time, and Remove.
 
 An effect of ours carries a page about itself the way a machine does: the hamburger in the
 corner of its face has **Help** on it where its author wrote one, and the three that ship all

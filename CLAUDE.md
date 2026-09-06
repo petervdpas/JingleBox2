@@ -4329,6 +4329,53 @@ whole exercise and is worth writing down rather than summarising:
   on, and a pad catches and puts the message on itself: better than pads that play a different
   way and lose solo, pan, mute and ASIO in silence. `SaySoloable` already asked `Output.IsOpen`
   rather than the switch, so it needed nothing
+- **A chain is reordered by dragging, and the instrument is not in the dance.** The strip already
+  had Move earlier and Move later on its context menu, which is a step at a time through a menu
+  nobody opens, and `PluginChain.Move` already took any offset rather than only one. What was
+  missing was the gesture. One strip is drawn over a track's chain, the master's, a pad's and the
+  recording input's, so it arrived on all four at once
+- **The instrument stays first by construction rather than by a guard.** It is drawn outside the
+  row of devices, so it is never picked up and there is no place in the row for it to be dropped
+  into. What the whole row takes is the drop, so letting go over the instrument means in front of
+  the first effect, which is what a hand dragging leftwards means and would otherwise have been a
+  drop that quietly did nothing
+- **A block with no background took no presses, which is this application's oldest pointer fault
+  turning up in a fourth place.** `Border.device` set a thickness, a radius and a brush and no
+  background, so a press on the face of a block fell straight through to the card behind it: the
+  only presses the row ever heard were the ones on its buttons, and those are handled. From a
+  chair that is a drag that does not exist, and it was reported in exactly those words, "how to
+  drag then". Transparent, so it looks exactly as it did. The patchbay's pan was the same
+  sentence about a `Panel`, and the ghost's own painting is the same sentence about clearing a
+  brush rather than setting it to null
+- **The picture in the hand is built and never the block itself**, which is not a nicety: a
+  control has one parent, so handing the live block to `DragGhost.Show` takes it out of the row
+  it is being dragged along and the toolkit refuses it outright, as "The Control already has a
+  parent" on the first movement of the first drag. The ghost's layer is a canvas and takes a
+  control rather than a data context, which is why the tracker writes its own picture out too
+- Two things were added at the same time and they are not decoration. The pointer over a block
+  that moves is the west-east one, since what the block does is move along a row, and the buttons
+  on it put the arrow back because what they do is not moving anything. The instrument keeps the
+  arrow, deliberately: the same cursor over it would be a promise nothing keeps
+- **The press bubbles rather than tunnels, and that is the whole of how it stays out of the way of
+  the buttons on a block.** A button answers a press and marks it handled, and a handled event is
+  not delivered to the row, so the name, the power switch and the cross work exactly as they did.
+  Letting go without moving ends a drag with no effect, so a plain click on the body is still a
+  click, and the right button is untouched, which is where the two move commands already live
+- **`ISlotDrag` carries the chain beside the number, and that is why it is not `IDragPayload`.** A
+  place in a chain means nothing without the chain it is a place in: slot 1 is four different
+  devices on four different chains and two strips can be on the screen at once, so a number alone
+  would let a device let go over the wrong strip reorder a chain nobody was dragging. Compared by
+  which object it is rather than by anything about it, since a track and the master can hold the
+  same effects in the same order. A device from another chain is refused rather than carried
+  across, since moving one between chains would mean loading a plugin somewhere else, which is
+  what the plus is for
+- **`IChainDrop` is the arithmetic, and it is out of the view because it is the half that is wrong
+  by one.** Which gap a point across the row means, half a block at a time, with before the first
+  and past the last being the start and the end; and what that gap comes to once the device has
+  left where it was. **A gap is counted with the device still in the row and a chain counts
+  without it**, so a device dragged rightwards lands one short of the gap it was dropped in and
+  one dragged leftwards does not. A version with that wrong works perfectly half the time, which
+  is exactly the kind of thing that survives being dragged about by hand
 - **The recording input is heard through its own chain now, which is what an insert on a desk's
   input channel has always meant.** A microphone through a pitch effect is heard as the pitched
   thing while you play it. Every piece of it existed and none of them were joined: the chain ran
