@@ -46,7 +46,8 @@ public sealed class PatchFlow : IPatchFlow
     /// <remarks>
     /// Read by where the cable lands. Anything arriving at the recorder is the input; anything
     /// leaving the desk is the output; and a cable into the desk carries whatever the block at
-    /// its other end is doing. A cable between two things that are nothing to do with us carries
+    /// its other end is doing. The tracker is asked per track, since it gives out one pair a
+    /// track and only some of them are ever sounding. A cable between two things that are nothing to do with us carries
     /// nothing we can know about, and says so by staying dashed.
     /// </remarks>
     private static bool Carrying(PatchLink link, PatchSignals signals)
@@ -57,7 +58,7 @@ public sealed class PatchFlow : IPatchFlow
         if (!Is(link.To.Node, MixerNode)) return false;
 
         if (Is(link.From.Node, RecordNode)) return signals.Takes;
-        if (Is(link.From.Node, TrackerNode)) return signals.Tracker;
+        if (Is(link.From.Node, TrackerNode)) return signals.Sounding(link.From.Name);
         if (Is(link.From.Node, FireNode)) return signals.Pads;
 
         return false;

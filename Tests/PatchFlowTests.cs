@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Avalonia.Input;
 using Avalonia.Media;
 using JingleBox2.UI;
@@ -27,7 +28,16 @@ public class PatchFlowTests
     private readonly IPatchColours _colours = new PatchColours();
 
     /// <summary>Nothing at all is sounding.</summary>
-    private static readonly PatchSignals Silent = new(false, false, false, false, false);
+    private static readonly PatchSignals Silent = new(false, false, false, null, false);
+
+    /// <summary>Those tracks, and no others, are sounding.</summary>
+    private static PatchSignals Playing(params string[] tracks) =>
+        Silent with { Tracks = new HashSet<string>(tracks, StringComparer.Ordinal) };
+
+    /// <summary>A cable from one of the tracker's tracks into the desk.</summary>
+    private static PatchLink TrackCable(string track) =>
+        new(new PatchPort("tracker", track, PatchSide.Out, PatchChannels.Stereo, Fixed: true),
+            new PatchPort("mixer", track, PatchSide.In, PatchChannels.Stereo, Fixed: true));
 
     /// <summary>A cable from one block to another, as the graph would make it.</summary>
     private static PatchLink Cable(string from, string to) =>
@@ -65,15 +75,36 @@ public class PatchFlowTests
         Assert.Equal(Cable("record", "mixer"), Assert.Single(live));
     }
 
-    /// <summary>The song playing lights the tracker's cable and nothing else.</summary>
+    /// <summary>A track that is sounding lights its own cable and no other track's.</summary>
+    /// <remarks>
+    /// **Per track rather than per song**, which is the whole reason the tracker gives out a
+    /// pair each: a picture that lit every track because something was playing would be saying
+    /// an empty track is carrying audio.
+    /// </remarks>
     [Fact]
-    public void The_song_lights_the_tracker()
+    public void A_track_lights_its_own_cable()
     {
-        var links = new[] { Cable("tracker", "mixer"), Cable("fire", "mixer") };
+        var links = new[] { TrackCable("TR-01"), TrackCable("TR-02"), Cable("fire", "mixer") };
 
-        var live = _flow.Live(links, Silent with { Tracker = true });
+        var live = _flow.Live(links, Playing("TR-01"));
 
-        Assert.Equal(Cable("tracker", "mixer"), Assert.Single(live));
+        Assert.Equal(TrackCable("TR-01"), Assert.Single(live));
+    }
+
+    /// <summary>Several sounding at once light several.</summary>
+    [Fact]
+    public void Several_tracks_light_several_cables()
+    {
+        var links = new[] { TrackCable("TR-01"), TrackCable("TR-02"), TrackCable("TR-03") };
+
+        Assert.Equal(2, _flow.Live(links, Playing("TR-01", "TR-03")).Count);
+    }
+
+    /// <summary>A track nobody can say anything about stays quiet rather than being lit.</summary>
+    [Fact]
+    public void A_track_nobody_can_speak_for_stays_quiet()
+    {
+        Assert.Empty(_flow.Live(new[] { TrackCable("TR-01") }, Silent));
     }
 
     /// <summary>A pad lights the pads' cable.</summary>
@@ -100,9 +131,9 @@ public class PatchFlowTests
     [Fact]
     public void Two_things_sounding_light_both()
     {
-        var links = new[] { Cable("tracker", "mixer"), Cable("fire", "mixer"), Cable("mixer", "output") };
-
-        var live = _flow.Live(links, Silent with { Tracker = true, Pads = true, Output = true });
+        var live = _flow.Live(
+            new[] { TrackCable("TR-01"), Cable("fire", "mixer"), Cable("mixer", "output") },
+            Playing("TR-01") with { Pads = true, Output = true });
 
         Assert.Equal(3, live.Count);
     }
@@ -118,7 +149,7 @@ public class PatchFlowTests
     {
         var live = _flow.Live(
             new[] { Cable("firefox", "speech-dispatcher") },
-            new PatchSignals(true, true, true, true, true));
+            Playing("TR-01") with { Input = true, Takes = true, Pads = true, Output = true });
 
         Assert.Empty(live);
     }

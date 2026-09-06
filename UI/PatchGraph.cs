@@ -79,17 +79,16 @@ public sealed class PatchGraph : IPatchGraph
     private static readonly PatchPort MixerTakes =
         new(MixerNode, "takes", PatchSide.In, PatchChannels.Stereo, Fixed: true);
 
-    /// <summary>The tracker's mix, on its way to the desk.</summary>
-    private static readonly PatchPort TrackerOut =
-        new(TrackerNode, "mix", PatchSide.Out, PatchChannels.Stereo, Fixed: true);
+    /// <summary>What the tracker gives out where the song has no tracks at all.</summary>
+    /// <remarks>
+    /// A block with nothing on it would be a block nobody can read: a song is always going to
+    /// have tracks, and what this covers is the moment before one has been opened.
+    /// </remarks>
+    private const string WholeMix = "mix";
 
     /// <summary>The pads, on their way to the desk.</summary>
     private static readonly PatchPort FireOut =
         new(FireNode, "pads", PatchSide.Out, PatchChannels.Stereo, Fixed: true);
-
-    /// <summary>Where the tracker arrives on the desk.</summary>
-    private static readonly PatchPort MixerTracker =
-        new(MixerNode, "tracker", PatchSide.In, PatchChannels.Stereo, Fixed: true);
 
     /// <summary>Where the pads arrive on it.</summary>
     private static readonly PatchPort MixerPads =
@@ -103,8 +102,27 @@ public sealed class PatchGraph : IPatchGraph
     private static readonly PatchPort OutputIn =
         new(OutputNode, "playback", PatchSide.In, PatchChannels.Stereo, Fixed: true);
 
+    /// <summary>
+    /// One track's pair, on the tracker and again on the desk.
+    /// </summary>
+    /// <remarks>
+    /// **Stereo, and that is not a guess.** A track is summed into a bus of its own, and that bus
+    /// is interleaved two channels because a track has a pan and an insert chain: a plugin on it
+    /// places what it hears in the stereo field, so what leaves a track has two sides whatever
+    /// the instrument on it was. See <c>TrackMixer.VoicesThenInsert</c>.
+    /// </remarks>
+    /// <param name="node">Which block the point is on.</param>
+    /// <param name="track">The track's name, as its strip wears it.</param>
+    /// <param name="side">Whether audio leaves here or arrives here.</param>
+    private static PatchPort Track(string node, string track, PatchSide side) =>
+        new(node, track, side, PatchChannels.Stereo, Fixed: true);
+
     /// <inheritdoc/>
-    public PatchScene Read(IReadOnlyList<AudioRoute> routes, AudioRoute? chosen, string? output = null)
+    public PatchScene Read(
+        IReadOnlyList<AudioRoute> routes,
+        AudioRoute? chosen,
+        string? output = null,
+        IReadOnlyList<string>? tracks = null)
     {
         var nodes = new List<PatchNode>();
         var links = new List<PatchLink>();
@@ -135,8 +153,19 @@ public sealed class PatchGraph : IPatchGraph
         nodes.Add(new PatchNode(
             RecordNode, "RECORD", new[] { OwnInput }, new[] { RecordOut }, true, OwnX, TopY));
 
+        var named = tracks is { Count: > 0 } ? tracks : new[] { WholeMix };
+
+        var plays = new List<PatchPort>(named.Count);
+        var takes = new List<PatchPort>(named.Count);
+
+        foreach (string track in named)
+        {
+            plays.Add(Track(TrackerNode, track, PatchSide.Out));
+            takes.Add(Track(MixerNode, track, PatchSide.In));
+        }
+
         nodes.Add(new PatchNode(
-            TrackerNode, "TRACKER", Array.Empty<PatchPort>(), new[] { TrackerOut }, true, OwnX, PlayY));
+            TrackerNode, "TRACKER", Array.Empty<PatchPort>(), plays, true, OwnX, PlayY));
 
         nodes.Add(new PatchNode(
             FireNode, "FIRE", Array.Empty<PatchPort>(), new[] { FireOut }, true, OwnX, PlayY + Apart));
@@ -144,7 +173,7 @@ public sealed class PatchGraph : IPatchGraph
         nodes.Add(new PatchNode(
             MixerNode,
             "MIXER",
-            new[] { MixerTracker, MixerPads, MixerTakes },
+            Desk(takes),
             new[] { MixerOut },
             true,
             MixX,
@@ -160,11 +189,33 @@ public sealed class PatchGraph : IPatchGraph
             PlayY));
 
         links.Add(new PatchLink(RecordOut, MixerTakes));
-        links.Add(new PatchLink(TrackerOut, MixerTracker));
+
+        for (int track = 0; track < plays.Count; track++)
+            links.Add(new PatchLink(plays[track], takes[track]));
         links.Add(new PatchLink(FireOut, MixerPads));
         links.Add(new PatchLink(MixerOut, OutputIn));
 
         return new PatchScene(nodes, links);
+    }
+
+    /// <summary>
+    /// Everything the desk takes in: the song's tracks, then the pads, then a take.
+    /// </summary>
+    /// <remarks>
+    /// The tracks first and in the song's own order, which is the order the strips stand in on
+    /// the page beside this one. The two that are not tracks go under them rather than among
+    /// them, so adding a track to a song does not move the point a cable was drawn to.
+    /// </remarks>
+    /// <param name="tracks">One point per track, already made.</param>
+    private static IReadOnlyList<PatchPort> Desk(IReadOnlyList<PatchPort> tracks)
+    {
+        var takes = new List<PatchPort>(tracks.Count + 2);
+
+        takes.AddRange(tracks);
+        takes.Add(MixerPads);
+        takes.Add(MixerTakes);
+
+        return takes;
     }
 
     /// <summary>Whether an address is one of this application's own blocks.</summary>

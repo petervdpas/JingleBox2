@@ -331,6 +331,102 @@ public class PatchbayTests
         Assert.DoesNotContain(scene.Links, l => l.To == _graph.OwnInput);
     }
 
+    /// <summary>The tracker gives out a pair for every track the song has.</summary>
+    /// <remarks>
+    /// Which is what makes the patchbay say anything about the music: a single pair called "mix"
+    /// is the sum, and the sum is one wire whether the song has one track or thirty two.
+    /// </remarks>
+    [Fact]
+    public void Every_track_is_its_own_pair()
+    {
+        var scene = _graph.Read(
+            Array.Empty<AudioRoute>(), null, null, new[] { "TR-01", "TR-02", "TR-03" });
+
+        var tracker = scene.Nodes.Single(n => n.Id == "tracker");
+
+        Assert.Equal(new[] { "TR-01", "TR-02", "TR-03" }, tracker.Outs.Select(p => p.Name));
+    }
+
+    /// <summary>And the desk takes one in for each of them, under its own name.</summary>
+    [Fact]
+    public void The_desk_takes_one_in_for_every_track()
+    {
+        var scene = _graph.Read(Array.Empty<AudioRoute>(), null, null, new[] { "TR-01", "TR-02" });
+
+        var mixer = scene.Nodes.Single(n => n.Id == "mixer");
+
+        Assert.Contains(mixer.Ins, p => p.Name == "TR-01");
+        Assert.Contains(mixer.Ins, p => p.Name == "TR-02");
+    }
+
+    /// <summary>Each track's cable runs to its own point on the desk and no other.</summary>
+    [Fact]
+    public void A_track_runs_to_its_own_point()
+    {
+        var scene = _graph.Read(Array.Empty<AudioRoute>(), null, null, new[] { "TR-01", "TR-02" });
+
+        foreach (var link in scene.Links)
+        {
+            if (link.From.Node != "tracker") continue;
+
+            Assert.Equal(link.From.Name, link.To.Name);
+            Assert.Equal("mixer", link.To.Node);
+        }
+    }
+
+    /// <summary>The pads and a take go under the tracks rather than among them.</summary>
+    /// <remarks>
+    /// So adding a track to a song does not move the point a cable was drawn to, which on a
+    /// picture somebody has arranged is the difference between a new row and everything shifting
+    /// down one.
+    /// </remarks>
+    [Fact]
+    public void The_pads_and_the_takes_go_under_the_tracks()
+    {
+        var mixer = _graph
+            .Read(Array.Empty<AudioRoute>(), null, null, new[] { "TR-01" })
+            .Nodes.Single(n => n.Id == "mixer");
+
+        Assert.Equal("TR-01", mixer.Ins[0].Name);
+        Assert.Equal("pads", mixer.Ins[^2].Name);
+        Assert.Equal("takes", mixer.Ins[^1].Name);
+    }
+
+    /// <summary>A song with no tracks yet draws the whole mix as one pair.</summary>
+    /// <remarks>
+    /// Which is the moment before a song has been opened. A block with nothing on it would be a
+    /// block nobody can read, and a picture that lost its middle until a song arrived would look
+    /// broken rather than empty.
+    /// </remarks>
+    [Fact]
+    public void No_tracks_yet_still_draws_the_mix()
+    {
+        foreach (var tracks in new[] { null, Array.Empty<string>() })
+        {
+            var tracker = _graph
+                .Read(Array.Empty<AudioRoute>(), null, null, tracks)
+                .Nodes.Single(n => n.Id == "tracker");
+
+            Assert.Single(tracker.Outs);
+        }
+    }
+
+    /// <summary>A track's pair is stereo, since a track has a pan and an insert chain.</summary>
+    /// <remarks>
+    /// Not a guess: a track is summed into a bus of its own and that bus is interleaved two
+    /// channels, because a plugin on a track's chain places what it hears in the stereo field.
+    /// See <c>TrackMixer.VoicesThenInsert</c>.
+    /// </remarks>
+    [Fact]
+    public void A_track_carries_two_channels()
+    {
+        var tracker = _graph
+            .Read(Array.Empty<AudioRoute>(), null, null, new[] { "TR-01" })
+            .Nodes.Single(n => n.Id == "tracker");
+
+        Assert.Equal(PatchChannels.Stereo, tracker.Outs[0].Channels);
+    }
+
     /// <summary>The pads and the tracker reach the desk, and the desk reaches the machine.</summary>
     /// <remarks>
     /// **This is the routing table rather than a drawing of one.** What these cables say is how

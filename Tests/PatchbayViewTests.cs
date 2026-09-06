@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.ComponentModel;
 using JingleBox2.Audio.Routing.Enums;
 using JingleBox2.Audio.Routing.Records;
@@ -297,6 +298,291 @@ public class PatchbayViewTests
         bay.Place("mixer", 30, 40);
 
         Assert.NotEmpty(bay.Nodes);
+    }
+
+    /// <summary>The tracker's tracks reach the picture as one pair each.</summary>
+    /// <remarks>
+    /// The whole of what this buys: the picture says something about the music rather than about
+    /// the sum of it.
+    /// </remarks>
+    [Fact]
+    public void The_songs_tracks_are_on_the_picture()
+    {
+        var bay = new PatchbayViewModel(new Bench(), null, null, new Playing("TR-01", "TR-02"));
+
+        var tracker = Assert.Single(bay.Nodes, n => n.Id == "tracker");
+
+        Assert.Equal(2, tracker.Outs.Count);
+    }
+
+    /// <summary>And what is sounding on them is what is drawn solid.</summary>
+    [Fact]
+    public void A_sounding_track_is_drawn_solid()
+    {
+        var flowing = new Playing("TR-01", "TR-02") { Sounding = { "TR-02" } };
+
+        var bay = new PatchbayViewModel(new Bench(), null, null, flowing);
+
+        bay.Pulse();
+
+        var live = Assert.Single(bay.Live, l => l.From.Node == "tracker");
+
+        Assert.Equal("TR-02", live.From.Name);
+    }
+
+    /// <summary>A song whose tracks nobody can name still draws the mix.</summary>
+    [Fact]
+    public void No_tracks_named_still_draws_the_mix()
+    {
+        var bay = new PatchbayViewModel(new Bench());
+
+        Assert.Single(Assert.Single(bay.Nodes, n => n.Id == "tracker").Outs);
+    }
+
+    /// <summary>A song with tracks, and whichever of them are sounding.</summary>
+    private sealed class Playing : IAudioFlowing
+    {
+        /// <summary>Takes the tracks the song has.</summary>
+        /// <param name="tracks">Their names, as their strips wear them.</param>
+        public Playing(params string[] tracks) => Tracks = tracks;
+
+        /// <inheritdoc/>
+        public System.Collections.Generic.IReadOnlyList<string> Tracks { get; }
+
+        /// <summary>Which of them are making a sound.</summary>
+        public System.Collections.Generic.HashSet<string> Sounding { get; } = new(System.StringComparer.Ordinal);
+
+        /// <inheritdoc/>
+        public JingleBox2.UI.Records.PatchSignals Signals =>
+            new(false, false, false, Sounding, false);
+
+        /// <summary>What each block is putting out, for whoever wants to say.</summary>
+        public System.Collections.Generic.Dictionary<string, JingleBox2.UI.Records.PatchLevel> Levels { get; } =
+            new(System.StringComparer.Ordinal);
+
+        /// <inheritdoc/>
+        public JingleBox2.UI.Records.PatchLevel Level(string node) =>
+            Levels.TryGetValue(node, out var level) ? level : default;
+
+        /// <summary>The strips answering for each block and output, where anything does.</summary>
+        public System.Collections.Generic.Dictionary<(string Node, string Port), IStripSwitches> Strips { get; } =
+            new();
+
+        /// <inheritdoc/>
+        public IStripSwitches? Switches(string node, string port) =>
+            Strips.TryGetValue((node, port), out var strip) ? strip : null;
+    }
+
+    /// <summary>The picked block's meter is what the sidebar shows.</summary>
+    [Fact]
+    public void The_sidebar_reads_the_picked_blocks_meter()
+    {
+        var flowing = new Playing("TR-01");
+
+        flowing.Levels["tracker"] = new JingleBox2.UI.Records.PatchLevel(true, 0.4f, 0.6f);
+
+        var bay = new PatchbayViewModel(new Bench(), null, null, flowing)
+        {
+            Selected = null
+        };
+
+        bay.Selected = Assert.Single(bay.Nodes, n => n.Id == "tracker");
+
+        Assert.True(bay.Metered);
+        Assert.Equal(0.4f, bay.LevelLeft);
+        Assert.Equal(0.6f, bay.LevelRight);
+    }
+
+    /// <summary>Picking a block reads it at once rather than on the next tick.</summary>
+    /// <remarks>
+    /// A fifth of a second of an empty meter after clicking a block reads as a block that has
+    /// nothing to show.
+    /// </remarks>
+    [Fact]
+    public void Picking_a_block_reads_it_at_once()
+    {
+        var flowing = new Playing();
+
+        flowing.Levels["mixer"] = new JingleBox2.UI.Records.PatchLevel(true, 0.9f, 0.9f);
+
+        var bay = new PatchbayViewModel(new Bench(), null, null, flowing);
+
+        bay.Selected = Assert.Single(bay.Nodes, n => n.Id == "mixer");
+
+        Assert.Equal(0.9f, bay.LevelLeft);
+    }
+
+    /// <summary>A block on the machine has no meter, rather than one stuck at nought.</summary>
+    /// <remarks>
+    /// What somebody else's program is putting out is not something this application measures,
+    /// and a bar that cannot move reads as silence rather than as a question nobody can answer.
+    /// </remarks>
+    [Fact]
+    public void A_block_on_the_machine_has_no_meter()
+    {
+        var bench = new Bench();
+        bench.Routes.Add(Route("firefox"));
+
+        var bay = new PatchbayViewModel(bench, null, null, new Playing());
+
+        bay.Selected = Assert.Single(bay.Nodes, n => n.Id == "firefox");
+
+        Assert.False(bay.Metered);
+    }
+
+    /// <summary>Nothing picked shows no meter.</summary>
+    [Fact]
+    public void Nothing_picked_shows_no_meter()
+    {
+        var bay = new PatchbayViewModel(new Bench(), null, null, new Playing());
+
+        bay.Selected = null;
+
+        Assert.False(bay.Metered);
+    }
+
+    /// <summary>A patchbay with nobody to ask shows none either.</summary>
+    [Fact]
+    public void With_nobody_to_ask_there_is_no_meter()
+    {
+        var bay = new PatchbayViewModel(new Bench());
+
+        bay.Selected = Assert.Single(bay.Nodes, n => n.Id == "mixer");
+
+        Assert.False(bay.Metered);
+    }
+
+    /// <summary>Every output of the picked block is a row, whatever the block is.</summary>
+    /// <remarks>
+    /// The uniform shape is the point: a track, the pads, a take and the master are four things
+    /// in this application and the sidebar draws them the same way.
+    /// </remarks>
+    [Fact]
+    public void Every_output_is_a_row()
+    {
+        var bay = new PatchbayViewModel(new Bench(), null, null, new Playing("TR-01", "TR-02"));
+
+        bay.Selected = Assert.Single(bay.Nodes, n => n.Id == "tracker");
+
+        Assert.Equal(new[] { "TR-01", "TR-02" }, bay.Outputs.Select(o => o.Name));
+    }
+
+    /// <summary>A row over a strip drives that strip, rather than keeping its own answer.</summary>
+    /// <remarks>
+    /// Pressing M in the sidebar and pressing M on the desk have to be the same press on the
+    /// same thing, or the two pages would show a track muted and unmuted at once.
+    /// </remarks>
+    [Fact]
+    public void A_row_drives_the_strip_behind_it()
+    {
+        var flowing = new Playing("TR-01");
+        var strip = new Switchable();
+
+        flowing.Strips[("tracker", "TR-01")] = strip;
+
+        var bay = new PatchbayViewModel(new Bench(), null, null, flowing);
+
+        bay.Selected = Assert.Single(bay.Nodes, n => n.Id == "tracker");
+
+        Assert.Single(bay.Outputs).Mute = true;
+
+        Assert.True(strip.Mute);
+    }
+
+    /// <summary>And it reads back what the strip says, however that was set.</summary>
+    [Fact]
+    public void A_row_reads_the_strip_back()
+    {
+        var flowing = new Playing("TR-01");
+
+        flowing.Strips[("tracker", "TR-01")] = new Switchable { Solo = true };
+
+        var bay = new PatchbayViewModel(new Bench(), null, null, flowing);
+
+        bay.Selected = Assert.Single(bay.Nodes, n => n.Id == "tracker");
+
+        Assert.True(Assert.Single(bay.Outputs).Solo);
+    }
+
+    /// <summary>A row over nothing keeps its shape and both switches stay dark.</summary>
+    /// <remarks>
+    /// Which is every block on the machine: somebody else's program has no mute of ours, and a
+    /// row that vanished would make the sidebar a different shape for every block.
+    /// </remarks>
+    [Fact]
+    public void A_row_over_nothing_is_still_a_row()
+    {
+        var bench = new Bench();
+        bench.Routes.Add(Route("firefox"));
+
+        var bay = new PatchbayViewModel(bench, null, null, new Playing());
+
+        bay.Selected = Assert.Single(bay.Nodes, n => n.Id == "firefox");
+
+        var row = Assert.Single(bay.Outputs);
+
+        Assert.False(row.CanMute);
+        Assert.False(row.CanSolo);
+    }
+
+    /// <summary>Pressing a switch that cannot be pressed changes nothing.</summary>
+    [Fact]
+    public void A_switch_that_cannot_be_pressed_does_nothing()
+    {
+        var bay = new PatchbayViewModel(new Bench(), null, null, new Playing("TR-01"));
+
+        bay.Selected = Assert.Single(bay.Nodes, n => n.Id == "tracker");
+
+        var row = Assert.Single(bay.Outputs);
+
+        row.Mute = true;
+        row.Solo = true;
+
+        Assert.False(row.Mute);
+        Assert.False(row.Solo);
+    }
+
+    /// <summary>Picking another block gives the sidebar that block's rows.</summary>
+    [Fact]
+    public void Picking_another_block_changes_the_rows()
+    {
+        var bay = new PatchbayViewModel(new Bench(), null, null, new Playing("TR-01", "TR-02"));
+
+        bay.Selected = Assert.Single(bay.Nodes, n => n.Id == "tracker");
+
+        Assert.Equal(2, bay.Outputs.Count);
+
+        bay.Selected = Assert.Single(bay.Nodes, n => n.Id == "mixer");
+
+        Assert.Single(bay.Outputs);
+    }
+
+    /// <summary>Nothing picked leaves no rows behind.</summary>
+    [Fact]
+    public void Nothing_picked_leaves_no_rows()
+    {
+        var bay = new PatchbayViewModel(new Bench(), null, null, new Playing("TR-01"));
+
+        bay.Selected = Assert.Single(bay.Nodes, n => n.Id == "tracker");
+        bay.Selected = null;
+
+        Assert.Empty(bay.Outputs);
+    }
+
+    /// <summary>A strip that can be muted and soloed, holding its own two answers.</summary>
+    private sealed class Switchable : IStripSwitches
+    {
+        /// <inheritdoc/>
+        public bool CanMute => true;
+
+        /// <inheritdoc/>
+        public bool CanSolo => true;
+
+        /// <inheritdoc/>
+        public bool Mute { get; set; }
+
+        /// <inheritdoc/>
+        public bool Solo { get; set; }
     }
 
     /// <summary>Somewhere to keep places, holding them in memory.</summary>

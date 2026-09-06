@@ -21,7 +21,7 @@ namespace JingleBox2.ViewModels;
 /// the meters are about is whether anything is sounding at all and that is a question about the
 /// page rather than about one strip.
 /// </remarks>
-public sealed partial class SourceStripViewModel : ObservableObject
+public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.IStripSwitches
 {
     /// <summary>Reads where the level stands.</summary>
     private readonly Func<double> _read;
@@ -107,6 +107,13 @@ public sealed partial class SourceStripViewModel : ObservableObject
     /// <summary>Whether this strip has a pan and a mute, which a strip over a bus has.</summary>
     public bool OnABus => _bus != null;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Only where there is a bus underneath. The recording input has none: a mute there would
+    /// mean quietly recording nothing, which is a way to lose a take rather than a control.
+    /// </remarks>
+    public bool CanMute => OnABus;
+
     /// <summary>
     /// What this strip is fed from, or nothing where that is not a question anybody answers.
     /// </summary>
@@ -181,7 +188,7 @@ public sealed partial class SourceStripViewModel : ObservableObject
         set => SetProperty(ref canSolo, value);
     }
 
-    /// <summary>Whether it is silenced, with its fader left where it stands.</summary>
+    /// <inheritdoc/>
     public bool Mute
     {
         get => _bus?.Mute ?? false;

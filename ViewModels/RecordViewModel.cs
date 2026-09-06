@@ -1752,6 +1752,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             if (!ReferenceEquals(showing, SelectedRoute)) SelectedRoute = showing;
 
             _readingRoute = false;
+
+            PreferWhatIsPlaying();
             RestorePreferred(current);
         }
         catch (Exception ex)
@@ -1837,6 +1839,43 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         _preferredRoute = value;
         ApplyRoute(value, announce: true);
+    }
+
+    /// <summary>Whether the first reading of the graph has already been answered.</summary>
+    /// <remarks>
+    /// Once a session and not once a reading, so a source somebody chose is never overruled and
+    /// nothing is quietly re-pointed while they are working. The graph is read every two seconds
+    /// while a page carrying the picker is up.
+    /// </remarks>
+    private bool _preferredOnce;
+
+    /// <summary>
+    /// Points the input at what the machine is playing, the first time the graph is read.
+    /// </summary>
+    /// <remarks>
+    /// **What is playing is what somebody almost always wants**, which is the whole reason the
+    /// monitor of an output is offered at all: a jingle grabbed off a browser, a bed off a
+    /// player, a caller off a telephone application. A capture device is the other case and it
+    /// is one somebody goes and picks; picking that for them would mean the first take of a
+    /// session is silence off a microphone nobody plugged in.
+    ///
+    /// Only where nothing has been chosen and only once, so what somebody picked stands for the
+    /// rest of the session, and it does not fight the sound server: it goes through the same
+    /// path a hand does, which is the same handler a picker goes through.
+    /// </remarks>
+    private void PreferWhatIsPlaying()
+    {
+        if (_preferredOnce) return;
+
+        _preferredOnce = true;
+
+        if (_preferredRoute != null) return;
+
+        var playing = Routes.FirstOrDefault(r => r.Kind == Audio.Routing.Enums.AudioRouteKind.Monitor);
+
+        if (playing == null) return;
+
+        SelectedRoute = playing;
     }
 
     /// <summary>

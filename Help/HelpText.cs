@@ -41,6 +41,8 @@ public sealed class HelpText : IHelpText
     public const string TrackerEffects = "tracker.effects";
     /// <summary>What each control on a mixer strip does.</summary>
     public const string MixerStrips = "mixer.strips";
+    /// <summary>Where sound comes from, where it goes, and how to patch it.</summary>
+    public const string MixerPatchbay = "mixer.patchbay";
     /// <summary>What the designer's two tabs are, and what a machine and an effect each are.</summary>
     public const string DesignerWorlds = "designer.worlds";
     /// <summary>Dropping parts on a face and saying what each one turns.</summary>

@@ -15,7 +15,7 @@ namespace JingleBox2.ViewModels;
 /// One channel strip on the mixer. Writes straight into the song's <see cref="TrackMix"/>,
 /// and reports back so what is already sounding follows the fader.
 /// </summary>
-public sealed class TrackStripViewModel : ObservableObject
+public sealed class TrackStripViewModel : ObservableObject, Interfaces.IStripSwitches
 {
     /// <summary>The fader scale, so a reading in decibels can be checked without a window.</summary>
     private readonly IGainScale _gain = new GainScale();
@@ -153,6 +153,14 @@ public sealed class TrackStripViewModel : ObservableObject
     /// <summary>Whether there is a tag to draw at all.</summary>
     public bool HasEffect => EffectName.Length > 0;
 
+    /// <inheritdoc/>
+    /// <remarks>Every strip on the desk can be silenced, the master included.</remarks>
+    public bool CanMute => true;
+
+    /// <inheritdoc/>
+    /// <remarks>Every track can, and the master cannot: soloing everything is what it does.</remarks>
+    public bool CanSolo => !IsMaster;
+
     /// <summary>True for the strip the whole mix goes through, which is not a track.</summary>
     public bool IsMaster => Track < 0;
 
@@ -222,10 +230,11 @@ public sealed class TrackStripViewModel : ObservableObject
         set => Set(v => _strip.Pan = v, _strip.Pan, value, -1, 1, nameof(Pan));
     }
 
-    /// <summary>
-    /// Whether the track is silenced. Solo elsewhere silences it too, and does not touch this:
-    /// what a strip is muted to is a setting, and what it can be heard through is the mix.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Solo elsewhere silences it too, and does not touch this: what a strip is muted to is a
+    /// setting, and what it can be heard through is the mix.
+    /// </remarks>
     public bool Mute
     {
         get => _strip.Mute;
@@ -268,10 +277,10 @@ public sealed class TrackStripViewModel : ObservableObject
         set => SetProperty(ref right, value);
     }
 
-    /// <summary>
-    /// Whether this track is soloed. The master has no solo, since soloing everything is what
-    /// it is already doing.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The master has no solo, since soloing everything is what it is already doing.
+    /// </remarks>
     public bool Solo
     {
         get => _strip.Solo;

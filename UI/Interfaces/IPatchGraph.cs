@@ -50,5 +50,14 @@ public interface IPatchGraph
     /// <param name="routes">Everything with audio to give, as the routing offers it.</param>
     /// <param name="chosen">What is feeding the input now, or nothing while none is.</param>
     /// <param name="output">What the mix is leaving through, or nothing where that is not known yet.</param>
-    PatchScene Read(IReadOnlyList<AudioRoute> routes, AudioRoute? chosen, string? output = null);
+    /// <param name="tracks">
+    /// The song's tracks, by the names their strips wear. The tracker gives out one pair each,
+    /// so what the picture says about TR-03 is what the strip headed TR-03 is doing. Nothing
+    /// draws the whole mix as one pair, which is what there is before a song has been opened.
+    /// </param>
+    PatchScene Read(
+        IReadOnlyList<AudioRoute> routes,
+        AudioRoute? chosen,
+        string? output = null,
+        IReadOnlyList<string>? tracks = null);
 }

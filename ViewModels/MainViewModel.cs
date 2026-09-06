@@ -880,8 +880,112 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         Input: Loud(RecorderInput),
         Takes: Loud(RecorderPlay),
         Pads: Loud(PadsStrip),
-        Tracker: Tracker.IsPlaying,
+        Tracks: Sounding(),
         Output: Loud(RecorderPlay) || Loud(PadsStrip) || Tracker.IsPlaying);
+
+    /// <summary>Which of the song's tracks are sounding, by the name their strip wears.</summary>
+    /// <remarks>
+    /// Off the strips the mixer is already reading, so a track that is written but silent stays
+    /// dashed: a picture that lit every track because the song was playing would be saying an
+    /// empty track is carrying audio.
+    /// </remarks>
+    private System.Collections.Generic.IReadOnlySet<string> Sounding()
+    {
+        var sounding = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var strip in Tracker.Strips)
+            if (Math.Max(strip.Left, strip.Right) > Hearable) sounding.Add(strip.Label);
+
+        return sounding;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The strips' own labels rather than a second spelling of TR-01 here, so what the patchbay
+    /// says about a track and what the desk says about it cannot drift apart.
+    /// </remarks>
+    public System.Collections.Generic.IReadOnlyList<string> Tracks
+    {
+        get
+        {
+            var names = new System.Collections.Generic.List<string>();
+
+            foreach (var strip in Tracker.Strips) names.Add(strip.Label);
+
+            return names;
+        }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Every block this application owns has something to read; a block on the machine has not,
+    /// since what somebody else's program is putting out is not something we measure. The output
+    /// reads the master, because what leaves is what the desk summed.
+    /// </remarks>
+    public UI.Records.PatchLevel Level(string node) => node switch
+    {
+        "record" => Meter(RecorderInput),
+        "fire" => Meter(PadsStrip),
+        "tracker" => Joined(),
+        "mixer" => Master(),
+        "output" => Master(),
+        _ => default
+    };
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The tracker's outputs are its tracks, matched by the name the strip itself wears, so
+    /// there is one spelling of TR-01 rather than two agreeing by luck.
+    /// </remarks>
+    public IStripSwitches? Switches(string node, string port) => node switch
+    {
+        "tracker" => Track(port),
+        "mixer" => Tracker.MasterStrip,
+        "fire" => PadsStrip,
+        "record" => RecorderPlay,
+        _ => null
+    };
+
+    /// <summary>The strip for one track, by the name it wears on the desk.</summary>
+    private IStripSwitches? Track(string label)
+    {
+        foreach (var strip in Tracker.Strips)
+            if (string.Equals(strip.Label, label, StringComparison.Ordinal)) return strip;
+
+        return null;
+    }
+
+    /// <summary>One strip's meter, as an answer this page can give.</summary>
+    private static UI.Records.PatchLevel Meter(SourceStripViewModel strip) =>
+        new(true, (float)strip.Left, (float)strip.Right);
+
+    /// <summary>
+    /// Every track at once, which is what a block putting out a whole song is doing.
+    /// </summary>
+    /// <remarks>
+    /// The loudest of them a side rather than the sum, since a peak added to a peak is a number
+    /// no track ever reached and would light a clip lamp on a mix that never clipped. What is
+    /// really summed is the master, and that is the block after this one.
+    /// </remarks>
+    private UI.Records.PatchLevel Joined()
+    {
+        float left = 0;
+        float right = 0;
+
+        foreach (var strip in Tracker.Strips)
+        {
+            left = Math.Max(left, (float)strip.Left);
+            right = Math.Max(right, (float)strip.Right);
+        }
+
+        return new UI.Records.PatchLevel(true, left, right);
+    }
+
+    /// <summary>What the desk summed, which is also what leaves the machine.</summary>
+    private UI.Records.PatchLevel Master() =>
+        Tracker.MasterStrip is { } master
+            ? new UI.Records.PatchLevel(true, (float)master.Left, (float)master.Right)
+            : new UI.Records.PatchLevel(true, 0, 0);
 
     /// <summary>Whether a strip's meter is showing anything worth calling sound.</summary>
     private static bool Loud(SourceStripViewModel strip) =>

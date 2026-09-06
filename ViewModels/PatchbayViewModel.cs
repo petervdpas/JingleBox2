@@ -98,6 +98,30 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// </remarks>
     [ObservableProperty] private IReadOnlyList<PatchLink> live = Array.Empty<PatchLink>();
 
+    /// <summary>Whether the picked block is one this application can meter at all.</summary>
+    /// <remarks>
+    /// A block on the machine is somebody else's program, so the sidebar shows no meter for one
+    /// rather than a bar at nought: a meter that cannot move reads as silence rather than as a
+    /// question nobody can answer.
+    /// </remarks>
+    [ObservableProperty] private bool metered;
+
+    /// <summary>What the picked block is putting out, left.</summary>
+    [ObservableProperty] private float levelLeft;
+
+    /// <inheritdoc cref="LevelLeft"/>
+    [ObservableProperty] private float levelRight;
+
+    /// <summary>The picked block's outputs, each with its own mute and solo.</summary>
+    /// <remarks>
+    /// Built when a block is picked rather than followed, since what a block gives out changes
+    /// when the song does and not while somebody is looking at it. Its outputs rather than its
+    /// inputs: a mute belongs to what a thing is putting out, and the same audio arriving
+    /// somewhere else is that other block's business.
+    /// </remarks>
+    [ObservableProperty] private IReadOnlyList<PatchSwitchViewModel> outputs =
+        Array.Empty<PatchSwitchViewModel>();
+
     /// <summary>Which block the sidebar is about, or nothing while none is picked.</summary>
     [ObservableProperty] private PatchNode? selected;
 
@@ -111,7 +135,7 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// </remarks>
     public void Read()
     {
-        var scene = _graph.Read(_input.Routes, _input.SelectedRoute, _output?.SelectedOutputDevice?.Name);
+        var scene = _graph.Read(_input.Routes, _input.SelectedRoute, _output?.SelectedOutputDevice?.Name, _flowing?.Tracks);
 
         Nodes = Laid(scene.Nodes);
         Links = scene.Links;
@@ -121,6 +145,8 @@ public sealed partial class PatchbayViewModel : ObservableObject
         if (Selected is not { } picked) return;
 
         Selected = Find(picked.Id);
+
+        if (Selected is null) Outputs = Array.Empty<PatchSwitchViewModel>();
     }
 
     /// <summary>Asks the routing to read the graph again, for a page that has just been opened.</summary>
@@ -140,6 +166,30 @@ public sealed partial class PatchbayViewModel : ObservableObject
         if (_flowing == null) return;
 
         Live = _flow.Live(Links, _flowing.Signals);
+
+        Meter();
+    }
+
+    /// <summary>Reads the picked block's own meter, for the sidebar beside the picture.</summary>
+    /// <remarks>
+    /// Read on the same tick the cables are, rather than followed: what a meter shows changes
+    /// twenty times a second and a page that bound to it through the block would be rebuilding
+    /// the sidebar at that rate.
+    /// </remarks>
+    private void Meter()
+    {
+        if (_flowing == null || Selected is not { } picked)
+        {
+            Metered = false;
+
+            return;
+        }
+
+        var level = _flowing.Level(picked.Id);
+
+        Metered = level.Known;
+        LevelLeft = level.Left;
+        LevelRight = level.Right;
     }
 
     /// <summary>
@@ -246,6 +296,31 @@ public sealed partial class PatchbayViewModel : ObservableObject
 
     /// <summary>The list of sources moved, so the picture is read again.</summary>
     private void Changed(object? sender, NotifyCollectionChangedEventArgs e) => Read();
+
+    /// <summary>A block was picked, so its meter is read at once rather than on the next tick.</summary>
+    /// <remarks>
+    /// A fifth of a second of an empty meter after clicking a block reads as a block that has
+    /// nothing to show.
+    /// </remarks>
+    partial void OnSelectedChanged(PatchNode? value)
+    {
+        Outputs = Rows(value);
+
+        Meter();
+    }
+
+    /// <summary>One row per output of the picked block, each holding whatever switches it has.</summary>
+    private IReadOnlyList<PatchSwitchViewModel> Rows(PatchNode? node)
+    {
+        if (node == null) return Array.Empty<PatchSwitchViewModel>();
+
+        var rows = new List<PatchSwitchViewModel>(node.Outs.Count);
+
+        foreach (var port in node.Outs)
+            rows.Add(new PatchSwitchViewModel(port, _flowing?.Switches(node.Id, port.Name)));
+
+        return rows;
+    }
 
     /// <summary>The chosen source moved, which is the one property here that draws a cable.</summary>
     private void Told(object? sender, PropertyChangedEventArgs e)

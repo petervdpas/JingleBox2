@@ -331,6 +331,15 @@
 
              Here rather than in the two pages that use it, since two spellings of one look is
              how the mixer's tabs and the rack's come to disagree about their own size. -->
+        <!-- The strip's own room and nothing around what is under it. Fluent puts padding on
+             the selected content, which on a page that fills the window is a margin down both
+             sides that no other page has: the mixer sat further in from the edges than RECORD
+             and PADS did, by the width of that padding. -->
+        <Style Selector="TabControl.inner">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+        </Style>
+
         <Style Selector="TabControl.inner > TabItem">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="MinHeight" Value="0" />
