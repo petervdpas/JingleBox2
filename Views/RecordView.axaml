@@ -72,10 +72,11 @@
                plugin taking a moment cannot put a hole in the only copy of a performance, and
                the capture as it arrived is kept beside the take whenever there is anything here.
                See ITakeEffects. -->
-          <StackPanel Spacing="4">
-            <TextBlock Text="Record through" Opacity="0.8" />
+          <!-- Folded away under the same line the chains under the pattern and under the mixer
+               use, because a chain is a chain: what differs is only which of them it is about. -->
+          <views:FoldStrip Title="Recording Effects">
             <views:PluginStrip DataContext="{Binding Effect}" />
-          </StackPanel>
+          </views:FoldStrip>
 
         </StackPanel>
 
