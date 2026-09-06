@@ -11,6 +11,7 @@ public sealed class PatchWiring : IPatchWiring
     /// <inheritdoc/>
     public bool Allowed(PatchPort from, PatchPort to)
     {
+        if (from.Fixed || to.Fixed) return false;
         if (from.Side == to.Side) return false;
         if (string.IsNullOrEmpty(from.Node) || string.IsNullOrEmpty(to.Node)) return false;
 

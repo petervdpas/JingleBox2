@@ -236,6 +236,8 @@ public sealed class PatchbayView : Panel
     /// </remarks>
     private void Grab(PatchPort port, PointerPressedEventArgs e)
     {
+        if (port.Fixed) return;
+
         _moving = null;
         _anchor = port;
 
@@ -345,6 +347,28 @@ public sealed class PatchbayView : Panel
         return null;
     }
 
+    /// <summary>
+    /// Whether a cable runs between two of this application's own blocks.
+    /// </summary>
+    /// <remarks>
+    /// Drawn in another colour, because the two are different kinds of fact. **A cable to
+    /// something on the machine is a patch somebody made and can move**; one between our own
+    /// blocks is how this program is built, and it is on the picture so that the whole path can
+    /// be read at once rather than to be pulled apart. Worked out from the blocks rather than
+    /// written on the cable, so there is one answer to what is ours.
+    /// </remarks>
+    /// <param name="link">The cable in question.</param>
+    private bool Inside(PatchLink link) => IsOurs(link.From.Node) && IsOurs(link.To.Node);
+
+    /// <summary>Whether a block is one of ours, by its id.</summary>
+    private bool IsOurs(string node)
+    {
+        foreach (var one in Nodes)
+            if (string.Equals(one.Id, node, StringComparison.Ordinal)) return one.IsOurs;
+
+        return false;
+    }
+
     /// <summary>Where one end of a cable is on the surface, or nothing when its block has gone.</summary>
     private Point? Dot(PatchPort port, int channel)
     {
@@ -382,11 +406,16 @@ public sealed class PatchbayView : Panel
         {
             var palette = ThemePalette.From(this);
 
-            var wire = new Pen(new SolidColorBrush(ThemePalette.Alpha(palette.Accent, 0xC0)), 2);
+            var patched = new Pen(new SolidColorBrush(ThemePalette.Alpha(palette.Accent, 0xC0)), 2);
+            var inside = new Pen(
+                new SolidColorBrush(ThemePalette.Alpha(palette.Muted, 0xC0)), 2,
+                new DashStyle(new double[] { 5, 4 }, 0));
             var hand = new Pen(new SolidColorBrush(palette.Text), 2, new DashStyle(new double[] { 3, 3 }, 0));
 
             foreach (var link in _bay.Links)
             {
+                var wire = _bay.Inside(link) ? inside : patched;
+
                 foreach (var (from, to) in Wiring.Pairs(link.From.Channels, link.To.Channels))
                 {
                     var start = _bay.Dot(link.From, from);

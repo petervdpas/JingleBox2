@@ -33,6 +33,13 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// <summary>What turns those into blocks and cables.</summary>
     private readonly IPatchGraph _graph;
 
+    /// <summary>Where the mix leaves, or nothing where nobody has said.</summary>
+    /// <remarks>
+    /// Optional, so a patchbay can be built and put a question to without an engine: what it
+    /// costs is the last block being called Output rather than by its name.
+    /// </remarks>
+    private readonly IOutputChosen? _output;
+
     /// <summary>
     /// Takes what feeds the recorder, and what draws it.
     /// </summary>
@@ -41,15 +48,18 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// which is the rule every seam here follows.
     /// </remarks>
     /// <param name="input">The sources, and the one being taken.</param>
+    /// <param name="output">Where the mix leaves through, for the block at the end of the path.</param>
     /// <param name="graph">What blocks and cables those make.</param>
-    public PatchbayViewModel(IInputSource input, IPatchGraph? graph = null)
+    public PatchbayViewModel(IInputSource input, IOutputChosen? output = null, IPatchGraph? graph = null)
     {
         _input = input;
+        _output = output;
         _graph = graph ?? new PatchGraph();
 
         _input.Routes.CollectionChanged += Changed;
 
         if (_input is INotifyPropertyChanged told) told.PropertyChanged += Told;
+        if (_output is INotifyPropertyChanged said) said.PropertyChanged += Heard;
 
         Read();
     }
@@ -73,7 +83,7 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// </remarks>
     public void Read()
     {
-        var scene = _graph.Read(_input.Routes, _input.SelectedRoute);
+        var scene = _graph.Read(_input.Routes, _input.SelectedRoute, _output?.SelectedOutputDevice?.Name);
 
         Nodes = scene.Nodes;
         Links = scene.Links;
@@ -159,5 +169,11 @@ public sealed partial class PatchbayViewModel : ObservableObject
     private void Told(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(IInputSource.SelectedRoute)) Read();
+    }
+
+    /// <summary>The output moved, which renames the block at the end of our own path.</summary>
+    private void Heard(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(IOutputChosen.SelectedOutputDevice)) Read();
     }
 }

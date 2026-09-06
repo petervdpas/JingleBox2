@@ -24,6 +24,10 @@ public interface IPatchWiring
     /// two are handed over does not matter, since a hand drags a cable in whichever direction it
     /// likes. A block cannot be joined to itself, which is feedback and is the one connection
     /// that can be made by accident.
+    ///
+    /// **A fixed point refuses everything**, which is how the picture can show how this
+    /// application is wired inside itself without offering to take it apart: the pads reach the
+    /// mixer because that is what a mixer is, not because somebody patched them.
     /// </remarks>
     /// <param name="from">One end of the cable.</param>
     /// <param name="to">The other end.</param>

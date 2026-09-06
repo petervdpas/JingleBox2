@@ -88,8 +88,9 @@ public class PatchbayViewTests
     {
         var (bay, _) = Bay("firefox");
 
-        Assert.Equal(2, bay.Nodes.Count);
-        Assert.Empty(bay.Links);
+        Assert.Contains(bay.Nodes, n => n.Id == "firefox");
+        Assert.Contains(bay.Nodes, n => n.IsOurs);
+        Assert.DoesNotContain(bay.Links, l => l.To.Node == "record");
     }
 
     /// <summary>A cable into our own block picks that source.</summary>
@@ -116,9 +117,9 @@ public class PatchbayViewTests
 
         bay.Plug(Cable(bay, "firefox"));
 
-        var link = Assert.Single(bay.Links);
+        var link = Assert.Single(bay.Links, l => l.From.Node == "firefox");
 
-        Assert.Equal("firefox", link.From.Node);
+        Assert.Equal("record", link.To.Node);
     }
 
     /// <summary>A cable between two things that are not us changes nothing.</summary>
@@ -169,10 +170,10 @@ public class PatchbayViewTests
         var (bay, bench) = Bay("firefox");
 
         bay.Plug(Cable(bay, "firefox"));
-        bay.Unplug(Assert.Single(bay.Links));
+        bay.Unplug(Assert.Single(bay.Links, l => l.From.Node == "firefox"));
 
         Assert.NotNull(bench.SelectedRoute);
-        Assert.Single(bay.Links);
+        Assert.Single(bay.Links, l => l.From.Node == "firefox");
         Assert.NotEmpty(bay.Says);
     }
 
@@ -182,11 +183,11 @@ public class PatchbayViewTests
     {
         var (bay, bench) = Bay();
 
-        Assert.Single(bay.Nodes);
+        Assert.DoesNotContain(bay.Nodes, n => n.Id == "firefox");
 
         bench.Routes.Add(Route("firefox"));
 
-        Assert.Equal(2, bay.Nodes.Count);
+        Assert.Contains(bay.Nodes, n => n.Id == "firefox");
     }
 
     /// <summary>The picked block survives the machine being read again.</summary>

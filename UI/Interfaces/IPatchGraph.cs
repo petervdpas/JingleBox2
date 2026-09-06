@@ -13,6 +13,13 @@ namespace JingleBox2.UI.Interfaces;
 /// somebody can use rather than a picture of the whole machine: there is no gesture on it that
 /// can unplug the speakers, because no edge that does not touch us is drawn.
 ///
+/// **This is the routing table rather than a picture of one.** What the blocks and the fixed
+/// cables between them say is how audio moves through this application: the pads and the tracker
+/// reach the desk, the desk reaches the machine, and the recorder listens to whatever is patched
+/// into it. Today those inner cables describe what the engine already does and cannot be pulled
+/// out; the point of writing them down here is that there is then one place saying it, which is
+/// the place the engine can be made to read.
+///
 /// A rule of its own rather than something the page works out, so what is drawn can be put a
 /// question to without a window, a sound server or a hand: the awkward cases here are a source
 /// that is being captured but is not on the offered list, a machine offering nothing at all,
@@ -42,5 +49,6 @@ public interface IPatchGraph
     /// </remarks>
     /// <param name="routes">Everything with audio to give, as the routing offers it.</param>
     /// <param name="chosen">What is feeding the input now, or nothing while none is.</param>
-    PatchScene Read(IReadOnlyList<AudioRoute> routes, AudioRoute? chosen);
+    /// <param name="output">What the mix is leaving through, or nothing where that is not known yet.</param>
+    PatchScene Read(IReadOnlyList<AudioRoute> routes, AudioRoute? chosen, string? output = null);
 }

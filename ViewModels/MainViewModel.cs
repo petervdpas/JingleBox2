@@ -42,7 +42,7 @@ namespace JingleBox2.ViewModels;
 /// than on a page view model of their own, because two pages show them: PADS is where they are
 /// laid out and FIRE is where they are played.
 /// </remarks>
-public sealed partial class MainViewModel : ObservableObject, IShortcutContext
+public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IShortcutContext
 {
     /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
     /// <summary>
@@ -876,7 +876,7 @@ public sealed partial class MainViewModel : ObservableObject, IShortcutContext
     /// the recorder because that is what the picture is about: every block on it either feeds
     /// this application or is this application.
     /// </remarks>
-    public PatchbayViewModel Patchbay => patchbay ??= new PatchbayViewModel(Record);
+    public PatchbayViewModel Patchbay => patchbay ??= new PatchbayViewModel(Record, this);
 
     /// <summary>Backing field for <see cref="RecorderPlay"/>.</summary>
     private SourceStripViewModel? recorderPlay;

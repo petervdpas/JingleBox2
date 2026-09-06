@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using JingleBox2.UI.Interfaces;
+using JingleBox2.UI.Records;
 
 namespace JingleBox2.UI;
 
@@ -8,29 +9,22 @@ namespace JingleBox2.UI;
 public sealed class PatchGeometry : IPatchGeometry
 {
     /// <inheritdoc/>
-    public double HeaderHeight => 22;
+    public double HeaderHeight => 38;
 
     /// <inheritdoc/>
-    public double RowHeight => 18;
+    public double RowHeight => 24;
 
     /// <inheritdoc/>
-    public double DotRadius => 4;
+    public double DotRadius => 5.5;
 
     /// <inheritdoc/>
-    public double GrabRadius => 10;
+    public double GrabRadius => 12;
 
     /// <inheritdoc/>
-    public double EdgeInset => 8;
-
-    /// <summary>How far apart the two dots of a stereo port sit, either side of the middle.</summary>
-    /// <remarks>
-    /// Enough that two dots of four pixels do not touch, and little enough that the pair still
-    /// reads as one port rather than as two.
-    /// </remarks>
-    private const double StereoSpread = 5;
+    public double EdgeInset => 10;
 
     /// <summary>The air under the last row, so a dot is not against the bottom edge.</summary>
-    private const double Foot = 6;
+    private const double Foot = 8;
 
     /// <summary>How far a cable is allowed to bow out, whatever the gap.</summary>
     private const double MostBend = 90;
@@ -52,17 +46,20 @@ public sealed class PatchGeometry : IPatchGeometry
     }
 
     /// <inheritdoc/>
-    public IReadOnlyList<double> ChannelCentres(double centre, int channels)
+    public IReadOnlyList<PatchRow> Rows(IReadOnlyList<PatchPort>? ports)
     {
-        if (channels <= 1) return new[] { centre };
+        var rows = new List<PatchRow>();
 
-        var centres = new double[channels];
-        double top = centre - (channels - 1) * StereoSpread / 2;
+        if (ports == null) return rows;
 
-        for (int channel = 0; channel < channels; channel++)
-            centres[channel] = top + channel * StereoSpread;
+        for (int port = 0; port < ports.Count; port++)
+        {
+            int channels = Math.Max(1, (int)ports[port].Channels);
 
-        return centres;
+            for (int channel = 0; channel < channels; channel++) rows.Add(new PatchRow(port, channel));
+        }
+
+        return rows;
     }
 
     /// <inheritdoc/>

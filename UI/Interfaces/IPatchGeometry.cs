@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using JingleBox2.UI.Records;
 
 namespace JingleBox2.UI.Interfaces;
 
@@ -49,17 +50,18 @@ public interface IPatchGeometry
     int RowAt(double y, int rows);
 
     /// <summary>
-    /// Where each channel's dot sits within a row.
+    /// The lines one side of a block draws: one for every channel of every port on it.
     /// </summary>
     /// <remarks>
-    /// One dot in the middle for a mono port and a pair either side of the middle for a stereo
-    /// one, which is the whole of what "either stereo or mono depending on the type" comes to on
-    /// the screen. Asked for by count rather than by the enum so the drawing, the hit test and
-    /// the cable layer cannot each decide it differently.
+    /// **A channel to a line**, which is the whole of what "either stereo or mono depending on
+    /// the type" comes to on the screen: a stereo port is two dots with two names under each
+    /// other, and a mono one is a single dot. Two dots sharing a line read as one fat point.
+    ///
+    /// One list in one order, because the drawing, the press that lands on a dot and the cable
+    /// that has to arrive exactly where the dot was drawn all walk it.
     /// </remarks>
-    /// <param name="centre">The middle of the row, from <see cref="RowCentre"/>.</param>
-    /// <param name="channels">How many channels the port carries.</param>
-    IReadOnlyList<double> ChannelCentres(double centre, int channels);
+    /// <param name="ports">One side's ports, in the order they are shown.</param>
+    IReadOnlyList<PatchRow> Rows(IReadOnlyList<PatchPort> ports);
 
     /// <summary>
     /// The two control points that bend a cable between its ends.

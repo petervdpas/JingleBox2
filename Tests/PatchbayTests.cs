@@ -189,37 +189,91 @@ public class PatchbayTests
             Assert.Equal(row, _shape.RowAt(_shape.RowCentre(row), 4));
     }
 
-    /// <summary>A mono port is one dot, in the middle of its row.</summary>
+    /// <summary>A mono port is one line.</summary>
     [Fact]
-    public void A_mono_port_is_one_dot_on_the_line()
+    public void A_mono_port_takes_one_line()
     {
-        var centres = _shape.ChannelCentres(50, 1);
+        var rows = _shape.Rows(new[] { Port("us", PatchSide.In, PatchChannels.Mono) });
 
-        Assert.Equal(new[] { 50d }, centres);
+        Assert.Equal(new[] { new PatchRow(0, 0) }, rows);
     }
 
-    /// <summary>A stereo port is two dots, evenly either side of the middle.</summary>
-    [Fact]
-    public void A_stereo_port_is_a_pair_about_the_line()
-    {
-        var centres = _shape.ChannelCentres(50, 2);
-
-        Assert.Equal(2, centres.Count);
-        Assert.Equal(50, (centres[0] + centres[1]) / 2, 3);
-        Assert.True(centres[0] < centres[1]);
-    }
-
-    /// <summary>A port claiming no channels is still drawn, as one dot.</summary>
+    /// <summary>A stereo port is two lines, one per channel, in order.</summary>
     /// <remarks>
-    /// Nought and negative cannot arrive from the enum, and this is asked anyway: what is drawn
-    /// comes from somebody else's machine, and a port with no dot at all is a connection nobody
-    /// can make and nothing on the screen to say why.
+    /// The whole of what "either stereo or mono depending on the type" comes to on the screen.
+    /// Two dots sharing a line read as one fat point, which says nothing about how many wires
+    /// there are.
     /// </remarks>
     [Fact]
-    public void A_port_claiming_no_channels_still_has_a_dot()
+    public void A_stereo_port_takes_a_line_each()
     {
-        Assert.Single(_shape.ChannelCentres(50, 0));
-        Assert.Single(_shape.ChannelCentres(50, -3));
+        var rows = _shape.Rows(new[] { Port("us", PatchSide.In) });
+
+        Assert.Equal(new[] { new PatchRow(0, 0), new PatchRow(0, 1) }, rows);
+    }
+
+    /// <summary>Several ports run on after each other, keeping their order.</summary>
+    [Fact]
+    public void Ports_keep_their_order_down_the_side()
+    {
+        var rows = _shape.Rows(new[]
+        {
+            Port("us", PatchSide.In, PatchChannels.Mono),
+            Port("us", PatchSide.In)
+        });
+
+        Assert.Equal(
+            new[] { new PatchRow(0, 0), new PatchRow(1, 0), new PatchRow(1, 1) },
+            rows);
+    }
+
+    /// <summary>A side with no ports draws no lines, and does not throw about it.</summary>
+    [Fact]
+    public void A_side_with_no_ports_draws_nothing()
+    {
+        Assert.Empty(_shape.Rows(Array.Empty<PatchPort>()));
+        Assert.Empty(_shape.Rows(null!));
+    }
+
+    /// <summary>A port claiming no channels still gets a line, since a dot nobody can see is worse.</summary>
+    [Fact]
+    public void A_port_claiming_no_channels_still_has_a_line()
+    {
+        var rows = _shape.Rows(new[] { new PatchPort("us", "in", PatchSide.In, 0) });
+
+        Assert.Single(rows);
+    }
+
+    /// <summary>A stereo port's two lines are named apart, the way the sound server names them.</summary>
+    [Fact]
+    public void The_two_sides_are_named_apart()
+    {
+        var port = Port("firefox", PatchSide.Out);
+
+        Assert.Equal("out_FL", port.Label(0));
+        Assert.Equal("out_FR", port.Label(1));
+    }
+
+    /// <summary>A mono port says its own name and nothing else.</summary>
+    [Fact]
+    public void A_mono_port_says_its_own_name()
+    {
+        Assert.Equal("out", Port("mic", PatchSide.Out, PatchChannels.Mono).Label(0));
+    }
+
+    /// <summary>A fixed point refuses every cable, whichever end it is.</summary>
+    /// <remarks>
+    /// How the picture can show the way this application is wired inside itself without offering
+    /// to take it apart: the pads reach the desk because that is what a desk is.
+    /// </remarks>
+    [Fact]
+    public void A_fixed_point_refuses_the_hand()
+    {
+        var fixedIn = new PatchPort("mixer", "pads", PatchSide.In, PatchChannels.Stereo, Fixed: true);
+        var free = Port("fire", PatchSide.Out);
+
+        Assert.False(_wiring.Allowed(free, fixedIn));
+        Assert.False(_wiring.Allowed(fixedIn, free));
     }
 
     /// <summary>A cable leaves to the right and arrives from the left.</summary>
@@ -261,23 +315,68 @@ public class PatchbayTests
         Assert.Equal(90, y2, 3);
     }
 
-    /// <summary>A machine offering nothing still draws us.</summary>
+    /// <summary>A machine offering nothing still draws this application.</summary>
     /// <remarks>
-    /// The picture has to say "here is this program and nothing is feeding it" rather than being
-    /// blank, which reads as a page that has not loaded.
+    /// The picture has to say "here is this program, and nothing is feeding it" rather than being
+    /// blank, which reads as a page that has not loaded. What it draws then is our own signal
+    /// path, which is true whether or not anything is plugged in.
     /// </remarks>
     [Fact]
-    public void Nothing_on_offer_still_draws_our_own_block()
+    public void Nothing_on_offer_still_draws_our_own_path()
     {
         var scene = _graph.Read(Array.Empty<AudioRoute>(), null);
 
-        Assert.Single(scene.Nodes);
-        Assert.Equal(_graph.OwnNode, scene.Nodes[0].Id);
-        Assert.True(scene.Nodes[0].IsOurs);
-        Assert.Empty(scene.Links);
+        Assert.Contains(scene.Nodes, n => n.Id == _graph.OwnNode);
+        Assert.Contains(scene.Nodes, n => n.IsOurs && n.Title == "MIXER");
+        Assert.DoesNotContain(scene.Links, l => l.To == _graph.OwnInput);
     }
 
-    /// <summary>Every source on offer gets a block, and ours is the only one that is ours.</summary>
+    /// <summary>The pads and the tracker reach the desk, and the desk reaches the machine.</summary>
+    /// <remarks>
+    /// **This is the routing table rather than a drawing of one.** What these cables say is how
+    /// audio moves through this application, and they are here so that there is one place saying
+    /// it rather than the shape being spread through the engine and nowhere written down.
+    /// </remarks>
+    [Fact]
+    public void Our_own_path_is_drawn_end_to_end()
+    {
+        var scene = _graph.Read(Array.Empty<AudioRoute>(), null);
+
+        Assert.Contains(scene.Links, l => l.From.Node == "tracker" && l.To.Node == "mixer");
+        Assert.Contains(scene.Links, l => l.From.Node == "fire" && l.To.Node == "mixer");
+        Assert.Contains(scene.Links, l => l.From.Node == "mixer" && l.To.Node == "output");
+    }
+
+    /// <summary>Every one of those is fixed, since none of them is anybody's to move.</summary>
+    [Fact]
+    public void Our_own_path_cannot_be_pulled_apart()
+    {
+        var scene = _graph.Read(Array.Empty<AudioRoute>(), null);
+
+        foreach (var link in scene.Links)
+        {
+            if (link.To == _graph.OwnInput) continue;
+
+            Assert.True(link.From.Fixed);
+            Assert.True(link.To.Fixed);
+            Assert.False(_wiring.Allowed(link.From, link.To));
+        }
+    }
+
+    /// <summary>Where the mix leaves is named when the machine has said, and stands there anyway.</summary>
+    [Fact]
+    public void The_output_is_named_where_it_is_known()
+    {
+        Assert.Contains(
+            _graph.Read(Array.Empty<AudioRoute>(), null, "Scarlett 2i2").Nodes,
+            n => n.Title == "Scarlett 2i2");
+
+        Assert.Contains(
+            _graph.Read(Array.Empty<AudioRoute>(), null).Nodes,
+            n => n.Id == "output");
+    }
+
+    /// <summary>Every source on offer gets a block of its own.</summary>
     [Fact]
     public void Every_source_gets_a_block()
     {
@@ -287,9 +386,9 @@ public class PatchbayTests
             new AudioRoute("mic", "Built-in", AudioRouteKind.Input)
         }, null);
 
-        Assert.Equal(3, scene.Nodes.Count);
-        Assert.Single(scene.Nodes, n => n.IsOurs);
-        Assert.Empty(scene.Links);
+        Assert.Contains(scene.Nodes, n => n.Id == "firefox");
+        Assert.Contains(scene.Nodes, n => n.Id == "mic");
+        Assert.DoesNotContain(scene.Links, l => l.To == _graph.OwnInput);
     }
 
     /// <summary>What is feeding the input is drawn as a cable into our own block.</summary>
@@ -300,11 +399,11 @@ public class PatchbayTests
 
         var scene = _graph.Read(new[] { firefox }, firefox);
 
-        var link = Assert.Single(scene.Links);
+        var link = Assert.Single(scene.Links, l => l.To == _graph.OwnInput);
 
         Assert.Equal("firefox", link.From.Node);
         Assert.Equal(PatchSide.Out, link.From.Side);
-        Assert.Equal(_graph.OwnInput, link.To);
+        Assert.False(link.From.Fixed);
     }
 
     /// <summary>A source that is feeding us and is not on offer is drawn all the same.</summary>
@@ -320,9 +419,8 @@ public class PatchbayTests
 
         var scene = _graph.Read(Array.Empty<AudioRoute>(), hidden);
 
-        Assert.Equal(2, scene.Nodes.Count);
-        Assert.Single(scene.Links);
-        Assert.Equal("mystery", scene.Nodes[0].Id);
+        Assert.Contains(scene.Nodes, n => n.Id == "mystery");
+        Assert.Single(scene.Links, l => l.To == _graph.OwnInput);
     }
 
     /// <summary>And it is drawn once when it is also on offer.</summary>
@@ -333,8 +431,8 @@ public class PatchbayTests
 
         var scene = _graph.Read(new[] { firefox, firefox }, firefox);
 
-        Assert.Equal(2, scene.Nodes.Count);
-        Assert.Single(scene.Links);
+        Assert.Single(scene.Nodes, n => n.Id == "firefox");
+        Assert.Single(scene.Links, l => l.To == _graph.OwnInput);
     }
 
     /// <summary>The same node twice under two names is one block.</summary>
@@ -347,7 +445,7 @@ public class PatchbayTests
             new AudioRoute("firefox", "Firefox again", AudioRouteKind.Monitor)
         }, null);
 
-        Assert.Equal(2, scene.Nodes.Count);
+        Assert.Single(scene.Nodes, n => n.Id == "firefox");
     }
 
     /// <summary>A source with no address at all is left out rather than drawn as a dead block.</summary>
@@ -356,19 +454,26 @@ public class PatchbayTests
     {
         var scene = _graph.Read(new[] { new AudioRoute("", "Nameless", AudioRouteKind.Input) }, null);
 
-        Assert.Single(scene.Nodes);
-        Assert.True(scene.Nodes[0].IsOurs);
+        Assert.All(scene.Nodes, n => Assert.NotEqual("", n.Id));
+        Assert.DoesNotContain(scene.Nodes, n => n.Title == "Nameless");
     }
 
-    /// <summary>And so is anything claiming to be us, which would draw two of our block.</summary>
+    /// <summary>And so is anything on the machine calling itself one of our own blocks.</summary>
+    /// <remarks>
+    /// A program on this computer can be called anything at all, and two blocks with one id would
+    /// be one block with two meanings: a cable would land on whichever the walk found first.
+    /// </remarks>
     [Fact]
-    public void Nothing_may_pretend_to_be_us()
+    public void Nothing_may_pretend_to_be_one_of_ours()
     {
-        var scene = _graph.Read(
-            new[] { new AudioRoute(_graph.OwnNode, "Not us", AudioRouteKind.Application) }, null);
+        foreach (string ours in new[] { "record", "tracker", "fire", "mixer", "output" })
+        {
+            var scene = _graph.Read(
+                new[] { new AudioRoute(ours, "Not us", AudioRouteKind.Application) }, null);
 
-        Assert.Single(scene.Nodes);
-        Assert.True(scene.Nodes[0].IsOurs);
+            Assert.Single(scene.Nodes, n => n.Id == ours);
+            Assert.DoesNotContain(scene.Nodes, n => n.Title == "Not us");
+        }
     }
 
     /// <summary>Every cable names ports that are on blocks that are really there.</summary>
@@ -382,7 +487,7 @@ public class PatchbayTests
     {
         var firefox = new AudioRoute("firefox", "Firefox", AudioRouteKind.Application);
 
-        var scene = _graph.Read(new[] { firefox }, firefox);
+        var scene = _graph.Read(new[] { firefox }, firefox, "Built-in");
 
         foreach (var link in scene.Links)
         {
@@ -406,7 +511,7 @@ public class PatchbayTests
         Assert.Equal(places.Count, places.Distinct().Count());
     }
 
-    /// <summary>A source's port is on the source, and ours is on ours.</summary>
+    /// <summary>A source's port is on the source, and ours are on ours.</summary>
     /// <remarks>
     /// A port names its block, and the whole hit test rests on that: a port carrying the wrong
     /// block name would draw its cable onto somebody else's dot.
@@ -423,17 +528,17 @@ public class PatchbayTests
         }
     }
 
-    /// <summary>Our block takes audio in and a source gives it out, never the other way about.</summary>
+    /// <summary>A source gives out and the recorder takes in, never the other way about.</summary>
     [Fact]
-    public void Sources_give_out_and_we_take_in()
+    public void Sources_give_out_and_the_recorder_takes_in()
     {
         var scene = _graph.Read(new[] { new AudioRoute("mic", "Built-in", AudioRouteKind.Input) }, null);
 
-        var us = scene.Nodes.Single(n => n.IsOurs);
-        var source = scene.Nodes.Single(n => !n.IsOurs);
+        var recorder = scene.Nodes.Single(n => n.Id == _graph.OwnNode);
+        var source = scene.Nodes.Single(n => n.Id == "mic");
 
-        Assert.Single(us.Ins);
-        Assert.Empty(us.Outs);
+        Assert.Single(recorder.Ins);
+        Assert.Empty(recorder.Outs);
         Assert.Single(source.Outs);
         Assert.Empty(source.Ins);
     }
@@ -444,13 +549,17 @@ public class PatchbayTests
     /// the graph reads has to be something the wiring would have allowed a hand to make.
     /// </remarks>
     [Fact]
-    public void What_is_read_is_what_a_hand_could_have_made()
+    public void What_can_be_patched_is_what_a_hand_could_have_made()
     {
         var firefox = new AudioRoute("firefox", "Firefox", AudioRouteKind.Application);
 
         var scene = _graph.Read(new[] { firefox }, firefox);
 
         foreach (var link in scene.Links)
+        {
+            if (link.From.Fixed || link.To.Fixed) continue;
+
             Assert.True(_wiring.Allowed(link.From, link.To));
+        }
     }
 }

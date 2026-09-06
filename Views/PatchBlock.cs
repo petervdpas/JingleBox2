@@ -38,7 +38,7 @@ public sealed class PatchBlock : ThemedControl
     /// picker keeps: what a source is called is decided by whoever wrote the program, so a
     /// picture measured against it is a picture that moves about on its own.
     /// </remarks>
-    public const double Across = 168;
+    public const double Across = 220;
 
     /// <summary>Where the block's parts sit. Holds nothing, so one serves every block.</summary>
     private static readonly IPatchGeometry Shape = new PatchGeometry();
@@ -153,7 +153,7 @@ public sealed class PatchBlock : ThemedControl
     /// blocks with the same number of connections stand the same height wherever they are.
     /// </remarks>
     protected override Size MeasureOverride(Size available) =>
-        new(Across, Shape.BlockHeight(Math.Max(Ins.Count, Outs.Count)));
+        new(Across, Shape.BlockHeight(Math.Max(Shape.Rows(Ins).Count, Shape.Rows(Outs).Count)));
 
     /// <summary>
     /// Where one of this block's dots sits, in the block's own coordinates.
@@ -168,14 +168,22 @@ public sealed class PatchBlock : ThemedControl
     public Point Dot(PatchPort port, int channel)
     {
         var side = port.Side == PatchSide.In ? Ins : Outs;
-        int row = IndexOf(side, port);
+        int which = IndexOf(side, port);
 
-        if (row < 0) return default;
+        if (which < 0) return default;
 
-        double x = port.Side == PatchSide.In ? Shape.EdgeInset : Across - Shape.EdgeInset;
-        var centres = Shape.ChannelCentres(Shape.RowCentre(row), (int)port.Channels);
+        var rows = Shape.Rows(side);
 
-        return new Point(x, centres[Math.Clamp(channel, 0, centres.Count - 1)]);
+        for (int row = 0; row < rows.Count; row++)
+        {
+            if (rows[row].Port != which || rows[row].Channel != channel) continue;
+
+            double x = port.Side == PatchSide.In ? Shape.EdgeInset : Across - Shape.EdgeInset;
+
+            return new Point(x, Shape.RowCentre(row));
+        }
+
+        return default;
     }
 
     /// <summary>Which port a place on the block is on, or nothing where it is on none.</summary>
@@ -189,13 +197,14 @@ public sealed class PatchBlock : ThemedControl
     {
         bool left = at.X < Across / 2;
         var side = left ? Ins : Outs;
+        var rows = Shape.Rows(side);
 
-        int row = Shape.RowAt(at.Y, side.Count);
+        int row = Shape.RowAt(at.Y, rows.Count);
         if (row < 0) return null;
 
         double x = left ? Shape.EdgeInset : Across - Shape.EdgeInset;
 
-        return Math.Abs(at.X - x) <= Shape.GrabRadius * 2 ? side[row] : null;
+        return Math.Abs(at.X - x) <= Shape.GrabRadius * 2 ? side[rows[row].Port] : null;
     }
 
     /// <summary>
@@ -273,7 +282,11 @@ public sealed class PatchBlock : ThemedControl
             new Rect(0, 0, size.Width, Shape.HeaderHeight),
             4, 4);
 
-        Write(context, Title, palette.Text, 11.5, new Point(8, 4), size.Width - 16);
+        var title = Text(Title, palette.Text, 12.5, size.Width - 18, lines: 2);
+
+        context.DrawText(title, new Point(
+            (size.Width - title.Width) / 2,
+            (Shape.HeaderHeight - title.Height) / 2));
 
         Dots(context, palette, Ins);
         Dots(context, palette, Outs);
@@ -287,39 +300,51 @@ public sealed class PatchBlock : ThemedControl
     /// </remarks>
     private void Dots(DrawingContext context, ThemePalette palette, IReadOnlyList<PatchPort> ports)
     {
-        var fill = new SolidColorBrush(IsOurs ? palette.Accent : palette.Muted);
+        var rows = Shape.Rows(ports);
 
-        for (int row = 0; row < ports.Count; row++)
+        for (int row = 0; row < rows.Count; row++)
         {
-            var port = ports[row];
-            var centres = Shape.ChannelCentres(Shape.RowCentre(row), (int)port.Channels);
-            double x = port.Side == PatchSide.In ? Shape.EdgeInset : Across - Shape.EdgeInset;
+            var port = ports[rows[row].Port];
+            double y = Shape.RowCentre(row);
+            bool left = port.Side == PatchSide.In;
+            double x = left ? Shape.EdgeInset : Across - Shape.EdgeInset;
 
-            foreach (double y in centres)
-                context.DrawEllipse(fill, null, new Point(x, y), Shape.DotRadius, Shape.DotRadius);
+            var fill = new SolidColorBrush(port.Fixed ? palette.Muted : palette.Accent);
+            var ring = new Pen(new SolidColorBrush(ThemePalette.Shade(palette.Background, -0.2)), 1);
 
-            double left = port.Side == PatchSide.In ? Shape.EdgeInset + 10 : 0;
-            double room = Across - Shape.EdgeInset - 10 - left;
+            context.DrawEllipse(fill, ring, new Point(x, y), Shape.DotRadius, Shape.DotRadius);
 
-            var words = Text(port.Name, palette.Muted, 10, room);
+            double edge = Shape.EdgeInset + Shape.DotRadius + 6;
+            double room = Across - edge * 2;
+            var words = Text(port.Label(rows[row].Channel), palette.Text, 11, room);
 
             context.DrawText(words, new Point(
-                port.Side == PatchSide.In ? left : Across - Shape.EdgeInset - 10 - words.Width,
-                Shape.RowCentre(row) - words.Height / 2));
+                left ? edge : Across - edge - words.Width,
+                y - words.Height / 2));
         }
     }
 
-    /// <summary>Draws one piece of lettering, trimmed to the room it has.</summary>
-    private void Write(DrawingContext context, string words, Color colour, double size, Point at, double room) =>
-        context.DrawText(Text(words, colour, size, room), at);
-
-    /// <summary>Lays a piece of lettering out, trimmed rather than allowed to overrun.</summary>
-    private static FormattedText Text(string words, Color colour, double size, double room) =>
+    /// <summary>
+    /// Lays a piece of lettering out, wrapped to the lines it is allowed and trimmed after that.
+    /// </summary>
+    /// <remarks>
+    /// A block's title is given two lines and its port names one. What a source is called is
+    /// decided by whoever wrote that program, so a name over the room it has is wrapped and then
+    /// cut rather than being allowed to set how wide the block stands: a column of blocks that
+    /// were each their own width would not read as a column.
+    /// </remarks>
+    /// <param name="words">What to draw.</param>
+    /// <param name="colour">What colour to draw it.</param>
+    /// <param name="size">How big.</param>
+    /// <param name="room">How wide it may run before it wraps.</param>
+    /// <param name="lines">How many lines it may take.</param>
+    private static FormattedText Text(string words, Color colour, double size, double room, int lines = 1) =>
         new(words ?? "", System.Globalization.CultureInfo.CurrentCulture,
             FlowDirection.LeftToRight, Typeface.Default, size, new SolidColorBrush(colour))
         {
             MaxTextWidth = Math.Max(10, room),
-            MaxLineCount = 1,
+            MaxLineCount = lines,
+            TextAlignment = lines > 1 ? TextAlignment.Center : TextAlignment.Left,
             Trimming = TextTrimming.CharacterEllipsis
         };
 
