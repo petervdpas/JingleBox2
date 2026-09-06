@@ -987,15 +987,16 @@ public sealed partial class MainViewModel : ObservableObject, IShortcutContext
     /// <summary>What the switch means, said plainly enough to choose by.</summary>
     public string OverlapPluginsHint =>
         _cfg.OverlapPlugins
-            ? "Every track's chain is started before any of them is waited for, so the plugin "
-              + "processes wake at the same time instead of one after another. A crossing costs "
-              + "about a fifth of a millisecond and almost all of it is waking a process that has "
-              + "been asleep for a block, so this is worth the most where there are several "
-              + "plugins on several tracks. Not one sample is different."
-            : "Each track's chain is waited for before the next is started, which is what this "
-              + "application has always done. Switch it on if songs with several plugins on "
-              + "several tracks break up: the log's bridge line says what a crossing is costing "
-              + "on this machine, and it is the number this changes.";
+            ? "Every track is started before any of them is waited for, so the plugin processes "
+              + "wake at the same time instead of one after another, and a track that has its "
+              + "answer carries on while another track is still waiting. What a block costs is "
+              + "then the longest single track rather than everything on every track added up, "
+              + "so this is worth the most where there are several plugins on several tracks. "
+              + "Not one sample is different."
+            : "Each track is finished before the next is started, which is what this application "
+              + "has always done. Switch it on if songs with several plugins on several tracks "
+              + "break up: the log's bridge line says what a crossing is costing on this "
+              + "machine, and it is the number this changes.";
 
     /// <summary>What the switch means, said plainly enough to choose by.</summary>
     public string FastDriveCurveHint =>
@@ -1236,13 +1237,28 @@ public sealed partial class MainViewModel : ObservableObject, IShortcutContext
     /// The names are what the choice actually does to you. In step is tightest and is what this
     /// did before there was a choice; the rest buy a plugin room to be late in, and cost you
     /// exactly what they say between playing a note and hearing it.
+    ///
+    /// It stopped at 40 and had to be measured to be believed. A cushion is drained by one
+    /// block of mixing that runs long, and a song of three bridged plugins on a laptop reaches
+    /// 489% of the 11.6 ms a 512 frame chunk has, which is 57 ms: no cushion under about sixty
+    /// could have absorbed it, and the log said so 33 times in five minutes while the largest
+    /// one on offer was in force. The engine's own ceiling is
+    /// <c>TrackerOutput.MostAheadMs</c>, which is 200, so what was really wrong is that the
+    /// picker stopped a long way under what the thing behind it allows.
+    ///
+    /// Nothing here changes what anybody has: a picker with more rows in it still shows
+    /// whichever row the settings already name.
     /// </remarks>
     private static readonly (int Milliseconds, string Label)[] RenderAheads =
     {
         (0, "In step (tightest)"),
         (10, "10 ms cushion"),
         (20, "20 ms cushion"),
-        (40, "40 ms cushion")
+        (40, "40 ms cushion"),
+        (80, "80 ms cushion"),
+        (120, "120 ms cushion"),
+        (160, "160 ms cushion"),
+        (200, "200 ms cushion (loosest)")
     };
 
     /// <summary>The four choices, for the picker to show.</summary>

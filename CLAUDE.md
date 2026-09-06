@@ -1085,12 +1085,60 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   boundary, not the serialising, and nothing in this application's own code. It is the machine
   coming out of idle, and that is also why priority changed nothing: a priority says who runs, and
   a core that has gone to sleep has to be woken first
-- **Which answers the oldest question in this file.** The section above opens by asking why the
-  buffer here has to be twice another program's, and names two possible faults. It is neither of
-  them exactly: the wakeup is paid once per plugin per block, so it is a fixed cost per block, and
-  the only thing that makes it smaller as a share is a longer block. At 512 frames five plugins
-  cost 7.6% of the block in wakeups alone; at 2048 the same wakeups are 1.9%. **A host with the
-  plugins in its own process pays none of it**, which is the difference being compared against
+- **Which looked like the answer to the oldest question in this file, and was not.** The section
+  above opens by asking why the buffer here has to be twice another program's, and this looked
+  like the cause: the wakeup is paid once per plugin per block, so it is a fixed cost per block,
+  and the only thing that makes it smaller as a share is a longer block. At 512 frames five
+  plugins cost 7.6% of the block in wakeups alone; at 2048 the same wakeups are 1.9%. **A host
+  with the plugins in its own process pays none of it**, which is the difference being compared
+  against. All of that is true and none of it explains the buffer, which the Windows column
+  settled: see below
+- **Then it was measured on Windows, and the finding is that the bridge is ruled out rather than
+  guilty.** `docs/plugin-bridge-on-windows.md` is the column, taken on an i3-13100 on the Balanced
+  power plan with the default shared audio path, and `Assets/jinglebox.log.txt` is the run it was
+  read out of. The floor is the same finding: a socket round trip is 11.4 microseconds back to
+  back and 60 to 136 once every ten milliseconds, a factor of five to twelve, so the cost is the
+  machine coming out of idle rather than the socket, exactly as here. `afunix.sys` is about three
+  microseconds dearer than the kernel-native socket, which is nothing
+- **The crossing is twenty times cheaper there, and load is why rather than the platform.** Under
+  three busy Serum processes it is 0.06 to 0.10 ms against this machine's 1.8, on a box running at
+  33% of its block against 69% here, so nothing is queueing for a core. That confirms what the
+  Linux note already suspected, that the crossing grows with how loaded the machine is and the
+  platform is the smaller term. **And it reopens the buffer question**: three plugins at 0.10 ms
+  apiece is under three per cent of a 512 frame block, and no buffer was ever doubled for that.
+  Whatever forces the bigger buffer is still unfound
+- **Overlapping stays off by default, and the Windows run is not the argument for changing it.**
+  The mean came down 33.6% to 30.4%, the same three or four points and the same reason: one plugin
+  is the critical path, Serum 2 at 2.33 ms of round trip against Serum 2 FX's 0.47, and
+  overlapping cannot make the longest chain shorter. The blocks over budget look decisive at
+  eleven against one in three minutes and are not, since that is nearly nought against nearly
+  nought on a machine with nothing wrong with it, and the two mean ranges overlap almost
+  completely where here they barely touched. **A default is turned over on the machine the switch
+  exists for, which is one that is actually struggling**
+- **Every plugin process on Windows was declared dead thirty seconds after its last control
+  message, while alive and rendering.** `PluginProcess.Start` gives the listening socket thirty
+  seconds so a plugin that never connects cannot hold the caller for ever, which is right. **On
+  Windows a socket handed back by `Accept` carries a copy of the listening socket's options,
+  timeout included; on Linux it does not.** The audio socket had its own patience written over it
+  on the next line and the control socket did not, so a number meaning "how long to wait for a
+  plugin to turn up" silently became "how long a running plugin may go without speaking", and a
+  control socket is quiet by design since it carries knob moves rather than audio
+- Measured twice rather than reasoned about: a listener set to 12345 ms hands back an accepted
+  socket reporting 12345 ms there and nought here, and in a real session four plugin processes
+  were buried at 30.001, 30.001, 30.000 and 30.001 seconds after each one's last control message,
+  every one still alive to be closed on purpose later. The epitaph carried no exit code, because
+  the child had not exited to have one. The fix is one line,
+  `controlSocket.ReceiveTimeout = PluginBridge.WaitForEver`, and `Tests/BridgeSocketTests.cs`
+  pins that waiting for ever is nought, that the inheritance really is what each platform does,
+  and that a link saying nothing for longer than the listener's patience is still there when it
+  speaks
+- **Worth keeping for the shape rather than the fault, and it is the shape this file keeps
+  naming.** A socket option set in the right place for the right reason, inherited somewhere
+  nobody looked, on one platform only. From a chair it is every plugin crashing at once. And the
+  run that caught it was the long one: twenty seconds would have passed cleanly, produced a
+  plausible column for the table, and left the cliff under every number in it. What to ask of the
+  next platform this is carried to is what else is inherited, defaulted or assumed there that was
+  set once here and never looked at again
 - Three ways out, and none of them is a change to the bridge's own code. The blocks can be made
   longer, which works today and is what the buffer slider already does. The machine's idle
   governor can be told not to go so deep, which is what every Linux audio guide says and is
@@ -1110,10 +1158,11 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   their own busses and nothing on one reads the other, so those really are independent. The mixer
   begins every track, then drives rounds: each round collects what was outstanding and asks for
   whatever is next, so at any moment every track has one crossing in flight
-- Both places a crossing happens go through it: the plugin instruments in `RenderBusses` and the
-  insert chains in `ApplyInserts`. **Not one sample changes**, and that is checked rather than
-  argued: `Tests/OverlappedMixerTests.cs` renders the same three tracks both ways and compares the
-  block sample for sample. It also pins the interleaving, since **a run that collected each track
+- Both places a crossing happens go through it, the plugin instruments and the insert chains, and
+  they are one walk rather than two phases: see `TrackMixer.RunTracks` and the finding below that
+  made the phases go. **Not one sample changes**, and that is checked rather than argued:
+  `Tests/OverlappedMixerTests.cs` renders the same three tracks both ways and compares the block
+  sample for sample. It also pins the interleaving, since **a run that collected each track
   before starting the next would leave an identical block and save nothing whatever**, which is a
   change that passes every test about audio and does not work
 - `PluginProcess.Render` is now `Ask` and `Collect` with the old name calling both, so the
@@ -1717,7 +1766,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-1814 of them, in about twenty five seconds, with no window and no hardware. They run in CI on every push
+1826 of them, in about twenty five seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -2875,6 +2924,30 @@ whole exercise and is worth writing down rather than summarising:
   the patch, the kit and the shape are held by reference by the panel's own view models
 - SETTINGS aside, the tracker's song bar has Cancel changes: read the song back off disc as it
   was last saved, asked first, dead unless there is both a saved copy and something to lose
+- **And it stopped a song that was playing, for no reason anybody watching could see.** It went
+  through `Adopt`, which is opening a song: a fresh object swapped in, the plugins put down and
+  loaded again, the playhead sent to the top. `RunClock` takes the song and the sequencer once
+  at the top of a pass and keeps them, so a new object really does mean a new pass, and the
+  stop was honest about what `Adopt` does rather than about what cancelling is. **Cancelling is
+  an undo taken all the way back to the file**, which this codebase already had the shape for:
+  `Restore` pours the file's contents into the song that is open, exactly as `Pour` pours a
+  history step in, so the player, the mixer, the panels and the tracker go on holding the object
+  they already hold and nobody has to be told. The transport is left running and the playhead is
+  left where it was
+- The chains are made to agree only where they differ, since rebuilding one is seconds a plugin
+  and most cancels change none, and a plugin instrument keeps its process wherever the track
+  still names the same id, since the players are held by track and matched by id. What `Restore`
+  does that an undo does not is empty the history and mark the song clean, which is the point of
+  the button, and drop the copy kept for a crash. The cursor is held inside what came back rather
+  than sent to the top: the file may hold a shorter pattern than the work being thrown away, and
+  moving somebody's cursor is not part of what they asked for
+- `Tests/CancelChangesTests.cs` is the four facts under it, and the last of them is the one that
+  fails if the button ever goes back to opening the song. A running pass follows the contents of
+  the object it was started on, which is why pouring works; it does **not** follow a different
+  object handed to `Use`, which is why it has to be a pour; pouring keeps the object everything
+  is holding; and cancelling over a real tracker with the clock running leaves it running. The
+  dialog is not in any of them, since asking needs a window and the asking was never what was
+  wrong
 - **Unsaved work is two buttons and therefore two colours.** Coloured rather than starred,
   because a star is a character somebody has to know the meaning of and it moves the button's
   width as it comes and goes, where a colour is read from across the room. `Color.Save` is
@@ -4026,6 +4099,58 @@ whole exercise and is worth writing down rather than summarising:
   really on is read back afterwards and the mix is resampled into it through
   `BassAsio.ChannelSetRate`. The alternative is a stream pulled at a rate it was not made at, which
   is the whole song playing sharp with nothing anywhere saying why
+- **A song stuttering was read out of the log rather than guessed at, and the line naming it had
+  been there all along.** Moog: three tracks of ours and three bridged plugins, reported as hiccups
+  and grumbles. `the cushion ran dry: N frame(s) of silence so far` appears 33 times in five
+  minutes and reaches 24403 frames, which is half a second of literal silence handed to the sound
+  card in fragments. **That is the symptom, and it is not the same thing as a block going over its
+  budget**: a block over budget eats the cushion, and only a cushion that empties is a gap
+- What the block was spent on is somebody else's arithmetic and nothing of ours. One to four
+  voices in the mixer, and:
+
+  | | round trip | its own side | its worst |
+  |---|---|---|---|
+  | Vital, the instrument on track 3 | 4.1 ms | 2.4 to 4.1 ms | 12.8 ms |
+  | Serum 2 FX, an insert on track 2 | 1.8 ms | 1.3 to 1.8 ms | 4.7 ms |
+  | ZamDelay, an insert on track 0 | 0.14 ms | 0.05 ms | 0.15 ms |
+
+- Six of the 11.6 ms a 512 frame chunk has, run one after another, which is the 43 to 66% mean the
+  render line reports. **Vital alone reaches 12.8 ms, which is longer than the whole block**, and
+  the worst whole chunk measured is 489%, or 57 ms
+- **The cushion was 40 ms and 40 was the largest the picker offered, while `MostAheadMs` is 200.**
+  A cushion is drained by one long block, so the size to choose it against is the worst rather than
+  the mean: 40 ms cannot absorb 57. So the fault was not the cushion setting, it was that the
+  choices stopped a long way under what the engine allows, and the log's own advice, that a bigger
+  one in SETTINGS is what this is asking for, could not be taken. 80, 120, 160 and 200 are on the
+  picker now. Nothing anybody has changes, since a row is only what the settings already name
+- **Overlapping bought almost nothing on that song, and why is the interesting half.**
+  `TrackMixer.Render` ran `RenderBusses` to its end and then `ApplyInserts`, so each phase could
+  only overlap within itself. Vital is a bus and was alone in that phase; ZamDelay and Serum are
+  inserts on two tracks, so those two did overlap and saved the smaller of them, 0.15 ms of 11.6.
+  **The two crossings worth overlapping were on opposite sides of the phase boundary and waited
+  for each other for no reason**, which is a shape the switch could not reach however it was set
+- **So the phases went and the mixer is a per track pipeline.** `RunTracks` walks the tracks once:
+  a track's instrument is begun, and a track that has no instrument or whose instrument has come
+  back goes straight on to its own voices and its own insert while another track's instrument is
+  still out. The block is the longest single track rather than the sum of everything on it, which
+  on Moog is about 4.1 ms against 6.1
+- **One track is three things in order and two tracks are in no order at all**, which is the whole
+  of what it is arranged around. A plugin instrument fills its track's bus rather than adding to
+  it, so the voices land on top of what it played and the insert reads the two together; nothing
+  on one track reads another. `PrepareBusses` is what a bus holds before any of that, and it
+  finishes the loose bus outright, since an audition belongs to no track and nothing downstream
+  touches it
+- **The voices are threaded onto a chain per track and appended at the tail**, which is the one
+  place in this where the easy way is wrong. Pushing at the head plays a track's voices backwards,
+  and adding floating point numbers is not associative, so the mix would differ in the last few
+  digits. `A_chord_on_one_track_keeps_the_order_the_notes_were_taken` is that, and **it takes three
+  notes**: two floats added are the same either way round, so the test was written with two first
+  and passed happily with the chain built backwards
+- Four tests hold the shape and each was checked by breaking the thing it is about: an instrument
+  on one track and an insert on another are in flight together, which fails under the phases; the
+  voices are played after the instrument and before the insert; the block is the same sample for
+  sample with an instrument in the mix, which the old identity test had none of; and the chord's
+  order
 - **A buffer that has to be twice another program's is one of two faults and they want opposite
   answers**, and from a chair the two are the same stutter. Either the mixing is genuinely
   expensive, in which case the block is nearly all used up and the work has to get cheaper, or it is

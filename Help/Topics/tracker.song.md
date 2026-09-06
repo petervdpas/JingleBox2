@@ -20,6 +20,11 @@ Both buttons colour when there is something on screen that is not on disc: green
 the safe one and warm on the other, since the moment saving starts asking to be
 pressed is the moment discarding starts being able to cost you an afternoon.
 
+Cancelling does not stop the transport. It is an undo taken all the way back to the
+file rather than a different song being opened, so a song that was playing goes on
+playing, from the line it had reached, on whatever came back off disc. What it does
+throw away is what you have undone and redone: the history goes with the changes.
+
 ## Recordings a song uses
 
 A recording that lives in the application folder is written down by name rather than

@@ -31,6 +31,14 @@ thread that has milliseconds to fill a buffer. A cushion moves that work onto a 
 of its own, so a plugin being late eats into the queue instead of into the output, and
 it costs exactly what it says between playing a note and hearing it.
 
+Pick it against the worst block rather than the usual one, because one long block is
+what empties a cushion and what empties it is a gap in the sound. A song with two or
+three heavy plugins on it can take four or five times the length of one block now and
+then, so a cushion the size of the average is a cushion that runs out. When it does,
+the log says so in as many words: **the cushion ran dry**, with how much silence has
+gone out so far. That line is the one to look for when the sound breaks up in a way
+that comes and goes.
+
 Those four take effect at once: the output is closed and opened again as you change
 them, so the right value can be found by listening rather than by restarting between
 guesses.

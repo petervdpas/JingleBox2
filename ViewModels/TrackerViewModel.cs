@@ -79,6 +79,15 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>The clock, the mixer and everything that makes a sound. One per tracker.</summary>
     private readonly TrackerPlayer _player;
 
+    /// <summary>The transport itself, for a test that has to see what the clock is doing.</summary>
+    /// <remarks>
+    /// Internal and read only. What the pages read is <see cref="Transport"/>, which follows the
+    /// player through the drawing thread and so says nothing at all where there is no window to
+    /// pump it, and a test asking whether cancelling changes stopped the transport has to ask
+    /// the thing that would have been stopped rather than the picture of it.
+    /// </remarks>
+    internal ITrackerPlayer Player => _player;
+
     /// <summary>The songs folder, and the reading and writing of a song file.</summary>
     private readonly SongStore _store;
 
@@ -1554,7 +1563,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public IAsyncRelayCommand RevertSongCommand => new AsyncRelayCommand(RevertSong);
 
     /// <summary>
-    /// Asks, then reads the song back off disc and adopts it as though it had just been opened.
+    /// Asks, then reads the song back off disc and pours it into the one that is open.
     /// </summary>
     /// <remarks>
     /// A song that will not read is reported and nothing is changed, rather than the open song
@@ -1584,7 +1593,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             return;
         }
 
-        Adopt(loaded, name);
+        Restore(loaded);
 
         if (arrived.Count > 0) RecordingsArrived?.Invoke(this, EventArgs.Empty);
 
@@ -4171,6 +4180,85 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         OnPropertyChanged(nameof(PlayMode));
         OnPropertyChanged(nameof(QuantizeChoices));
         OnPropertyChanged(nameof(TrackCount));
+    }
+
+    /// <summary>
+    /// Pours a song read back off disc into the one that is open, which is Cancel changes.
+    /// </summary>
+    /// <remarks>
+    /// Into rather than instead of, which is <see cref="Pour"/>'s reasoning and the whole of
+    /// what separates this from <see cref="Adopt"/>. Cancel changes is an undo taken all the
+    /// way back to the file rather than a different song being opened, so the player, the
+    /// mixer, the panels and this view model go on holding the object they already hold, and
+    /// the transport is left running.
+    ///
+    /// Adopting a fresh object could not do that. A pass is bound to the song it was started
+    /// on, since <c>RunClock</c> takes the song and the sequencer once at the top, so a new
+    /// object meant stopping the clock, and cancelling a change silenced a song that was
+    /// playing for no reason anybody watching could see.
+    ///
+    /// The chains are made to agree only where they differ, the same as an undo and for the
+    /// same reason, since rebuilding one is seconds a plugin. A plugin instrument keeps its
+    /// process wherever the track still names the same id, because the players are held by
+    /// track and matched by id, and is started again where it does not; they are asked for
+    /// here rather than left to the first note that wants one, so a plugin the file brings
+    /// back does not stall the bar it arrives on.
+    ///
+    /// What it does that an undo does not is throw the history away and mark the song clean,
+    /// which is the point of the button, and drop the copy kept for a crash, since there is
+    /// nothing unsaved left for that to rescue.
+    ///
+    /// The cursor is held inside what came back rather than sent to the top: the file may hold
+    /// a shorter pattern or fewer tracks than the work being thrown away, and moving somebody's
+    /// cursor is not part of what they asked for.
+    /// </remarks>
+    internal void Restore(Song fromDisc)
+    {
+        TrackEffect.Target = null;
+
+        fromDisc.Normalize();
+
+        Song.TakeFrom(fromDisc);
+
+        var rebuilt = _player.MatchChains(Song);
+
+        if (rebuilt.Count > 0)
+            Log.Write(LogArea.Plugins, () =>
+                "cancel changes: " + rebuilt.Count + " track(s) had their inserts built again");
+
+        History.Forget();
+
+        Octave = Math.Clamp(Song.KeyboardOctave, 0, 9);
+
+        SyncInstruments();
+        RefreshStrips();
+
+        _player.PreloadPlugins(Song);
+
+        RefreshOrder();
+
+        if (Song.Order.Count > 0) OrderIndex = Math.Clamp(OrderIndex, 0, Song.Order.Count - 1);
+
+        CurrentPattern = Song.PatternAt(OrderIndex) ?? Song.PatternAt(0);
+        Cursor = Cursor.Clamp(CurrentPattern?.Lines ?? 0, Song.TrackCount);
+
+        PointEffectSlot();
+
+        IsDirty = false;
+
+        Drop();
+
+        _player.Mode = Song.PlayMode;
+        _player.Loop = Song.Looping;
+
+        OnPropertyChanged(nameof(Song));
+        OnPropertyChanged(nameof(Bpm));
+        OnPropertyChanged(nameof(LinesPerBeat));
+        OnPropertyChanged(nameof(LoopPlayback));
+        OnPropertyChanged(nameof(PlayMode));
+        OnPropertyChanged(nameof(QuantizeChoices));
+        OnPropertyChanged(nameof(TrackCount));
+        OnPropertyChanged(nameof(PatternLines));
     }
 
     /// <summary>
