@@ -123,23 +123,14 @@ public interface IAudioEngine : IDisposable
     float GetPadChannelVolume(int padIndex);
 
     /// <summary>
-    /// Everything this application plays, summed, or a bus that is not open where the switch is
-    /// off. See <see cref="IOutputBus"/>.
-    /// </summary>
-    IOutputBus Output { get; }
-
-    /// <summary>
-    /// Opens the device that is already open, again.
+    /// Everything this application plays, summed. See <see cref="IOutputBus"/>.
     /// </summary>
     /// <remarks>
-    /// For a change to how the output is opened rather than to which output it is, which is what
-    /// turning the bus on or off is. <see cref="SetOutputDevice"/> deliberately does nothing when
-    /// handed the device it already has, so it cannot serve here.
-    ///
-    /// Nothing at all before any device has been opened, since the first one opened reads the new
-    /// answer anyway.
+    /// The only way out. A pad, a take being auditioned and the tracker are all sources on it,
+    /// so a machine where it cannot be opened is one where nothing can be played, which is said
+    /// out loud when the device is opened rather than answered with a second path.
     /// </remarks>
-    void ReopenOutput();
+    IOutputBus Output { get; }
 
     /// <summary>
     /// The pads' own bus, which is one source on <see cref="Output"/> however many pads are down.

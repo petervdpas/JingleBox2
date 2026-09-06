@@ -1052,9 +1052,13 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// Says whether soloing is possible, which is only while everything is on one bus.
     /// </summary>
     /// <remarks>
-    /// Called when the output is opened again, which is what ticking the setting does, and once at
-    /// startup. A solo that was on when the bus went away is dropped rather than left standing:
-    /// the button would be lit and nothing would be soloed.
+    /// A solo is worked out by the bus, so it can only be offered where the bus really opened. It
+    /// always does, since the bus is the only path a source has and a machine without BASSmix says
+    /// so rather than playing the pads another way; asked all the same, because the button is lit
+    /// by it and a lit button that solos nothing is worse than a grey one.
+    ///
+    /// Said at startup and again whenever the output is opened, which is picking another device. A
+    /// solo that was on when the bus went away is dropped rather than left standing.
     /// </remarks>
     private void SaySoloable()
     {
@@ -1144,32 +1148,6 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// every plugin that has been told what it is fed at are all built from it.
     /// </remarks>
     private void ApplyAudioSizes() => Tracker.ApplyAudioSizes(Sizes, _cfg.RenderAheadMs);
-
-    /// <summary>
-    /// Opens the sound card again, which is what makes a change to the bus take effect now.
-    /// </summary>
-    /// <remarks>
-    /// The device rather than the tracker's stream, unlike <see cref="ApplyAudioSizes"/>: the bus
-    /// is made when a device is opened, so restarting the stream alone would put it back on
-    /// whichever arrangement was there before.
-    ///
-    /// A card that will not reopen is swallowed here the way it is everywhere else on this page:
-    /// it has already said so in the log, and a settings page can do nothing about it.
-    /// </remarks>
-    private void ReopenDevice()
-    {
-        try
-        {
-            _audio.ReopenOutput();
-
-            Tracker.ReopenAudio();
-        }
-        catch (Exception)
-        {
-        }
-
-        SaySoloable();
-    }
 
     /// <summary>
     /// What the slider is on: the size, and the latency it comes to.
@@ -2388,6 +2366,8 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
                 Tracker.ReopenAudio();
 
                 SaySoloable();
+
+                Record.OutputMoved();
 
                 OnPropertyChanged(nameof(DrivenHint));
                 OnPropertyChanged(nameof(OutputSizesHint));

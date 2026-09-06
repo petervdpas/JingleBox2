@@ -47,14 +47,13 @@
                             IsChecked="{Binding Mute}"
                             ToolTip.Tip="Silence this, leaving its fader where it is." />
 
-              <!-- Grey rather than gone while there is no bus: a solo is worked out by the bus,
-                   which is the only thing that knows every source, so with one output stream off
-                   there is nothing to pause the others with. Left in place so the strip does not
-                   change shape when the setting moves. -->
+              <!-- Grey rather than gone where there is no bus: a solo is worked out by the bus,
+                   which is the only thing that knows every source, so without one there is nothing
+                   to pause the others with. Left in place so the strip does not change shape. -->
               <ToggleButton Classes="strip" Content="S"
                             IsEnabled="{Binding CanSolo}"
                             IsChecked="{Binding Solo}"
-                            ToolTip.Tip="Hear only this. Needs One output stream in SETTINGS, since a solo silences everything else and only the one bus knows what everything else is." />
+                            ToolTip.Tip="Hear only this." />
           </StackPanel>
 
           <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8"

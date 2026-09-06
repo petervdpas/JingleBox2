@@ -4329,6 +4329,30 @@ whole exercise and is worth writing down rather than summarising:
   on, and a pad catches and puts the message on itself: better than pads that play a different
   way and lose solo, pan, mute and ASIO in silence. `SaySoloable` already asked `Output.IsOpen`
   rather than the switch, so it needed nothing
+- **What the switch left behind was a whole seam, and no warning would have found it.**
+  `IAudioEngine.ReopenOutput` and `BassAudioEngine.ReopenOutput` existed for one caller,
+  `MainViewModel.ReopenDevice`, which existed for one tick: opening the device again is what made
+  a change to how it is opened take effect now, and there is no such change left. The tick went
+  and the private method under it stayed, since **an unused private method is not a warning**, and
+  from there the interface member under that read as part of the contract. Gone, both doubles in
+  the tests with it. Reopening the device is still what picking another one does, through
+  `SetOutputDevice`, which is the only reason to do it
+- Three sentences went with them, and each said the tick was still there: the `Output` property's
+  own summary offered "a bus that is not open where the switch is off", `SourceStripViewModel.CanSolo`
+  said soloing was possible "only while there is one output stream", and the solo button's tooltip
+  on the mixer told somebody to go and tick One output stream in SETTINGS, which is **help text
+  naming a setting that does not exist**. `CanSolo` is still asked and still right: it is on in
+  every ordinary run and false only where the bus could not be opened at all
+- **Taking a source aside is put back when the output moves.** "Only here" unplugs somebody else's
+  program from its own output on the promise that it is heard through this application instead,
+  and where here comes out is the output in SETTINGS: pick another and the arrangement stands over
+  a device nobody is listening to, with the source still unplugged. Worse where the new output is
+  the one the source was taken off or the one it was sent to. `RecordViewModel.OutputMoved` puts it
+  back rather than carrying it over, which is the rule the switch already keeps at the other
+  moment: it reaches out of the application and quiets another program, so it goes on only when
+  somebody says so. Said on the status line and in the log, since a switch that turns itself off
+  with nothing saying why reads as one that does not stay put, and it does nothing whatever where
+  nothing was aside, which is every ordinary run
 - **The way that went stale is the one this file keeps warning about.** The note was written when
   it was true, the bus was built afterwards, and nothing made the two meet: a paragraph describing
   work still to do outlives the work. It cost a reading of this codebase that recommended building

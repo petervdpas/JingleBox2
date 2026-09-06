@@ -50,8 +50,6 @@ public class CancelChangesTests
         /// <inheritdoc/>
         public void SetOutputDevice(int deviceId) { }
         /// <inheritdoc/>
-        public void ReopenOutput() { }
-        /// <inheritdoc/>
         public void EnsureInitialized() { }
         /// <inheritdoc/>
         public event EventHandler<PadPlaybackChanged>? PadPlaybackChanged { add { } remove { } }

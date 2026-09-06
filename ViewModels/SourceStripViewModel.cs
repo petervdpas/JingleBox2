@@ -174,13 +174,16 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
     private bool canSolo;
 
     /// <summary>
-    /// Whether soloing is possible at all, which is only while there is one output stream.
+    /// Whether soloing is possible at all, which is only while the output bus is really open.
     /// </summary>
     /// <remarks>
-    /// A solo is worked out by the bus, so with the bus off there is nothing that knows every
-    /// source and nothing that could pause the others. The button is left where it is and goes
-    /// grey rather than coming and going: a control that vanishes takes the strip's layout with
-    /// it, and one that is dark and says why is the same answer without the movement.
+    /// A solo is worked out by the bus, so without one there is nothing that knows every source
+    /// and nothing that could pause the others. The button is left where it is and goes grey
+    /// rather than coming and going: a control that vanishes takes the strip's layout with it.
+    ///
+    /// It is on in every ordinary run, since the bus is the only path a source has. What it is
+    /// still asked for is the machine where the bus could not be opened at all, which is one
+    /// without BASSmix beside the program.
     /// </remarks>
     public bool CanSolo
     {

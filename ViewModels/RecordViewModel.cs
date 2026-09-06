@@ -1951,6 +1951,39 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             Status = $"{source.Display} could not be taken off its own output.";
     }
 
+    /// <summary>
+    /// Puts a source that was taken aside back, and says so.
+    /// </summary>
+    /// <remarks>
+    /// **Where the sound comes out is half of what taking a source aside means.** The switch says
+    /// this is heard through JingleBox2 and nowhere else, and what "here" is, is the output in
+    /// SETTINGS: picked another one and the arrangement somebody set up is over a device they
+    /// were not listening to, with the source still unplugged from its own. Worse where the new
+    /// output is the one the source was taken off or the one it was sent to, which is a source
+    /// silenced into the very thing it is being played back through.
+    ///
+    /// So it is put back rather than followed. Following would mean deciding on somebody's behalf
+    /// that the arrangement still holds, and this one reaches out of the application and quiets
+    /// another program: the rule the switch already keeps is that it goes on only when somebody
+    /// says so, and this is that rule at the other moment.
+    ///
+    /// Said on the status line, because a switch that turns itself off with nothing anywhere
+    /// saying why reads as a switch that does not stay put. Nothing at all where it was never on,
+    /// so picking a device on an ordinary machine is silent.
+    /// </remarks>
+    public void OutputMoved()
+    {
+        if (!TakeAside) return;
+
+        TakeAside = false;
+
+        Status = "The source was put back, since the output changed.";
+
+        Diagnostics.Log.Write(
+            Diagnostics.Enums.LogArea.Audio,
+            () => "routing: the output moved, so the source was put back on its own");
+    }
+
     /// <summary>Whether the first reading of the graph has already been answered.</summary>
     /// <remarks>
     /// Once a session and not once a reading, so a source somebody chose is never overruled and

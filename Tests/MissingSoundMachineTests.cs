@@ -42,8 +42,6 @@ public class MissingSoundMachineTests
         /// <inheritdoc/>
         public void SetOutputDevice(int deviceId) => throw Asked();
         /// <inheritdoc/>
-        public void ReopenOutput() => throw Asked();
-        /// <inheritdoc/>
         public void EnsureInitialized() => throw Asked();
         /// <inheritdoc/>
         public event EventHandler<PadPlaybackChanged>? PadPlaybackChanged { add { } remove { } }
