@@ -46,13 +46,23 @@ public partial class MixerView : UserControl
         {
             _meters.Start();
 
+            // The IN strip's meter is what the recorder is hearing, so this page is a reason to
+            // have the input open exactly as RECORD is. Without it the strip drew a meter that
+            // never moved: the input was closed, so the reading really was nought and the meter
+            // was reporting the truth. See IInputWatch.
+            Input?.Watch();
+
             // The button that takes the page out has nothing to offer once the page is out. It is
             // hidden rather than left to do nothing, and the way back is the window's own frame,
             // which every window already has in the corner this button would be near.
             DetachButton.IsVisible = this.FindAncestorOfType<DetachedWindow>() == null;
         };
 
-        DetachedFromVisualTree += (_, _) => _meters.Stop();
+        DetachedFromVisualTree += (_, _) =>
+        {
+            _meters.Stop();
+            Input?.LetGo();
+        };
     }
 
     /// <summary>
@@ -77,6 +87,24 @@ public partial class MixerView : UserControl
         (RecorderInput as ViewModels.SourceStripViewModel)?.ReadMeter();
         (RecorderPlay as ViewModels.SourceStripViewModel)?.ReadMeter();
         (PadsStrip as ViewModels.SourceStripViewModel)?.ReadMeter();
+    }
+
+    /// <summary><inheritdoc cref="Input" path="/summary"/></summary>
+    public static readonly StyledProperty<ViewModels.Interfaces.IInputWatch?> InputProperty =
+        AvaloniaProperty.Register<MixerView, ViewModels.Interfaces.IInputWatch?>(nameof(Input));
+
+    /// <summary>
+    /// Who to tell that this page is showing the input's meter.
+    /// </summary>
+    /// <remarks>
+    /// Handed in the way the three strips are and for the same reason: this page is bound to the
+    /// song, and the recording input belongs to the application rather than to any song. A page
+    /// built without one simply does not hold the input open, which is what it did before.
+    /// </remarks>
+    public ViewModels.Interfaces.IInputWatch? Input
+    {
+        get => GetValue(InputProperty);
+        set => SetValue(InputProperty, value);
     }
 
     /// <summary>

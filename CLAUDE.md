@@ -1766,7 +1766,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-1866 of them, in about twenty five seconds, with no window and no hardware. They run in CI on every push
+1872 of them, in about twenty five seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -3061,6 +3061,27 @@ whole exercise and is worth writing down rather than summarising:
   and a second instance is not sandboxed by pointing it at another settings folder.** The graph
   is shared, the node name is the only identity, and `pw-link -i | grep -i jingle` is what says
   whether anything is left behind
+
+- **The mixer's IN strip drew a meter that never moved, and nothing was broken.** Its reading is
+  `Record.LevelLeft`/`Right`, the input was opened only while RECORD was the page in front, and
+  with the capture closed that reading really is nought: the meter was reporting the truth about
+  an input nobody was listening to. The fader still worked, since a gain is a stored number
+  rather than something measured, which is what made it look like a broken meter beside a
+  working fader
+- `IInputWatch` is the answer and it is **counted rather than switched**: two pages show that
+  meter, either is reason enough to have the input open, and a flag would have whichever page
+  left last close it under the one still up. The delay before it really closes lives there too,
+  since a theme swap detaches a page and puts it straight back, and closing in between loses the
+  routing every time: the system wires a new capture stream to its own default
+- **Watching the input and reading the audio graph are two things, and only RECORD does the
+  second.** Reading the routes puts the preferred one back when the system has wired something
+  else up, which is rewiring the machine's graph, and a page with no route picker on it has no
+  business doing that every two seconds. `WatchRoutes` is RECORD's alone
+- `Tests/InputWatchTests.cs` is the count, and the two that earn it are one page leaving not
+  closing the input under the other, and a page that comes straight back keeping it. The second
+  caught the double rather than the code: an input already open is left alone, exactly as
+  `StartMonitoring` answers at once where it is already listening, and without that a
+  re-template would reopen the capture and lose the routing
 
 - **A take is not on the shelf until somebody names it, and the scratchpad is where it waits.**
   Pressing Record used to write straight into the recordings folder under whatever the name box

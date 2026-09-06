@@ -38,7 +38,7 @@ namespace JingleBox2.ViewModels;
 /// anybody wanted it. Only this session's deletions are offered back: putting back a take from
 /// last week is a filing cabinet, not undo.
 /// </remarks>
-public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, Shortcuts.Interfaces.IShortcutContext
+public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, IInputWatch, Shortcuts.Interfaces.IShortcutContext
 {
     /// <summary>The one door recordings come in through. Holds nothing, so one is enough.</summary>
     private readonly IRecordingImport _import = new RecordingImport();
@@ -1898,24 +1898,37 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         }
     }
 
+    /// <summary>How many pages showing the input's meter are on screen.</summary>
+    private int _watching;
+
+    /// <summary>Started when the last watcher goes, so a re-template does not close the input.</summary>
+    /// <remarks><inheritdoc cref="IInputWatch.LetGo" path="/remarks"/></remarks>
+    private DispatcherTimer? _closingInput;
+
     /// <summary>
-    /// Watches the input's level without keeping any of it, so the meter is live while a gain
-    /// is being set. Called when the RECORD page comes up.
+    /// How long a departure has to last before the input is really let go of. A second is long
+    /// enough to outlast a re-template and short enough that nobody is left holding the
+    /// microphone after they have walked away.
     /// </summary>
+    private static readonly TimeSpan InputCloseDelay = TimeSpan.FromSeconds(1);
+
+    /// <inheritdoc/>
     /// <remarks>
-    /// The routes are read after the input is open and not before, because the recorder only
-    /// appears in the graph once it is listening: reading first would show a graph with nothing
-    /// to connect to.
+    /// The second watcher and every one after it costs a comparison: the input is already open
+    /// and opening it again would close and reopen the capture, which is where the routing is
+    /// lost.
     /// </remarks>
-    public void StartInputMonitoring()
+    public void Watch()
     {
+        _watching++;
+        _closingInput?.Stop();
+
+        if (_watching > 1) return;
+
         try
         {
             _recordingService.StartMonitoring();
             StartLevelPolling();
-
-            RefreshRoutes();
-            StartRouteWatch();
         }
         catch (Exception ex)
         {
@@ -1923,14 +1936,45 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         }
     }
 
-    /// <summary>Stops watching, unless a take is running, which keeps the input open anyway.</summary>
-    public void StopInputMonitoring()
+    /// <inheritdoc/>
+    public void LetGo()
+    {
+        if (_watching > 0) _watching--;
+        if (_watching > 0) return;
+
+        _closingInput ??= Closing();
+
+        _closingInput.Stop();
+        _closingInput.Start();
+    }
+
+    /// <summary>The clock that lets the input go, made once so it carries one handler.</summary>
+    /// <remarks>
+    /// Hung here rather than at each departure, because a handler added per call is a handler
+    /// added per departure and the input would be closed as many times as the page had been
+    /// left. That is the shape this codebase has already paid for elsewhere.
+    /// </remarks>
+    private DispatcherTimer Closing()
+    {
+        var timer = new DispatcherTimer { Interval = InputCloseDelay };
+
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+
+            if (_watching == 0) CloseInput();
+        };
+
+        return timer;
+    }
+
+    /// <summary>Lets the input go, unless a take is running, which keeps it open anyway.</summary>
+    private void CloseInput()
     {
         _recordingService.StopMonitoring();
 
         if (_recordingService.IsRecording) return;
 
-        StopRouteWatch();
         StopLevelPolling();
 
         Level = 0;
@@ -1938,6 +1982,28 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         LevelRight = 0;
         IsClipping = false;
     }
+
+    /// <summary>
+    /// Reads the audio graph and keeps reading it, which is RECORD's alone.
+    /// </summary>
+    /// <remarks>
+    /// **Deliberately not part of watching the input**, although it needs the input open. Reading
+    /// the routes puts the preferred one back when the system has wired something else up, which
+    /// is rewiring the machine's audio graph, and a page with no route picker on it has no
+    /// business doing that every two seconds. The mixer watches the meter and nothing else.
+    ///
+    /// The routes are read after the input is open and not before, because the recorder only
+    /// appears in the graph once it is listening: reading first would show a graph with nothing
+    /// to connect to.
+    /// </remarks>
+    public void WatchRoutes()
+    {
+        RefreshRoutes();
+        StartRouteWatch();
+    }
+
+    /// <summary>Stops reading the graph, for a page that has gone.</summary>
+    public void LetRoutesGo() => StopRouteWatch();
 
     /// <summary>
     /// One poll for both jobs. It runs while the input is open, for a take or for the meter,

@@ -2,7 +2,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
-using Avalonia.Threading;
 using JingleBox2.Audio;
 using JingleBox2.ViewModels;
 using System;
@@ -25,12 +24,14 @@ public partial class RecordView : UserControl
     private readonly IRecordingImport _import = new RecordingImport();
 
     /// <summary>
-    /// The view model currently holding the input open, which is nothing while the page is not
-    /// on screen: the input follows whether anybody is looking at this page, and it is let go of
-    /// on the way out because holding a capture device open for a tab nobody is watching is rude
-    /// to whatever else wants the microphone.
+    /// The view model this page is currently watching the input on, or none.
     /// </summary>
-    private RecordViewModel? _monitoring;
+    /// <remarks>
+    /// Kept so the page lets go of exactly what it took hold of. The counting, the delay before
+    /// the input really closes, and the fact that the mixer holds it too are all
+    /// <see cref="ViewModels.Interfaces.IInputWatch"/>'s: this end only says whether this page is looking.
+    /// </remarks>
+    private RecordViewModel? _watching;
 
     /// <summary>Whether the page is up, which is what decides whether the input is held open.</summary>
     private bool _onScreen;
@@ -53,21 +54,6 @@ public partial class RecordView : UserControl
     }
 
     /// <summary>
-    /// A theme swap and other re-templating detach this page and put it straight back. Closing
-    /// the input on the way out and opening it again on the way in would lose the routing every
-    /// time, since the system wires a new capture stream to its own default, so a departure has
-    /// to prove itself before the input is let go.
-    /// </summary>
-    private DispatcherTimer? _closing;
-
-    /// <summary>
-    /// How long a departure has to last before the input is really let go of. A second is long
-    /// enough to outlast a re-template and short enough that nobody is left holding the
-    /// microphone after they have walked away from the page.
-    /// </summary>
-    private static readonly TimeSpan CloseDelay = TimeSpan.FromSeconds(1);
-
-    /// <summary>
     /// The input is watched while this page is up, so the meter reads before a take rather
     /// than only during one. It is closed again on the way out: holding a capture device open
     /// for a tab nobody is looking at is rude to whatever else wants the microphone.
@@ -81,8 +67,9 @@ public partial class RecordView : UserControl
     }
 
     /// <summary>
-    /// Leaving the page starts the clock on letting the input go, rather than closing it there
-    /// and then. See <see cref="_closing"/> for why the departure has to prove itself.
+    /// Leaving the page says so and no more. Whether the input really closes, and how long a
+    /// departure has to last before it does, is
+    /// <see cref="ViewModels.Interfaces.IInputWatch.LetGo"/>'s.
     /// </summary>
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -104,38 +91,21 @@ public partial class RecordView : UserControl
     {
         var vm = DataContext as RecordViewModel;
 
-        if (!ReferenceEquals(_monitoring, vm)) _monitoring?.StopInputMonitoring();
+        if (ReferenceEquals(_watching, vm) == (_onScreen && vm != null)) return;
 
-        _monitoring = vm;
-
-        if (vm == null) return;
-
-        if (_onScreen)
+        if (_watching != null)
         {
-            _closing?.Stop();
-            vm.StartInputMonitoring();
-            return;
+            _watching.LetRoutesGo();
+            _watching.LetGo();
+            _watching = null;
         }
 
-        ScheduleClose(vm);
-    }
+        if (vm == null || !_onScreen) return;
 
-    /// <summary>Lets go of the input only if the page is still gone a moment later.</summary>
-    private void ScheduleClose(RecordViewModel vm)
-    {
-        _closing ??= new DispatcherTimer { Interval = CloseDelay };
-        _closing.Stop();
+        vm.Watch();
+        vm.WatchRoutes();
 
-        void Close(object? sender, EventArgs e)
-        {
-            _closing!.Tick -= Close;
-            _closing.Stop();
-
-            if (!_onScreen) vm.StopInputMonitoring();
-        }
-
-        _closing.Tick += Close;
-        _closing.Start();
+        _watching = vm;
     }
 
     /// <summary>
