@@ -216,6 +216,18 @@ public sealed class AppConfig
     public string RecordInputDevice { get; set; } = "";
 
     /// <summary>
+    /// The effects every take is run through on its way to the shelf.
+    /// </summary>
+    /// <remarks>
+    /// One chain for the recorder rather than one per take, because it is a setup somebody leaves
+    /// standing: the microphone through a compressor and a delay is how the room is wired, and it
+    /// belongs beside <see cref="RecordGainDb"/> and <see cref="RecordInputDevice"/> rather than
+    /// in a profile. Null where nobody has put anything on it, so a settings file written before
+    /// this reads back as the empty chain it had.
+    /// </remarks>
+    public Audio.Plugins.PluginChainConfig? RecordEffects { get; set; }
+
+    /// <summary>
     /// Whether the threads that must not be late are scheduled as audio threads.
     /// </summary>
     /// <remarks>

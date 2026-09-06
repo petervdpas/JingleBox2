@@ -87,11 +87,47 @@ public interface IRecordingService
     /// <param name="maxBytes">At most this much, taken from the end.</param>
     byte[] GetRecentRecordingData(int maxBytes);
 
-    /// <summary>Writes the take to the recordings folder, at whatever rate it came in at.</summary>
-    /// <param name="fileName">The take's name, without the extension.</param>
-    /// <returns>Where it was written.</returns>
+    /// <summary>Writes the take out, at whatever rate it came in at.</summary>
+    /// <remarks>
+    /// **Into whatever folder it is told and never into the shelf's**, which is the whole of what
+    /// makes a take disposable until somebody names it: what comes off the input goes to the
+    /// scratchpad, and reaching the recordings folder is a separate act with a name in it. See
+    /// <see cref="ITakeScratch"/>.
+    ///
+    /// Both files where there is a chain on <see cref="Effect"/>, and one where there is not. The
+    /// take under the first name is the one that went through the chain, because that is the
+    /// sound somebody set a chain up to record; the capture as it arrived is written beside it
+    /// under the other name, since an effect cannot be taken off a take afterwards.
+    ///
+    /// The chain is run here rather than while the audio was arriving, and
+    /// <see cref="ITakeEffects"/> is where the reason for that is written down.
+    /// </remarks>
+    /// <param name="folder">Where to write, made if it is not there.</param>
+    /// <param name="fileName">The take's name there, without the extension.</param>
+    /// <param name="cleanName">
+    /// What to call the untouched capture, without the extension. Ignored where there is no
+    /// chain, since then it would be the same audio written twice.
+    /// </param>
+    /// <returns>Where each of them was written.</returns>
     /// <exception cref="InvalidOperationException">There is nothing to save, or it could not be written.</exception>
-    Task<string> SaveRecordingAsync(string fileName);
+    Task<SavedTake> WriteTakeAsync(string folder, string fileName, string cleanName);
+
+    /// <summary>
+    /// What every take is run through on its way to the shelf, or null to keep them as captured.
+    /// </summary>
+    /// <remarks>
+    /// Held rather than handed in per take, because it is a chain somebody built on the page and
+    /// left there: it belongs to the recorder the way the input gain does.
+    /// </remarks>
+    Plugins.Interfaces.IAudioInsert? Effect { get; set; }
+
+    /// <summary>The rate the capture is running at, which a chain has to be built for.</summary>
+    /// <remarks>
+    /// The device's own rate on the ordinary path and the output's where a loopback is being
+    /// captured, so it is only true once the input has been opened. Before that it is what the
+    /// next take will be opened at.
+    /// </remarks>
+    int SampleRate { get; }
 
     /// <summary>
     /// The output to record the playback of, or null to record from the selected input device.

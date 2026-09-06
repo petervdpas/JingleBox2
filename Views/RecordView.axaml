@@ -14,7 +14,7 @@
        eight hundred thousand pixels tall: the scrollbar is a hairline, the top cards scroll
        away as you look through the list, and the list cannot be scrolled on its own at all.
        Given a row of its own it stays the size of the window whatever the shelf holds. -->
-  <Grid RowDefinitions="Auto,Auto,*" Classes="tabRoot">
+  <Grid RowDefinitions="Auto,Auto,Auto,*" Classes="tabRoot">
 
     <!-- Recording Controls -->
       <Border Grid.Row="0" Classes="card" Margin="0,0,0,12">
@@ -38,17 +38,6 @@
                       Command="{Binding RefreshRoutesCommand}"
                       ToolTip.Tip="Programs only appear while they are playing something." />
             </Grid>
-          </StackPanel>
-
-          <StackPanel Spacing="4">
-            <TextBlock Text="Recording Name" Opacity="0.8" />
-            <TextBox Text="{Binding RecordingName}"
-                     Classes.invalid="{Binding HasNameError}" />
-            <TextBlock Text="{Binding NameError}"
-                       IsVisible="{Binding HasNameError}"
-                       Foreground="{DynamicResource DangerBrush}"
-                       FontSize="12"
-                       TextWrapping="Wrap" />
           </StackPanel>
 
           <StackPanel Orientation="Horizontal" Spacing="4">
@@ -77,6 +66,16 @@
           <views:TimeReadout Time="{Binding RecordingTime}"
                              ReadingSize="24"
                              HorizontalAlignment="Center" />
+
+          <!-- The same slot the tracker and the pads use, pointed at the recorder. What is on it
+               is applied to the take after it has been captured rather than on the way in, so a
+               plugin taking a moment cannot put a hole in the only copy of a performance, and
+               the capture as it arrived is kept beside the take whenever there is anything here.
+               See ITakeEffects. -->
+          <StackPanel Spacing="4">
+            <TextBlock Text="Record through" Opacity="0.8" />
+            <views:PluginStrip DataContext="{Binding Effect}" />
+          </StackPanel>
 
         </StackPanel>
 
@@ -109,8 +108,86 @@
         </Grid>
       </Border>
 
-      <!-- The take that is picked: its picture, and everything you can do to it. -->
+      <!-- The take that has just been made, and it is a card of its own on purpose. A take
+           nobody has named is not on the shelf: not in the list, not under the search box and
+           not filed anywhere. Here it is played, named and kept, or thrown away. See
+           ITakeScratch. -->
       <Border Grid.Row="1" Classes="card" Margin="0,0,0,12"
+              IsVisible="{Binding HasScratch}">
+        <StackPanel Classes="cardBody">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+            <TextBlock Grid.Column="0" Classes="cardTitle" Text="Scratchpad"
+                       VerticalAlignment="Center" />
+
+            <TextBlock Grid.Column="1" Opacity="0.7" FontSize="12" VerticalAlignment="Center"
+                       Text="{Binding ScratchShown.DurationMs, StringFormat='{}{0}ms'}" />
+
+            <!-- Which of the two the card is about. Only where a chain made two of them, since
+                 with nothing on the chain there is one take and a picker with one row on it is
+                 a control that says nothing. -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4"
+                        VerticalAlignment="Center"
+                        IsVisible="{Binding ScratchHasClean}">
+              <RadioButton Content="Through the chain" GroupName="scratchVersion"
+                           IsChecked="{Binding !ScratchShowsClean}" />
+              <RadioButton Content="Clean" GroupName="scratchVersion" Margin="8,0,0,0"
+                           IsChecked="{Binding ScratchShowsClean}" />
+            </StackPanel>
+          </Grid>
+
+          <Border Background="{DynamicResource BgBrush}"
+                  BorderBrush="{DynamicResource BorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="4">
+            <ui:WaveformView Height="120"
+                             Peaks="{Binding ScratchWaveform.PeakData}"
+                             Playhead="{Binding ScratchPlayhead}"
+                             ShowMarkers="False"
+                             ShowLoop="False"
+                             Placeholder="Nothing recorded yet" />
+          </Border>
+
+          <!-- The name and the two answers. The name box lives here rather than over the Record
+               button because naming is what saving is: nothing is written under a name until
+               this is pressed, and until then the take is disposable. -->
+          <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="6">
+            <Button Grid.Column="0" Content="▶" MinWidth="36" Padding="6,5" FontSize="12"
+                    IsEnabled="{Binding !ScratchShown.IsPlaying}"
+                    Command="{Binding PlayRecordingCommand}"
+                    CommandParameter="{Binding ScratchShown}"
+                    ToolTip.Tip="Play what was just recorded" />
+            <Button Grid.Column="1" Content="■" MinWidth="36" Padding="6,5" FontSize="12"
+                    IsEnabled="{Binding ScratchShown.IsPlaying}"
+                    Command="{Binding StopRecordingPlaybackCommand}"
+                    CommandParameter="{Binding ScratchShown}"
+                    ToolTip.Tip="Stop playing" />
+
+            <TextBox Grid.Column="2" Margin="6,0,0,0"
+                     Text="{Binding RecordingName}"
+                     PlaceholderText="Name this take"
+                     Classes.invalid="{Binding HasNameError}" />
+
+            <Button Grid.Column="3" Content="Save" MinWidth="80" Padding="10,5"
+                    Classes="save"
+                    IsEnabled="{Binding CanSaveTake}"
+                    Command="{Binding SaveTakeCommand}"
+                    ToolTip.Tip="Keep this take on the shelf under that name." />
+            <Button Grid.Column="4" Content="Throw away" MinWidth="96" Padding="10,5"
+                    Classes="danger"
+                    Command="{Binding DiscardTakeCommand}"
+                    ToolTip.Tip="Delete it. Recording again does this too, and so does closing the application." />
+          </Grid>
+
+          <TextBlock Text="{Binding NameError}"
+                     IsVisible="{Binding HasNameError}"
+                     Foreground="{DynamicResource DangerBrush}"
+                     FontSize="12"
+                     TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+
+      <!-- The take that is picked: its picture, and everything you can do to it. -->
+      <Border Grid.Row="2" Classes="card" Margin="0,0,0,12"
               IsVisible="{Binding SelectedRecording, Converter={x:Static ObjectConverters.IsNotNull}}">
         <StackPanel Classes="cardBody">
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
@@ -185,7 +262,7 @@
       </Border>
 
       <!-- Recordings Library -->
-      <Border Grid.Row="2" Classes="card" IsVisible="{Binding Recordings.Count}">
+      <Border Grid.Row="3" Classes="card" IsVisible="{Binding Recordings.Count}">
         <DockPanel>
           <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,220,Auto" ColumnSpacing="8" Margin="0,0,0,8">
             <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">

@@ -41,22 +41,14 @@ public sealed class RecordingService : IRecordingService, IDisposable
     /// What has been heard: the whole take while one is being kept, and the last moment of it
     /// otherwise. Held under its own lock, since it is written from the capture's thread.
     /// </summary>
-    private readonly List<byte> _recordingBuffer = new();
+    private readonly ITakeBuffer _heard = new TakeBuffer();
 
-    /// <summary>Whether a take is being kept.</summary>
-    private bool _isRecording;
 
     /// <summary>Whether the level is being watched.</summary>
     private bool _isMonitoring;
 
     /// <summary>True while the input is open, whether for a take or only for the meter.</summary>
     private bool _capturing;
-
-    /// <summary>
-    /// A fifth of a second of audio: enough for a meter to read, small enough that watching
-    /// the input all afternoon costs nothing.
-    /// </summary>
-    private const int MonitorBufferBytes = 44100 / 5 * 4;
 
     /// <summary>
     /// How long the recent window keeps answering after the last audio arrived. A source that
@@ -133,7 +125,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
     public string? SelectedDevice { get; set; }
 
     /// <inheritdoc/>
-    public bool IsRecording => _isRecording;
+    public bool IsRecording => _heard.Recording;
 
     /// <inheritdoc/>
     public bool IsMonitoring => _isMonitoring;
@@ -242,18 +234,16 @@ public sealed class RecordingService : IRecordingService, IDisposable
     /// <inheritdoc/>
     public void StartRecording()
     {
-        if (_isRecording) return;
+        if (_heard.Recording) return;
 
         _clippedDuringTake = false;
         _lastClipTick = long.MinValue / 2;
-        lock (_recordingBuffer)
-        {
-            _recordingBuffer.Clear();
-        }
+
+        _heard.Reset();
 
         if (!_capturing) OpenInput();
 
-        _isRecording = true;
+        _heard.Start();
     }
 
     /// <inheritdoc/>
@@ -273,7 +263,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
 
         _isMonitoring = false;
 
-        if (!_isRecording) CloseInput();
+        if (!_heard.Recording) CloseInput();
     }
 
     /// <summary>Opens the selected input, falling back to the default when it will not open.</summary>
@@ -355,11 +345,23 @@ public sealed class RecordingService : IRecordingService, IDisposable
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// **The take is taken out of the buffer here, under the lock, and that is not tidiness.**
+    /// While nothing is being recorded the buffer is a monitor: every block that arrives trims
+    /// it back to the last fifth of a second, so a callback landing between this method and the
+    /// save is a take reduced to its last 200 milliseconds of near silence. The trim reads
+    /// its own recording flag inside the same lock, so flipping it and lifting the audio out
+    /// together is what closes the door: nothing can arrive in between.
+    ///
+    /// It was a race before this and is now not one. A window of a few instructions is still a
+    /// window, and what falls through it is somebody's only copy of a performance.
+    /// </remarks>
+    /// <inheritdoc/>
     public void StopRecording()
     {
-        if (!_isRecording) return;
+        if (!_heard.Recording) return;
 
-        _isRecording = false;
+        _heard.Stop();
 
         if (!_isMonitoring) CloseInput();
     }
@@ -407,45 +409,98 @@ public sealed class RecordingService : IRecordingService, IDisposable
     {
         if (Environment.TickCount64 - _lastDataTick > RecentDataStaleMs) return Array.Empty<byte>();
 
-        lock (_recordingBuffer)
-        {
-            if (_recordingBuffer.Count == 0) return Array.Empty<byte>();
-
-            int count = Math.Min(maxBytes, _recordingBuffer.Count);
-            count -= count % BytesPerFrame;
-            if (count <= 0) return Array.Empty<byte>();
-
-            int start = _recordingBuffer.Count - count;
-            return _recordingBuffer.GetRange(start, count).ToArray();
-        }
+        return _heard.Recent(maxBytes, BytesPerFrame);
     }
 
     /// <inheritdoc/>
-    public Task<string> SaveRecordingAsync(string fileName)
+    public Plugins.Interfaces.IAudioInsert? Effect { get; set; }
+
+    /// <inheritdoc/>
+    public int SampleRate => _sampleRate;
+
+    /// <summary>What runs a take through the chain, which is arithmetic and nothing else.</summary>
+    private readonly ITakeEffects _effects = new TakeEffects();
+
+    /// <summary>The longest block the chain here is built for, and is therefore given.</summary>
+    private const int ChainFrames = 2048;
+
+    /// <summary>How long a stretch of silence the chain is given before a take goes through it.</summary>
+    /// <remarks>
+    /// Two seconds, which is past the tail of anything but a delay somebody has set to repeat
+    /// for ever. See <see cref="ITakeEffects.Settle"/> for what it is for.
+    /// </remarks>
+    private const double SettleSeconds = 2;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The buffer is read once, under the lock, and everything after that happens on the pool:
+    /// running a take through a chain is a plugin's own arithmetic and a crossing per block, and
+    /// none of it belongs on the thread that was asked to stop recording.
+    ///
+    /// A chain that leaves nothing behind is not a chain: an empty one writes one file and says
+    /// there is no twin, so a take made with nothing on the page is exactly the take it always
+    /// was.
+    /// </remarks>
+    public Task<SavedTake> WriteTakeAsync(string folder, string fileName, string cleanName)
     {
-        byte[] pcmData;
-        lock (_recordingBuffer)
-        {
-            if (_recordingBuffer.Count == 0)
-                throw new InvalidOperationException("No recording data to save");
+        byte[] pcmData = _heard.Take;
 
-            pcmData = _recordingBuffer.ToArray();
-        }
+        if (pcmData.Length == 0)
+            throw new InvalidOperationException("No recording data to save");
 
-        string filePath = Path.Combine(_recordingsDir, $"{fileName}.wav");
+        Directory.CreateDirectory(folder);
+
+        string filePath = Path.Combine(folder, $"{fileName}.wav");
+        string cleanPath = Path.Combine(folder, $"{cleanName}.wav");
+
+        var effect = Effect;
+        int rate = _sampleRate;
+        int channels = _channels;
 
         return Task.Run(() =>
         {
             try
             {
-                _wav.Write(filePath, pcmData, _sampleRate, _channels);
-                return filePath;
+                if (effect is not { } chain || Empty(chain))
+                {
+                    _wav.Write(filePath, pcmData, rate, channels);
+                    return new SavedTake(filePath, null);
+                }
+
+                _effects.Settle(chain, (int)(rate * SettleSeconds), ChainFrames);
+
+                byte[] worked = _effects.Through(pcmData, channels, chain, ChainFrames);
+
+                _wav.Write(cleanPath, pcmData, rate, channels);
+                _wav.Write(filePath, worked, rate, _effects.Channels);
+
+                return new SavedTake(filePath, cleanPath);
             }
             catch (Exception ex)
             {
                 throw new InvalidOperationException($"Failed to save recording: {ex.Message}", ex);
             }
         });
+    }
+
+    /// <summary>Whether a chain would leave a take exactly as it found it.</summary>
+    /// <remarks>
+    /// Asked of a <see cref="Plugins.PluginChain"/> and answered no for anything else, since an
+    /// insert that is not a chain is something somebody put there on purpose. A chain holding
+    /// nothing but bypassed slots counts as empty: what it would write is the take again under
+    /// a second name.
+    /// </remarks>
+    /// <param name="effect">The chain to ask about.</param>
+    private static bool Empty(Plugins.Interfaces.IAudioInsert effect)
+    {
+        if (effect is not Plugins.PluginChain chain) return false;
+
+        foreach (var slot in chain.Slots)
+        {
+            if (!slot.Bypassed) return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -464,13 +519,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
             _clippedDuringTake = true;
         }
 
-        lock (_recordingBuffer)
-        {
-            _recordingBuffer.AddRange(data);
-
-            if (!_isRecording && _recordingBuffer.Count > MonitorBufferBytes)
-                _recordingBuffer.RemoveRange(0, _recordingBuffer.Count - MonitorBufferBytes);
-        }
+        _heard.Add(data);
     }
 
     /// <summary>Audio from a capture device, on BASS's own thread.</summary>
@@ -498,13 +547,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
                 _clippedDuringTake = true;
             }
 
-            lock (_recordingBuffer)
-            {
-                _recordingBuffer.AddRange(data);
-
-                if (!_isRecording && _recordingBuffer.Count > MonitorBufferBytes)
-                    _recordingBuffer.RemoveRange(0, _recordingBuffer.Count - MonitorBufferBytes);
-            }
+            _heard.Add(data);
         }
         return true;
     }

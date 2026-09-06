@@ -1766,7 +1766,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-1826 of them, in about twenty five seconds, with no window and no hardware. They run in CI on every push
+1866 of them, in about twenty five seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -3029,6 +3029,103 @@ whole exercise and is worth writing down rather than summarising:
   what was just copied into the application folder, and then the engine settings one at a time
   before the output is opened. `IStartupLines` is the seam, so a window built with nobody
   watching hands in nothing and every line is skipped
+- **A take was saved as 200 milliseconds of silence, and the cause was stopping being two acts.**
+  Reported as recording not working at all: a four second performance on the shelf under the
+  right name, 8820 samples long, drawing a flat line. 8820 frames is exactly the monitor's own
+  buffer, which is the tell and is what named the fault. While no take is being made the capture
+  buffer is a meter's: every block that arrives trims it back to the last fifth of a second.
+  `StopRecording` set the flag and left the audio where it was, so **a block arriving between the
+  flag and the save read the take as monitoring and threw it away**
+- It was a race before RECORD had a chain and it was a race that mostly won: the window was a few
+  instructions. Working out the clean take's name widened it by a walk of the shelf, which was
+  enough to lose almost every take. **A window of a few instructions is still a window, and what
+  falls through this one is somebody's only copy of a performance**
+- `ITakeBuffer` is that seam and the fix is what the type is for: `Stop` clears the flag and lifts
+  the audio out **under one lock**, and every other member takes the same lock, so there is no
+  moment left for a block to arrive in. The flag and the audio are one fact rather than two, which
+  is the shape `docs/threads.md` already names: a value wants a lock, a shape wants to be one
+  object swapped whole
+- `Tests/TakeBufferTests.cs` is the seam with two threads on it, since one thread cannot fail the
+  way this failed: a capture thread adding as fast as it can while another stops the take, run a
+  hundred times because a race that fires one time in twenty passes a test that runs it once.
+  **Checked by putting the fault back**, and it answers 35280 bytes, which is the monitor's length
+  to the byte and is what was on his shelf
+- **Two copies of this application fight over the recording input, and neither says so.**
+  `PipeWireRouting` finds its own capture by looking for nodes named `JingleBox2`, so a second
+  instance's capture node answers to that name too: each one's Connect deletes every link into
+  both and rebuilds its own, and the two second refresh means they do it to each other for ever.
+  From a chair that is Capture from flipping back to nothing every couple of seconds and
+  recording that will not work. Nothing in the log mentions it, because from inside each process
+  everything succeeded
+- Worth keeping because it is not a bug so much as a thing to know: **the routing is machine wide
+  and a second instance is not sandboxed by pointing it at another settings folder.** The graph
+  is shared, the node name is the only identity, and `pw-link -i | grep -i jingle` is what says
+  whether anything is left behind
+
+- **A take is not on the shelf until somebody names it, and the scratchpad is where it waits.**
+  Pressing Record used to write straight into the recordings folder under whatever the name box
+  held, so every false start, every level check and every accident was a row in the list with a
+  search box over it as though it were work worth finding again. `ITakeScratch` is a folder of
+  its own under the application folder: what comes off the input is written there, and reaching
+  `recordings/` is a separate act with a name in it
+- **`Sweep` runs on the way in as well as on the way out.** What is left when the application
+  closes was never asked for, and a run that ended badly leaves files that are by definition the
+  ones nobody kept, so a folder that is only emptied at closing time fills up on every crash
+- It holds **one take**, which is the whole meaning of the word: recording again is starting
+  again and what was on it goes. Chosen over a session's worth of them deliberately, and the cost
+  is named rather than guarded against: a take you did not save is gone when you record the next
+  one. No dialog in front of Record, which is the rule this file already keeps about a question
+  in the way of a button that used to do something
+- **A name already on the shelf is refused rather than numbered.** By the time `Keep` is reached
+  the name has been through the box's own check, so a second answer here would be two rules
+  disagreeing about one name; and what refusing protects is the one thing that cannot be undone,
+  which is last week's take written over by this week's. Kept by moving rather than copying, the
+  same reasoning the bin already keeps: a take is the one thing here that can be a hundred
+  megabytes
+- **The scratchpad is a card of its own and the name box moved onto it**, because naming is what
+  saving is: the box over the Record button said a take was going to be called something before
+  anything had been recorded, and nothing was ever written under that name. Where a chain made
+  two of them both are on the card, picked between by two buttons over one picture, and Save
+  keeps both
+- `Tests/TakeScratchTests.cs` is the seven rules, and the one worth naming is that a take that
+  was kept survives the sweep, which is the whole design said as one test
+
+- **RECORD has an effect chain, and what it does is done after the take rather than during it.**
+  The same `PluginStrip` the tracker and the pads use, pointed at `RecordPluginTarget`, so ours
+  and somebody's plugin go on it the same way they go anywhere else. It is a setup somebody
+  leaves standing rather than a per take choice, so it lives beside the input gain in
+  `AppConfig.RecordEffects`
+- **Nothing is heard while a take is being made**, which is what decides the whole shape of it.
+  With no monitoring there is no reason whatever to put a plugin on the capture callback: a
+  crossing is a fixed cost per block, and paying it where a late block is a hole in the only copy
+  of a performance is the worst trade in this application. `ITakeEffects` runs the finished take
+  through the chain on the pool, where it may take as long as it likes, and **the answer is the
+  same** because a chain is a stream processor: handed a take in blocks it makes what it would
+  have made in real time
+- **Both takes are kept, and the name says which is which.** The take under the name that was
+  typed is the one through the chain, since that is the sound somebody set a chain up to record,
+  and the capture as it arrived is `<name> (clean)` beside it, because an effect cannot be taken
+  off a take afterwards. A chain holding nothing, or nothing but bypassed slots, writes one file:
+  two names over the same audio is not a safety net, it is clutter. The clean name is numbered if
+  it is taken, the rule an arriving song already keeps
+- **The processed take is exactly as long as the take it came from**, so the two lie on top of
+  each other frame for frame, which is most of what keeping both is worth. A delay still ringing
+  at the last frame is cut off with it, deliberately
+- The chain is given two seconds of silence before each take. It holds its own state between
+  takes, so a delay line full of the end of one would repeat it over the beginning of the next,
+  which reads as the recorder having captured something that was never there. It cannot help a
+  chain that never decays, and there is no way to ask an insert to forget: adding one is a change
+  to a contract this does not need
+- **The scaling is the same number in both directions and that is not a detail.** 32768 out and
+  32767 back would mean a take through an empty chain coming back a hair quieter than it went in,
+  which is the sort of difference nobody can account for a week later. `Tests/TakeEffectsTests.cs`
+  pins the exact round trip along with the block boundary, where an offline pass goes wrong in the
+  two ways that both leave a take of the right length: a frame played twice and a frame skipped.
+  Only the order of what the effect actually saw says which happened
+- Mono in comes back stereo, since an effect places things in the stereo field and narrowing the
+  answer would throw half of what it did away; a take of more than two channels is read as its
+  first two. NaN is written out as silence, which matters more here than at the converters: a file
+  full of it plays as full scale noise the first time anybody opens it
 - Deleting a recording no longer deletes it. It moves into `deleted/` beside the recordings, so
   undo on RECORD fetches the last one back, and the confirmation stopped having to say "this
   cannot be undone". A move rather than a copy, because a take is the one thing here that can be

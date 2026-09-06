@@ -209,12 +209,16 @@ public sealed partial class MainViewModel : ObservableObject, IShortcutContext
     /// Says the application is closing because somebody closed it.
     /// </summary>
     /// <remarks>
-    /// The one thing that has to hear it is the tracker, which keeps a copy of unsaved work for
-    /// a crash and has no other way of telling a crash from a Friday afternoon. Said through
-    /// here rather than reached for from the window, since the pages are this one's to know
-    /// about and there will be others one day.
+    /// Two things have to hear it. The tracker keeps a copy of unsaved work for a crash and has
+    /// no other way of telling a crash from a Friday afternoon. And RECORD's scratchpad holds a
+    /// take nobody named, which is by definition a take nobody asked to keep. Said through here
+    /// rather than reached for from the window, since the pages are this one's to know about.
     /// </remarks>
-    public void Finished() => Tracker.Finished();
+    public void Finished()
+    {
+        Tracker.Finished();
+        Record.Finished();
+    }
 
     /// <summary>The machines you have, as a list to pick from and to open one of.</summary>
     public RackViewModel Machines { get; }
@@ -1734,6 +1738,8 @@ public sealed partial class MainViewModel : ObservableObject, IShortcutContext
         });
 
         Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg, routing, _audio.TakeBus);
+
+        Record.UsePlugins(Plugins, _effects, _effectInFront);
 
         // The recording input has two faders on two pages and one gain underneath them, so each
         // has to hear the other move. The mixer's writes reach RECORD already, since it writes

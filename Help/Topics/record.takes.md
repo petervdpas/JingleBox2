@@ -2,11 +2,48 @@
 
 Making a take, trimming it, and where it goes.
 
-RECORD captures from whatever the input picker is set to, and the take lands on the
-shelf under a name you can change. Everything else in the application takes its
-sounds from that shelf: a pad, a machine's preset, a tracker instrument.
+RECORD captures from whatever the input picker is set to. Everything else in the
+application takes its sounds from the shelf below: a pad, a machine's preset, a
+tracker instrument.
 
 `Ctrl+R` starts a recording and stops it again, from any window.
+
+## The scratchpad
+
+**A take is not on the shelf until you name it.** What you record lands on the
+scratchpad, which is the card of its own between the controls and the list: play it,
+and either **Save** it under a name or **Throw it away**. Until you save it, it is in
+no list, under no search and filed under nothing.
+
+The scratchpad holds one take. Recording again starts again, so what was on it goes,
+and so does anything still on it when you close the application. That is the whole
+meaning of the word: a take you did not name is a take you did not want.
+
+A name already on the shelf is refused rather than numbered, so saving can never
+write over a recording you already have.
+
+## Recording through effects
+
+**Record through** is a chain like a track's or a pad's: press the plus and put our
+own effects or a plugin on it, and every take goes through it on its way to the shelf.
+It stays where you leave it, the way the input gain does, so the microphone through a
+compressor and a delay is how the room is wired until you change it.
+
+**Both go on the scratchpad**, and the two buttons above the picture pick which one
+you are looking at and would play. Saving keeps both: the name you typed is the take
+through the chain, and the capture exactly as it arrived goes beside it as
+`<name> (clean)`, because an effect cannot be taken off a take afterwards. With
+nothing on the chain there is one take, since the two files would otherwise be the
+same audio under two names.
+
+The two are the same length to the frame, so they lie on top of each other. That is
+also why a delay still ringing at the last frame is cut off with it rather than
+running on.
+
+The chain is applied once the take has been made rather than while it is being made,
+and nothing is heard through it while you record. That is deliberate: a plugin taking
+a moment longer than usual would be a hole in the only copy of a performance, and
+offline it can take as long as it likes and makes exactly the same sound.
 
 ## Trimming
 

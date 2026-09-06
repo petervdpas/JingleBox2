@@ -144,6 +144,310 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     private readonly DispatcherTimer _gainSaveTimer;
 
+    /// <summary>The chain a take is run through, and where it is held.</summary>
+    private readonly RecordPluginTarget _chain;
+
+    /// <summary>Where a take lives before somebody gives it a name.</summary>
+    private readonly ITakeScratch _scratch = new TakeScratch();
+
+    /// <summary>What a take is called on the scratchpad, where it has no name of its own.</summary>
+    /// <remarks>
+    /// Fixed rather than named after the box, since the scratchpad holds one take and a name
+    /// somebody is still typing is not something to build a path out of. What is in the box is
+    /// what the card shows and what the file is called once it is saved.
+    /// </remarks>
+    private const string ScratchName = "take";
+
+    /// <summary>What the untouched twin is called on the scratchpad.</summary>
+    private const string ScratchCleanName = "take (clean)";
+
+    /// <summary>Where the shelf keeps its takes.</summary>
+    private static string ShelfFolder => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "JingleBox2", "recordings");
+
+    /// <summary>
+    /// The take that has just been made, through whatever was on the chain, or none.
+    /// </summary>
+    /// <remarks>
+    /// **Deliberately not in <see cref="Recordings"/>.** A take nobody has named is not on the
+    /// shelf, so it is not in the list, not under the search box and not filed under a category:
+    /// it is one card of its own with a name box and two buttons. That is what the scratchpad
+    /// is, and the shelf is what is left once somebody has said a take was worth keeping.
+    ///
+    /// One at a time. Recording again is starting again, and what was on the scratchpad goes
+    /// with it, which is the whole meaning of the word.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasScratch))]
+    [NotifyPropertyChangedFor(nameof(ScratchShown))]
+    [NotifyPropertyChangedFor(nameof(CanSaveTake))]
+    private Recording? scratchTake;
+
+    /// <summary>The same take as it arrived, where a chain means there are two of it.</summary>
+    /// <remarks>
+    /// Both are on the scratchpad and both are saved under the name, because an effect cannot be
+    /// taken off a take afterwards and the moment to decide you wanted the plain one is after
+    /// you have heard the other.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ScratchHasClean))]
+    [NotifyPropertyChangedFor(nameof(ScratchShown))]
+    private Recording? scratchClean;
+
+    /// <summary>Which of the two the card is drawing and would play.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ScratchShown))]
+    private bool scratchShowsClean;
+
+    /// <summary>The picture of whichever one is being shown.</summary>
+    [ObservableProperty]
+    private WaveformData? scratchWaveform;
+
+    /// <summary>Where the scratchpad's own playback has got to, and -1 for nothing playing.</summary>
+    [ObservableProperty]
+    private double scratchPlayhead = -1;
+
+    /// <summary>Whether there is a take waiting to be kept or thrown away.</summary>
+    public bool HasScratch => ScratchTake != null;
+
+    /// <summary>Whether this take has an untouched twin, which it has where a chain was on.</summary>
+    public bool ScratchHasClean => ScratchClean != null;
+
+    /// <summary>The one the card is about: the clean twin where that is what is picked.</summary>
+    public Recording? ScratchShown =>
+        ScratchShowsClean && ScratchClean != null ? ScratchClean : ScratchTake;
+
+    /// <summary>Whether the take can be put on the shelf under what is in the name box.</summary>
+    public bool CanSaveTake => HasScratch && NameError == null;
+
+    /// <summary>Puts the take on the shelf under the name in the box.</summary>
+    public IRelayCommand SaveTakeCommand => new RelayCommand(SaveTake);
+
+    /// <summary>Throws the take away without keeping it.</summary>
+    public IRelayCommand DiscardTakeCommand => new RelayCommand(DiscardTake);
+
+    /// <summary>Reads the picture of whichever of the two is being shown.</summary>
+    private void ReadScratchWaveform()
+    {
+        ScratchPlayhead = -1;
+
+        if (ScratchShown is not { } shown)
+        {
+            ScratchWaveform = null;
+            return;
+        }
+
+        try { ScratchWaveform = _waveformService.AnalyzeFile(shown.FilePath); }
+        catch (Exception) { ScratchWaveform = null; }
+    }
+
+    /// <summary>Switching between the two draws the other one and stops what was playing.</summary>
+    partial void OnScratchShowsCleanChanged(bool value)
+    {
+        StopPreview();
+        ReadScratchWaveform();
+    }
+
+    /// <summary>
+    /// Moves the take onto the shelf under the name in the box, its clean twin with it.
+    /// </summary>
+    /// <remarks>
+    /// The name is checked here as well as on every keystroke, because the shelf can have
+    /// gained a take of that name since the box was last typed in: importing one, or another
+    /// take saved in between.
+    ///
+    /// The audition is stopped first. A file that is being played is a file that is open, which
+    /// on Windows is a file that will not move.
+    ///
+    /// The clean twin is moved first and the take second, so a failure part way leaves the take
+    /// still on the scratchpad rather than half of it on the shelf.
+    /// </remarks>
+    private void SaveTake()
+    {
+        if (ScratchTake is not { } take) return;
+
+        string name = RecordingName.Trim();
+
+        if (_names.Validate(name, Recordings.Select(one => one.Name)) is { } why)
+        {
+            Status = why;
+            return;
+        }
+
+        StopPreview();
+
+        string folder = ShelfFolder;
+        string? clean = null;
+
+        if (ScratchClean is { } twin)
+        {
+            string cleanName = CleanName(name);
+
+            if (_scratch.Keep(twin.FilePath, folder, cleanName) is { } wentTo)
+            {
+                clean = cleanName;
+                Shelve(cleanName, wentTo);
+            }
+        }
+
+        if (_scratch.Keep(take.FilePath, folder, name) is not { } kept)
+        {
+            Status = $"'{name}' could not be saved.";
+            return;
+        }
+
+        var row = Shelve(name, kept);
+
+        ClearScratch(drop: false);
+
+        SelectedRecording = row;
+        RecordingName = NextRecordingName(name);
+
+        Status = clean == null ? $"Saved '{name}'" : $"Saved '{name}', and '{clean}' beside it";
+    }
+
+    /// <summary>Throws the take away, both of it where there are two.</summary>
+    private void DiscardTake()
+    {
+        StopPreview();
+        ClearScratch(drop: true);
+
+        Status = "Take thrown away.";
+    }
+
+    /// <summary>Empties the scratchpad, deleting what was on it where nothing else has it.</summary>
+    /// <param name="drop">
+    /// True to delete the files, which is throwing a take away and is also what starting another
+    /// one does. False where they have just been moved onto the shelf and are somebody's now.
+    /// </param>
+    private void ClearScratch(bool drop)
+    {
+        if (drop)
+        {
+            _scratch.Drop(ScratchTake?.FilePath);
+            _scratch.Drop(ScratchClean?.FilePath);
+        }
+
+        ScratchTake = null;
+        ScratchClean = null;
+        ScratchShowsClean = false;
+        ScratchWaveform = null;
+        ScratchPlayhead = -1;
+    }
+
+    /// <summary>A take on the scratchpad, which is a recording that is on no shelf.</summary>
+    /// <param name="name">What to call it while it is unnamed, which is what the box says.</param>
+    /// <param name="path">The scratch file.</param>
+    private Recording Scratched(string name, string path) =>
+        new()
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = name,
+            FilePath = path,
+            DurationMs = ReadDurationMs(path),
+            CreatedAt = DateTime.Now
+        };
+
+    /// <summary>
+    /// Says the application is closing, so nothing unnamed is left lying about.
+    /// </summary>
+    /// <remarks>
+    /// What is on the scratchpad was never asked to be kept, which is the whole of what the
+    /// scratchpad means, so it goes. Swept rather than dropped one file at a time, since a run
+    /// that ended badly can have left more than this one behind.
+    /// </remarks>
+    public void Finished()
+    {
+        StopPreview();
+        _scratch.Sweep();
+    }
+
+    /// <summary>What the plugins on the chain are holding inside themselves, in chain order.</summary>
+    /// <remarks>
+    /// A preset is not a set of knob positions, so a chain saved as its parameters alone comes
+    /// back sounding roughly right and calling itself untitled. Read when the chain settles
+    /// rather than on every move of a knob, since asking a plugin for its patch is a round trip
+    /// to another process.
+    /// </remarks>
+    private IReadOnlyList<byte[]> _patches = Array.Empty<byte[]>();
+
+    /// <summary>What is on the chain, or null until the page has been given the plugin list.</summary>
+    /// <remarks>
+    /// Set once, from <see cref="UsePlugins"/>, the same as a pad's: a page built without a
+    /// plugin library simply has no strip rather than a broken one.
+    /// </remarks>
+    public PluginChainViewModel? Effect { get; private set; }
+
+    /// <summary>How long the chain has to be still before it is written down, in milliseconds.</summary>
+    /// <remarks>
+    /// Long enough that a knob dragged across its travel is one save rather than a hundred,
+    /// short enough that letting go and closing the application keeps the change. The pads keep
+    /// the same rule for the same reason.
+    /// </remarks>
+    private const int ChainSettleMs = 600;
+
+    /// <summary>Restarted by every change to the chain, so it fires once the hand has stopped.</summary>
+    private readonly DispatcherTimer _chainSave =
+        new() { Interval = TimeSpan.FromMilliseconds(ChainSettleMs) };
+
+    /// <summary>
+    /// Gives the page its effect chain and puts back whatever was on it last time.
+    /// </summary>
+    /// <remarks>
+    /// Told rather than asked for, because the plugin library is scanned in SETTINGS and belongs
+    /// to the application rather than to this page.
+    /// </remarks>
+    /// <param name="plugins">Everything installed, as scanned in SETTINGS.</param>
+    /// <param name="effects">What effects of ours this installation has, which the plus offers first.</param>
+    /// <param name="front">Where a face opened off this chain says it is in front.</param>
+    public void UsePlugins(
+        PluginLibraryViewModel plugins,
+        SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null,
+        ISoundEffectInFront? front = null)
+    {
+        _chains = new Audio.Plugins.PluginChainState(
+            new SoundDevices.SoundEffects.SoundEffectEngines(effects));
+
+        Effect = new PluginChainViewModel(plugins, effects, front: front)
+        {
+            Target = _chain,
+            Nothing = "Nothing yet, so a take is kept exactly as it arrives."
+        };
+
+        Effect.Changed += () =>
+        {
+            _chainSave.Stop();
+            _chainSave.Start();
+        };
+
+        _chainSave.Tick += (_, _) =>
+        {
+            _chainSave.Stop();
+
+            _patches = _chains.Patches(_chain.Chain);
+
+            _cfg.RecordEffects = _chains.Capture(_chain.Chain, patches: true);
+            _configStore.Save(_cfg);
+        };
+
+        if (_cfg.RecordEffects is { IsEmpty: false } saved)
+        {
+            var missing = _chains.Restore(
+                _chain.Chain, saved, _chain.SampleRate, PluginChainViewModel.MaxFrames);
+
+            Effect.Reload();
+
+            _patches = saved.Devices.Select(one => one.State).ToList();
+
+            if (missing.Count > 0) Effect.Status = "Missing: " + string.Join(", ", missing);
+        }
+
+        OnPropertyChanged(nameof(Effect));
+    }
+
+    /// <summary>Builds and reads the chain's plugins, which is arithmetic and a round trip.</summary>
+    private Audio.Plugins.Interfaces.IPluginChainState _chains = new Audio.Plugins.PluginChainState();
+
     /// <summary>
     /// False until the stored gain has been put on the slider.
     /// </summary>
@@ -257,6 +561,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRecord))]
     [NotifyPropertyChangedFor(nameof(HasNameError))]
+    [NotifyPropertyChangedFor(nameof(CanSaveTake))]
     private string? nameError;
 
     /// <summary>What the page has to say for itself, in the bar under the buttons.</summary>
@@ -346,9 +651,17 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         Shelf = new TakeFilter(Recordings);
 
+        _chain = new RecordPluginTarget(_recordingService);
+
+        _scratch.Sweep();
+
         Recordings.CollectionChanged += (_, _) => ValidateName();
 
-        _preview.PositionChanged += at => Playhead = at;
+        _preview.PositionChanged += at =>
+        {
+            if (ScratchTake != null && ReferenceEquals(_playing, ScratchShown)) ScratchPlayhead = at;
+            else Playhead = at;
+        };
 
         _preview.Stopped += () =>
         {
@@ -1697,6 +2010,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         StopPreview();
 
+        ClearScratch(drop: true);
+
         try
         {
             _recordingService.StartRecording();
@@ -1745,35 +2060,80 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             bool clipped = _recordingService.ClippedDuringTake;
 
-            string savedName = RecordingName.Trim();
-            string filePath = await _recordingService.SaveRecordingAsync(savedName);
-            Status = "Saved recording";
+            string working = RecordingName.Trim();
 
-            var recording = new Recording
-            {
-                Id = Guid.NewGuid().ToString(),
-                Name = savedName,
-                FilePath = filePath,
-                DurationMs = ReadDurationMs(filePath),
-                CreatedAt = DateTime.Now
-            };
+            var written = await _recordingService.WriteTakeAsync(_scratch.Folder, ScratchName, ScratchCleanName);
 
-            Recordings.Add(recording);
+            ScratchTake = Scratched(working, written.Path);
+            ScratchClean = written.Clean == null ? null : Scratched(working + " (clean)", written.Clean);
+            ScratchShowsClean = false;
 
-            SelectedRecording = recording;
+            ReadScratchWaveform();
+
+            Status = written.Clean == null
+                ? "On the scratchpad. Save it under a name to keep it."
+                : "On the scratchpad, through the chain and clean. Save it under a name to keep both.";
 
             if (clipped)
-                Status = "Saved, but the input clipped. Lower the input gain or the source level.";
+                Status = "The input clipped. Lower the input gain or the source level, and record it again.";
 
             Level = 0;
             LevelLeft = 0;
             LevelRight = 0;
             RecordingTime = TimeSpan.Zero;
-            RecordingName = NextRecordingName(savedName);
         }
         catch (Exception ex)
         {
             Status = $"Error: {ex.Message}";
         }
     }
+
+    /// <summary>Puts one written file on the shelf under a name.</summary>
+    /// <param name="name">What it is called.</param>
+    /// <param name="path">Where it was written.</param>
+    /// <returns>The row that was added, so the caller can pick it.</returns>
+    private Recording Shelve(string name, string path)
+    {
+        var recording = new Recording
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = name,
+            FilePath = path,
+            DurationMs = ReadDurationMs(path),
+            CreatedAt = DateTime.Now
+        };
+
+        Recordings.Add(recording);
+
+        return recording;
+    }
+
+    /// <summary>What the untouched capture is called beside the take that went through the chain.</summary>
+    /// <remarks>
+    /// The take's own name with a word after it, and a number after that where the name is taken,
+    /// which is the rule an arriving song already keeps: a twin that quietly overwrote last
+    /// week's would be the one thing this feature exists to prevent.
+    ///
+    /// Worked out even where there is no chain, since it costs a walk of a list somebody is
+    /// looking at and the recorder is what decides whether there is a twin to name.
+    /// </remarks>
+    /// <param name="name">What the take is called.</param>
+    private string CleanName(string name)
+    {
+        string wanted = name + " (clean)";
+
+        if (!Taken(wanted)) return wanted;
+
+        for (int at = 2; at < 1000; at++)
+        {
+            string another = name + " (clean " + at + ")";
+            if (!Taken(another)) return another;
+        }
+
+        return name + " (clean " + Guid.NewGuid().ToString("N")[..8] + ")";
+    }
+
+    /// <summary>Whether a take of that name is already on the shelf, however it is cased.</summary>
+    private bool Taken(string name) =>
+        Recordings.Any(one => string.Equals(one.Name, name, StringComparison.OrdinalIgnoreCase));
 }
