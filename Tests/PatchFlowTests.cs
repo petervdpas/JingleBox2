@@ -1,4 +1,5 @@
 using System;
+using Avalonia.Input;
 using Avalonia.Media;
 using JingleBox2.UI;
 using JingleBox2.UI.Enums;
@@ -168,6 +169,37 @@ public class PatchFlowTests
         Assert.True(Math.Abs(accent.R - there.R) <= 1);
         Assert.True(Math.Abs(accent.G - there.G) <= 1);
         Assert.True(Math.Abs(accent.B - there.B) <= 1);
+    }
+
+    /// <summary>
+    /// The patchbay is panned by the same press every other picture in this application is.
+    /// </summary>
+    /// <remarks>
+    /// It is the waveform's own rule rather than a second one, so the two cannot drift; what is
+    /// pinned here is that the gesture somebody learns in the trim dialog is the one that works
+    /// on the patchbay. Ctrl and Shift together is the one that was asked for and it matches,
+    /// since it holds both.
+    /// </remarks>
+    [Fact]
+    public void The_page_is_moved_by_the_same_press_as_every_other_picture()
+    {
+        var press = new JingleBox2.Rack.Controls.WaveformPress();
+
+        Assert.True(press.MeansPan(false, KeyModifiers.Control | KeyModifiers.Shift));
+        Assert.True(press.MeansPan(false, KeyModifiers.Control));
+        Assert.True(press.MeansPan(false, KeyModifiers.Shift));
+        Assert.True(press.MeansPan(true, KeyModifiers.None));
+    }
+
+    /// <summary>And a plain press is not that, since a plain press already means something here.</summary>
+    /// <remarks>
+    /// A block is dragged by a plain press and a dot starts a cable with one, so a page that
+    /// panned on a plain drag would have no way left to move a block.
+    /// </remarks>
+    [Fact]
+    public void A_plain_press_does_not_move_the_page()
+    {
+        Assert.False(new JingleBox2.Rack.Controls.WaveformPress().MeansPan(false, KeyModifiers.None));
     }
 
     /// <summary>A grey has nothing opposite it and is left alone.</summary>

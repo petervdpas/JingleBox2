@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using JingleBox2.Rack.Controls.Records;
 using JingleBox2.UI;
@@ -38,6 +39,17 @@ public sealed class PatchbayView : Panel
 
     /// <summary>What the two kinds of wire are painted in.</summary>
     private static readonly Interfaces.IPatchColours Colours = new PatchColours();
+
+    /// <summary>
+    /// What a press means before anything on the page is asked about it.
+    /// </summary>
+    /// <remarks>
+    /// The waveform's own rule rather than a second one written here, which is what makes the
+    /// gesture that moves a picture the same gesture everywhere in this application: the middle
+    /// button, or Ctrl, or Shift. Two spellings of it would drift, and the way that fails is a
+    /// drag that pans in one editor and drags a block in the next.
+    /// </remarks>
+    private static readonly Rack.Controls.Interfaces.IWaveformPress Press = new Rack.Controls.WaveformPress();
 
     /// <summary>The blocks to draw.</summary>
     public static readonly StyledProperty<IReadOnlyList<PatchNode>> NodesProperty =
@@ -150,9 +162,21 @@ public sealed class PatchbayView : Panel
     {
         ClipToBounds = true;
 
+        // A panel with no background is invisible to the pointer, so every press on the empty
+        // part of the surface went to whatever was behind it and the page could not be taken
+        // hold of at all. Transparent rather than a colour: the card underneath paints the
+        // ground, and painting a second one over it would be a plate on a plate.
+        Background = Brushes.Transparent;
+
         _cables = new PatchCables(this) { IsHitTestVisible = false };
 
         Children.Add(_cables);
+
+        // On the way down rather than on the way up, because a block answers a press by taking
+        // hold of itself and a dot answers by starting a cable: coming up, the two keys would
+        // only work over the parts of the page where nothing is, which is the opposite of what
+        // they are for.
+        AddHandler(PointerPressedEvent, Grabbed, RoutingStrategies.Tunnel);
     }
 
     /// <summary>Rebuilds the blocks whenever the list of them changes.</summary>
@@ -312,23 +336,25 @@ public sealed class PatchbayView : Panel
     }
 
     /// <summary>
-    /// Ctrl and Shift together take hold of the whole surface, which is then dragged about.
+    /// A held modifier or the middle button takes hold of the whole surface, which is then
+    /// dragged about.
     /// </summary>
     /// <remarks>
-    /// The same two keys the waveform is panned with, and for the same reason: every plain press
-    /// on this page already means something, since a block is dragged and a dot starts a cable,
-    /// so the gesture that moves the page has to be one that cannot be made by accident. It
-    /// works anywhere, blocks included, because the whole point of it is to reach a part of the
-    /// picture that is off the page.
+    /// The waveform's own gesture, through the waveform's own rule: every plain press on this
+    /// page already means something, since a block is dragged and a dot starts a cable, so the
+    /// one that moves the page has to be a press that cannot be made by accident. It works
+    /// anywhere, blocks included, because the whole point of it is to reach a part of the picture
+    /// that is off the page.
     /// </remarks>
-    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    private void Grabbed(object? sender, PointerPressedEventArgs e)
     {
-        base.OnPointerPressed(e);
+        var pressed = e.GetCurrentPoint(this).Properties;
 
-        if (!Grabbing(e.KeyModifiers)) return;
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        if (!Press.MeansPan(pressed.IsMiddleButtonPressed, e.KeyModifiers)) return;
+        if (!pressed.IsLeftButtonPressed && !pressed.IsMiddleButtonPressed) return;
 
         _panning = e.GetPosition(this);
+        Cursor = new Cursor(StandardCursorType.SizeAll);
 
         e.Pointer.Capture(this);
         e.Handled = true;
@@ -359,9 +385,7 @@ public sealed class PatchbayView : Panel
         _cables.InvalidateVisual();
     }
 
-    /// <summary>Whether the two keys that mean take hold of the page are both down.</summary>
-    private static bool Grabbing(KeyModifiers keys) =>
-        keys.HasFlag(KeyModifiers.Control) && keys.HasFlag(KeyModifiers.Shift);
+
 
     /// <summary>
     /// Lets go of the cable: onto a point that will take it, or out.
@@ -379,6 +403,8 @@ public sealed class PatchbayView : Panel
         if (_panning != null)
         {
             _panning = null;
+            Cursor = Cursor.Default;
+
             return;
         }
 
