@@ -32,16 +32,6 @@
       <Setter Property="Margin" Value="0,0,24,10" />
     </Style>
 
-    <!-- The rack's own two tabs, not the application's five. Left as they were they take the
-         page strip's size, which is a heading, and two headings will not stand side by side in
-         a column this narrow so they stack and eat a third of the list. -->
-    <Style Selector="TabControl.rack > TabItem">
-      <Setter Property="FontSize" Value="13" />
-      <Setter Property="MinHeight" Value="0" />
-      <Setter Property="Padding" Value="0,2,0,6" />
-      <Setter Property="Margin" Value="0,0,14,0" />
-    </Style>
-
     <!-- Each row in its machine's colour, a wash for a row and more of it for the one in hand.
          The rack reads as a rack of coloured boxes rather than as a list with a coloured edge,
          and the row you have picked is that machine's colour rather than the application's.
@@ -73,7 +63,7 @@
              is somebody else's program, used by a song rather than owned by this installation,
              and it is picked where a song picks its instruments and where a track adds an
              effect. -->
-        <TabControl Classes="rack" SelectedIndex="{Binding RackTab}">
+        <TabControl Classes="inner" SelectedIndex="{Binding RackTab}">
 
           <TabItem Header="Machines">
             <DockPanel>

@@ -862,7 +862,8 @@ public sealed partial class MainViewModel : ObservableObject, IShortcutContext
             Record.MaxGainDb,
             () => Record.RecordGainDb,
             value => Record.RecordGainDb = value,
-            () => (Record.LevelLeft, Record.LevelRight));
+            () => (Record.LevelLeft, Record.LevelRight),
+            source: Record);
 
     /// <summary>Backing field for <see cref="RecorderPlay"/>.</summary>
     private SourceStripViewModel? recorderPlay;

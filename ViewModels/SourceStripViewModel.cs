@@ -61,6 +61,10 @@ public sealed partial class SourceStripViewModel : ObservableObject
     /// that is over something else, which is the recording input.
     /// </param>
     /// <param name="soloed">Told after the solo moves, so the whole row can be worked out again.</param>
+    /// <param name="source">
+    /// What this strip is fed from, where that is a thing anybody can choose. Only the recording
+    /// input has one; the pads and a take being auditioned are fed by this program.
+    /// </param>
     public SourceStripViewModel(
         string label,
         string tip,
@@ -70,10 +74,13 @@ public sealed partial class SourceStripViewModel : ObservableObject
         Action<double> write,
         Func<(float Left, float Right)> meter,
         Audio.Interfaces.IOutputBus? bus = null,
-        Action? soloed = null)
+        Action? soloed = null,
+        Interfaces.IInputSource? source = null)
     {
         _bus = bus;
         _soloed = soloed;
+
+        Source = source;
 
         Label = label;
         Tip = tip;
@@ -99,6 +106,19 @@ public sealed partial class SourceStripViewModel : ObservableObject
 
     /// <summary>Whether this strip has a pan and a mute, which a strip over a bus has.</summary>
     public bool OnABus => _bus != null;
+
+    /// <summary>
+    /// What this strip is fed from, or nothing where that is not a question anybody answers.
+    /// </summary>
+    /// <remarks>
+    /// **A strip says what a thing is doing, and where it comes from is the first half of that**,
+    /// which is why the picker is at the foot of this strip rather than on another page. The pads
+    /// and a take have none: what feeds them is this program.
+    /// </remarks>
+    public Interfaces.IInputSource? Source { get; }
+
+    /// <summary>Whether to draw the source picker, which only a strip with a source does.</summary>
+    public bool TakesSource => Source != null;
 
     /// <summary>Where it sits between the speakers, -1 hard left to 1 hard right.</summary>
     public double Pan

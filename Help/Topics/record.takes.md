@@ -24,10 +24,8 @@ write over a recording you already have.
 
 ## Recording through effects
 
-**Record through** is a chain like a track's or a pad's: press the plus and put our
-own effects or a plugin on it, and every take goes through it on its way to the shelf.
-It stays where you leave it, the way the input gain does, so the microphone through a
-compressor and a delay is how the room is wired until you change it.
+**Recording Effects** is a chain like a track's or a pad's: press the plus and put our own effects or a plugin on it, and every take goes through it on its way to the shelf.
+It stays where you leave it, the way the input gain does, so the microphone through a compressor and a delay is how the room is wired until you change it.
 
 **Both go on the scratchpad**, and the two buttons above the picture pick which one
 you are looking at and would play. Saving keeps both: the name you typed is the take

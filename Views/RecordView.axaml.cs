@@ -146,11 +146,4 @@ public partial class RecordView : UserControl
             .ToList());
     }
 
-    /// <summary>
-    /// Opening the list is the moment it has to be right: a program only appears in the graph
-    /// while it is playing, so what was true a minute ago usually is not.
-    /// </summary>
-    private void Routes_DropDownOpened(object? sender, EventArgs e) =>
-        (DataContext as RecordViewModel)?.RefreshRoutesCommand.Execute(null);
-
 }

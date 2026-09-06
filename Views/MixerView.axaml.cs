@@ -52,6 +52,11 @@ public partial class MixerView : UserControl
             // was reporting the truth. See IInputWatch.
             Input?.Watch();
 
+            // And the source picker at the foot of that strip is the reason this page reads the
+            // graph, which is a different thing from watching the meter and is why it is asked
+            // for separately. See IInputSource.
+            Sources?.WatchRoutes();
+
             // The button that takes the page out has nothing to offer once the page is out. It is
             // hidden rather than left to do nothing, and the way back is the window's own frame,
             // which every window already has in the corner this button would be near.
@@ -61,6 +66,7 @@ public partial class MixerView : UserControl
         DetachedFromVisualTree += (_, _) =>
         {
             _meters.Stop();
+            Sources?.LetRoutesGo();
             Input?.LetGo();
         };
     }
@@ -76,6 +82,23 @@ public partial class MixerView : UserControl
     /// are for, so a mixer nobody is looking at costs nothing.
     /// </remarks>
     private readonly Avalonia.Threading.DispatcherTimer _meters;
+
+    /// <summary>Where the IN strip is fed from, or nothing where the page was built without it.</summary>
+    /// <remarks>
+    /// Read off the strip rather than handed to the page a second time: the strip is what the
+    /// picker is on, and two ways in would be two answers to one question.
+    /// </remarks>
+    private ViewModels.Interfaces.IInputSource? Sources =>
+        (RecorderInput as ViewModels.SourceStripViewModel)?.Source;
+
+    /// <summary>
+    /// Reads the graph again as the picker opens, so what is playing right now is in the list.
+    /// </summary>
+    /// <remarks>
+    /// A program is only in the graph while it is making a sound, so a list read two seconds ago
+    /// is a list that can be missing the thing somebody opened the picker to choose.
+    /// </remarks>
+    private void Sources_DropDownOpened(object? sender, System.EventArgs e) => Sources?.RefreshRoutes();
 
     /// <summary>Reads the three meters again, on the drawing thread.</summary>
     /// <remarks>

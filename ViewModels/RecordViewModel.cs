@@ -38,7 +38,7 @@ namespace JingleBox2.ViewModels;
 /// anybody wanted it. Only this session's deletions are offered back: putting back a take from
 /// last week is a filing cabinet, not undo.
 /// </remarks>
-public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, IInputWatch, Shortcuts.Interfaces.IShortcutContext
+public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, IInputWatch, IInputSource, Shortcuts.Interfaces.IShortcutContext
 {
     /// <summary>The one door recordings come in through. Holds nothing, so one is enough.</summary>
     private readonly IRecordingImport _import = new RecordingImport();
@@ -1709,29 +1709,31 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     [ObservableProperty] private AudioRoute? selectedRoute;
 
-    /// <summary>False on a system with no graph to patch, and the picker stays hidden.</summary>
+    /// <summary>False on a system with no graph to patch, and the line stays hidden.</summary>
     public bool IsRoutingAvailable => _routing.IsAvailable;
 
-    /// <summary>Reads the graph again, for a program that has started playing since.</summary>
-    /// <remarks>
-    /// Always enabled, and the button is only on the page at all where there is a graph to
-    /// read. It is also called on a timer while the page is up, so pressing it is a way to be
-    /// sure rather than the only way to be told.
-    /// </remarks>
-    public IRelayCommand RefreshRoutesCommand => new RelayCommand(RefreshRoutes);
-
     /// <summary>
-    /// Reads the graph and shows what is feeding the recorder. The tools take a moment, so
-    /// this happens off the UI thread.
+    /// Where the input is taken from, in words, for the page that says it rather than sets it.
     /// </summary>
     /// <remarks>
+    /// **RECORD reads and the mixer chooses.** The picker is at the foot of the IN strip, since
+    /// that is the strip it is about, and one choice offered in two places is two ways of doing
+    /// one thing that eventually answer differently. Nothing chosen says so plainly: it is the
+    /// ordinary state at startup and the meter reading nothing is the other half of it.
+    /// </remarks>
+    public string CaptureFrom => SelectedRoute?.Display ?? "Nothing yet. Pick a source on the mixer, at the foot of the IN strip.";
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The tools take a moment, so this happens off the UI thread.
+    ///
     /// The route on show is matched to the current one by node rather than by object, because
     /// the list is read afresh every time and the object from before is not in it.
     ///
     /// One reading at a time: the timer fires every two seconds and the tools can take longer
     /// than that, so without the guard the readings would pile up on each other.
     /// </remarks>
-    private async void RefreshRoutes()
+    public async void RefreshRoutes()
     {
         if (!_routing.IsAvailable || _refreshingRoutes) return;
 
@@ -1829,6 +1831,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     partial void OnSelectedRouteChanged(AudioRoute? value)
     {
+        OnPropertyChanged(nameof(CaptureFrom));
+
         if (_readingRoute || value == null) return;
 
         _preferredRoute = value;
@@ -1983,14 +1987,12 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         IsClipping = false;
     }
 
-    /// <summary>
-    /// Reads the audio graph and keeps reading it, which is RECORD's alone.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// **Deliberately not part of watching the input**, although it needs the input open. Reading
     /// the routes puts the preferred one back when the system has wired something else up, which
-    /// is rewiring the machine's audio graph, and a page with no route picker on it has no
-    /// business doing that every two seconds. The mixer watches the meter and nothing else.
+    /// is rewiring the machine's audio graph, so it belongs to a page carrying the picker rather
+    /// than to every page showing a meter.
     ///
     /// The routes are read after the input is open and not before, because the recorder only
     /// appears in the graph once it is listening: reading first would show a graph with nothing
@@ -1998,12 +2000,30 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     public void WatchRoutes()
     {
+        _watchingRoutes++;
+
+        if (_watchingRoutes > 1) return;
+
         RefreshRoutes();
         StartRouteWatch();
     }
 
-    /// <summary>Stops reading the graph, for a page that has gone.</summary>
-    public void LetRoutesGo() => StopRouteWatch();
+    /// <inheritdoc/>
+    public void LetRoutesGo()
+    {
+        if (_watchingRoutes > 0) _watchingRoutes--;
+        if (_watchingRoutes > 0) return;
+
+        StopRouteWatch();
+    }
+
+    /// <summary>How many pages carrying the source picker are on screen.</summary>
+    /// <remarks>
+    /// Counted for the reason the input's own watchers are: the mixer holds the picker and
+    /// RECORD says what it reads, so both are reasons to keep reading the graph, and a flag
+    /// would have whichever page left last stop the reading under the page still up.
+    /// </remarks>
+    private int _watchingRoutes;
 
     /// <summary>
     /// One poll for both jobs. It runs while the input is open, for a take or for the meter,

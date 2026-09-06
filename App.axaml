@@ -324,6 +324,20 @@
           </Setter>
         </Style>
 
+        <!-- Tabs inside a page, which are not the application's along the top. Left as they
+             were they take the page strip's size, which is a heading, and a heading is the
+             wrong weight for a choice made within a page: on the rack two of them would not
+             stand side by side in that column and stacked they ate a third of the list.
+
+             Here rather than in the two pages that use it, since two spellings of one look is
+             how the mixer's tabs and the rack's come to disagree about their own size. -->
+        <Style Selector="TabControl.inner > TabItem">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="0,2,0,6" />
+            <Setter Property="Margin" Value="0,0,14,0" />
+        </Style>
+
         <!-- The two things under the pattern, wearing the one shape: a line with a name on it
              and whatever it folds away underneath. Only the line is here; the room the open
              one gets belongs to the grid it stands in, since only a grid can share it out. -->

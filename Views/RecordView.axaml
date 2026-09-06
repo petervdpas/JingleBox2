@@ -22,22 +22,16 @@
              stop a take belong together, and the fader belongs next to the meter it feeds. -->
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
         <StackPanel Grid.Column="0" Spacing="12">
-          <!-- Only on a system with a graph to patch; elsewhere the input is whatever the
-               device picker in SETTINGS chose. -->
+          <!-- Said rather than chosen. The source is picked at the foot of the IN strip on the
+               mixer, because that is the strip it is about, and one choice offered in two
+               pickers is two ways of doing one thing that would eventually answer differently.
+               Only on a system with a graph to patch; elsewhere the input is whatever the device
+               picker in SETTINGS chose. -->
           <StackPanel Spacing="4" IsVisible="{Binding IsRoutingAvailable}">
             <TextBlock Text="Capture from" Opacity="0.8" />
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-              <ComboBox Grid.Column="0"
-                        ItemsSource="{Binding Routes}"
-                        SelectedItem="{Binding SelectedRoute}"
-                        DisplayMemberBinding="{Binding Display}"
-                        HorizontalAlignment="Stretch"
-                        DropDownOpened="Routes_DropDownOpened"
-                        PlaceholderText="Whatever the system chose" />
-              <Button Grid.Column="1" Content="Refresh"
-                      Command="{Binding RefreshRoutesCommand}"
-                      ToolTip.Tip="Programs only appear while they are playing something." />
-            </Grid>
+            <TextBlock Text="{Binding CaptureFrom}"
+                       TextTrimming="CharacterEllipsis"
+                       ToolTip.Tip="Where the input is taken from. Change it at the foot of the IN strip on the mixer." />
           </StackPanel>
 
           <StackPanel Orientation="Horizontal" Spacing="4">
