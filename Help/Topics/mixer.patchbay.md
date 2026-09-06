@@ -40,11 +40,11 @@ The cables between our own blocks wear a different colour from the ones you patc
 and they cannot be pulled apart. That is not a limitation to work around, it is what
 this program is: the pads reach the desk because a desk is what they are summed on.
 
-## The sidebar
+## The details
 
-Touch a block to see what it is, what it takes in, and what it gives out. Its meter
-is there too, and for the tracker that is one meter for every track at once, since
-what a sidebar is asked is whether audio is coming out of the block. Which track is
+Touch a block and what it is appears under the picture: what it takes in, what it
+gives out, and its meter. For the tracker that meter is every track at once, since
+what this panel is asked is whether audio is coming out of the block. Which track is
 which is answered on the picture, by the cables that are solid.
 
 Every output has a mute and a solo beside it, and they are the same switches the desk
@@ -63,4 +63,4 @@ the blocks. That is the same press every picture in this application is panned w
 Panning changes nothing you have arranged; it only changes where the window is
 looking.
 
-The handle between the picture and the sidebar gives either of them more room.
+The handle between the picture and the details gives either of them more room.

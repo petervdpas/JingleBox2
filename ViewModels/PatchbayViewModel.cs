@@ -142,7 +142,12 @@ public sealed partial class PatchbayViewModel : ObservableObject
 
         Pulse();
 
-        if (Selected is not { } picked) return;
+        if (Selected is not { } picked)
+        {
+            Selected ??= Opening();
+
+            return;
+        }
 
         Selected = Find(picked.Id);
 
@@ -281,6 +286,30 @@ public sealed partial class PatchbayViewModel : ObservableObject
     {
         foreach (var route in _input.Routes)
             if (string.Equals(route.Node, node, StringComparison.Ordinal)) return route;
+
+        return null;
+    }
+
+    /// <summary>
+    /// The block to be looking at before anybody has touched one.
+    /// </summary>
+    /// <remarks>
+    /// **Whatever is feeding the input**, which is the one block on the page that was chosen
+    /// rather than simply being there: everything else is either this application or a program
+    /// that happens to be playing. A page that opened with an empty panel under it was asking
+    /// somebody to click something before it would say anything, and took the room either way.
+    ///
+    /// Only while nothing has been touched. The graph is read every couple of seconds, so a
+    /// page that chose again on each reading would take the panel off a block somebody was
+    /// looking at; nothing is chosen until there is a source, so a machine with none opens on
+    /// nothing and fills in when one is picked.
+    /// </remarks>
+    private PatchNode? Opening()
+    {
+        if (_input.SelectedRoute is not { } taking) return null;
+
+        foreach (var node in Nodes)
+            if (string.Equals(node.Id, taking.Node, StringComparison.Ordinal)) return node;
 
         return null;
     }

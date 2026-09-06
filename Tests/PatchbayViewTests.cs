@@ -430,6 +430,60 @@ public class PatchbayViewTests
         Assert.False(bay.Metered);
     }
 
+    /// <summary>The page opens on whatever is feeding the input.</summary>
+    /// <remarks>
+    /// The one block on the picture that was chosen rather than simply being there: everything
+    /// else is either this application or a program that happens to be playing.
+    /// </remarks>
+    [Fact]
+    public void It_opens_on_the_source_being_taken()
+    {
+        var bench = new Bench();
+        bench.Routes.Add(Route("firefox"));
+        bench.SelectedRoute = bench.Routes[0];
+
+        var bay = new PatchbayViewModel(bench);
+
+        Assert.Equal("firefox", bay.Selected?.Id);
+    }
+
+    /// <summary>With no source chosen it opens on nothing, and fills in when one is.</summary>
+    [Fact]
+    public void With_no_source_it_waits_for_one()
+    {
+        var bench = new Bench();
+        bench.Routes.Add(Route("firefox"));
+
+        var bay = new PatchbayViewModel(bench);
+
+        Assert.Null(bay.Selected);
+
+        bench.SelectedRoute = bench.Routes[0];
+
+        Assert.Equal("firefox", bay.Selected?.Id);
+    }
+
+    /// <summary>And having picked one, a fresh reading does not take it away.</summary>
+    /// <remarks>
+    /// The graph is read every couple of seconds, so a page that chose again on each reading
+    /// would take the panel off a block somebody was looking at.
+    /// </remarks>
+    [Fact]
+    public void Opening_on_the_source_happens_once()
+    {
+        var bench = new Bench();
+        bench.Routes.Add(Route("firefox"));
+        bench.SelectedRoute = bench.Routes[0];
+
+        var bay = new PatchbayViewModel(bench);
+
+        bay.Selected = Assert.Single(bay.Nodes, n => n.Id == "mixer");
+
+        bench.Routes.Add(Route("chromium"));
+
+        Assert.Equal("mixer", bay.Selected?.Id);
+    }
+
     /// <summary>Nothing picked shows no meter.</summary>
     [Fact]
     public void Nothing_picked_shows_no_meter()

@@ -455,12 +455,14 @@
         <ContentControl Content="{Binding $parent[views:MixerView].Patchbay}">
           <ContentControl.ContentTemplate>
             <DataTemplate x:DataType="vm:PatchbayViewModel">
-              <!-- The same handle the rack and the help window use, so the two panes can be
-                   shared out: a block's name is whatever the program that owns it is called, and
-                   how much room that wants is not something this layout can know. -->
-              <Grid ColumnDefinitions="*,12,260">
+              <!-- The details go under the picture rather than beside it. The picture is
+                   wide and grows sideways as blocks are added, so a column down the right was
+                   taking room from the one thing on the page that needs it; under it the same
+                   details lie in a row and cost only height. The same handle the rack and the
+                   help window use shares the two out. -->
+              <Grid RowDefinitions="*,12,Auto">
 
-                <Border Grid.Column="0" Classes="card" MinWidth="240">
+                <Border Grid.Row="0" Classes="card" MinHeight="180">
                   <views:PatchbayView Loaded="Bay_Loaded"
                                       Nodes="{Binding Nodes}"
                                       Links="{Binding Links}"
@@ -468,92 +470,105 @@
                                       Selected="{Binding Selected, Mode=TwoWay}" />
                 </Border>
 
-                <!-- What the block in hand is. It says nothing rather than the last thing when
-                     nothing is picked, since a sidebar describing a block nobody touched reads
-                     as the picture having chosen for you. -->
-                <GridSplitter Grid.Column="1" Classes="handle" ResizeDirection="Columns"
+                <GridSplitter Grid.Row="1" Classes="handle rows" ResizeDirection="Rows"
                               ToolTip.Tip="Drag to give the picture or the details more room." />
 
-                <Border Grid.Column="2" Classes="card" MinWidth="180">
+                <!-- What the block in hand is. It says nothing rather than the last thing when
+                     nothing is picked, since a panel describing a block nobody touched reads as
+                     the picture having chosen for you. -->
+                <Border Grid.Row="2" Classes="card">
                   <DockPanel>
-                    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8"
+                          Margin="0,0,0,8">
                       <TextBlock Grid.Column="0" Classes="cardTitle" Text="Block" />
                       <views:HelpBadge Grid.Column="1" Topic="mixer.patchbay" VerticalAlignment="Center" />
+
+                      <!-- On the heading's own line rather than under the details, since down
+                           here the details are columns and a line of prose under them would be
+                           as wide as the window and read as a caption for all of it. -->
+                      <TextBlock Grid.Column="3" Classes="cardHint" VerticalAlignment="Center"
+                                 TextTrimming="CharacterEllipsis"
+                                 Text="{Binding Says}" />
                     </Grid>
 
-                    <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" TextWrapping="Wrap"
-                               Margin="0,8,0,0"
-                               Text="{Binding Says}" />
+                    <!-- The details in a row, each part taking only what it needs, and the lot
+                         scrolling sideways rather than wrapping: a block with thirty two tracks
+                         on it is a long list however it is drawn, and a panel that grew taller
+                         as a song did would take the picture's room with it. -->
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                                  IsVisible="{Binding Selected, Converter={x:Static ObjectConverters.IsNotNull}}">
+                      <StackPanel Orientation="Horizontal" Spacing="24">
 
-                    <StackPanel Spacing="10" IsVisible="{Binding Selected, Converter={x:Static ObjectConverters.IsNotNull}}">
-                      <StackPanel Spacing="2">
-                        <TextBlock Text="{Binding Selected.Title}" TextWrapping="Wrap" FontWeight="SemiBold" />
-                        <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding Selected.Id}" />
-                      </StackPanel>
+                        <StackPanel Spacing="2" MaxWidth="240" VerticalAlignment="Top">
+                          <TextBlock Text="{Binding Selected.Title}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                          <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding Selected.Id}" />
+                        </StackPanel>
 
-                      <!-- What the block is putting out. Only for the blocks this application
-                           owns: a program on the machine is somebody else's and we measure
-                           nothing about it, so it gets no meter rather than one that cannot
-                           move. The tracker's is every track at once, since what a sidebar is
-                           asked is whether audio is coming out of the block. -->
-                      <StackPanel Spacing="4" IsVisible="{Binding Metered}">
-                        <TextBlock Classes="cardHint" Text="Level" />
-                        <ui:LevelMeter Width="26" Height="120"
-                                       HorizontalAlignment="Left"
-                                       Stereo="True"
-                                       Left="{Binding LevelLeft}"
-                                       Right="{Binding LevelRight}"
-                                       ToolTip.Tip="What is leaving this block, left and right." />
-                      </StackPanel>
+                        <!-- What the block is putting out. Only for the blocks this application
+                             owns: a program on the machine is somebody else's and we measure
+                             nothing about it, so it gets no meter rather than one that cannot
+                             move. The tracker's is every track at once, since what this panel
+                             is asked is whether audio is coming out of the block. -->
+                        <StackPanel Spacing="4" IsVisible="{Binding Metered}" VerticalAlignment="Top">
+                          <TextBlock Classes="cardHint" Text="Level" />
+                          <ui:LevelMeter Width="26" Height="96"
+                                         HorizontalAlignment="Left"
+                                         Stereo="True"
+                                         Left="{Binding LevelLeft}"
+                                         Right="{Binding LevelRight}"
+                                         ToolTip.Tip="What is leaving this block, left and right." />
+                        </StackPanel>
 
-                      <StackPanel Spacing="4" IsVisible="{Binding Selected.HasIns}">
-                        <TextBlock Classes="cardHint" Text="Takes in" />
-                        <ItemsControl ItemsSource="{Binding Selected.Ins}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="rec:PatchPort">
-                              <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock FontFamily="{x:Static ui:PatternFont.Family}" FontSize="11"
-                                           Text="{Binding Name}" />
-                                <TextBlock Classes="cardHint" FontSize="11" Text="{Binding Shape}" />
-                              </StackPanel>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                      </StackPanel>
-
-                      <!-- One row per output, and the row is the same shape whatever the block
-                           is: a track, the pads, a take and the master are four things here and
-                           to a hand reaching for M or S they are one. A switch that means
-                           nothing is dark rather than gone, which is the rule the mixer's own
-                           strips keep, since a control that vanishes takes the layout with it. -->
-                      <StackPanel Spacing="4" IsVisible="{Binding Selected.HasOuts}">
-                        <TextBlock Classes="cardHint" Text="Gives out" />
-                        <ItemsControl ItemsSource="{Binding Outputs}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:PatchSwitchViewModel">
-                              <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4" Margin="0,0,0,3">
-                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6"
-                                            VerticalAlignment="Center">
+                        <StackPanel Spacing="4" IsVisible="{Binding Selected.HasIns}" VerticalAlignment="Top">
+                          <TextBlock Classes="cardHint" Text="Takes in" />
+                          <ItemsControl ItemsSource="{Binding Selected.Ins}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="rec:PatchPort">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
                                   <TextBlock FontFamily="{x:Static ui:PatternFont.Family}" FontSize="11"
                                              Text="{Binding Name}" />
                                   <TextBlock Classes="cardHint" FontSize="11" Text="{Binding Shape}" />
                                 </StackPanel>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
 
-                                <ToggleButton Grid.Column="1" Classes="strip" Content="M"
-                                              IsEnabled="{Binding CanMute}"
-                                              IsChecked="{Binding Mute}"
-                                              ToolTip.Tip="Silence this, leaving its fader where it is." />
+                        <!-- One row per output, and the row is the same shape whatever the block
+                             is: a track, the pads, a take and the master are four things here and
+                             to a hand reaching for M or S they are one. A switch that means
+                             nothing is dark rather than gone, which is the rule the mixer's own
+                             strips keep, since a control that vanishes takes the layout with it. -->
+                        <StackPanel Spacing="4" IsVisible="{Binding Selected.HasOuts}" VerticalAlignment="Top">
+                          <TextBlock Classes="cardHint" Text="Gives out" />
+                          <ItemsControl ItemsSource="{Binding Outputs}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:PatchSwitchViewModel">
+                                <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6" Margin="0,0,0,3">
+                                  <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6"
+                                              MinWidth="90" VerticalAlignment="Center">
+                                    <TextBlock FontFamily="{x:Static ui:PatternFont.Family}" FontSize="11"
+                                               Text="{Binding Name}" />
+                                    <TextBlock Classes="cardHint" FontSize="11" Text="{Binding Shape}" />
+                                  </StackPanel>
 
-                                <ToggleButton Grid.Column="2" Classes="strip" Content="S"
-                                              IsEnabled="{Binding CanSolo}"
-                                              IsChecked="{Binding Solo}"
-                                              ToolTip.Tip="Hear only this." />
-                              </Grid>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                                  <ToggleButton Grid.Column="1" Classes="strip" Content="M"
+                                                IsEnabled="{Binding CanMute}"
+                                                IsChecked="{Binding Mute}"
+                                                ToolTip.Tip="Silence this, leaving its fader where it is." />
+
+                                  <ToggleButton Grid.Column="2" Classes="strip" Content="S"
+                                                IsEnabled="{Binding CanSolo}"
+                                                IsChecked="{Binding Solo}"
+                                                ToolTip.Tip="Hear only this." />
+                                </Grid>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+
                       </StackPanel>
-                    </StackPanel>
+                    </ScrollViewer>
                   </DockPanel>
                 </Border>
 
