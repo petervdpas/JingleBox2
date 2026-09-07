@@ -156,16 +156,7 @@ jobs:
         run: |
           set -euo pipefail
           OUT="out/${{ matrix.name }}"
-
-          if [ -f "$OUT/runtimes/${{ matrix.rid }}/native/libbass.so" ]; then
-            cp -a "$OUT/runtimes/${{ matrix.rid }}/native/libbass.so" "$OUT/libbass.so"
-          fi
-          if [ -f "$OUT/runtimes/${{ matrix.rid }}/native/libbass_aac.so" ]; then
-            cp -a "$OUT/runtimes/${{ matrix.rid }}/native/libbass_aac.so" "$OUT/libbass_aac.so"
-          fi
-
-          rm -f "$OUT/libcoreclrtraceptprovider.so"
-
+          bash .github/scripts/linux-natives.sh "$OUT" "${{ matrix.rid }}"
           test -f "$OUT/${APP_NAME}"
 
       - name: Verify the rack is packaged (Linux)
@@ -295,16 +286,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          if [ -f out/linux-x64/runtimes/linux-x64/native/libbass.so ]; then
-            cp -a out/linux-x64/runtimes/linux-x64/native/libbass.so out/linux-x64/libbass.so
-          fi
-          if [ -f out/linux-x64/runtimes/linux-x64/native/libbass_aac.so ]; then
-            cp -a out/linux-x64/runtimes/linux-x64/native/libbass_aac.so out/linux-x64/libbass_aac.so
-          fi
-
-          rm -f out/linux-x64/libcoreclrtraceptprovider.so
-
+          bash .github/scripts/linux-natives.sh out/linux-x64 linux-x64
           test -f out/linux-x64/JingleBox2
 
       - name: Verify the rack is packaged
@@ -447,16 +429,7 @@ jobs:
         run: |
           set -euo pipefail
           OUT="out/linux-x64"
-
-          if [ -f "$OUT/runtimes/linux-x64/native/libbass.so" ]; then
-            cp -a "$OUT/runtimes/linux-x64/native/libbass.so" "$OUT/libbass.so"
-          fi
-          if [ -f "$OUT/runtimes/linux-x64/native/libbass_aac.so" ]; then
-            cp -a "$OUT/runtimes/linux-x64/native/libbass_aac.so" "$OUT/libbass_aac.so"
-          fi
-
-          rm -f "$OUT/libcoreclrtraceptprovider.so"
-
+          bash .github/scripts/linux-natives.sh "$OUT" linux-x64
           test -f "$OUT/${APP_NAME}"
 
       - name: Verify the rack is packaged

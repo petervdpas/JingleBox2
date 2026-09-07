@@ -26,9 +26,9 @@ class Program
     /// (see <see cref="Audio.Plugins.Bridge.PluginHostProcess"/>). Started as a panel preview
     /// it draws one machine's front panel and nothing else.
     ///
-    /// Anything thrown on the way up is written to startup.log before it is rethrown, because
-    /// a failure this early has no window to report itself in and would otherwise be a process
-    /// that started and vanished.
+    /// Anything thrown on the way up is written down before it is rethrown, because a failure
+    /// this early has no window to report itself in and would otherwise be a process that
+    /// started and vanished. Where it is written down is <see cref="Note"/>, which cannot fail.
     /// </remarks>
     [STAThread]
     public static void Main(string[] args)
@@ -45,7 +45,7 @@ class Program
             return;
         }
 
-        File.AppendAllText("startup.log", $"Main entered {DateTime.Now:O}{Environment.NewLine}");
+        Note($"Main entered {DateTime.Now:O}");
 
         try
         {
@@ -53,8 +53,48 @@ class Program
         }
         catch (Exception ex)
         {
-            File.AppendAllText("startup.log", $"FATAL: {ex}{Environment.NewLine}");
+            Note($"FATAL: {ex}");
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Writes one line into <c>startup.log</c> in the application folder, and never throws.
+    /// </summary>
+    /// <remarks>
+    /// It was written to <c>startup.log</c> with no folder in front of it, which is a path
+    /// relative to wherever the process happened to be started, and that is not somewhere this
+    /// program may write. Installed from a package the program lives under <c>/opt</c>, which is
+    /// the system's; a desktop launcher starts it at the root of the disc or at the user's home,
+    /// neither of which is where a log belongs and the first of which is refused outright. So
+    /// the first line the application wrote threw <see cref="UnauthorizedAccessException"/>
+    /// before the toolkit had been asked for anything, and the whole of the symptom was a
+    /// program that would not start. It ran from a checkout throughout, because a build tree is
+    /// somewhere its owner can write.
+    ///
+    /// The application folder is where everything else this program keeps already lives, it is
+    /// the same folder whatever started the process and from where, and
+    /// <see cref="Files.AppFolder"/> knows it without reading the settings, which is what lets
+    /// it be asked this early.
+    ///
+    /// Nothing here is allowed to throw, which is the other half of the same fault: a note
+    /// about starting was the reason the application did not start. A folder that cannot be
+    /// made, a disc that is full and a file somebody else holds open are all the same answer,
+    /// which is that this run goes unrecorded and the application carries on. The catch is
+    /// deliberately over everything rather than over the write alone, since working out where
+    /// to write reads the environment and that can fail on its own.
+    /// </remarks>
+    /// <param name="line">What to write down, with no line ending on it.</param>
+    private static void Note(string line)
+    {
+        try
+        {
+            string folder = new Files.AppFolder().Path();
+            Directory.CreateDirectory(folder);
+            File.AppendAllText(Path.Combine(folder, "startup.log"), line + Environment.NewLine);
+        }
+        catch
+        {
         }
     }
 

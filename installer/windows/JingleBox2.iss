@@ -45,7 +45,24 @@ Name: "{commondesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desk
 Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"
 
 [Run]
-Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
+; runasoriginaluser is the default here rather than a change: Inno documents it as the default
+; behaviour when postinstall is used, so this launch was never the elevated one. It is said out
+; loud all the same, for the reason every shipped machine names its own menu corner rather than
+; leaning on the default: a flag nobody wrote down is one that moves the first time somebody
+; edits the line, and what it decides is whether the launch that checks the install is the same
+; launch as the shortcut.
+;
+; It is not the whole promise, and the gap is Windows' rather than Inno's. Setup started by
+; right-clicking and choosing "Run as administrator", or from an already elevated process, never
+; holds the original credentials to hand back, so this launch is elevated and the flag has no
+; effect. Nothing in this file can reach that case.
+;
+; Which is why the app may not depend on it. It once did: the startup log was written to a path
+; relative to the working directory, which is {app} here and therefore Program Files, so an
+; elevated launch wrote it happily and a desktop shortcut threw before the toolkit was asked for
+; anything. That log goes to the application folder now, so an install checked from the last
+; page and an install checked from the shortcut are the same program either way.
+Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [Code]
 { Every release up to now ran the installer in 32-bit mode, so those copies sit in

@@ -79,8 +79,8 @@ public partial class App : Application
     ///
     /// Anything thrown while the window is built takes the splash down before it goes up, so a
     /// startup that fails is not a purple rectangle sitting there for ever. What it throws is
-    /// left alone: <c>Program.Main</c> writes it to startup.log, which is where a failure this
-    /// early is read.
+    /// left alone: <c>Program.Main</c> writes it to startup.log in the application folder, which
+    /// is where a failure this early is read.
     /// </remarks>
     /// <param name="desktop">The lifetime, which is told which window is the main one.</param>
     /// <param name="splash">What is on screen until there is a window to replace it.</param>

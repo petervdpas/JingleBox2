@@ -4502,4 +4502,38 @@ whole exercise and is worth writing down rather than summarising:
   only way this is ever going to be caught
 - BASS library binaries are copied to output via build targets in csproj
 - managed-midi API has obsolete warnings (suppressed via `<NoWarn>CS0618</NoWarn>`)
-- Startup errors logged to `startup.log` for debugging
+- **`startup.log` is in the application folder, and writing it may not stop the application.** It
+  was written to `startup.log` with no folder in front of it, which is a path relative to
+  wherever the process was started, and that is nowhere this program may write: installed from a
+  package the program lives under `/opt`, and a desktop launcher starts it at the root of the
+  disc or at the user's home. So the first line the application wrote threw
+  `UnauthorizedAccessException` before the toolkit had been asked for anything, and the whole of
+  the symptom was **a program that would not start**. It ran from a checkout throughout, because
+  a build tree is somewhere its owner can write, which is why nothing here ever saw it
+- **The second half is that a note about starting was the reason the application did not start.**
+  The line was written outside the try that exists to catch a failed start, so the one thing that
+  cannot be allowed to fail was the one thing with nothing around it. `Program.Note` writes into
+  the application folder and swallows everything: a folder that cannot be made, a full disc and a
+  file somebody else holds open are all the same answer, which is that this run goes unrecorded
+  and the application carries on
+- **A native carried by hand is carried in three places, and Linux had no check on any of them.**
+  A .NET publish for a Linux runtime leaves each BASS library under `runtimes/<rid>/native/`,
+  where nothing looks for one, so the release workflow copied them up beside the executable: once
+  for the tarball, once for the RPM and once for the .deb, each naming the files one by one and
+  each wrapping the copy in a test for the file being there. `libbassmix.so` was added to the
+  repository and to the csproj and to none of the three, and a file that is not there was passed
+  over in silence, so **every Linux release since the output bus went in shipped without it**.
+  Windows has a step that refuses a payload with no `bassmix.dll`, which is the whole of why
+  Windows kept working, and is exactly the difference this file already names between a check
+  that exists and a copy that is merely written correctly
+- What the absence cost was the application rather than a feature, and only because the bus
+  stopped being a switch: with no second path the mixer stream cannot be opened and the first
+  thing to ask for audio throws. **A switch removed after it had been listened to is right, and
+  what goes with it is the tolerance it bought**, so the day the fallback went was the day the
+  library became something to check for
+- `.github/scripts/linux-natives.sh` is the one place that says which, doing the carrying and the
+  checking in one act, since two spellings of a list of libraries is how the list came to be
+  wrong in the first place. `libbass.so` and `libbassmix.so` are fatal and `libbass_aac.so` is a
+  warning, which is the line the Windows step already draws. Proved by publishing and taking the
+  library back out rather than by reading the workflow, which is the only way this is ever caught:
+  the payload that shipped is refused, and the one missing only the decoder passes with a warning
