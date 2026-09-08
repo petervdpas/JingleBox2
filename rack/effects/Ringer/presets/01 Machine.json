@@ -1,0 +1,9 @@
+{
+  "Name": "Machine",
+  "Effect": "effect.ringer",
+  "carrier": 90,
+  "square": 1,
+  "spread": 0,
+  "crush": 0.3,
+  "mix": 1.0
+}

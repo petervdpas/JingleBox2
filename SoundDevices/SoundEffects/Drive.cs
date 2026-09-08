@@ -9,7 +9,7 @@ namespace JingleBox2.SoundDevices.SoundEffects;
 /// <remarks>
 /// The third engine. What it does is one line of arithmetic and everything around that line is
 /// the reason it is worth having as an effect rather than as a knob: a curve on its own is a
-/// fuzz box, and what makes drive usable on a whole track is what is done before and after it.
+/// fuzz pedal, and what makes drive usable on a whole track is what is done before and after it.
 ///
 /// **Before it is a tilt.** Distortion is loudest where the signal is, so driving a full mix
 /// turns the bass into mud and takes the top with it. A tilt in front lets you choose what gets

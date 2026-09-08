@@ -23,7 +23,7 @@ namespace JingleBox2.SoundDevices.SoundEffects;
 /// <see cref="JingleBox2.SoundDevices.SoundMachines.SoundMachineProject"/> with a flag on it. What a
 /// machine carries that an effect has no use for is most of it: which engine it borrows, where
 /// its picker gets its list, and a folder of sounds, all of which are about a thing that is
-/// sent notes and plays them back. What is left is what any box on the rack is, which is
+/// sent notes and plays them back. What is left is what any device on the rack is, which is
 /// <see cref="IRackProject"/>, plus the face.
 ///
 /// An effect in use is a slot on a track's chain, and it takes no name of its own: two of the

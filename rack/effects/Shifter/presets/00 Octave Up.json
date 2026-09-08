@@ -1,0 +1,8 @@
+{
+  "Name": "Octave Up",
+  "Effect": "effect.shifter",
+  "steps": 12,
+  "cents": 0,
+  "window": 45,
+  "mix": 1.0
+}

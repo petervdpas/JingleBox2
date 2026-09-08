@@ -1,0 +1,9 @@
+{
+  "Name": "Telephone",
+  "Effect": "effect.ringer",
+  "carrier": 500,
+  "square": 0,
+  "spread": 0,
+  "crush": 0.55,
+  "mix": 0.8
+}

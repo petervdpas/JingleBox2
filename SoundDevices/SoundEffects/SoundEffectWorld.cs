@@ -32,7 +32,7 @@ public sealed class SoundEffectWorld : IDesignWorld
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Everything a box that is not played can fill, which is the list without the eight that
+    /// Everything a device that is not played can fill, which is the list without the eight that
     /// need notes or a kit behind them.
     /// </remarks>
     public IReadOnlyList<string> Parts => _parts.For(Played);

@@ -1,11 +1,11 @@
 # Effects of our own
 
-Decided on 2026-09-02, and built since. Three effects of ours ship: **EchoBox** the delay,
-**Sweeper** the filter and **Roaster** the drive, with six presets apiece, and each is on the
-rack's Effects tab, on a track's chain, on the master and on a pad. They are registered, imported
-and thrown out by the same rules a machine is, laid out in the same designer, and pointed at by
-the same links. The rest of this file is the design that got there, and the list at the foot says
-which of the six planned engines are the three that are not written.
+Decided on 2026-09-02, and built since. Five effects of ours ship: **EchoBox** the delay,
+**Sweeper** the filter, **Roaster** the drive, **Shifter** the pitch shifter and **Ringer** the
+ring modulator, with six presets apiece, and each is on the rack's Effects tab, on a track's
+chain, on the master and on a pad. They are registered, imported and thrown out by the same rules
+a machine is, laid out in the same designer, and pointed at by the same links. The rest of this
+file is the design that got there, and the list at the foot says what is still unwritten.
 
 ## An effect is not a machine
 
@@ -31,7 +31,7 @@ shipped beside the program and one under the application folder that decides; `o
 that removing an effect is not losing it and a newly shipped one still arrives; files kept up to
 date against the shipped copy by each file's clock, with nothing ever deleted; and an id whose
 engine this build has no engine for read off disc and passed over rather than put on the rack as
-a box that cannot sound.
+a device that cannot sound.
 
 What the two worlds share is the drawing. A face is a face.
 
@@ -192,8 +192,8 @@ what and which parameter, `Slot` for where. Automation goes the same way through
 The Menu part then means something on an effect's face on the day the face exists, which is what
 it was built generic for.
 
-**Which box the link reaches is the one whose face is in front.** A link names the effect and the
-key and never where the box is standing, which is what makes it travel, so something else has to
+**Which effect the link reaches is the one whose face is in front.** A link names the effect and
+the key and never where it is standing, which is what makes it travel, so something else has to
 answer "which EchoBox". That answer was the chain of the track you are working on, and it is right
 while you are working in the pattern and wrong in three ways once a face is open in a window,
 which is exactly when a hand is reaching for a knob:
@@ -205,7 +205,7 @@ which is exactly when a hand is reaching for a knob:
   pointed at an effect on a pad moved nothing, ever
 
 `ISoundEffectInFront` is the one answer, asked before anything else, and `ISoundEffectShown` is the three
-things a link needs about a box: which effect it is, where it is standing (for the sentence on the
+things a link needs about an effect: which effect it is, where it is standing (for the sentence on the
 status line, since a chain is not always on a track), and what its knobs stand at. The window says
 it on opening as well as on being brought forward, because whether a window hears that it was
 activated is the window manager's business and under a bare X server there is nobody to tell it.
@@ -215,9 +215,9 @@ With no face open the chain of the track you are on answers as it always did, an
 through the panel's own `IPanelValues`, which raises `Said` and redraws the face; an effect on a
 chain wrote straight into the engine, so the sound changed and every knob on the screen stayed
 where it was. From a chair that reads as a link that was never made rather than as a picture that
-is stale. `ControlTargets.Reaching` is the one builder both ways of arriving at a box go through.
+is stale. `ControlTargets.Reaching` is the one builder both ways of arriving at an effect go through.
 
-## The six
+## The six that were planned
 
 Delay, filter, drive, reverb, EQ and compressor. Each is an engine and a face, and each engine is
 a class that takes a block of interleaved stereo and works on it in place, under the rules on
@@ -229,6 +229,18 @@ its makeup levels the curve at full scale and nowhere else. Per voice and per tr
 same signal, so what moves across is the maths and not the class.
 
 Reverb and the compressor are each a piece of work on their own and go last for that reason.
+
+**And the six were a plan rather than a bound.** Two more were asked for and written, and neither
+needed anything widened to take it: an engine, a folder, a line in `SoundEffectEngines`, and they
+are on every chain in the application. **Shifter** is a pitch shifter, two taps through a delay
+line at the wrong speed with a raised cosine over each, which is the old cheap way and says so on
+its own help page: it knows nothing about the sound it is given, so the window is the trade
+between following a drum and holding a note, and that trade is a knob rather than something the
+effect pretends to solve. **Ringer** is a ring modulator, the signal multiplied by a tone rather
+than mixed with one, which takes the pitch away and leaves the rhythm, and is what a robot voice
+has been made of since before anybody could afford a vocoder. Under about twenty cycles a second
+the same arithmetic is heard as a tremolo, which is not a second mode and is most of what the
+bottom of the knob is for.
 
 ## The order of work
 
@@ -247,7 +259,7 @@ Reverb and the compressor are each a piece of work on their own and go last for 
    and `SoundEffectRegistry` are what is left over when those are taken out. Then `SoundEffectProject`
    (`effect.json`), `SoundEffectProjects`, `ISoundEffectEngines` as the gate with an empty table, and the
    rack's Effects tab drawn from what is registered, with no picker beside it: an effect cannot be
-   shelved, because there is no box of yours to shelve. `Tests/SoundEffectRackTests.cs` is eighteen
+   shelved, because there is nothing of yours on it to shelve. `Tests/SoundEffectRackTests.cs` is eighteen
    tests and most of them are the refusals.
 3. **The effects designer. Done**, and moved ahead of the engines so that a face is drawn in
    the tool rather than typed into a manifest by hand. One page told which world it is in:
@@ -285,12 +297,18 @@ Reverb and the compressor are each a piece of work on their own and go last for 
    out by subtracting what the curve does to it, since once the curve saturates the offset is
    not that number, so it comes out with a filter.
 
-6. **The other three engines.** Reverb, EQ and the compressor.
+6. **Two that were not on the list. Done.** Shifter and Ringer, asked for after the three were
+   working. `Tests/ShiftTests.cs` and `Tests/RingTests.cs` are what can honestly be measured of
+   them without ears: that no shift at all really is the signal itself, that the block size
+   decides nothing, that a square carrier through a steady signal reads back as the square, and
+   that nothing either can be set to makes it hand back something that is not a number.
+
+7. **The other three engines.** Reverb, EQ and the compressor.
 
 ## Still open
 
-- **What the six are called.** A machine is not called Sampler, it is called Zampler, and a pedal
-  wants the same treatment. Three are named: EchoBox, Sweeper and Roaster. The names are the
+- **What they are called.** A machine is not called Sampler, it is called Zampler, and a pedal
+  wants the same treatment. Five are named: EchoBox, Sweeper, Roaster, Shifter and Ringer. The names are the
   manifest's business and are somebody's to edit; the ids under them are not, since a chain
   writes those down.
 - Nothing about where the designer lives: both worlds are tabs inside DESIGNER, which is the one

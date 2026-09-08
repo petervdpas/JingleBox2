@@ -1,0 +1,9 @@
+{
+  "Name": "Wide",
+  "Effect": "effect.ringer",
+  "carrier": 140,
+  "square": 0,
+  "spread": 25,
+  "crush": 0.0,
+  "mix": 1.0
+}

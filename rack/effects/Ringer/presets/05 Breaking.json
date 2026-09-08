@@ -1,0 +1,9 @@
+{
+  "Name": "Breaking",
+  "Effect": "effect.ringer",
+  "carrier": 1200,
+  "square": 1,
+  "spread": 8,
+  "crush": 0.8,
+  "mix": 1.0
+}

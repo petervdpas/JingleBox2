@@ -1,0 +1,9 @@
+{
+  "Name": "Robot",
+  "Effect": "effect.ringer",
+  "carrier": 200,
+  "square": 0,
+  "spread": 0,
+  "crush": 0.0,
+  "mix": 1.0
+}

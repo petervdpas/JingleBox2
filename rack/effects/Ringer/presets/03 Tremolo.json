@@ -1,0 +1,9 @@
+{
+  "Name": "Tremolo",
+  "Effect": "effect.ringer",
+  "carrier": 6,
+  "square": 0,
+  "spread": 2,
+  "crush": 0.0,
+  "mix": 0.9
+}

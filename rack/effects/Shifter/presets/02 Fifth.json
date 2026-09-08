@@ -1,0 +1,8 @@
+{
+  "Name": "Fifth",
+  "Effect": "effect.shifter",
+  "steps": 7,
+  "cents": 0,
+  "window": 50,
+  "mix": 0.5
+}

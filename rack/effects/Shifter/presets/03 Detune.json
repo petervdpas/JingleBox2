@@ -1,0 +1,8 @@
+{
+  "Name": "Detune",
+  "Effect": "effect.shifter",
+  "steps": 0,
+  "cents": 12,
+  "window": 80,
+  "mix": 0.5
+}

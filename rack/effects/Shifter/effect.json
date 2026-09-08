@@ -1,0 +1,164 @@
+{
+  "Id": "effect.shifter",
+  "Name": "Shifter",
+  "Summary": "Pitch. Two taps through a line at the wrong speed, crossfaded.",
+  "Author": "Peter van de Pas",
+  "Version": "1.0",
+  "Engine": "pitch",
+  "Theme": {
+    "Accent": "#3F9AD0",
+    "Face": 0.68,
+    "Panel": 0.52,
+    "Edge": 0.1,
+    "Mark": 0.35,
+    "Row": 0.18,
+    "RowOver": 0.3,
+    "RowPicked": 0.58
+  },
+  "Parameters": [
+    {
+      "Key": "steps",
+      "Name": "Steps",
+      "Unit": "st",
+      "Min": -24,
+      "Max": 24,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "cents",
+      "Name": "Cents",
+      "Unit": "c",
+      "Min": -100,
+      "Max": 100,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "window",
+      "Name": "Window",
+      "Unit": "ms",
+      "Min": 10,
+      "Max": 120,
+      "Default": 50,
+      "Step": 1
+    },
+    {
+      "Key": "mix",
+      "Name": "Mix",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 1,
+      "Step": 0.01
+    }
+  ],
+  "Panel": {
+    "Root": {
+      "Element": "Column",
+      "Parameter": "",
+      "Label": "",
+      "Properties": {
+        "gap": "10",
+        "align": "stretch"
+      },
+      "Children": [
+        {
+          "Element": "Menu",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "corner": "topRight"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Label",
+          "Parameter": "",
+          "Label": "Shifter",
+          "Properties": {
+            "style": "section"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Preset",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {},
+          "Children": []
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Pitch"
+          },
+          "Children": [
+            {
+              "Element": "Strip",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "cell": "26",
+                "gap": "6",
+                "columns": "3 3 3 3"
+              },
+              "Children": [
+                {
+                  "Element": "Knob",
+                  "Parameter": "steps",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How far to move it, in semitones. Twelve is an octave and nought is straight through, since with nothing to move the taps stand still and what would come out is the dry signal a fraction of a window late."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "cents",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "And the part of a semitone, a hundred either way. Its own knob because a detune is dialled in by ear where an interval is chosen."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "window",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How long each tap runs before it is crossfaded away. Short follows a drum and flutters on a held note; long holds a note and smears a drum. There is no setting that does both: that is what this kind of shifter is."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "mix",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How much of what you hear has been moved. Kept back with an interval on it, the original and the shifted copy are a harmony."
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

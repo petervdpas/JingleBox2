@@ -7,7 +7,7 @@ namespace JingleBox2.SoundDevices.SoundEffects.Interfaces;
 /// An effect is a face over an engine, and the engine is compiled into the application: the
 /// folder on disc carries the face, the parameters and the presets, and nothing that makes a
 /// sound. So an id is either one this build knows how to build or it is not, and one it does not
-/// know is read off disc and left there rather than put on the rack as a box that cannot sound.
+/// know is read off disc and left there rather than put on the rack as a device that cannot sound.
 ///
 /// A question rather than a switch statement in the registry, for two reasons. A test can hand
 /// one over that knows an id nobody has written an engine for, which is the only way the folder

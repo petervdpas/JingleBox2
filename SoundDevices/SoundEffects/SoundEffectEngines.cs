@@ -7,8 +7,8 @@ namespace JingleBox2.SoundDevices.SoundEffects;
 /// <inheritdoc/>
 /// <remarks>
 /// One line an engine, and the line arrives with the class that does the work rather than before
-/// it: an effect that could be had and makes no sound is exactly the box this codebase refuses to
-/// put on a rack.
+/// it: an effect that could be had and makes no sound is exactly the device this codebase refuses
+/// to put on a rack.
 ///
 /// Ids are compared without case, the way the machines' are, since an id is typed by hand into a
 /// manifest and a capital letter is not a different effect.
@@ -27,6 +27,8 @@ public sealed class SoundEffectEngines : ISoundEffectEngines
             [Delayed] = (id, rate, _) => new Delay(rate, id),
             [Filtered] = (id, rate, _) => new Sweep(rate, id),
             [Driven] = (id, rate, _) => new Drive(rate, id),
+            [Shifted] = (id, rate, _) => new Shift(rate, id),
+            [Ringed] = (id, rate, _) => new Ring(rate, id),
         };
 
     /// <summary>
@@ -47,6 +49,14 @@ public sealed class SoundEffectEngines : ISoundEffectEngines
     /// <remarks><inheritdoc cref="EchoBox" path="/remarks"/></remarks>
     public const string Roaster = "effect.roaster";
 
+    /// <summary>Shifter, which is a pitch shifter.</summary>
+    /// <remarks><inheritdoc cref="EchoBox" path="/remarks"/></remarks>
+    public const string Shifter = "effect.shifter";
+
+    /// <summary>Ringer, which is a ring modulator.</summary>
+    /// <remarks><inheritdoc cref="EchoBox" path="/remarks"/></remarks>
+    public const string Ringer = "effect.ringer";
+
     /// <summary>A delay line, which is what EchoBox is a face over.</summary>
     /// <remarks>
     /// An engine name and not an effect id. It is written into the application because the class
@@ -63,6 +73,14 @@ public sealed class SoundEffectEngines : ISoundEffectEngines
     /// <remarks><inheritdoc cref="Delayed" path="/remarks"/></remarks>
     public const string Driven = "drive";
 
+    /// <summary>A pitch shifter, which is what Shifter is a face over.</summary>
+    /// <remarks><inheritdoc cref="Delayed" path="/remarks"/></remarks>
+    public const string Shifted = "pitch";
+
+    /// <summary>A ring modulator, which is what Ringer is a face over.</summary>
+    /// <remarks><inheritdoc cref="Delayed" path="/remarks"/></remarks>
+    public const string Ringed = "ring";
+
     /// <summary>What this run has registered, for turning an id into an engine.</summary>
     /// <remarks>
     /// Left out where there is nothing to look in, which is the registry itself: it is holding
@@ -78,7 +96,9 @@ public sealed class SoundEffectEngines : ISoundEffectEngines
     /// <summary>Which engine each of the three original ids implied.</summary>
     /// <remarks>
     /// The effects that shipped before an effect could name its own engine. Their manifests say
-    /// nothing, and every chain on anybody's disc names them, so the mapping cannot go.
+    /// nothing, and every chain on anybody's disc names them, so the mapping cannot go. Nothing
+    /// is added to it: an effect that shipped after that names its engine in its own manifest,
+    /// which is the door this table exists to make unnecessary.
     ///
     /// Compared without regard to case, like every other id here, since a folder name is what it
     /// came from and a capital letter is not a different effect.

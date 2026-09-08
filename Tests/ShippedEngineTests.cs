@@ -111,6 +111,12 @@ public class ShippedEngineTests
     /// The half that matters to anybody's songs. Naming an engine is only safe if it names the
     /// same one the id implied: a shipped device that quietly moved to another engine would open
     /// every song that plays it and sound like something else.
+    ///
+    /// **An effect that shipped after the field existed has no older answer to disagree with**,
+    /// and asking it to have one would be asking for its id to be added to the list of ids that
+    /// were guessed from, which is the one thing that list must never grow. What is asked of
+    /// those instead is that they name an engine at all, since with no id list behind them
+    /// nothing else decides what they play.
     /// </remarks>
     [Fact]
     public void The_named_engine_is_the_one_the_id_used_to_imply()
@@ -138,8 +144,17 @@ public class ShippedEngineTests
         {
             var project = SoundEffectProject.Open(one)!;
 
-            Assert.Equal(engines.EngineOf(project.Id, null), engines.EngineOf(project.Id, project.Engine),
-                ignoreCase: true);
+            string? implied = engines.EngineOf(project.Id, null);
+
+            if (implied is null)
+            {
+                Assert.False(project.Engine.Length == 0,
+                    project.Id + " names no engine and no id answers for it, so nothing decides what it plays");
+
+                continue;
+            }
+
+            Assert.Equal(implied, engines.EngineOf(project.Id, project.Engine), ignoreCase: true);
         }
     }
 }

@@ -1,0 +1,8 @@
+{
+  "Name": "Big Voice",
+  "Effect": "effect.shifter",
+  "steps": -5,
+  "cents": 0,
+  "window": 90,
+  "mix": 1.0
+}

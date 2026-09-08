@@ -1,0 +1,185 @@
+{
+  "Id": "effect.ringer",
+  "Name": "Ringer",
+  "Summary": "Ring modulation. The signal multiplied by a tone, which is a machine talking.",
+  "Author": "Peter van de Pas",
+  "Version": "1.0",
+  "Engine": "ring",
+  "Theme": {
+    "Accent": "#C25FA8",
+    "Face": 0.68,
+    "Panel": 0.52,
+    "Edge": 0.1,
+    "Mark": 0.35,
+    "Row": 0.18,
+    "RowOver": 0.3,
+    "RowPicked": 0.58
+  },
+  "Parameters": [
+    {
+      "Key": "carrier",
+      "Name": "Carrier",
+      "Unit": "Hz",
+      "Min": 1,
+      "Max": 2000,
+      "Default": 200,
+      "Step": 1
+    },
+    {
+      "Key": "square",
+      "Name": "Carrier is",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "spread",
+      "Name": "Spread",
+      "Unit": "Hz",
+      "Min": -40,
+      "Max": 40,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "crush",
+      "Name": "Crush",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "mix",
+      "Name": "Mix",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 1,
+      "Step": 0.01
+    }
+  ],
+  "Panel": {
+    "Root": {
+      "Element": "Column",
+      "Parameter": "",
+      "Label": "",
+      "Properties": {
+        "gap": "10",
+        "align": "stretch"
+      },
+      "Children": [
+        {
+          "Element": "Menu",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "corner": "topRight"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Label",
+          "Parameter": "",
+          "Label": "Ringer",
+          "Properties": {
+            "style": "section"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Preset",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {},
+          "Children": []
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Ring"
+          },
+          "Children": [
+            {
+              "Element": "Strip",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "cell": "26",
+                "gap": "6",
+                "columns": "3 4 3 3 3"
+              },
+              "Children": [
+                {
+                  "Element": "Knob",
+                  "Parameter": "carrier",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "What the signal is multiplied by. Above about twenty a second the pitch of the original is gone and what is left is a machine; under it the same arithmetic is heard as the level going up and down, which is a tremolo."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Choice",
+                  "Parameter": "square",
+                  "Label": "",
+                  "Properties": {
+                    "span": "4",
+                    "options": "Tone,Square",
+                    "width": "100",
+                    "tip": "What the carrier is. A tone gives the clean two sideband sound. A square is that tone and every odd harmonic of it, so it gives the same sound several times over at once, which is harsher and reads as older hardware."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "spread",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How far apart the two sides are carried. Nought is one carrier and dead centre; a few cycles apart puts the machine across the room rather than inside your head."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "crush",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How many bits are taken away afterwards, down to two. What a converter does with the bits it has not got, applied to the sound you are keeping rather than to what went in."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "mix",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How much of what you hear has been modulated. Kept back, the words come back through the machine."
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

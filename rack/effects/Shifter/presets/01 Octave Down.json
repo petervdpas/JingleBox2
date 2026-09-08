@@ -1,0 +1,8 @@
+{
+  "Name": "Octave Down",
+  "Effect": "effect.shifter",
+  "steps": -12,
+  "cents": 0,
+  "window": 70,
+  "mix": 1.0
+}

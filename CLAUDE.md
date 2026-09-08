@@ -1371,8 +1371,12 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   passed over. What the two share is the drawing, which is why the panel types stopped being
   named for machines. An effect in use is a slot on a track's chain and takes no name of its own,
   the way two of the same plugin on one track already read. `docs/effects.md` is the design, the
-  rename, the six engines and the order they are built in. Three of the six are: the delay, the
-  filter and the drive. Reverb, EQ and the compressor are not
+  rename, the engines and the order they are built in. Five are written: the delay is EchoBox,
+  the filter is Sweeper, the drive is Roaster, the pitch shifter is Shifter and the ring
+  modulator is Ringer. Reverb, EQ and the compressor are not. **The list of six that document
+  opens with was a plan and not a bound**, which the last two say out loud: they were asked for,
+  they are an engine and a face like the other three, and nothing anywhere had to be widened to
+  take them
 - **The rack decides which machines a song can be given, so a machine can be taken off it.** It
   could not be, on the reasoning that a machine is not something you can be without, and that was
   the wrong shape: a machine you never reach for is one that should not be in the list a song

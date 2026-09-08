@@ -1,0 +1,8 @@
+{
+  "Name": "Small Voice",
+  "Effect": "effect.shifter",
+  "steps": 5,
+  "cents": 0,
+  "window": 25,
+  "mix": 1.0
+}
