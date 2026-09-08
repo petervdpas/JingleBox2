@@ -43,6 +43,8 @@ public sealed class RecordingService : IRecordingService, IDisposable
     /// </summary>
     private readonly ITakeBuffer _heard = new TakeBuffer();
 
+    /// <summary>What the recorder's bus is summing, which is the take where anything is patched in.</summary>
+    private readonly Interfaces.ITakeTap _tap = new TakeTap();
 
     /// <summary>Whether the level is being watched.</summary>
     private bool _isMonitoring;
@@ -274,6 +276,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
         if (!_capturing) OpenInput();
 
         _heard.Start();
+        _tap.Start();
     }
 
     /// <inheritdoc/>
@@ -406,6 +409,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
         if (!_heard.Recording) return;
 
         _heard.Stop();
+        _tap.Stop();
 
         if (!_isMonitoring) CloseInput();
     }
@@ -490,6 +494,9 @@ public sealed class RecordingService : IRecordingService, IDisposable
     private Interfaces.IMonitorFeed? _monitor;
 
     /// <inheritdoc/>
+    public void TakeFrom(Interfaces.IOutputBus bus) => _tap.Follow(bus);
+
+    /// <inheritdoc/>
     public void HearThrough(Interfaces.IMonitorFeed monitor)
     {
         _monitor = monitor;
@@ -528,17 +535,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
 
             _hearing = value;
 
-            if (value)
-            {
-                OpenMonitor();
-
-                return;
-            }
-
-            if (_monitor == null) return;
-
-            _monitor.Heard = false;
-            _monitor.Close();
+            OpenMonitor();
         }
     }
 
@@ -555,16 +552,16 @@ public sealed class RecordingService : IRecordingService, IDisposable
     {
         if (_monitor == null) return;
 
-        _monitor.Heard = _hearing;
+        _monitor.Heard = _hearing && _hearsCapture;
 
-        if (!_hearsCapture)
+        if (!_capturing)
         {
             _monitor.Close();
 
             return;
         }
 
-        if (!_hearing || !_capturing) return;
+        if (_monitor.IsOpen) return;
 
         _monitor.Insert = _effect;
         _monitor.Open(_sampleRate, _channels);
@@ -599,6 +596,15 @@ public sealed class RecordingService : IRecordingService, IDisposable
     public Task<SavedTake> WriteTakeAsync(string folder, string fileName, string cleanName)
     {
         byte[] pcmData = _heard.Take;
+        int rate = _sampleRate;
+        int channels = _channels;
+
+        if (_tap.Mixed && _tap.Take.Length > 0)
+        {
+            pcmData = _tap.Take;
+            rate = _tap.Rate;
+            channels = _tap.Channels;
+        }
 
         if (pcmData.Length == 0)
             throw new InvalidOperationException("No recording data to save");
@@ -609,8 +615,6 @@ public sealed class RecordingService : IRecordingService, IDisposable
         string cleanPath = Path.Combine(folder, $"{cleanName}.wav");
 
         var effect = Effect;
-        int rate = _sampleRate;
-        int channels = _channels;
 
         return Task.Run(() =>
         {
@@ -676,7 +680,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
 
         _heard.Add(data);
 
-        if (_hearing) _monitor?.Push(data, data.Length);
+        _monitor?.Push(data, data.Length);
     }
 
     /// <summary>Audio from a capture device, on BASS's own thread.</summary>
@@ -706,7 +710,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
 
             _heard.Add(data);
 
-            if (_hearing) _monitor?.Push(data, data.Length);
+            _monitor?.Push(data, data.Length);
         }
         return true;
     }

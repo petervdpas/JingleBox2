@@ -70,6 +70,9 @@ public sealed class MonitorFeedTests
         public void HearOnly(System.Collections.Generic.IReadOnlyCollection<int> sources) { }
 
         /// <inheritdoc/>
+        /// <inheritdoc/>
+        public int Sources => 0;
+
         public bool Holds(int source) => false;
 
         /// <inheritdoc/>

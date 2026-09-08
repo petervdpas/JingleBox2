@@ -857,7 +857,8 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// </remarks>
     public UI.Records.PatchSignals Signals => new(
         Input: Loud(RecorderInput),
-        Takes: Loud(RecorderPlay) || Heard(),
+        Heard: Heard(),
+        Takes: Loud(RecorderPlay),
         Pads: Loud(PadsStrip),
         Tracks: Sounding(),
         Output: Loud(RecorderPlay) || Loud(PadsStrip) || Heard() || Tracker.IsPlaying);
@@ -930,6 +931,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// </remarks>
     public UI.Interfaces.ISignalPoints Points => points ??= new UI.SignalPoints(
         capture: () => new UI.Records.PatchLevel(true, Record.LevelLeft, Record.LevelRight),
+        heard: () => Reading(_audio.MonitorBus),
         takes: () => Reading(_audio.TakeBus),
         pads: () => Reading(_audio.PadBus),
         song: Sung,
@@ -976,7 +978,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
 
     /// <summary>The take bus, which is what the PLAY strip shows.</summary>
     private static readonly UI.Records.SignalPoint TakesPoint =
-        new(UI.PatchNodes.Record, UI.PatchPorts.Takes);
+        new(UI.PatchNodes.Play, UI.PatchPorts.Takes);
 
     /// <summary>The pad bus, which is what the PADS strip shows.</summary>
     private static readonly UI.Records.SignalPoint PadsPoint =
@@ -1018,7 +1020,8 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         UI.PatchNodes.Song => Tracker.MasterStrip,
         UI.PatchNodes.Mixer => DeskMaster,
         UI.PatchNodes.Fire => PadsStrip,
-        UI.PatchNodes.Record => RecorderPlay,
+        UI.PatchNodes.Record => RecorderInput,
+        UI.PatchNodes.Play => RecorderPlay,
         _ => null
     };
 
@@ -1192,12 +1195,25 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// The tracker is not named and needs no case of its own. It is a source on that bus like the
     /// other two, so soloing the pads pauses it with everything else that was not named, and the
     /// song's own track solos go on meaning what they meant inside it.
+    ///
+    /// **A take being made is heard whatever is soloed, and that is not about hearing.** A source
+    /// that is not heard is paused rather than turned down, which is the whole of why a solo costs
+    /// nothing, and a paused bus is not pulled at all; the take is read off the recorder's bus as
+    /// it is pulled, so soloing anything else during a take would leave a hole in the file with
+    /// nothing anywhere saying so.
+    ///
+    /// So it stays audible for the length of the take, which is the price and is said out loud
+    /// rather than worked around: a solo is a listening decision somebody can make again in a
+    /// moment, and a hole in the only copy of a performance is not. Silencing it instead would
+    /// mean writing the bus's level, and that is what Hear it writes: two things on one switch is
+    /// the fault this codebase keeps paying for.
     /// </remarks>
     private void ApplySolo()
     {
         var heard = new List<int>();
 
-        if (RecorderInput.Solo && _audio.MonitorBus.Handle != 0) heard.Add(_audio.MonitorBus.Handle);
+        if ((RecorderInput.Solo || Record.IsRecording) && _audio.MonitorBus.Handle != 0)
+            heard.Add(_audio.MonitorBus.Handle);
         if (RecorderPlay.Solo && _audio.TakeBus.Handle != 0) heard.Add(_audio.TakeBus.Handle);
         if (PadsStrip.Solo && _audio.PadBus.Handle != 0) heard.Add(_audio.PadBus.Handle);
 

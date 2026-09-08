@@ -17,8 +17,23 @@ public static class PatchPorts
     /// <summary>Where the recorder listens.</summary>
     public const string Capture = "capture";
 
-    /// <summary>What the recorder sends to the desk: a take, or the input being listened to.</summary>
+    /// <summary>What a take being auditioned sends to the desk.</summary>
+    /// <remarks>
+    /// The player's alone now. It carried the input being listened to as well while the recorder
+    /// was one block, which is two busses down one cable and is why neither could be read.
+    /// </remarks>
     public const string Takes = "takes";
+
+    /// <summary>
+    /// What the recorder's own bus sends to the desk, which is everything pointed at RECORD.
+    /// </summary>
+    /// <remarks>
+    /// The same word at both ends, like <see cref="Takes"/>, <see cref="Pads"/> and
+    /// <see cref="Song"/>: a cable is one thing and is called one thing, and where it lands on
+    /// the desk is the IN strip. Whether anything travels along it is Hear it, which is that
+    /// cable said in a switch.
+    /// </remarks>
+    public const string Input = "input";
 
     /// <summary>The pads, together.</summary>
     public const string Pads = "pads";

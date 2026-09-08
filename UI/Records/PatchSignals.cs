@@ -15,6 +15,12 @@ namespace JingleBox2.UI.Records;
 /// the music would be a second set of meters on a page that is not about levels.
 /// </remarks>
 /// <param name="Input">Whether anything is arriving at the recorder's input.</param>
+/// <param name="Heard">
+/// Whether the recorder's own bus is passing anything on to the desk, which is what is arriving
+/// at it while Hear it is on. Apart from <paramref name="Input"/> because they are two points on
+/// one path: something can be coming in with nobody listening to it, and apart from
+/// <paramref name="Takes"/> because a take being played is a different bus altogether.
+/// </param>
 /// <param name="Takes">Whether a take is being auditioned.</param>
 /// <param name="Pads">Whether a pad is sounding.</param>
 /// <param name="Tracks">
@@ -23,6 +29,7 @@ namespace JingleBox2.UI.Records;
 /// <param name="Output">Whether anything at all is leaving through the master.</param>
 public readonly record struct PatchSignals(
     bool Input,
+    bool Heard,
     bool Takes,
     bool Pads,
     IReadOnlySet<string>? Tracks,

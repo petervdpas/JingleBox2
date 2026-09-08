@@ -396,6 +396,24 @@ public sealed class OutputBus : IOutputBus
         lock (_lock) return HoldsLocked(source);
     }
 
+    /// <inheritdoc/>
+    public int Sources
+    {
+        get
+        {
+            lock (_lock)
+            {
+                int on = 0;
+
+                foreach (int source in _sources)
+                    if (HoldsLocked(source))
+                        on++;
+
+                return on;
+            }
+        }
+    }
+
     /// <summary>Whether this bus really has the channel, with the lock already held.</summary>
     /// <remarks>
     /// **The mixer is asked and <see cref="_sources"/> is not, and that is the whole of the

@@ -377,7 +377,7 @@ public class PatchbayTests
             .Read(Array.Empty<AudioRoute>(), null, null, new[] { "TR-01", "TR-02", "TR-03" })
             .Nodes.Single(n => n.Id == "mixer");
 
-        Assert.Equal(3, mixer.Ins.Count);
+        Assert.Equal(4, mixer.Ins.Count);
         Assert.DoesNotContain(mixer.Ins, p => p.Name == "TR-01");
     }
 
@@ -409,9 +409,10 @@ public class PatchbayTests
             .Read(Array.Empty<AudioRoute>(), null, null, new[] { "TR-01" })
             .Nodes.Single(n => n.Id == "mixer");
 
-        Assert.Equal("takes", mixer.Ins[0].Name);
-        Assert.Equal("pads", mixer.Ins[1].Name);
-        Assert.Equal("song", mixer.Ins[2].Name);
+        Assert.Equal("input", mixer.Ins[0].Name);
+        Assert.Equal("takes", mixer.Ins[1].Name);
+        Assert.Equal("pads", mixer.Ins[2].Name);
+        Assert.Equal("song", mixer.Ins[3].Name);
     }
 
     /// <summary>A song with no tracks yet draws the whole mix as one pair.</summary>

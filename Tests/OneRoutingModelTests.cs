@@ -36,7 +36,7 @@ public sealed class OneRoutingModelTests
     {
         PatchLevel Silent() => new(true, 0, 0);
 
-        return new SignalPoints(Silent, Silent, Silent, Silent, Silent, Silent);
+        return new SignalPoints(Silent, Silent, Silent, Silent, Silent, Silent, Silent);
     }
 
     /// <summary>
@@ -101,7 +101,8 @@ public sealed class OneRoutingModelTests
         foreach (var point in new[]
         {
             new SignalPoint(PatchNodes.Record, PatchPorts.Capture),
-            new SignalPoint(PatchNodes.Record, PatchPorts.Takes),
+            new SignalPoint(PatchNodes.Record, PatchPorts.Input),
+            new SignalPoint(PatchNodes.Play, PatchPorts.Takes),
             new SignalPoint(PatchNodes.Fire, PatchPorts.Pads),
             new SignalPoint(PatchNodes.Mixer, PatchPorts.Master)
         })
@@ -140,6 +141,7 @@ public sealed class OneRoutingModelTests
 
         var everything = new PatchSignals(
             Input: true,
+            Heard: true,
             Takes: true,
             Pads: true,
             Tracks: new System.Collections.Generic.HashSet<string>(

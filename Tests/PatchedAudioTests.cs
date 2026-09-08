@@ -38,7 +38,10 @@ public sealed class PatchedAudioTests
         public List<Bus> All { get; } = new();
 
         /// <summary>What has been put on it.</summary>
-        public HashSet<int> Sources { get; } = new();
+        public HashSet<int> On { get; } = new();
+
+        /// <inheritdoc/>
+        public int Sources => On.Count;
 
         /// <summary>How many times something was put on it, so a second pass shows up.</summary>
         public int Added { get; private set; }
@@ -52,18 +55,18 @@ public sealed class PatchedAudioTests
         {
             if (!Takes) return false;
 
-            foreach (var bus in All) bus.Sources.Remove(source);
+            foreach (var bus in All) bus.On.Remove(source);
 
             Added++;
-            Sources.Add(source);
+            On.Add(source);
 
             return true;
         }
 
         /// <inheritdoc/>
-        public void Remove(int source) => Sources.Remove(source);
+        public void Remove(int source) => On.Remove(source);
         /// <inheritdoc/>
-        public bool Holds(int source) => Sources.Contains(source);
+        public bool Holds(int source) => On.Contains(source);
         /// <inheritdoc/>
         public bool Present => true;
         /// <inheritdoc/>
@@ -200,7 +203,7 @@ public sealed class PatchedAudioTests
         bench.Follow(PatchNodes.Song);
 
         Assert.Equal(put, bench.Recorder.Added);
-        Assert.Single(bench.Recorder.Sources);
+        Assert.Single(bench.Recorder.On);
     }
 
     /// <summary>
@@ -214,7 +217,7 @@ public sealed class PatchedAudioTests
 
         bench.Follow(PatchNodes.Song);
 
-        Assert.Empty(bench.Recorder.Sources);
+        Assert.Empty(bench.Recorder.On);
         Assert.True(bench.Desk.Holds(SongStream));
 
         bench.Song = SongStream;
@@ -234,7 +237,7 @@ public sealed class PatchedAudioTests
 
         Assert.True(bench.Recorder.Holds(SongStream));
         Assert.True(bench.Recorder.Holds(PadStream));
-        Assert.Empty(bench.Desk.Sources);
+        Assert.Empty(bench.Desk.On);
     }
 
     /// <summary>
@@ -281,7 +284,7 @@ public sealed class PatchedAudioTests
         bench.Follow(PatchNodes.Song);
 
         Assert.True(bench.Desk.Holds(SongStream));
-        Assert.Empty(bench.Recorder.Sources);
+        Assert.Empty(bench.Recorder.On);
     }
 
     /// <summary>A routing with nothing in it leaves the busses alone.</summary>
@@ -293,6 +296,6 @@ public sealed class PatchedAudioTests
         bench.Audio.Follow(null!);
 
         Assert.True(bench.Desk.Holds(SongStream));
-        Assert.Empty(bench.Recorder.Sources);
+        Assert.Empty(bench.Recorder.On);
     }
 }

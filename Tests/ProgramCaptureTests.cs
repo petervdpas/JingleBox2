@@ -95,6 +95,9 @@ public class ProgramCaptureTests
         public void HearThrough(JingleBox2.Audio.Interfaces.IMonitorFeed monitor) { }
 
         /// <inheritdoc/>
+        public void TakeFrom(JingleBox2.Audio.Interfaces.IOutputBus bus) { }
+
+        /// <inheritdoc/>
         public bool Hearing { get; set; }
 
         /// <inheritdoc/>

@@ -158,6 +158,9 @@ public sealed class RecorderBench
         /// <inheritdoc/>
         public void HearThrough(IMonitorFeed monitor) => Told = monitor;
 
+        /// <inheritdoc/>
+        public void TakeFrom(IOutputBus bus) { }
+
         /// <summary>The path it was told about, so a test can say it was told once.</summary>
         public IMonitorFeed? Told { get; private set; }
 

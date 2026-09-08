@@ -190,6 +190,15 @@ public interface IOutputBus : IDisposable
     /// <param name="source">The channel to ask about.</param>
     bool Holds(int source);
 
+    /// <summary>How many sources the bus really has on it.</summary>
+    /// <remarks>
+    /// Counted through the same question <see cref="Holds"/> answers, so a source another bus has
+    /// since taken is not counted here. What it is for is the recorder: with one source the bus is
+    /// carrying the capture and nothing else, and with more than one somebody has patched
+    /// something into RECORD and the take can no longer be built out of the capture alone.
+    /// </remarks>
+    int Sources { get; }
+
     /// <summary>Lets the bus go, and does nothing twice.</summary>
     /// <remarks>
     /// The sources are unplugged rather than freed. They belong to whoever made them, and a bus

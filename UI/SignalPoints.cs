@@ -33,13 +33,15 @@ public sealed class SignalPoints : ISignalPoints
     /// only the tracker can work them out: a track's level comes from the voices sounding on it.
     /// </remarks>
     /// <param name="capture">What is arriving at the recorder's input.</param>
-    /// <param name="takes">What the recorder is sending to the desk.</param>
+    /// <param name="heard">What the recorder's own bus is sending to the desk.</param>
+    /// <param name="takes">What a take being auditioned is sending to the desk.</param>
     /// <param name="pads">What the pads sum to.</param>
     /// <param name="song">What the song sums to, after its own chain and level.</param>
     /// <param name="tracks">The song's tracks at once, which is what a whole song block shows.</param>
     /// <param name="leaving">What the desk sums to, which is what the machine plays.</param>
     public SignalPoints(
         Func<PatchLevel> capture,
+        Func<PatchLevel> heard,
         Func<PatchLevel> takes,
         Func<PatchLevel> pads,
         Func<PatchLevel> song,
@@ -49,8 +51,11 @@ public sealed class SignalPoints : ISignalPoints
         _points = new Dictionary<SignalPoint, Func<PatchLevel>>
         {
             [new SignalPoint(PatchNodes.Record, PatchPorts.Capture)] = capture,
-            [new SignalPoint(PatchNodes.Record, PatchPorts.Takes)] = takes,
+            [new SignalPoint(PatchNodes.Record, PatchPorts.Input)] = heard,
             [new SignalPoint(PatchNodes.Record, "")] = capture,
+
+            [new SignalPoint(PatchNodes.Play, PatchPorts.Takes)] = takes,
+            [new SignalPoint(PatchNodes.Play, "")] = takes,
 
             [new SignalPoint(PatchNodes.Fire, PatchPorts.Pads)] = pads,
             [new SignalPoint(PatchNodes.Fire, "")] = pads,

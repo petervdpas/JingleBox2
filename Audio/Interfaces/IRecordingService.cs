@@ -171,6 +171,21 @@ public interface IRecordingService
     void HearThrough(IMonitorFeed monitor);
 
     /// <summary>
+    /// Says which bus everything pointed at RECORD lands on, so a take can be written off it.
+    /// </summary>
+    /// <remarks>
+    /// **An input point is a merge and the file has to be the merge.** The capture is one source
+    /// on that bus and a song or the pads patched across are others, and what is heard is the sum
+    /// of them; a take built out of the capture's own bytes is one cable of several, which is a
+    /// picture that draws two things arriving and a file that holds one.
+    ///
+    /// Told rather than found, because the recorder deals in captures and knows nothing about
+    /// busses, and told again whenever the output moves, since that makes every bus again.
+    /// </remarks>
+    /// <param name="bus">The recorder's own bus.</param>
+    void TakeFrom(IOutputBus bus);
+
+    /// <summary>
     /// Whether what is coming in is played out of the desk while it comes in.
     /// </summary>
     /// <remarks>

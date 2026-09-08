@@ -222,6 +222,7 @@ public partial class MainWindow : Window
         // What is coming in is heard through the engine's own bus, so the recorder is told where
         // that is rather than making a stream of its own beside the ones the engine owns.
         _recording.HearThrough(_audio.Monitor);
+        _recording.TakeFrom(_audio.MonitorBus);
 
         saying?.Doing("Building the pages");
 

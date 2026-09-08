@@ -132,6 +132,9 @@ public class CancelChangesTests
         /// <inheritdoc/>
         public void HearOnly(IReadOnlyCollection<int> sources) { }
         /// <inheritdoc/>
+        /// <inheritdoc/>
+        public int Sources => 0;
+
         public bool Holds(int source) => false;
         /// <inheritdoc/>
         public void Close() { }

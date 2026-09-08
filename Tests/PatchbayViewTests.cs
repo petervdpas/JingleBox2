@@ -376,7 +376,7 @@ public class PatchbayViewTests
 
         /// <inheritdoc/>
         public JingleBox2.UI.Records.PatchSignals Signals =>
-            new(false, false, false, Sounding, false);
+            new(false, false, false, false, Sounding, false);
 
         /// <summary>What each point is carrying, for whoever wants to say.</summary>
         public System.Collections.Generic.Dictionary<JingleBox2.UI.Records.SignalPoint, JingleBox2.UI.Records.PatchLevel> Levels { get; } =

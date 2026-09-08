@@ -20,6 +20,9 @@ public sealed class PatchFlow : IPatchFlow
     private const string RecordNode = PatchNodes.Record;
 
     /// <inheritdoc cref="RecordNode"/>
+    private const string PlayNode = PatchNodes.Play;
+
+    /// <inheritdoc cref="RecordNode"/>
     private const string TrackerNode = PatchNodes.Tracker;
 
     /// <inheritdoc cref="RecordNode"/>
@@ -66,7 +69,8 @@ public sealed class PatchFlow : IPatchFlow
 
         if (!Is(link.To.Node, MixerNode)) return false;
 
-        if (Is(link.From.Node, RecordNode)) return signals.Takes;
+        if (Is(link.From.Node, RecordNode)) return signals.Heard;
+        if (Is(link.From.Node, PlayNode)) return signals.Takes;
         if (Is(link.From.Node, SongNode)) return signals.Singing;
         if (Is(link.From.Node, TrackerNode)) return signals.Sounding(link.From.Name);
         if (Is(link.From.Node, FireNode)) return signals.Pads;

@@ -28,7 +28,7 @@ public class PatchFlowTests
     private readonly IPatchColours _colours = new PatchColours();
 
     /// <summary>Nothing at all is sounding.</summary>
-    private static readonly PatchSignals Silent = new(false, false, false, null, false);
+    private static readonly PatchSignals Silent = new(false, false, false, false, null, false);
 
     /// <summary>Those tracks, and no others, are sounding.</summary>
     private static PatchSignals Playing(params string[] tracks) =>
@@ -64,13 +64,32 @@ public class PatchFlowTests
         Assert.Equal(link, Assert.Single(live));
     }
 
-    /// <summary>A take being auditioned lights the recorder's cable into the desk and no other.</summary>
+    /// <summary>A take being auditioned lights the player's cable into the desk and no other.</summary>
+    /// <remarks>
+    /// **And not the recorder's**, which is the whole of why the two are separate blocks. A take
+    /// being played and what is arriving at the input are two busses, and while they were drawn
+    /// as one cable, playing a take lit the cable that carries what is being recorded.
+    /// </remarks>
     [Fact]
-    public void A_take_lights_the_recorder_into_the_desk()
+    public void A_take_lights_the_player_into_the_desk()
     {
-        var links = new[] { Cable("record", "mixer"), Cable("tracker", "mixer"), Cable("fire", "mixer") };
+        var links = new[]
+        {
+            Cable("play", "mixer"), Cable("record", "mixer"), Cable("tracker", "mixer"), Cable("fire", "mixer")
+        };
 
         var live = _flow.Live(links, Silent with { Takes = true });
+
+        Assert.Equal(Cable("play", "mixer"), Assert.Single(live));
+    }
+
+    /// <summary>And what is being heard lights the recorder's own cable and no other.</summary>
+    [Fact]
+    public void Hearing_the_input_lights_the_recorder_into_the_desk()
+    {
+        var links = new[] { Cable("record", "mixer"), Cable("play", "mixer"), Cable("fire", "mixer") };
+
+        var live = _flow.Live(links, Silent with { Heard = true });
 
         Assert.Equal(Cable("record", "mixer"), Assert.Single(live));
     }

@@ -53,6 +53,9 @@ public sealed class PatchGraph : IPatchGraph
     private const string RecordNode = PatchNodes.Record;
 
     /// <inheritdoc cref="RecordNode"/>
+    private const string PlayNode = PatchNodes.Play;
+
+    /// <inheritdoc cref="RecordNode"/>
     private const string TrackerNode = PatchNodes.Tracker;
 
     /// <inheritdoc cref="RecordNode"/>
@@ -77,17 +80,32 @@ public sealed class PatchGraph : IPatchGraph
     public PatchPort OwnInput => new(RecordNode, CaptureName, PatchSide.In, PatchChannels.Stereo);
 
     /// <summary>
+    /// What the recorder's bus passes on to the desk, which is everything pointed at it.
+    /// </summary>
+    /// <remarks>
+    /// **This is the throughput and it is the only port on the picture that is one.** What comes
+    /// in at the capture sums onto the recorder's bus, that bus is what a take is written from,
+    /// and this is the same bus on its way to the desk. Hear it is this cable: with it off the
+    /// block still takes in and still records, and nothing travels along here.
+    /// </remarks>
+    private static readonly PatchPort TakeOut =
+        new(RecordNode, PatchPorts.Input, PatchSide.Out, PatchChannels.Stereo, Fixed: true);
+
+    /// <summary>Where that arrives on the desk, which is the IN strip.</summary>
+    private static readonly PatchPort MixerInput =
+        new(MixerNode, PatchPorts.Input, PatchSide.In, PatchChannels.Stereo, Fixed: true);
+
+    /// <summary>
     /// A take being auditioned, on its way to the desk.
     /// </summary>
     /// <remarks>
-    /// **The take goes through the mixer and the capture does not**, which is why the recorder
-    /// has one point of each kind. Auditioning a take is played through the take bus and comes
-    /// out of the master like anything else, so it has a strip on the desk; what is arriving at
-    /// the input has a strip too and that strip reaches nothing, since its fader sets what a take
-    /// will hold rather than what anybody hears.
+    /// **A source and not the other end of the recorder.** Auditioning a take is a file being
+    /// played on a bus of its own and comes out of the master like the pads do; it is nothing to
+    /// do with what is being recorded, and drawn out of the same block as the capture it read as
+    /// though it were.
     /// </remarks>
-    private static readonly PatchPort RecordOut =
-        new(RecordNode, PatchPorts.Takes, PatchSide.Out, PatchChannels.Stereo, Fixed: true);
+    private static readonly PatchPort PlayOut =
+        new(PlayNode, PatchPorts.Takes, PatchSide.Out, PatchChannels.Stereo, Fixed: true);
 
     /// <summary>Where a take arrives on the desk.</summary>
     private static readonly PatchPort MixerTakes =
@@ -183,7 +201,7 @@ public sealed class PatchGraph : IPatchGraph
         }
 
         nodes.Add(new PatchNode(
-            RecordNode, "RECORD", new[] { OwnInput }, new[] { RecordOut }, true, OwnX, TopY));
+            RecordNode, "TAKE", new[] { OwnInput }, new[] { TakeOut }, true, OwnX, TopY));
 
         var named = tracks is { Count: > 0 } ? tracks : new[] { WholeMix };
 
@@ -201,6 +219,9 @@ public sealed class PatchGraph : IPatchGraph
 
         nodes.Add(new PatchNode(
             FireNode, "FIRE", Array.Empty<PatchPort>(), new[] { FireOut }, true, OwnX, PlayY + Apart));
+
+        nodes.Add(new PatchNode(
+            PlayNode, "PLAY", Array.Empty<PatchPort>(), new[] { PlayOut }, true, OwnX, PlayY + (Apart * 2)));
 
         nodes.Add(new PatchNode(
             SongNode, "SONG", sung, new[] { SongOut }, true, SongX, PlayY));
@@ -223,7 +244,8 @@ public sealed class PatchGraph : IPatchGraph
             OutX,
             PlayY));
 
-        links.Add(new PatchLink(RecordOut, MixerTakes));
+        links.Add(new PatchLink(TakeOut, MixerInput));
+        links.Add(new PatchLink(PlayOut, MixerTakes));
 
         for (int track = 0; track < plays.Count; track++)
             links.Add(new PatchLink(plays[track], sung[track]));
@@ -244,12 +266,13 @@ public sealed class PatchGraph : IPatchGraph
     /// it. Adding a track to a song moves nothing here at all now, where it used to move every
     /// point under it.
     ///
-    /// **Down the block in the order the desk reads across**, which is the recorder, then the
-    /// pads, then the song. A cable is followed with the same eye that reads the strips beside
-    /// it, so a point that is third here and first there is a point somebody has to look twice
-    /// for.
+    /// **Down the block in the order the desk reads across**, which is the input, then a take
+    /// being played, then the pads, then the song. A cable is followed with the same eye that
+    /// reads the strips beside it, so a point that is third here and first there is a point
+    /// somebody has to look twice for.
     /// </remarks>
-    private static IReadOnlyList<PatchPort> Desk() => new[] { MixerTakes, MixerPads, MixerSong };
+    private static IReadOnlyList<PatchPort> Desk() =>
+        new[] { MixerInput, MixerTakes, MixerPads, MixerSong };
 
     /// <summary>Where one of our own sources is going: the desk, or the recorder's input.</summary>
     /// <remarks>
