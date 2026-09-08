@@ -345,13 +345,20 @@ public sealed class PatchbayView : Panel
     }
 
     /// <summary>
-    /// Takes hold of a cable: the one already on this point, or a new one from it.
+    /// Takes hold of a cable at the point that was grabbed, and remembers the one already there.
     /// </summary>
     /// <remarks>
-    /// **A point that already has a cable hands that cable over rather than starting a second
-    /// one**, which is what makes a cable re-attachable: the far end stays where it is and the
-    /// end you took moves with the pointer, exactly as a real one does. Dropped on nothing it is
+    /// **The end you took is the end that stays and the free end follows the pointer**, which is
+    /// what a hand expects: taking hold of a source and dragging to somewhere else moves the
+    /// cable there. It read the other way round first, anchoring at the far end, and that made
+    /// the one gesture the picture is for impossible: a source's cable landing on the recorder
+    /// could only be re-dropped on another source, since the end being carried was an input and
+    /// two inputs are not a cable. From a chair the wire was stuck in the recorder.
+    ///
+    /// What was already on the point is remembered so that letting go over nothing can pull it
     /// out, which is the only way to unplug something and needs no second gesture to learn.
+    /// Moving one source's cable from one landing place to another is a move rather than an
+    /// unplug and a plug, which is what the two ends being compared at the drop is about.
     /// </remarks>
     private void Grab(PatchPort port, PointerPressedEventArgs e)
     {
@@ -363,20 +370,11 @@ public sealed class PatchbayView : Panel
         foreach (var link in Links)
         {
             if (!Wiring.Allowed(link.From, link.To)) continue;
+            if (link.From != port && link.To != port) continue;
 
-            if (link.From == port)
-            {
-                _moving = link;
-                _anchor = link.To;
-                break;
-            }
+            _moving = link;
 
-            if (link.To == port)
-            {
-                _moving = link;
-                _anchor = link.From;
-                break;
-            }
+            break;
         }
 
         _loose = e.GetPosition(this);
@@ -486,7 +484,7 @@ public sealed class PatchbayView : Panel
             {
                 if (was == link) return;
 
-                Unwired?.Invoke(was);
+                if (was.From != link.From) Unwired?.Invoke(was);
             }
 
             Wired?.Invoke(link);

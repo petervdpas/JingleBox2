@@ -467,7 +467,14 @@ public class PatchbayTests
         Assert.Contains(scene.Links, l => l.From.Node == "mixer" && l.To.Node == "output");
     }
 
-    /// <summary>Every one of those is fixed, since none of them is anybody's to move.</summary>
+    /// <summary>
+    /// Every one of those is fixed, and all but two of them are nobody's to move.
+    /// </summary>
+    /// <remarks>
+    /// The two are the song and the pads, which each choose between the desk and the recorder:
+    /// where a source of ours goes is a decision somebody makes rather than a fact about the
+    /// engine, and the rest of the path is the engine. See <see cref="PatchedInTests"/>.
+    /// </remarks>
     [Fact]
     public void Our_own_path_cannot_be_pulled_apart()
     {
@@ -479,6 +486,9 @@ public class PatchbayTests
 
             Assert.True(link.From.Fixed);
             Assert.True(link.To.Fixed);
+
+            if (link.From.Node is "song" or "fire") continue;
+
             Assert.False(_wiring.Allowed(link.From, link.To));
         }
     }

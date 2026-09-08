@@ -84,11 +84,30 @@ public sealed class PatchedInTests
         Assert.False(_wiring.Allowed(Desk, Capture));
     }
 
-    /// <summary>Nothing else about the inside of this application may be taken apart.</summary>
+    /// <summary>And it may be put back on the desk, since a source has to go somewhere.</summary>
+    [Fact]
+    public void The_song_may_be_put_back_on_the_desk()
+    {
+        Assert.True(_wiring.Allowed(Song, DeskSong));
+    }
+
+    /// <summary>But only onto its own point, since the desk's points are not interchangeable.</summary>
+    [Fact]
+    public void A_source_may_not_be_dropped_on_another_sources_point()
+    {
+        var deskPads = new PatchPort(PatchNodes.Mixer, PatchPorts.Pads, PatchSide.In, PatchChannels.Stereo, Fixed: true);
+
+        Assert.False(_wiring.Allowed(Song, deskPads));
+    }
+
+    /// <summary>The rest of our own wiring is still nobody's to take apart.</summary>
     [Fact]
     public void The_wiring_of_the_desk_itself_stays_fixed()
     {
-        Assert.False(_wiring.Allowed(Song, DeskSong));
+        var deskTakes = new PatchPort(PatchNodes.Mixer, PatchPorts.Takes, PatchSide.In, PatchChannels.Stereo, Fixed: true);
+        var recordOut = new PatchPort(PatchNodes.Record, PatchPorts.Takes, PatchSide.Out, PatchChannels.Stereo, Fixed: true);
+
+        Assert.False(_wiring.Allowed(recordOut, deskTakes));
     }
 
     /// <summary>And the input's other point is not where these land.</summary>
@@ -156,8 +175,17 @@ public sealed class PatchedInTests
     [Fact]
     public void The_rest_of_our_wiring_may_not_be_taken_hold_of()
     {
+        var deskTakes = new PatchPort(PatchNodes.Mixer, PatchPorts.Takes, PatchSide.In, PatchChannels.Stereo, Fixed: true);
+
         Assert.False(_wiring.Wirable(Desk));
-        Assert.False(_wiring.Wirable(DeskSong));
+        Assert.False(_wiring.Wirable(deskTakes));
+    }
+
+    /// <summary>The desk's own song and pads points do answer, or the cable could never go back.</summary>
+    [Fact]
+    public void Where_a_source_belongs_may_be_taken_hold_of()
+    {
+        Assert.True(_wiring.Wirable(DeskSong));
     }
 
     /// <summary>Anything that is not fixed may be, which is every source on the machine.</summary>
@@ -201,21 +229,33 @@ public sealed class PatchedInTests
         Assert.False(kept.Holds(PatchNodes.Fire));
     }
 
-    /// <summary>The picture draws a cable for each one that was kept.</summary>
+    /// <summary>
+    /// A source moved to the recorder goes there **instead of** to the desk, which is the whole
+    /// rule: two cables would put it on the master twice, the second a capture buffer late, which
+    /// is a comb filter rather than a mix.
+    /// </summary>
     [Fact]
-    public void What_was_kept_is_drawn()
+    public void A_source_moved_to_the_recorder_leaves_the_desk()
     {
-        var scene = new PatchGraph().Read(
-            Array.Empty<AudioRoute>(),
-            null,
-            null,
-            new[] { "TR-01" },
-            new[] { PatchNodes.Song, PatchNodes.Fire });
+        var scene = Drawn(PatchNodes.Song);
 
-        Assert.Equal(2, Into(scene.Links).Count(l =>
-            string.Equals(l.From.Node, PatchNodes.Song, StringComparison.Ordinal) ||
-            string.Equals(l.From.Node, PatchNodes.Fire, StringComparison.Ordinal)));
+        Assert.Contains(scene.Links, l => l.From.Node == PatchNodes.Song && l.To.Node == PatchNodes.Record);
+        Assert.DoesNotContain(scene.Links, l => l.From.Node == PatchNodes.Song && l.To.Node == PatchNodes.Mixer);
     }
+
+    /// <summary>And the one that was not moved stays exactly where it was.</summary>
+    [Fact]
+    public void A_source_that_was_not_moved_stays_on_the_desk()
+    {
+        var scene = Drawn(PatchNodes.Song);
+
+        Assert.Contains(scene.Links, l => l.From.Node == PatchNodes.Fire && l.To.Node == PatchNodes.Mixer);
+        Assert.DoesNotContain(scene.Links, l => l.From.Node == PatchNodes.Fire && l.To.Node == PatchNodes.Record);
+    }
+
+    /// <summary>The picture, with whichever sources have been moved to the recorder.</summary>
+    private static PatchScene Drawn(params string[] moved) =>
+        new PatchGraph().Read(Array.Empty<AudioRoute>(), null, null, new[] { "TR-01" }, moved);
 
     /// <summary>
     /// And an id naming no block of ours is passed over rather than drawn from nowhere, which is
@@ -224,24 +264,25 @@ public sealed class PatchedInTests
     [Fact]
     public void An_id_we_do_not_know_is_passed_over()
     {
-        var scene = new PatchGraph().Read(
-            Array.Empty<AudioRoute>(),
-            null,
-            null,
-            new[] { "TR-01" },
-            new[] { "something-later" });
+        var scene = Drawn("something-later");
 
         Assert.Empty(Into(scene.Links));
+        Assert.Contains(scene.Links, l => l.From.Node == PatchNodes.Song && l.To.Node == PatchNodes.Mixer);
     }
 
-    /// <summary>Nothing kept is nothing drawn, which is every fresh installation.</summary>
+    /// <summary>
+    /// Nothing moved is both of them on the desk, which is every fresh installation and every
+    /// settings file written before this existed.
+    /// </summary>
     [Fact]
-    public void Nothing_kept_draws_nothing()
+    public void Nothing_moved_leaves_both_on_the_desk()
     {
-        var scene = new PatchGraph().Read(
-            Array.Empty<AudioRoute>(), null, null, new[] { "TR-01" });
+        var scene = Drawn();
 
         Assert.Empty(Into(scene.Links));
+
+        Assert.Contains(scene.Links, l => l.From.Node == PatchNodes.Song && l.To.Node == PatchNodes.Mixer);
+        Assert.Contains(scene.Links, l => l.From.Node == PatchNodes.Fire && l.To.Node == PatchNodes.Mixer);
     }
 
     /// <summary>Every cable landing on the recorder's input.</summary>

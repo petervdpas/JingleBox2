@@ -48,10 +48,14 @@ public sealed class PatchWiring : IPatchWiring
     /// <param name="takes">The end it arrives at.</param>
     private static bool Absorbed(PatchPort gives, PatchPort takes)
     {
-        if (!string.Equals(takes.Node, PatchNodes.Record, System.StringComparison.Ordinal)) return false;
-        if (!string.Equals(takes.Name, PatchPorts.Capture, System.StringComparison.Ordinal)) return false;
+        if (!Feeds(gives)) return false;
 
-        return Feeds(gives);
+        if (string.Equals(takes.Node, PatchNodes.Record, System.StringComparison.Ordinal))
+            return string.Equals(takes.Name, PatchPorts.Capture, System.StringComparison.Ordinal);
+
+        if (!string.Equals(takes.Node, PatchNodes.Mixer, System.StringComparison.Ordinal)) return false;
+
+        return string.Equals(takes.Name, gives.Name, System.StringComparison.Ordinal);
     }
 
     /// <summary>Whether that point is one of ours that may go to the recorder.</summary>
@@ -73,8 +77,21 @@ public sealed class PatchWiring : IPatchWiring
         if (string.IsNullOrEmpty(port.Node)) return false;
         if (!port.Fixed) return true;
 
-        return Feeds(port);
+        return Feeds(port) || Lands(port);
     }
+
+    /// <summary>Whether that point is a place one of ours may be dropped.</summary>
+    /// <remarks>
+    /// The desk's own song and pads points, which is where those two go unless somebody moves
+    /// them. They have to answer the hand as well as the source does, or the cable can be picked
+    /// up off the desk and never put back on it.
+    /// </remarks>
+    /// <param name="takes">The point audio would arrive at.</param>
+    private static bool Lands(PatchPort takes) =>
+        takes.Side == PatchSide.In
+        && string.Equals(takes.Node, PatchNodes.Mixer, System.StringComparison.Ordinal)
+        && (string.Equals(takes.Name, PatchPorts.Song, System.StringComparison.Ordinal)
+            || string.Equals(takes.Name, PatchPorts.Pads, System.StringComparison.Ordinal));
 
     /// <inheritdoc/>
     /// <remarks>

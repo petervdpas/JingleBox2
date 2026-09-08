@@ -259,16 +259,16 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// <param name="link">The cable, as the surface made it.</param>
     public void Plug(PatchLink link)
     {
-        if (!string.Equals(link.To.Node, _graph.OwnNode, StringComparison.Ordinal))
+        if (Ours(link.From.Node))
         {
-            Says = "Only a cable into JingleBox2 changes anything here.";
+            Send(link.From.Node, link.To.Node);
+
             return;
         }
 
-        if (Ours(link.From.Node))
+        if (!string.Equals(link.To.Node, _graph.OwnNode, StringComparison.Ordinal))
         {
-            Patch(link.From.Node);
-
+            Says = "Only a cable into JingleBox2 changes anything here.";
             return;
         }
 
@@ -298,11 +298,9 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// <param name="link">The cable that was pulled out.</param>
     public void Unplug(PatchLink link)
     {
-        if (Ours(link.From.Node) && _patched is { } kept)
+        if (Ours(link.From.Node))
         {
-            kept.Remove(link.From.Node);
-
-            Says = $"{Named(link.From.Node)} is no longer going to the recorder.";
+            Says = $"{Named(link.From.Node)} has to go somewhere: drop it on the desk or on the recorder.";
 
             Read();
 
@@ -327,15 +325,23 @@ public sealed partial class PatchbayViewModel : ObservableObject
         string.Equals(node, PatchNodes.Song, StringComparison.Ordinal) ||
         string.Equals(node, PatchNodes.Fire, StringComparison.Ordinal);
 
-    /// <summary>Writes down that one of ours is going to the recorder, and says so.</summary>
+    /// <summary>Sends one of ours where the cable was dropped, and says where that is.</summary>
     /// <remarks>
-    /// **Nothing is heard yet and the line says so.** The cable is drawn and kept; what it does
-    /// not do is put audio into the take, since the recorder still takes what the machine's
-    /// capture hands it. That is the next piece of work, and a cable that quietly did nothing
-    /// while looking exactly like one that did would be worse than one that says where it stands.
+    /// **Moving it rather than adding a second cable**, which is the whole rule: a source that
+    /// went to the desk and to the recorder at once would arrive at the master twice, the second
+    /// copy a capture buffer late, and two copies of one thing a few milliseconds apart is a comb
+    /// filter rather than a mix. So dropped on the recorder it comes off the desk, and dropped
+    /// back on the desk it comes off the recorder.
+    ///
+    /// **Nothing is in the take yet and the line says so.** The cable is drawn and kept; what it
+    /// does not do is put audio anywhere, since the recorder still takes what the machine's
+    /// capture hands it and the desk still gets the source. That is the next piece of work, and a
+    /// cable that quietly did nothing while looking exactly like one that did would be worse than
+    /// one that says where it stands.
     /// </remarks>
     /// <param name="node">The block the cable leaves by.</param>
-    private void Patch(string node)
+    /// <param name="landed">The block it was dropped on.</param>
+    private void Send(string node, string landed)
     {
         if (_patched is not { } kept)
         {
@@ -346,9 +352,14 @@ public sealed partial class PatchbayViewModel : ObservableObject
             return;
         }
 
-        kept.Add(node);
+        bool recorder = string.Equals(landed, _graph.OwnNode, StringComparison.Ordinal);
 
-        Says = $"{Named(node)} is patched into the recorder. It is not in the take yet.";
+        if (recorder) kept.Add(node);
+        else kept.Remove(node);
+
+        Says = recorder
+            ? $"{Named(node)} goes to the recorder and no longer to the desk. It is not in the take yet."
+            : $"{Named(node)} goes to the desk again.";
 
         Read();
     }

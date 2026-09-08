@@ -29,11 +29,12 @@ public interface IPatchWiring
     /// this application is wired inside itself without offering to take it apart: the pads reach
     /// the mixer because that is what a mixer is, not because somebody patched them.
     ///
-    /// The case is a source of ours landing on the recorder's input. That one really is a
-    /// patch: the song's own master and the pads are things this application is playing, and
-    /// whether they are also being recorded is a decision rather than a fact about the engine.
-    /// Everything else stays fixed, so the one cable somebody can draw between our own blocks is
-    /// the one that means something.
+    /// The case is a source of ours choosing where it goes: the song's own master and the pads
+    /// each land either on the desk, which is what they do unless somebody says otherwise, or on
+    /// the recorder's input. That really is a patch rather than a fact about the engine, and
+    /// **it is one cable rather than two**, since a source that went both ways would arrive at
+    /// the master twice, once directly and once a capture buffer later, which is a comb filter
+    /// rather than a mix. Everything else stays fixed.
     /// </remarks>
     /// <param name="from">One end of the cable.</param>
     /// <param name="to">The other end.</param>

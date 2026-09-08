@@ -220,11 +220,9 @@ public sealed class PatchGraph : IPatchGraph
         for (int track = 0; track < plays.Count; track++)
             links.Add(new PatchLink(plays[track], sung[track]));
 
-        links.Add(new PatchLink(SongOut, MixerSong));
-        links.Add(new PatchLink(FireOut, MixerPads));
+        links.Add(Goes(SongOut, MixerSong, patched));
+        links.Add(Goes(FireOut, MixerPads, patched));
         links.Add(new PatchLink(MixerOut, OutputIn));
-
-        foreach (var source in PatchedIn(patched)) links.Add(new PatchLink(source, OwnInput));
 
         return new PatchScene(nodes, links);
     }
@@ -245,28 +243,39 @@ public sealed class PatchGraph : IPatchGraph
     /// </remarks>
     private static IReadOnlyList<PatchPort> Desk() => new[] { MixerTakes, MixerPads, MixerSong };
 
-    /// <summary>
-    /// The points of our own that are patched into the input, out of the ids that were kept.
-    /// </summary>
+    /// <summary>Where one of our own sources is going: the desk, or the recorder's input.</summary>
     /// <remarks>
-    /// An id that names no block of ours is passed over rather than drawn, which is what a
-    /// settings file written by a later version looks like from here: what it names may not exist
-    /// yet, and a cable from nowhere is worse than a cable that is missing.
+    /// **One cable and not two, which is the whole of why this is a question at all.** A source
+    /// that went to both would arrive at the master twice, once straight from its own strip and
+    /// once a capture buffer later out of the recorder, and two copies of one thing a few
+    /// milliseconds apart is a comb filter rather than a mix. So moving it is moving it: drawn to
+    /// the recorder it comes off the desk, and drawn back to the desk it comes off the recorder.
+    ///
+    /// The desk unless somebody has said otherwise, so a fresh installation and every settings
+    /// file written before this draw exactly what they always did.
     /// </remarks>
+    /// <param name="gives">The source's own point.</param>
+    /// <param name="desk">Where it lands on the desk.</param>
+    /// <param name="patched">The ids somebody has moved to the recorder.</param>
+    private PatchLink Goes(PatchPort gives, PatchPort desk, IReadOnlyList<string>? patched) =>
+        Moved(gives.Node, patched) ? new PatchLink(gives, OwnInput) : new PatchLink(gives, desk);
+
+    /// <summary>Whether that block has been moved off the desk and onto the recorder.</summary>
+    /// <remarks>
+    /// An id naming no block of ours is nothing to anybody here, which is what a settings file
+    /// written by a later version looks like from here: it is passed over rather than drawn from
+    /// nowhere.
+    /// </remarks>
+    /// <param name="node">The block's id.</param>
     /// <param name="patched">The ids that were kept.</param>
-    private static IReadOnlyList<PatchPort> PatchedIn(IReadOnlyList<string>? patched)
+    private static bool Moved(string node, IReadOnlyList<string>? patched)
     {
-        if (patched == null || patched.Count == 0) return Array.Empty<PatchPort>();
+        if (patched == null) return false;
 
-        var points = new List<PatchPort>(patched.Count);
+        foreach (string one in patched)
+            if (string.Equals(one, node, StringComparison.Ordinal)) return true;
 
-        foreach (string node in patched)
-        {
-            if (string.Equals(node, SongNode, StringComparison.Ordinal)) points.Add(SongOut);
-            else if (string.Equals(node, FireNode, StringComparison.Ordinal)) points.Add(FireOut);
-        }
-
-        return points;
+        return false;
     }
 
     /// <summary>Whether an address is one of this application's own blocks.</summary>
