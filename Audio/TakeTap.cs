@@ -13,10 +13,11 @@ namespace JingleBox2.Audio;
 /// A hook on the bus itself, which is what puts it before the level: BASS runs it as the bus
 /// produces its block and whatever pulls the bus applies the level afterwards.
 ///
-/// It allocates a block per block, which the mixing path may not and this may. It is hooked only
-/// while a take is being made and only where something is patched into RECORD, so what it costs
-/// is paid during a recording rather than for the life of the session, and the alternative is a
-/// second spelling of <see cref="ISixteenBit"/> written to avoid one small array.
+/// **It allocates nothing once a take is running**, which is the rule the mixing thread keeps and
+/// this is on that thread. Two buffers are grown to the longest block that has arrived and then
+/// reused, so a take costs the same whether it is four seconds or an hour. The reading itself is
+/// <see cref="ISixteenBit"/>'s own, written into a buffer rather than handed back as one, so
+/// there is still one place that knows what full scale is.
 /// </remarks>
 public sealed class TakeTap : ITakeTap
 {
@@ -43,6 +44,9 @@ public sealed class TakeTap : ITakeTap
 
     /// <summary>What a block is read into on its way out of the pointer BASS hands over.</summary>
     private byte[] _block = Array.Empty<byte>();
+
+    /// <summary>What it is read down into, kept for the same reason.</summary>
+    private byte[] _ready = Array.Empty<byte>();
 
     /// <summary>Makes one over the buffer and the conversion it uses.</summary>
     /// <param name="kept">Where what is read goes, or the ordinary buffer.</param>
@@ -174,6 +178,12 @@ public sealed class TakeTap : ITakeTap
 
         Marshal.Copy(buffer, _block, 0, length);
 
-        _kept.Add(_sixteen.Down(_block, length, new CaptureFormat(Rate, Channels, 32, Floats: true)));
+        var shape = new CaptureFormat(Rate, Channels, 32, Floats: true);
+        int room = _sixteen.Room(length, shape);
+
+        if (room <= 0) return;
+        if (_ready.Length < room) _ready = new byte[room];
+
+        _kept.Add(_ready, _sixteen.Down(_block, length, shape, _ready));
     }
 }

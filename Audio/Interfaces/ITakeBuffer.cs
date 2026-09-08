@@ -50,6 +50,19 @@ public interface ITakeBuffer
     /// <param name="block">The audio, as it arrived.</param>
     void Add(byte[] block);
 
+    /// <summary>
+    /// Adds the first part of a block, for a caller that keeps its own buffer.
+    /// </summary>
+    /// <remarks>
+    /// The buffer a caller reuses is as long as the longest block it has ever had, so what is in
+    /// it after a shorter one is the tail of an older block. Handing the whole array over would
+    /// write that tail into the take, which is a stutter of something that really happened a
+    /// moment ago and is the hardest kind of fault to hear as a fault.
+    /// </remarks>
+    /// <param name="block">The buffer holding it.</param>
+    /// <param name="bytes">How many of its bytes are this block.</param>
+    void Add(byte[] block, int bytes);
+
     /// <summary>The last moment of audio, for a meter to read.</summary>
     /// <remarks>
     /// Always a whole number of frames, so the samples in it stay in step with their channels.

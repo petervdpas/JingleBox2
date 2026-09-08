@@ -44,11 +44,27 @@ public sealed class RecorderBench
         /// <inheritdoc/>
         public IReadOnlyList<AudioRoute> GetRoutes() => new[] { Firefox, Speakers };
 
-        /// <inheritdoc/>
-        public AudioRoute? GetCurrentRoute() => Firefox;
+        /// <summary>What was last connected, which is what the graph would then be showing.</summary>
+        /// <remarks>
+        /// **It remembers rather than answering one route for ever**, because the page reads the
+        /// graph on a clock and puts the picker back to whatever the graph says is current. A
+        /// double that always answered the same source made that reading a change: land it after
+        /// a test had chosen another one and the picker flipped back, which showed up as one test
+        /// failing about one time in three and passing on its own. The rule the real routing keeps
+        /// is that connecting is what decides the current route, so the double keeps it too.
+        /// </remarks>
+        private AudioRoute _current = Firefox;
 
         /// <inheritdoc/>
-        public bool Connect(AudioRoute route) => true;
+        public AudioRoute? GetCurrentRoute() => _current;
+
+        /// <inheritdoc/>
+        public bool Connect(AudioRoute route)
+        {
+            _current = route;
+
+            return true;
+        }
 
         /// <inheritdoc/>
         public bool CanTakeAside => true;

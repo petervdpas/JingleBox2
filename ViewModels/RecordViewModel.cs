@@ -1863,14 +1863,14 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     {
         OnPropertyChanged(nameof(CaptureFrom));
 
+        Listening();
+
         if (_readingRoute || value == null) return;
 
         _preferredRoute = value;
         ApplyRoute(value, announce: true);
 
         Aside();
-
-        Listening();
     }
 
     /// <summary>Whether this machine can take a source off everything but this application.</summary>
@@ -2117,6 +2117,17 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// a switch that was already on, which is the one case the switch being grey cannot cover: it
     /// is grey from the moment the source changes and by then the audio is already going round.
     /// So the source decides, and the switch follows it.
+    ///
+    /// **Said for every way the source can move, including the ones nobody chose.** The graph is
+    /// read on a clock and puts the picker back to whatever the machine says is current, and that
+    /// path deliberately skips connecting, since it is answering a reading rather than making
+    /// one. It used to skip this with it, which is a different kind of thing: the picker landed
+    /// on what an output is playing, the screen said the recorder could not be heard, and the
+    /// capture was still on its bus going round. Nothing on the page says why, because as far as
+    /// the page is concerned nobody touched anything.
+    ///
+    /// It showed up first as a test that failed about one run in three and passed on its own,
+    /// which is what a poll landing inside somebody else's moment looks like from the outside.
     /// </remarks>
     private void Listening()
     {

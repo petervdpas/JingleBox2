@@ -232,4 +232,39 @@ public class TakeBufferTests
 
         Assert.Equal(64, buffer.Stop().Length);
     }
+
+    /// <summary>
+    /// Only the part of a reused buffer that is this block is kept.
+    /// </summary>
+    /// <remarks>
+    /// The one that reads the recorder's bus keeps its own buffer, as long as the longest block
+    /// it has ever had, so what sits past a shorter block is the tail of an older one. Written
+    /// into a take that is a moment of something that really happened, repeated, which is the
+    /// hardest kind of fault to hear as a fault rather than as a performance.
+    /// </remarks>
+    [Fact]
+    public void Only_this_much_of_a_reused_buffer_is_kept()
+    {
+        var buffer = new TakeBuffer();
+
+        buffer.Start();
+
+        buffer.Add(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 }, 8);
+        buffer.Add(new byte[] { 9, 10, 3, 4, 5, 6, 7, 8 }, 2);
+
+        Assert.Equal(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, buffer.Stop());
+    }
+
+    /// <summary>A count past the end of the buffer is held to what is really there.</summary>
+    [Fact]
+    public void More_than_there_is_keeps_what_there_is()
+    {
+        var buffer = new TakeBuffer();
+
+        buffer.Start();
+
+        buffer.Add(new byte[] { 1, 2 }, 64);
+
+        Assert.Equal(new byte[] { 1, 2 }, buffer.Stop());
+    }
 }

@@ -24,16 +24,70 @@ public sealed class SixteenBit : ISixteenBit
     /// <inheritdoc/>
     public byte[] Down(byte[]? block, int count, CaptureFormat from)
     {
-        if (block == null || count <= 0) return Array.Empty<byte>();
+        int room = Room(block, ref count, from);
+
+        if (room <= 0) return Array.Empty<byte>();
+
+        var made = new byte[room];
+
+        Down(block, count, from, made);
+
+        return made;
+    }
+
+    /// <inheritdoc/>
+    public int Down(byte[]? block, int count, CaptureFormat from, byte[]? into)
+    {
+        int room = Room(block, ref count, from);
+
+        if (room <= 0 || into == null || into.Length < room) return 0;
+
+        if (from.Bits == 16 && !from.Floats) Whole(block!, count, 2, into);
+        else if (from.Bits == 32 && from.Floats) Floats(block!, count, into);
+        else if (from.Bits == 32) Narrow(block!, count, 4, 2, into);
+        else Narrow(block!, count, 3, 1, into);
+
+        return room;
+    }
+
+    /// <inheritdoc/>
+    public int Room(int count, CaptureFormat from)
+    {
+        int width = Width(from);
+
+        return width == 0 || count <= 0 ? 0 : count / width * 2;
+    }
+
+    /// <summary>
+    /// How much room a block needs, and how much of it will be read.
+    /// </summary>
+    /// <remarks>
+    /// Both answers at once because they are the same arithmetic, and the count is held to what
+    /// the block really has here rather than in each of the two ways in: a caller that says more
+    /// bytes than it handed over is what a capture looks like when a device is closing.
+    /// </remarks>
+    /// <param name="block">The audio as it arrived.</param>
+    /// <param name="count">How many bytes are claimed, held to what is there.</param>
+    /// <param name="from">What those bytes are made of.</param>
+    private static int Room(byte[]? block, ref int count, CaptureFormat from)
+    {
+        if (block == null || count <= 0) return 0;
 
         count = Math.Min(count, block.Length);
 
-        if (from.Bits == 16 && !from.Floats) return Whole(block, count, 2);
-        if (from.Bits == 32 && from.Floats) return Floats(block, count);
-        if (from.Bits == 32 && !from.Floats) return Narrow(block, count, 4, 2);
-        if (from.Bits == 24 && !from.Floats) return Narrow(block, count, 3, 1);
+        int width = Width(from);
 
-        return Array.Empty<byte>();
+        return width == 0 ? 0 : count / width * 2;
+    }
+
+    /// <summary>How wide one sample of that shape is, or nought for one nothing here reads.</summary>
+    private static int Width(CaptureFormat from)
+    {
+        if (from.Bits == 16 && !from.Floats) return 2;
+        if (from.Bits == 32) return 4;
+        if (from.Bits == 24 && !from.Floats) return 3;
+
+        return 0;
     }
 
     /// <summary>The block as it stands, trimmed to whole samples.</summary>
@@ -41,21 +95,13 @@ public sealed class SixteenBit : ISixteenBit
     /// Handed back as its own array rather than the one that arrived, since the capture goes on
     /// using its buffer for the next block and everything above keeps what it is given.
     /// </remarks>
-    private static byte[] Whole(byte[] block, int count, int width)
-    {
-        int bytes = count - (count % width);
-        var same = new byte[bytes];
-
-        Buffer.BlockCopy(block, 0, same, 0, bytes);
-
-        return same;
-    }
+    private static void Whole(byte[] block, int count, int width, byte[] into) =>
+        Buffer.BlockCopy(block, 0, into, 0, count - (count % width));
 
     /// <summary>Floating point samples, held at full scale and silenced where they are not numbers.</summary>
-    private static byte[] Floats(byte[] block, int count)
+    private static void Floats(byte[] block, int count, byte[] into)
     {
         int samples = count / 4;
-        var sixteen = new byte[samples * 2];
 
         for (int sample = 0; sample < samples; sample++)
         {
@@ -65,11 +111,9 @@ public sealed class SixteenBit : ISixteenBit
                 ? 0
                 : Math.Clamp((int)MathF.Round(value * FullScale), Floor, Ceiling);
 
-            sixteen[sample * 2] = (byte)(written & 0xFF);
-            sixteen[(sample * 2) + 1] = (byte)((written >> 8) & 0xFF);
+            into[sample * 2] = (byte)(written & 0xFF);
+            into[(sample * 2) + 1] = (byte)((written >> 8) & 0xFF);
         }
-
-        return sixteen;
     }
 
     /// <summary>
@@ -84,19 +128,17 @@ public sealed class SixteenBit : ISixteenBit
     /// <param name="count">How many bytes of it are real.</param>
     /// <param name="width">How wide one sample is in it.</param>
     /// <param name="skip">How many of its low bytes to drop.</param>
-    private static byte[] Narrow(byte[] block, int count, int width, int skip)
+    /// <param name="into">Where the samples go.</param>
+    private static void Narrow(byte[] block, int count, int width, int skip, byte[] into)
     {
         int samples = count / width;
-        var sixteen = new byte[samples * 2];
 
         for (int sample = 0; sample < samples; sample++)
         {
             int at = (sample * width) + skip;
 
-            sixteen[sample * 2] = block[at];
-            sixteen[(sample * 2) + 1] = block[at + 1];
+            into[sample * 2] = block[at];
+            into[(sample * 2) + 1] = block[at + 1];
         }
-
-        return sixteen;
     }
 }

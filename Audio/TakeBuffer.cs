@@ -83,13 +83,18 @@ public sealed class TakeBuffer : ITakeBuffer
     }
 
     /// <inheritdoc/>
-    public void Add(byte[] block)
+    public void Add(byte[] block) => Add(block, block?.Length ?? 0);
+
+    /// <inheritdoc/>
+    public void Add(byte[] block, int bytes)
     {
-        if (block == null || block.Length == 0) return;
+        if (block == null || bytes <= 0) return;
+
+        bytes = Math.Min(bytes, block.Length);
 
         lock (_lock)
         {
-            _heard.AddRange(block);
+            _heard.AddRange(new ReadOnlySpan<byte>(block, 0, bytes));
 
             if (!_recording && _heard.Count > MonitorBytes)
                 _heard.RemoveRange(0, _heard.Count - MonitorBytes);
