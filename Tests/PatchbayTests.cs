@@ -349,14 +349,36 @@ public class PatchbayTests
 
     /// <summary>And the desk takes one in for each of them, under its own name.</summary>
     [Fact]
-    public void The_desk_takes_one_in_for_every_track()
+    public void The_song_takes_one_in_for_every_track()
     {
         var scene = _graph.Read(Array.Empty<AudioRoute>(), null, null, new[] { "TR-01", "TR-02" });
 
-        var mixer = scene.Nodes.Single(n => n.Id == "mixer");
+        var song = scene.Nodes.Single(n => n.Id == "song");
 
-        Assert.Contains(mixer.Ins, p => p.Name == "TR-01");
-        Assert.Contains(mixer.Ins, p => p.Name == "TR-02");
+        Assert.Contains(song.Ins, p => p.Name == "TR-01");
+        Assert.Contains(song.Ins, p => p.Name == "TR-02");
+    }
+
+    /// <summary>
+    /// And the desk takes one pair from the song however many tracks there are, since what
+    /// reaches it is what the song already summed.
+    /// </summary>
+    /// <remarks>
+    /// **The tracks never reached the desk and the picture used to say they did**, which is the
+    /// inside of the tracker drawn as though it were the wiring: `TrackMixer` sums every track
+    /// into the song's own master, puts the song's chain, its level, its pan and the saturation
+    /// on it, and one stereo pair goes to the output bus. Adding a track to a song now moves
+    /// nothing on the desk block, where before it moved every point under it.
+    /// </remarks>
+    [Fact]
+    public void The_desk_takes_the_song_as_one_pair()
+    {
+        var mixer = _graph
+            .Read(Array.Empty<AudioRoute>(), null, null, new[] { "TR-01", "TR-02", "TR-03" })
+            .Nodes.Single(n => n.Id == "mixer");
+
+        Assert.Equal(3, mixer.Ins.Count);
+        Assert.DoesNotContain(mixer.Ins, p => p.Name == "TR-01");
     }
 
     /// <summary>Each track's cable runs to its own point on the desk and no other.</summary>
@@ -370,26 +392,26 @@ public class PatchbayTests
             if (link.From.Node != "tracker") continue;
 
             Assert.Equal(link.From.Name, link.To.Name);
-            Assert.Equal("mixer", link.To.Node);
+            Assert.Equal("song", link.To.Node);
         }
     }
 
-    /// <summary>The pads and a take go under the tracks rather than among them.</summary>
+    /// <summary>The desk's points run down it in the order the strips read across it.</summary>
     /// <remarks>
-    /// So adding a track to a song does not move the point a cable was drawn to, which on a
-    /// picture somebody has arranged is the difference between a new row and everything shifting
-    /// down one.
+    /// The recorder, then the pads, then the song, which is what the mixer beside this page shows
+    /// left to right. A cable is followed with the same eye that reads the strips, so a point
+    /// that is third here and first there is one somebody has to look twice for.
     /// </remarks>
     [Fact]
-    public void The_pads_and_the_takes_go_under_the_tracks()
+    public void The_desk_reads_in_the_order_the_strips_do()
     {
         var mixer = _graph
             .Read(Array.Empty<AudioRoute>(), null, null, new[] { "TR-01" })
             .Nodes.Single(n => n.Id == "mixer");
 
-        Assert.Equal("TR-01", mixer.Ins[0].Name);
-        Assert.Equal("pads", mixer.Ins[^2].Name);
-        Assert.Equal("takes", mixer.Ins[^1].Name);
+        Assert.Equal("takes", mixer.Ins[0].Name);
+        Assert.Equal("pads", mixer.Ins[1].Name);
+        Assert.Equal("song", mixer.Ins[2].Name);
     }
 
     /// <summary>A song with no tracks yet draws the whole mix as one pair.</summary>
@@ -439,7 +461,8 @@ public class PatchbayTests
         var scene = _graph.Read(Array.Empty<AudioRoute>(), null);
 
         Assert.Contains(scene.Links, l => l.From.Node == "record" && l.To.Node == "mixer");
-        Assert.Contains(scene.Links, l => l.From.Node == "tracker" && l.To.Node == "mixer");
+        Assert.Contains(scene.Links, l => l.From.Node == "tracker" && l.To.Node == "song");
+        Assert.Contains(scene.Links, l => l.From.Node == "song" && l.To.Node == "mixer");
         Assert.Contains(scene.Links, l => l.From.Node == "fire" && l.To.Node == "mixer");
         Assert.Contains(scene.Links, l => l.From.Node == "mixer" && l.To.Node == "output");
     }

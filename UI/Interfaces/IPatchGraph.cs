@@ -55,9 +55,15 @@ public interface IPatchGraph
     /// so what the picture says about TR-03 is what the strip headed TR-03 is doing. Nothing
     /// draws the whole mix as one pair, which is what there is before a song has been opened.
     /// </param>
+    /// <param name="patched">
+    /// Which of this application's own blocks are patched into the input, by id. The one part of
+    /// this picture somebody decided rather than something read off the machine, so it is handed
+    /// in from wherever it is kept.
+    /// </param>
     PatchScene Read(
         IReadOnlyList<AudioRoute> routes,
         AudioRoute? chosen,
         string? output = null,
-        IReadOnlyList<string>? tracks = null);
+        IReadOnlyList<string>? tracks = null,
+        IReadOnlyList<string>? patched = null);
 }

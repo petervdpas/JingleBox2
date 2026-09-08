@@ -25,13 +25,34 @@ public interface IPatchWiring
     /// likes. A block cannot be joined to itself, which is feedback and is the one connection
     /// that can be made by accident.
     ///
-    /// **A fixed point refuses everything**, which is how the picture can show how this
-    /// application is wired inside itself without offering to take it apart: the pads reach the
-    /// mixer because that is what a mixer is, not because somebody patched them.
+    /// **A fixed point refuses everything but one case**, which is how the picture can show how
+    /// this application is wired inside itself without offering to take it apart: the pads reach
+    /// the mixer because that is what a mixer is, not because somebody patched them.
+    ///
+    /// The case is a source of ours landing on the recorder's input. That one really is a
+    /// patch: the song's own master and the pads are things this application is playing, and
+    /// whether they are also being recorded is a decision rather than a fact about the engine.
+    /// Everything else stays fixed, so the one cable somebody can draw between our own blocks is
+    /// the one that means something.
     /// </remarks>
     /// <param name="from">One end of the cable.</param>
     /// <param name="to">The other end.</param>
     bool Allowed(PatchPort from, PatchPort to);
+
+    /// <summary>
+    /// Whether a hand may take hold of a cable at this point at all.
+    /// </summary>
+    /// <remarks>
+    /// **Asked before a drag starts, where <see cref="Allowed"/> is asked when it lands.** A point
+    /// nothing may ever be drawn to or from must not answer the press in the first place, or the
+    /// cable follows the hand across the page and springs back for no visible reason.
+    ///
+    /// It also decides what may be pulled out. The pads reach the desk because that is what a desk
+    /// is, so that cable is not a thing anybody drew and not a thing anybody may take away; a
+    /// point that could never be one end of a cable somebody drew cannot be one they undraw.
+    /// </remarks>
+    /// <param name="port">The point under the hand.</param>
+    bool Wirable(PatchPort port);
 
     /// <summary>
     /// Which channel of the output feeds which channel of the input.

@@ -115,7 +115,7 @@ public sealed class PatchGraph : IPatchGraph
     /// strip the song is really summed on with no block at all.
     /// </remarks>
     private static readonly PatchPort SongOut =
-        new(SongNode, "master", PatchSide.Out, PatchChannels.Stereo, Fixed: true);
+        new(SongNode, "song", PatchSide.Out, PatchChannels.Stereo, Fixed: true);
 
     /// <summary>Where the song arrives on the desk.</summary>
     private static readonly PatchPort MixerSong =
@@ -145,7 +145,8 @@ public sealed class PatchGraph : IPatchGraph
         IReadOnlyList<AudioRoute> routes,
         AudioRoute? chosen,
         string? output = null,
-        IReadOnlyList<string>? tracks = null)
+        IReadOnlyList<string>? tracks = null,
+        IReadOnlyList<string>? patched = null)
     {
         var nodes = new List<PatchNode>();
         var links = new List<PatchLink>();
@@ -223,6 +224,8 @@ public sealed class PatchGraph : IPatchGraph
         links.Add(new PatchLink(FireOut, MixerPads));
         links.Add(new PatchLink(MixerOut, OutputIn));
 
+        foreach (var source in PatchedIn(patched)) links.Add(new PatchLink(source, OwnInput));
+
         return new PatchScene(nodes, links);
     }
 
@@ -241,6 +244,30 @@ public sealed class PatchGraph : IPatchGraph
     /// for.
     /// </remarks>
     private static IReadOnlyList<PatchPort> Desk() => new[] { MixerTakes, MixerPads, MixerSong };
+
+    /// <summary>
+    /// The points of our own that are patched into the input, out of the ids that were kept.
+    /// </summary>
+    /// <remarks>
+    /// An id that names no block of ours is passed over rather than drawn, which is what a
+    /// settings file written by a later version looks like from here: what it names may not exist
+    /// yet, and a cable from nowhere is worse than a cable that is missing.
+    /// </remarks>
+    /// <param name="patched">The ids that were kept.</param>
+    private static IReadOnlyList<PatchPort> PatchedIn(IReadOnlyList<string>? patched)
+    {
+        if (patched == null || patched.Count == 0) return Array.Empty<PatchPort>();
+
+        var points = new List<PatchPort>(patched.Count);
+
+        foreach (string node in patched)
+        {
+            if (string.Equals(node, SongNode, StringComparison.Ordinal)) points.Add(SongOut);
+            else if (string.Equals(node, FireNode, StringComparison.Ordinal)) points.Add(FireOut);
+        }
+
+        return points;
+    }
 
     /// <summary>Whether an address is one of this application's own blocks.</summary>
     /// <remarks>

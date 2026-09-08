@@ -984,7 +984,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         (UI.PatchNodes.Fire, UI.PatchPorts.Pads) => Reading(_audio.PadBus),
         (UI.PatchNodes.Fire, "") => Reading(_audio.PadBus),
         (UI.PatchNodes.Tracker, "") => Joined(),
-        (UI.PatchNodes.Song, UI.PatchPorts.Master) => Sung(),
+        (UI.PatchNodes.Song, UI.PatchPorts.Song) => Sung(),
         (UI.PatchNodes.Song, "") => Sung(),
         (UI.PatchNodes.Mixer, UI.PatchPorts.Master) => Reading(_audio.Output),
         (UI.PatchNodes.Mixer, "") => Reading(_audio.Output),
@@ -1073,7 +1073,12 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// the recorder because that is what the picture is about: every block on it either feeds
     /// this application or is this application.
     /// </remarks>
-    public PatchbayViewModel Patchbay => patchbay ??= new PatchbayViewModel(Record, this, new Config.PatchPlaces(_cfg, _store), this);
+    public PatchbayViewModel Patchbay => patchbay ??= new PatchbayViewModel(
+        Record,
+        this,
+        new Config.PatchPlaces(_cfg, _store),
+        this,
+        patched: new Config.PatchedIn(_cfg, _store));
 
     /// <summary>Backing field for <see cref="DeskMaster"/>.</summary>
     private SourceStripViewModel? deskMaster;

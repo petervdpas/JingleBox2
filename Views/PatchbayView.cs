@@ -355,13 +355,15 @@ public sealed class PatchbayView : Panel
     /// </remarks>
     private void Grab(PatchPort port, PointerPressedEventArgs e)
     {
-        if (port.Fixed) return;
+        if (!Wiring.Wirable(port)) return;
 
         _moving = null;
         _anchor = port;
 
         foreach (var link in Links)
         {
+            if (!Wiring.Allowed(link.From, link.To)) continue;
+
             if (link.From == port)
             {
                 _moving = link;

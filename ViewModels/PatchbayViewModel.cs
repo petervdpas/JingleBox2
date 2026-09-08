@@ -42,6 +42,13 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// <summary>Where the blocks were left, or nothing where nobody is keeping that.</summary>
     private readonly IPatchPlaces? _places;
 
+    /// <summary>What of ours is patched into the input, or nothing where nobody is keeping it.</summary>
+    /// <remarks>
+    /// Optional, so a patchbay can be built and put a question to without a settings file: what
+    /// it costs is a cable somebody draws not being there in the morning.
+    /// </remarks>
+    private readonly IPatchedIn? _patched;
+
     /// <summary>Where the mix leaves, or nothing where nobody has said.</summary>
     /// <remarks>
     /// Optional, so a patchbay can be built and put a question to without an engine: what it
@@ -62,18 +69,21 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// <param name="flowing">What is carrying audio, for the cables that are drawn solid.</param>
     /// <param name="graph">What blocks and cables those make.</param>
     /// <param name="flow">Which cables that makes live.</param>
+    /// <param name="patched">What of ours is patched into the input, and where that is kept.</param>
     public PatchbayViewModel(
         IInputSource input,
         IOutputChosen? output = null,
         IPatchPlaces? places = null,
         IAudioFlowing? flowing = null,
         IPatchGraph? graph = null,
-        IPatchFlow? flow = null)
+        IPatchFlow? flow = null,
+        IPatchedIn? patched = null)
     {
         _input = input;
         _output = output;
         _places = places;
         _flowing = flowing;
+        _patched = patched;
         _graph = graph ?? new PatchGraph();
         _flow = flow ?? new PatchFlow();
 
@@ -135,7 +145,12 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// </remarks>
     public void Read()
     {
-        var scene = _graph.Read(_input.Routes, _input.SelectedRoute, _output?.SelectedOutputDevice?.Name, _flowing?.Tracks);
+        var scene = _graph.Read(
+            _input.Routes,
+            _input.SelectedRoute,
+            _output?.SelectedOutputDevice?.Name,
+            _flowing?.Tracks,
+            _patched?.Sources);
 
         Nodes = Laid(scene.Nodes);
         Links = scene.Links;
@@ -250,6 +265,13 @@ public sealed partial class PatchbayViewModel : ObservableObject
             return;
         }
 
+        if (Ours(link.From.Node))
+        {
+            Patch(link.From.Node);
+
+            return;
+        }
+
         var route = Route(link.From.Node);
 
         if (route == null)
@@ -276,10 +298,64 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// <param name="link">The cable that was pulled out.</param>
     public void Unplug(PatchLink link)
     {
+        if (Ours(link.From.Node) && _patched is { } kept)
+        {
+            kept.Remove(link.From.Node);
+
+            Says = $"{Named(link.From.Node)} is no longer going to the recorder.";
+
+            Read();
+
+            return;
+        }
+
         Says = "Nothing is taken off yet: pick another source instead.";
 
         Read();
     }
+
+    /// <summary>Whether that address is one of ours that may be patched into the input.</summary>
+    /// <remarks>
+    /// Asked of the block rather than of the cable, since the wiring rule has already refused
+    /// anything else by the time either of these is reached: what is left to decide here is only
+    /// whether this is a source of ours or a program on the machine, and those are answered in
+    /// two completely different ways. A program is chosen, which rewires the machine's own graph;
+    /// one of ours is written down, and nothing outside this application hears about it.
+    /// </remarks>
+    /// <param name="node">The block the cable leaves by.</param>
+    private static bool Ours(string node) =>
+        string.Equals(node, PatchNodes.Song, StringComparison.Ordinal) ||
+        string.Equals(node, PatchNodes.Fire, StringComparison.Ordinal);
+
+    /// <summary>Writes down that one of ours is going to the recorder, and says so.</summary>
+    /// <remarks>
+    /// **Nothing is heard yet and the line says so.** The cable is drawn and kept; what it does
+    /// not do is put audio into the take, since the recorder still takes what the machine's
+    /// capture hands it. That is the next piece of work, and a cable that quietly did nothing
+    /// while looking exactly like one that did would be worse than one that says where it stands.
+    /// </remarks>
+    /// <param name="node">The block the cable leaves by.</param>
+    private void Patch(string node)
+    {
+        if (_patched is not { } kept)
+        {
+            Says = "That cable cannot be kept, since there is nowhere to write it down.";
+
+            Read();
+
+            return;
+        }
+
+        kept.Add(node);
+
+        Says = $"{Named(node)} is patched into the recorder. It is not in the take yet.";
+
+        Read();
+    }
+
+    /// <summary>What one of our blocks is called on the picture.</summary>
+    private static string Named(string node) =>
+        string.Equals(node, PatchNodes.Song, StringComparison.Ordinal) ? "SONG" : "FIRE";
 
     /// <summary>The route with that address, or nothing where it has stopped playing.</summary>
     private AudioRoute? Route(string node)

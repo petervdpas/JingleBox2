@@ -239,6 +239,20 @@ public sealed class AppConfig
     public System.Collections.Generic.List<Records.PatchbayPlace> PatchbayPlaces { get; set; } = new();
 
     /// <summary>
+    /// Which of this application's own sources are patched into the recorder's input, by block id.
+    /// </summary>
+    /// <remarks>
+    /// The one part of the patchbay somebody decides rather than reads: the rest of the picture
+    /// is what the machine is doing and what this application already does. Here for the reason
+    /// the places are, which is that a patchbay is about this installation and a song carried to
+    /// another machine has no business arriving with the pads wired into somebody's recorder.
+    ///
+    /// Empty on a fresh installation, which is what nothing patched looks like and is what this
+    /// application has always done.
+    /// </remarks>
+    public System.Collections.Generic.List<string> PatchedIntoInput { get; set; } = new();
+
+    /// <summary>
     /// The output a source is sent to so that nobody hears it, by the system's own id for it.
     /// </summary>
     /// <remarks>
