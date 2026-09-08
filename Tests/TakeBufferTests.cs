@@ -267,4 +267,97 @@ public class TakeBufferTests
 
         Assert.Equal(new byte[] { 1, 2 }, buffer.Stop());
     }
+
+    /// <summary>
+    /// A take that runs over many blocks comes back in order, byte for byte.
+    /// </summary>
+    /// <remarks>
+    /// The whole risk of keeping a take in blocks rather than in one array is the joins, and
+    /// every way a join goes wrong leaves a take of exactly the right length: a block copied
+    /// twice, one dropped, or two swapped. So it is checked by content and not by length, with a
+    /// pattern that says where each byte came from.
+    /// </remarks>
+    [Fact]
+    public void A_take_over_many_blocks_comes_back_in_order()
+    {
+        var buffer = new TakeBuffer();
+        var written = new System.Collections.Generic.List<byte>();
+
+        buffer.Start();
+
+        for (int round = 0; round < 40; round++)
+        {
+            var block = new byte[3000];
+
+            for (int at = 0; at < block.Length; at++) block[at] = (byte)((round * 7) + at);
+
+            written.AddRange(block);
+            buffer.Add(block);
+        }
+
+        byte[] take = buffer.Stop();
+
+        Assert.True(take.Length > TakeBuffer.ChunkBytes * 3, "the take was too short to cross the joins");
+        Assert.Equal(written.ToArray(), take);
+    }
+
+    /// <summary>A block longer than one of them is kept whole rather than to the first join.</summary>
+    [Fact]
+    public void A_block_longer_than_one_of_them_is_kept_whole()
+    {
+        var buffer = new TakeBuffer();
+        var block = new byte[(TakeBuffer.ChunkBytes * 2) + 17];
+
+        for (int at = 0; at < block.Length; at++) block[at] = (byte)at;
+
+        buffer.Start();
+        buffer.Add(block);
+
+        Assert.Equal(block, buffer.Stop());
+    }
+
+    /// <summary>
+    /// Monitoring holds the last moment and no more of it, and it really is the last.
+    /// </summary>
+    /// <remarks>
+    /// Blocks are dropped off the front to keep it, and dropping whole blocks would be easier and
+    /// would leave the meter reading a moment that is up to one block longer than it says. What is
+    /// pinned here is both halves: how much is held, and that it is the end of what went in.
+    /// </remarks>
+    [Fact]
+    public void Monitoring_holds_the_last_moment_exactly()
+    {
+        var buffer = new TakeBuffer();
+        byte written = 0;
+
+        for (int round = 0; round < 60; round++)
+        {
+            var block = new byte[4000];
+
+            for (int at = 0; at < block.Length; at++) block[at] = written++;
+
+            buffer.Add(block);
+        }
+
+        byte[] recent = buffer.Recent(int.MaxValue, 4);
+
+        Assert.Equal(TakeBuffer.MonitorBytes, recent.Length);
+        Assert.Equal((byte)(written - 1), recent[^1]);
+
+        for (int at = 1; at < recent.Length; at++)
+            Assert.Equal((byte)(recent[at - 1] + 1), recent[at]);
+    }
+
+    /// <summary>What was heard while nobody was recording is not in the take that follows.</summary>
+    [Fact]
+    public void The_last_moment_is_not_the_start_of_the_next_take()
+    {
+        var buffer = new TakeBuffer();
+
+        buffer.Add(new byte[8000]);
+        buffer.Start();
+        buffer.Add(new byte[] { 1, 2, 3, 4 });
+
+        Assert.Equal(new byte[] { 1, 2, 3, 4 }, buffer.Stop());
+    }
 }
