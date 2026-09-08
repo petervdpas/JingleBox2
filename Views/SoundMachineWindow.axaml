@@ -7,8 +7,6 @@
         Title="{Binding Selected.Name}"
         SizeToContent="WidthAndHeight"
         MinWidth="680"
-        MaxWidth="1400"
-        MaxHeight="1000"
         WindowStartupLocation="CenterOwner">
 
   <!-- The machine being worked on, in a window of its own: the same panel a track's instrument

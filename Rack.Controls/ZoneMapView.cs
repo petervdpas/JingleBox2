@@ -206,15 +206,34 @@ public class ZoneMapView : ThemedControl
         return laid;
     }
 
+    /// <summary>The width a map wants when nobody is telling it, which is ten octaves at a glance.</summary>
+    /// <remarks>
+    /// A number rather than a measurement, because there is nothing to measure: the map draws a
+    /// keyboard's worth of lanes and every one of them is as wide as the strip, so any width at
+    /// all is legible and the only question is what looks like a keyboard rather than a ruler.
+    /// </remarks>
+    private const double Wanted = 480;
+
+    /// <summary>The narrowest it is worth drawing at, below which the octave marks run together.</summary>
+    private const double Least = 240;
+
     /// <summary>
-    /// As tall as the lanes plus the octave marks under them, and as wide as it is offered.
+    /// As tall as the lanes plus the octave marks under them, and as wide as a map wants to be.
     /// </summary>
     /// <remarks>
     /// One lane is claimed even when there are no zones at all, so an empty map is a strip
     /// somebody can drop a zone onto rather than nothing at all.
     ///
-    /// The fallback width is for being measured with no limit, which is what a panel that
-    /// scrolls sideways offers: a strip that asked for infinity would be drawn off the page.
+    /// **It asks for a width of its own rather than taking what it is offered, and that is the
+    /// whole of this method.** A control that answers the available width has no size, and a face
+    /// holding one has none either, since a panel is as wide as its widest part: the window then
+    /// takes every pixel it can get, and the parts underneath that do have a size are cut off
+    /// wherever the screen or the window's own ceiling stops it. From a chair that is a machine
+    /// whose panel is too big and clipped at the same time, which is exactly what it was.
+    ///
+    /// It still fills whatever room it is given, since it is laid out stretched and draws to its
+    /// bounds. Wanting a size and taking more when there is more are different questions, and
+    /// only the first one belongs here.
     /// </remarks>
     protected override Size MeasureOverride(Size availableSize)
     {
@@ -223,8 +242,7 @@ public class ZoneMapView : ThemedControl
 
         double height = lanes * LaneHeight + (lanes - 1) * LaneGap + LabelGap + LineHeight;
 
-        return new Size(
-            Math.Max(240, double.IsInfinity(availableSize.Width) ? 480 : availableSize.Width), height);
+        return new Size(Math.Max(Least, Wanted), height);
     }
 
     /// <summary>

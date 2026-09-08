@@ -7,8 +7,6 @@
         Title="{Binding Title}"
         SizeToContent="WidthAndHeight"
         MinWidth="680"
-        MaxWidth="1200"
-        MaxHeight="1000"
         WindowStartupLocation="CenterOwner">
 
   <!-- The same panel the rack shows, over this track's own instrument. A machine's front panel,

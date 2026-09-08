@@ -343,7 +343,8 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "6"
+            "gap": "6",
+            "align": "stretch"
           },
           "Children": [
             {

@@ -85,7 +85,7 @@
 
   <Panel>
 
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+  <ScrollViewer HorizontalScrollBarVisibility="Hidden">
     <StackPanel Spacing="8"
                 IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
 
