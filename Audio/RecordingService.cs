@@ -592,14 +592,22 @@ public sealed class RecordingService : IRecordingService, IDisposable
     /// A chain that leaves nothing behind is not a chain: an empty one writes one file and says
     /// there is no twin, so a take made with nothing on the page is exactly the take it always
     /// was.
+    ///
+    /// **A take read off the recorder's bus has already been through the chain and is not put
+    /// through it again.** The chain runs where the input is heard, so what the bus sums is what
+    /// somebody was listening to; running it a second time on the way to the file would write a
+    /// take with the delay on it twice, which is a fault nobody would spot until they played it
+    /// back. It writes one file for the same reason there is no twin: the clean copy of a mix is
+    /// the capture without whatever was patched in, which is not the same performance.
     /// </remarks>
     public Task<SavedTake> WriteTakeAsync(string folder, string fileName, string cleanName)
     {
         byte[] pcmData = _heard.Take;
         int rate = _sampleRate;
         int channels = _channels;
+        bool offBus = _tap.Mixed && _tap.Take.Length > 0;
 
-        if (_tap.Mixed && _tap.Take.Length > 0)
+        if (offBus)
         {
             pcmData = _tap.Take;
             rate = _tap.Rate;
@@ -614,7 +622,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
         string filePath = Path.Combine(folder, $"{fileName}.wav");
         string cleanPath = Path.Combine(folder, $"{cleanName}.wav");
 
-        var effect = Effect;
+        var effect = offBus ? null : Effect;
 
         return Task.Run(() =>
         {
