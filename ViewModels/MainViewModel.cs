@@ -984,11 +984,25 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         (UI.PatchNodes.Fire, UI.PatchPorts.Pads) => Reading(_audio.PadBus),
         (UI.PatchNodes.Fire, "") => Reading(_audio.PadBus),
         (UI.PatchNodes.Tracker, "") => Joined(),
+        (UI.PatchNodes.Song, UI.PatchPorts.Master) => Sung(),
+        (UI.PatchNodes.Song, "") => Sung(),
         (UI.PatchNodes.Mixer, UI.PatchPorts.Master) => Reading(_audio.Output),
         (UI.PatchNodes.Mixer, "") => Reading(_audio.Output),
         (UI.PatchNodes.Output, "") => Reading(_audio.Output),
         _ => default
     };
+
+    /// <summary>What the song sums to, which is the strip the tracker's own clock fills.</summary>
+    /// <remarks>
+    /// Off the strip rather than measured again, because the tracker really is the one that
+    /// knows: a track's level is worked out from the voices sounding on it, and the song's master
+    /// is what those come to after the song's chain, its level and the saturation. Nothing else
+    /// in the application can see that number.
+    /// </remarks>
+    private UI.Records.PatchLevel Sung() =>
+        Tracker.MasterStrip is { } master
+            ? new UI.Records.PatchLevel(true, (float)master.Left, (float)master.Right)
+            : new UI.Records.PatchLevel(true, 0, 0);
 
     /// <summary>One bus, as an answer this table can give.</summary>
     private static UI.Records.PatchLevel Reading(Audio.Interfaces.IOutputBus bus)
@@ -1006,6 +1020,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     public IStripSwitches? Switches(string node, string port) => node switch
     {
         "tracker" => Track(port),
+        "song" => Tracker.MasterStrip,
         "mixer" => DeskMaster,
         "fire" => PadsStrip,
         "record" => RecorderPlay,

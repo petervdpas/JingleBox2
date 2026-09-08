@@ -14,8 +14,20 @@ public static class PatchNodes
     /// <summary>The recorder: what is coming in, and what a take is putting out.</summary>
     public const string Record = "record";
 
-    /// <summary>The song, which gives out one pair per track.</summary>
+    /// <summary>The song's tracks, which give out one pair each.</summary>
     public const string Tracker = "tracker";
+
+    /// <summary>
+    /// The song's own master, where the tracks are summed before the desk hears them.
+    /// </summary>
+    /// <remarks>
+    /// A block of its own because it is one in the engine: `TrackMixer` sums every track into
+    /// `Song.Master`, applies the song's chain, its level and its pan and then the saturation,
+    /// and **one** stereo pair leaves for the output bus. The picture used to draw four track
+    /// pairs arriving at the desk, which is the inside of the tracker drawn as though it were
+    /// the wiring.
+    /// </remarks>
+    public const string Song = "song";
 
     /// <summary>The pads, together, however many are down.</summary>
     public const string Fire = "fire";

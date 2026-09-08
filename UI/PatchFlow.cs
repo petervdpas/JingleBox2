@@ -24,6 +24,9 @@ public sealed class PatchFlow : IPatchFlow
     private const string FireNode = "fire";
 
     /// <inheritdoc cref="RecordNode"/>
+    private const string SongNode = "song";
+
+    /// <inheritdoc cref="RecordNode"/>
     private const string MixerNode = "mixer";
 
     /// <inheritdoc cref="RecordNode"/>
@@ -45,19 +48,24 @@ public sealed class PatchFlow : IPatchFlow
     /// <summary>Whether one cable is carrying audio.</summary>
     /// <remarks>
     /// Read by where the cable lands. Anything arriving at the recorder is the input; anything
-    /// leaving the desk is the output; and a cable into the desk carries whatever the block at
-    /// its other end is doing. The tracker is asked per track, since it gives out one pair a
-    /// track and only some of them are ever sounding. A cable between two things that are nothing to do with us carries
-    /// nothing we can know about, and says so by staying dashed.
+    /// leaving the desk is the output; a cable into the song is that track; and a cable into the
+    /// desk carries whatever the block at its other end is doing. The tracker is asked per track,
+    /// since it gives out one pair a track and only some of them are ever sounding, and the song
+    /// is asked once, since what leaves it is those tracks already summed. A cable between two
+    /// things that are nothing to do with us carries nothing we can know about, and says so by
+    /// staying dashed.
     /// </remarks>
     private static bool Carrying(PatchLink link, PatchSignals signals)
     {
         if (Is(link.To.Node, RecordNode)) return signals.Input;
         if (Is(link.To.Node, OutputNode)) return signals.Output;
 
+        if (Is(link.To.Node, SongNode)) return signals.Sounding(link.From.Name);
+
         if (!Is(link.To.Node, MixerNode)) return false;
 
         if (Is(link.From.Node, RecordNode)) return signals.Takes;
+        if (Is(link.From.Node, SongNode)) return signals.Singing;
         if (Is(link.From.Node, TrackerNode)) return signals.Sounding(link.From.Name);
         if (Is(link.From.Node, FireNode)) return signals.Pads;
 

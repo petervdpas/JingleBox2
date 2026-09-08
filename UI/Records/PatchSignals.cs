@@ -40,4 +40,13 @@ public readonly record struct PatchSignals(
     /// </remarks>
     /// <param name="track">The track's name, as its port carries it.</param>
     public bool Sounding(string track) => Tracks != null && Tracks.Contains(track);
+
+    /// <summary>Whether the song is putting anything out, which is any track sounding.</summary>
+    /// <remarks>
+    /// The song's own master carries whatever its tracks add up to, so one track is enough for
+    /// the cable out of it to be carrying something. Asked as a question rather than kept as a
+    /// sixth field, since it is the same fact the tracks already answer and two spellings of one
+    /// fact drift apart.
+    /// </remarks>
+    public bool Singing => Tracks is { Count: > 0 };
 }

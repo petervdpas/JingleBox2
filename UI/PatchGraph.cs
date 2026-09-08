@@ -17,10 +17,13 @@ public sealed class PatchGraph : IPatchGraph
     private const double OwnX = 290;
 
     /// <inheritdoc cref="SourceX"/>
-    private const double MixX = 570;
+    private const double SongX = 570;
 
     /// <inheritdoc cref="SourceX"/>
-    private const double OutX = 850;
+    private const double MixX = 850;
+
+    /// <inheritdoc cref="SourceX"/>
+    private const double OutX = 1130;
 
     /// <summary>How far down the first block starts, and how far apart a column stacks them.</summary>
     private const double TopY = 20;
@@ -46,6 +49,9 @@ public sealed class PatchGraph : IPatchGraph
 
     /// <inheritdoc cref="RecordNode"/>
     private const string FireNode = "fire";
+
+    /// <inheritdoc cref="RecordNode"/>
+    private const string SongNode = "song";
 
     /// <inheritdoc cref="RecordNode"/>
     private const string MixerNode = "mixer";
@@ -97,6 +103,23 @@ public sealed class PatchGraph : IPatchGraph
     /// <summary>What the whole desk sums to.</summary>
     private static readonly PatchPort MixerOut =
         new(MixerNode, "master", PatchSide.Out, PatchChannels.Stereo, Fixed: true);
+
+    /// <summary>
+    /// What the song sums to, which is the one pair the desk hears from the tracker.
+    /// </summary>
+    /// <remarks>
+    /// **The tracks do not reach the desk and never did.** They are summed into the song's own
+    /// master, which carries the song's effect chain, its level, its pan and the saturation, and
+    /// that one pair is what goes onto the output bus. Drawing four track pairs arriving at the
+    /// desk was the inside of the tracker drawn as though it were the wiring, and it left the
+    /// strip the song is really summed on with no block at all.
+    /// </remarks>
+    private static readonly PatchPort SongOut =
+        new(SongNode, "master", PatchSide.Out, PatchChannels.Stereo, Fixed: true);
+
+    /// <summary>Where the song arrives on the desk.</summary>
+    private static readonly PatchPort MixerSong =
+        new(MixerNode, "song", PatchSide.In, PatchChannels.Stereo, Fixed: true);
 
     /// <summary>Where that lands on the machine.</summary>
     private static readonly PatchPort OutputIn =
@@ -156,12 +179,12 @@ public sealed class PatchGraph : IPatchGraph
         var named = tracks is { Count: > 0 } ? tracks : new[] { WholeMix };
 
         var plays = new List<PatchPort>(named.Count);
-        var takes = new List<PatchPort>(named.Count);
+        var sung = new List<PatchPort>(named.Count);
 
         foreach (string track in named)
         {
             plays.Add(Track(TrackerNode, track, PatchSide.Out));
-            takes.Add(Track(MixerNode, track, PatchSide.In));
+            sung.Add(Track(SongNode, track, PatchSide.In));
         }
 
         nodes.Add(new PatchNode(
@@ -171,9 +194,12 @@ public sealed class PatchGraph : IPatchGraph
             FireNode, "FIRE", Array.Empty<PatchPort>(), new[] { FireOut }, true, OwnX, PlayY + Apart));
 
         nodes.Add(new PatchNode(
+            SongNode, "SONG", sung, new[] { SongOut }, true, SongX, PlayY));
+
+        nodes.Add(new PatchNode(
             MixerNode,
             "MIXER",
-            Desk(takes),
+            Desk(),
             new[] { MixerOut },
             true,
             MixX,
@@ -191,7 +217,9 @@ public sealed class PatchGraph : IPatchGraph
         links.Add(new PatchLink(RecordOut, MixerTakes));
 
         for (int track = 0; track < plays.Count; track++)
-            links.Add(new PatchLink(plays[track], takes[track]));
+            links.Add(new PatchLink(plays[track], sung[track]));
+
+        links.Add(new PatchLink(SongOut, MixerSong));
         links.Add(new PatchLink(FireOut, MixerPads));
         links.Add(new PatchLink(MixerOut, OutputIn));
 
@@ -202,21 +230,17 @@ public sealed class PatchGraph : IPatchGraph
     /// Everything the desk takes in: the song's tracks, then the pads, then a take.
     /// </summary>
     /// <remarks>
-    /// The tracks first and in the song's own order, which is the order the strips stand in on
-    /// the page beside this one. The two that are not tracks go under them rather than among
-    /// them, so adding a track to a song does not move the point a cable was drawn to.
+    /// Three points and not one per track, since what arrives from the tracker is the song's own
+    /// master: one pair, summed inside the tracker, with the song's chain and level already on
+    /// it. Adding a track to a song moves nothing here at all now, where it used to move every
+    /// point under it.
+    ///
+    /// **Down the block in the order the desk reads across**, which is the recorder, then the
+    /// pads, then the song. A cable is followed with the same eye that reads the strips beside
+    /// it, so a point that is third here and first there is a point somebody has to look twice
+    /// for.
     /// </remarks>
-    /// <param name="tracks">One point per track, already made.</param>
-    private static IReadOnlyList<PatchPort> Desk(IReadOnlyList<PatchPort> tracks)
-    {
-        var takes = new List<PatchPort>(tracks.Count + 2);
-
-        takes.AddRange(tracks);
-        takes.Add(MixerPads);
-        takes.Add(MixerTakes);
-
-        return takes;
-    }
+    private static IReadOnlyList<PatchPort> Desk() => new[] { MixerTakes, MixerPads, MixerSong };
 
     /// <summary>Whether an address is one of this application's own blocks.</summary>
     /// <remarks>
@@ -226,6 +250,7 @@ public sealed class PatchGraph : IPatchGraph
     private static bool Ours(string node) =>
         string.Equals(node, RecordNode, StringComparison.Ordinal) ||
         string.Equals(node, TrackerNode, StringComparison.Ordinal) ||
+        string.Equals(node, SongNode, StringComparison.Ordinal) ||
         string.Equals(node, FireNode, StringComparison.Ordinal) ||
         string.Equals(node, MixerNode, StringComparison.Ordinal) ||
         string.Equals(node, OutputNode, StringComparison.Ordinal);

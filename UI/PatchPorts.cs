@@ -23,8 +23,16 @@ public static class PatchPorts
     /// <summary>The pads, together.</summary>
     public const string Pads = "pads";
 
-    /// <summary>What the whole desk sums to.</summary>
+    /// <summary>What the whole desk sums to, and what the song sums to before it.</summary>
+    /// <remarks>
+    /// One word on two blocks, which is right: each is the sum of what arrives at it. Which
+    /// master is meant is the block, and that is what <see cref="Records.SignalPoint"/> carries
+    /// both halves of.
+    /// </remarks>
     public const string Master = "master";
+
+    /// <summary>Where the song arrives on the desk.</summary>
+    public const string Song = "song";
 
     /// <summary>Where that lands on the machine.</summary>
     public const string Playback = "playback";
