@@ -1923,10 +1923,50 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             OnPropertyChanged();
 
+            Standing();
+
             Status = value
                 ? "What is coming in is being heard through the desk."
                 : "The input is no longer being heard.";
         }
+    }
+
+    /// <summary>Whether the switches are holding the input open by themselves.</summary>
+    private bool _standing;
+
+    /// <summary>
+    /// Holds the input open for as long as either switch is on, whatever page is in front.
+    /// </summary>
+    /// <remarks>
+    /// **An arrangement is not a page.** The input is held open by whoever is showing its meter,
+    /// which is right for a meter and wrong for these two: Hear it says a source is coming through
+    /// the desk and Only here says it is coming through nothing else, and neither of those has
+    /// anything to do with which tab is in front. Walking to the tracker or to the pads took the
+    /// last watcher away, the input closed a second later, and the source stopped being heard: it
+    /// was reported as those pages stopping the sound, and RECORD being the only page that did
+    /// not, which is exactly the list of pages that show the meter.
+    ///
+    /// Counted rather than switched, through the same door a page goes through, so this and a page
+    /// showing the meter can both be reasons at once and neither takes the input away from the
+    /// other. One reason at most from here, which is what <see cref="_standing"/> is: the two
+    /// switches are one arrangement.
+    ///
+    /// **The graph is deliberately not watched from here.** Reading it puts the chosen source back
+    /// on the capture and holds it off its own output, which are worth having, and it also writes
+    /// the picker's selection from a reading that lands a moment later. Tying that to a switch is
+    /// a second change with a fault of its own history, so it is left for its own turn: what this
+    /// does is hold the input open and nothing else.
+    /// </remarks>
+    private void Standing()
+    {
+        bool wanted = Hearing || TakeAside;
+
+        if (wanted == _standing) return;
+
+        _standing = wanted;
+
+        if (wanted) Watch();
+        else LetGo();
     }
 
     /// <inheritdoc/>
@@ -1952,6 +1992,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         _recordingService.Hearing = false;
 
         OnPropertyChanged(nameof(Hearing));
+
+        Standing();
 
         Status = "What an output is playing cannot be heard through the desk, since that is a loop.";
     }
@@ -1982,6 +2024,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             takeAside = value;
 
             OnPropertyChanged();
+
+            Standing();
             Aside();
         }
     }
@@ -2285,6 +2329,14 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// The clock is only written while a take is running: the meter runs whenever the input is
     /// open, and a clock that ticked while nothing was being recorded would be counting
     /// something nobody could keep.
+    ///
+    /// **Handed over rather than waited on.** It was a blocking call onto the drawing thread,
+    /// which parks this timer's thread until a window gets round to it. That was survivable while
+    /// the input was only open on the two pages that show its meter; it is not now that a switch
+    /// holds it open on every page, since the tracker's drawing thread is the busiest in the
+    /// application and every tick would take another thread out of the pool waiting for it.
+    /// Nothing here needs the answer, since all it does is write four numbers, and a reading that
+    /// lands a frame late is a meter rather than a fault.
     /// </remarks>
     private void StartLevelPolling()
     {
@@ -2299,7 +2351,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             bool clipping = _recordingService.IsClipping;
             bool recording = _recordingService.IsRecording;
 
-            Dispatcher.UIThread.Invoke(() =>
+            Dispatcher.UIThread.Post(() =>
             {
                 Level = stereo.Peak;
                 LevelLeft = stereo.Left;
