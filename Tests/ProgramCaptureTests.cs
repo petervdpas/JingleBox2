@@ -96,6 +96,9 @@ public class ProgramCaptureTests
 
         /// <inheritdoc/>
         public bool Hearing { get; set; }
+
+        /// <inheritdoc/>
+        public bool HearsCapture { get; set; } = true;
     }
 
     /// <summary>A machine with no per-process capture offers none and says so.</summary>

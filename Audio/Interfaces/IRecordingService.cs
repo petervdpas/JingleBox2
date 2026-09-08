@@ -184,6 +184,24 @@ public interface IRecordingService
     bool Hearing { get; set; }
 
     /// <summary>
+    /// Whether what is coming in at the input may be one of the things that is heard.
+    /// </summary>
+    /// <remarks>
+    /// **Two different questions, and they were one switch.** Hear it says whether the recorder is
+    /// heard at all, which is a property of the recorder; this says whether the capture is one of
+    /// the things it is carrying, which is a property of the source. An output's own monitor
+    /// cannot be: heard through the desk it comes back round through the speakers and into the
+    /// capture again, which is a loop rather than a mix.
+    ///
+    /// Asked as one switch, the loop took the whole recorder with it. Anything else on the
+    /// recorder's bus could not be heard either, although nothing about it loops, and Hear it sat
+    /// grey because of a source that had nothing to do with it.
+    ///
+    /// True unless somebody says otherwise, which is every ordinary source.
+    /// </remarks>
+    bool HearsCapture { get; set; }
+
+    /// <summary>
     /// Closes and reopens the input if anything is listening, for a change that only takes
     /// effect on a fresh capture. Does nothing when nothing is open.
     /// </summary>

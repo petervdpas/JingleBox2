@@ -139,7 +139,11 @@ public interface IOutputBus : IDisposable
     /// is a source nobody can hear with nothing anywhere saying why, which is the fault this whole
     /// class exists to end.
     ///
-    /// A source already on the bus is left where it is rather than added twice.
+    /// **A connect point is a switch, and this is the end of it that throws.** A source sent here
+    /// is taken off whatever bus was holding it, since a channel belongs to one bus, and whether
+    /// it is already here is asked of the mixer rather than of any list kept beside it: a bus that
+    /// went by its own record would answer yes about a channel another bus had since taken and
+    /// then do nothing, which is a cable drawn over a turnout that never moved.
     /// </remarks>
     /// <param name="source">The decoding channel to sum in.</param>
     /// <returns>False where there is no bus, or the add-on would not take it.</returns>
@@ -148,6 +152,11 @@ public interface IOutputBus : IDisposable
     /// <summary>
     /// Unplugs a source, and does nothing for one that is not on the bus.
     /// </summary>
+    /// <remarks>
+    /// Not on the bus includes one this bus asked for and another has since taken, which is what
+    /// sending a source somewhere else does. Unplugging there would take the channel off the bus
+    /// that really has it, so what a source is let go of is what is really held.
+    /// </remarks>
     /// <param name="source">The channel that was plugged in.</param>
     void Remove(int source);
 

@@ -298,7 +298,13 @@ public sealed class OutputBus : IOutputBus
         lock (_lock)
         {
             if (_handle == 0) return false;
-            if (_sources.Contains(source)) return true;
+
+            if (HoldsLocked(source))
+            {
+                _sources.Add(source);
+
+                return true;
+            }
 
             bool took;
 
@@ -376,6 +382,7 @@ public sealed class OutputBus : IOutputBus
         lock (_lock)
         {
             if (!_sources.Remove(source)) return;
+            if (!HoldsLocked(source)) return;
 
             RemoveLocked(source);
 
@@ -386,18 +393,35 @@ public sealed class OutputBus : IOutputBus
     /// <inheritdoc/>
     public bool Holds(int source)
     {
-        lock (_lock)
-        {
-            if (_handle == 0 || source == 0) return false;
+        lock (_lock) return HoldsLocked(source);
+    }
 
-            try
-            {
-                return BassMix.ChannelGetMixer(source) == _handle;
-            }
-            catch (Exception)
-            {
-                return _sources.Contains(source);
-            }
+    /// <summary>Whether this bus really has the channel, with the lock already held.</summary>
+    /// <remarks>
+    /// **The mixer is asked and <see cref="_sources"/> is not, and that is the whole of the
+    /// switch.** A connect point is a turnout: sending a source to another bus throws it away from
+    /// this one, and it is thrown by the add-on rather than by anybody here, so the first this bus
+    /// hears of it is nothing at all. Its record still names the channel, and a record that
+    /// outlives the fact is worse than no record: asked whether it holds the song it says yes,
+    /// <see cref="Add"/> does nothing on the strength of that, and the cable is drawn over a
+    /// turnout that never moved. Both ways round, which is how it was found: pointed at the desk
+    /// the song was silent, and pointed at the recorder it was still coming out of the desk.
+    ///
+    /// The set is what this bus asked for, which is what tells a source of ours from a stranger
+    /// when the bus closes. It is the answer only where the add-on will not speak at all.
+    /// </remarks>
+    /// <param name="source">The channel being asked about.</param>
+    private bool HoldsLocked(int source)
+    {
+        if (_handle == 0 || source == 0) return false;
+
+        try
+        {
+            return BassMix.ChannelGetMixer(source) == _handle;
+        }
+        catch (Exception)
+        {
+            return _sources.Contains(source);
         }
     }
 
@@ -444,7 +468,9 @@ public sealed class OutputBus : IOutputBus
             return;
         }
 
-        foreach (int source in _sources) RemoveLocked(source);
+        foreach (int source in _sources)
+            if (HoldsLocked(source))
+                RemoveLocked(source);
 
         if (_sources.Count > 0)
             Log.Write(LogArea.Audio, () => "bus: " + _sources.Count + " source(s) taken off as the bus closes");

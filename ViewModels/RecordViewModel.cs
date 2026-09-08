@@ -1944,8 +1944,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         {
             if (_recordingService.Hearing == value) return;
 
-            if (value && !CanHear) return;
-
             _recordingService.Hearing = value;
 
             OnPropertyChanged();
@@ -2124,15 +2122,12 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     {
         OnPropertyChanged(nameof(CanHear));
 
+        _recordingService.HearsCapture = CanHear;
+
         if (CanHear || !_recordingService.Hearing) return;
 
-        _recordingService.Hearing = false;
-
-        OnPropertyChanged(nameof(Hearing));
-
-        Standing();
-
-        Status = "What an output is playing cannot be heard through the desk, since that is a loop.";
+        Status = "What an output is playing cannot be heard through the desk, since that is a loop. "
+            + "Anything else the recorder is carrying still is.";
     }
 
     /// <summary>Backing field for <see cref="TakeAside"/>.</summary>

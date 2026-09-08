@@ -163,6 +163,9 @@ public sealed class RecorderBench
 
         /// <inheritdoc/>
         public bool Hearing { get; set; }
+
+        /// <inheritdoc/>
+        public bool HearsCapture { get; set; } = true;
     }
 
     /// <summary>A meter that reads nothing.</summary>

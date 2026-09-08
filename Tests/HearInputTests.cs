@@ -33,9 +33,18 @@ public sealed class HearInputTests
         Assert.True(bench.Recorder.Hearing, "the recorder was never told to push what it captures");
     }
 
-    /// <summary>What an output is playing cannot, since that is the output hearing itself.</summary>
+    /// <summary>
+    /// What an output is playing is left off the recorder's bus, since hearing that through the
+    /// desk is the output hearing itself.
+    /// </summary>
+    /// <remarks>
+    /// **The switch is not refused, the capture is.** Hear it says whether the recorder is heard,
+    /// which is a property of the recorder; whether the capture is one of the things it carries is
+    /// a property of the source. They were one switch, and the loop took the whole recorder with
+    /// it.
+    /// </remarks>
     [Fact]
-    public void What_an_output_is_playing_cannot_be_heard()
+    public void What_an_output_is_playing_is_left_off_the_recorder()
     {
         var bench = new RecorderBench();
 
@@ -45,17 +54,22 @@ public sealed class HearInputTests
 
         bench.Page.Hearing = true;
 
-        Assert.False(bench.Page.Hearing, "a loop was made out of the source the picker defaults to");
-        Assert.False(bench.Recorder.Hearing);
+        Assert.True(bench.Page.Hearing, "the switch was refused over a source it is not about");
+        Assert.False(bench.Recorder.HearsCapture, "the capture was left on the bus and the loop stands");
     }
 
-    /// <summary>And choosing one while it is already on turns it off rather than leaving it.</summary>
+    /// <summary>
+    /// And choosing one while it is already on takes the capture off the bus rather than turning
+    /// the recorder off.
+    /// </summary>
     /// <remarks>
-    /// The switch being grey cannot cover this on its own: it goes grey at the moment the source
-    /// changes, and by then the audio is already going round.
+    /// The source can change under a switch that is already on, and by then the audio would
+    /// already be going round, so the answer cannot wait for anybody to press anything. What it
+    /// answers with is the capture leaving the recorder's bus, which is where the loop is, and a
+    /// line saying so.
     /// </remarks>
     [Fact]
-    public void Choosing_it_while_listening_stops_the_listening()
+    public void Choosing_it_while_listening_takes_the_capture_off()
     {
         var bench = new RecorderBench();
 
@@ -63,21 +77,26 @@ public sealed class HearInputTests
         bench.Page.Hearing = true;
 
         Assert.True(bench.Page.Hearing);
+        Assert.True(bench.Recorder.HearsCapture);
 
         bench.Page.SelectedRoute = RecorderBench.Speakers;
 
-        Assert.False(bench.Page.Hearing, "the loop was made by changing the source rather than the switch");
-        Assert.False(bench.Recorder.Hearing);
+        Assert.True(bench.Page.Hearing, "the recorder was silenced over one thing on its bus");
+        Assert.False(bench.Recorder.HearsCapture, "the loop was left standing");
         Assert.Contains("loop", bench.Page.Status);
     }
 
-    /// <summary>Moving back to a source that can be heard does not start listening again.</summary>
+    /// <summary>
+    /// Moving back to a source that can be heard puts the capture back on the recorder's bus,
+    /// since nothing was ever switched off.
+    /// </summary>
     /// <remarks>
-    /// Turning it off is answering a danger, and answering it does not leave a promise to turn it
-    /// back on later: a switch that came on by itself is one nobody set.
+    /// The switch is what somebody set and it stays where they set it. What came off was the
+    /// capture, and it comes back when the reason it left does, which is the source: nothing here
+    /// turns itself on, because nothing turned itself off.
     /// </remarks>
     [Fact]
-    public void It_does_not_come_back_on_by_itself()
+    public void The_capture_comes_back_when_the_source_can_be_heard_again()
     {
         var bench = new RecorderBench();
 
@@ -85,10 +104,14 @@ public sealed class HearInputTests
         bench.Page.Hearing = true;
 
         bench.Page.SelectedRoute = RecorderBench.Speakers;
+
+        Assert.False(bench.Recorder.HearsCapture);
+
         bench.Page.SelectedRoute = RecorderBench.Firefox;
 
         Assert.True(bench.Page.CanHear);
-        Assert.False(bench.Page.Hearing);
+        Assert.True(bench.Page.Hearing, "the switch somebody set did not stay where they set it");
+        Assert.True(bench.Recorder.HearsCapture);
     }
 
     /// <summary>Turning it off is not refused, whatever the source is.</summary>

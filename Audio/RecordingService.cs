@@ -499,6 +499,24 @@ public sealed class RecordingService : IRecordingService, IDisposable
     /// <summary>Backing field for <see cref="Hearing"/>.</summary>
     private volatile bool _hearing;
 
+    /// <summary>Backing field for <see cref="HearsCapture"/>.</summary>
+    private bool _hearsCapture = true;
+
+    /// <inheritdoc/>
+    public bool HearsCapture
+    {
+        get => _hearsCapture;
+
+        set
+        {
+            if (_hearsCapture == value) return;
+
+            _hearsCapture = value;
+
+            OpenMonitor();
+        }
+    }
+
     /// <inheritdoc/>
     public bool Hearing
     {
@@ -535,9 +553,18 @@ public sealed class RecordingService : IRecordingService, IDisposable
     /// </remarks>
     private void OpenMonitor()
     {
-        if (_monitor != null) _monitor.Heard = _hearing;
+        if (_monitor == null) return;
 
-        if (!_hearing || _monitor == null || !_capturing) return;
+        _monitor.Heard = _hearing;
+
+        if (!_hearsCapture)
+        {
+            _monitor.Close();
+
+            return;
+        }
+
+        if (!_hearing || !_capturing) return;
 
         _monitor.Insert = _effect;
         _monitor.Open(_sampleRate, _channels);

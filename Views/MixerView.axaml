@@ -127,9 +127,14 @@
                  under one picker have their boxes on two different lines down the strip. Given
                  the picker's width they all start on the picker's own left edge, which is the
                  one edge this column has. -->
+            <!-- **Never greyed, because it is a property of the recorder.** It says whether the
+                 recorder is heard at all; what the recorder is carrying is a separate question.
+                 It was disabled whenever the chosen source was an output's own monitor, which
+                 really cannot be heard through the desk, and that took the whole recorder with
+                 it. The loop is answered where it happens now, by leaving the capture off the
+                 recorder's bus and saying so on the line. -->
             <CheckBox Content="Hear it"
                       Classes="strip"
-                      IsEnabled="{Binding Source.CanHear}"
                       IsChecked="{Binding Source.Hearing, Mode=TwoWay}"
                       ToolTip.Tip="Hear what is coming in, through the Recording Effects chain, out of the master. It arrives a buffer or two late, and what an output is playing cannot be heard this way because that is a loop." />
 
