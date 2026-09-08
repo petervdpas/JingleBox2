@@ -172,6 +172,12 @@ public interface IOutputBus : IDisposable
     void HearOnly(System.Collections.Generic.IReadOnlyCollection<int> sources);
 
     /// <summary>Whether a source is on the bus.</summary>
+    /// <remarks>
+    /// **Asked of the mixer rather than of a list kept beside it**, because a channel can leave
+    /// without this bus being told: putting it on another takes it off this one, which is what a
+    /// channel belonging to one bus means. A list would go on claiming it, and a bus that claims a
+    /// channel it has lost is one that will happily take it off the bus that really has it.
+    /// </remarks>
     /// <param name="source">The channel to ask about.</param>
     bool Holds(int source);
 

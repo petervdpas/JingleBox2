@@ -61,6 +61,20 @@ public sealed class RecorderBench
             return true;
         }
 
+        /// <summary>How many times the arrangement was held over what had crept back.</summary>
+        public int Held { get; private set; }
+
+        /// <summary>What the next hold answers, which is what a source creeping back looks like.</summary>
+        public bool CreptBack { get; set; }
+
+        /// <inheritdoc/>
+        public bool HoldAside(AudioRoute route)
+        {
+            Held++;
+
+            return CreptBack;
+        }
+
         /// <inheritdoc/>
         public void GiveBack() => Back++;
     }

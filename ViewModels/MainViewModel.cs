@@ -908,7 +908,33 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// The whole block, which is one of the points on the table like any other: a block is asked
     /// for its own reading and the table is the one place that says what a reading is.
     /// </remarks>
-    public UI.Records.PatchLevel Level(string node) => Measure(new UI.Records.SignalPoint(node, ""));
+    public UI.Records.PatchLevel Level(UI.Records.SignalPoint point) => Points.At(point);
+
+    /// <summary>Backing field for <see cref="Points"/>.</summary>
+    private UI.Interfaces.ISignalPoints? points;
+
+    /// <summary>
+    /// Which points the routing has, and what each one reads.
+    /// </summary>
+    /// <remarks>
+    /// **The list rather than a switch here**, so what the patchbay draws can be walked against
+    /// what the meters answer for. It was a switch inside this class, which meant the two halves
+    /// shared a vocabulary and nothing could check it: a port renamed on the picture left the
+    /// meter behind it reading nought, with nothing that would fail.
+    ///
+    /// Handed the readings and never the engine, so the table itself can be put a question to
+    /// without a sound card. Every reading is taken where the audio actually is: a strip would be
+    /// a reading of a reading, and since the strips are fed from this it would be a circle. The
+    /// tracker is the one thing read off its strips and is not an exception, since a track's level
+    /// is worked out from the voices sounding on it and nothing else can see that.
+    /// </remarks>
+    public UI.Interfaces.ISignalPoints Points => points ??= new UI.SignalPoints(
+        capture: () => new UI.Records.PatchLevel(true, Record.LevelLeft, Record.LevelRight),
+        takes: () => Reading(_audio.TakeBus),
+        pads: () => Reading(_audio.PadBus),
+        song: Sung,
+        tracks: Joined,
+        leaving: () => Reading(_audio.Output));
 
     /// <summary>Backing field for <see cref="Levels"/>.</summary>
     private UI.Interfaces.ISignalTable? levels;
@@ -929,7 +955,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// </remarks>
     private UI.Interfaces.ISignalTable Watched()
     {
-        var table = new UI.SignalTable(Measure);
+        var table = new UI.SignalTable(Points.At);
 
         table.Watch(CapturePoint, Onto(RecorderInput));
         table.Watch(TakesPoint, Onto(RecorderPlay));
@@ -960,37 +986,6 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     private static readonly UI.Records.SignalPoint MasterPoint =
         new(UI.PatchNodes.Mixer, UI.PatchPorts.Master);
 
-    /// <summary>
-    /// What one point on the routing table is carrying, which is the one place that says.
-    /// </summary>
-    /// <remarks>
-    /// **The desk and the output are what everything is summed onto**, which is the output bus,
-    /// and that is the one reading on here that is not what the meter beside it used to show.
-    /// They were the song's master, which is a strip and not the desk: it sums the tracker's
-    /// tracks and has never heard of the pads, a take being auditioned or the input being
-    /// listened to. So a browser coming through the input lit the meter on the recorder's block
-    /// and left the desk and the output reading nought while it was audibly playing, which reads
-    /// as a broken meter rather than as a meter measuring something else.
-    ///
-    /// A point nothing here knows about answers nothing rather than nought, which is what keeps a
-    /// block on the machine from drawing a meter that cannot move.
-    /// </remarks>
-    /// <param name="point">The place on the table.</param>
-    private UI.Records.PatchLevel Measure(UI.Records.SignalPoint point) => (point.Node, point.Port) switch
-    {
-        (UI.PatchNodes.Record, UI.PatchPorts.Capture) => new(true, Record.LevelLeft, Record.LevelRight),
-        (UI.PatchNodes.Record, UI.PatchPorts.Takes) => Reading(_audio.TakeBus),
-        (UI.PatchNodes.Record, "") => new(true, Record.LevelLeft, Record.LevelRight),
-        (UI.PatchNodes.Fire, UI.PatchPorts.Pads) => Reading(_audio.PadBus),
-        (UI.PatchNodes.Fire, "") => Reading(_audio.PadBus),
-        (UI.PatchNodes.Tracker, "") => Joined(),
-        (UI.PatchNodes.Song, UI.PatchPorts.Song) => Sung(),
-        (UI.PatchNodes.Song, "") => Sung(),
-        (UI.PatchNodes.Mixer, UI.PatchPorts.Master) => Reading(_audio.Output),
-        (UI.PatchNodes.Mixer, "") => Reading(_audio.Output),
-        (UI.PatchNodes.Output, "") => Reading(_audio.Output),
-        _ => default
-    };
 
     /// <summary>What the song sums to, which is the strip the tracker's own clock fills.</summary>
     /// <remarks>
@@ -1019,11 +1014,11 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// </remarks>
     public IStripSwitches? Switches(string node, string port) => node switch
     {
-        "tracker" => Track(port),
-        "song" => Tracker.MasterStrip,
-        "mixer" => DeskMaster,
-        "fire" => PadsStrip,
-        "record" => RecorderPlay,
+        UI.PatchNodes.Tracker => Track(port),
+        UI.PatchNodes.Song => Tracker.MasterStrip,
+        UI.PatchNodes.Mixer => DeskMaster,
+        UI.PatchNodes.Fire => PadsStrip,
+        UI.PatchNodes.Record => RecorderPlay,
         _ => null
     };
 
@@ -1078,7 +1073,31 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         this,
         new Config.PatchPlaces(_cfg, _store),
         this,
-        patched: new Config.PatchedIn(_cfg, _store));
+        patched: new Config.PatchedIn(_cfg, _store),
+        audio: Wired);
+
+    /// <summary>Backing field for <see cref="Wired"/>.</summary>
+    private Interfaces.IPatchedAudio? wired;
+
+    /// <summary>
+    /// What makes the busses agree with the routing as it is drawn.
+    /// </summary>
+    /// <remarks>
+    /// Held here because this is the one place both halves are in view: the settings a cable is
+    /// written in, the picture it is drawn on, and the busses it is a cable between. It remembers
+    /// nothing itself, so a second one would behave exactly as this one does.
+    /// </remarks>
+    public Interfaces.IPatchedAudio Wired => wired ??= new PatchedAudio(
+        new System.Collections.Generic.Dictionary<string, Audio.Interfaces.IOutputBus>(StringComparer.Ordinal)
+        {
+            [UI.PatchNodes.Mixer] = _audio.Output,
+            [UI.PatchNodes.Record] = _audio.MonitorBus
+        },
+        new System.Collections.Generic.Dictionary<string, Func<int>>(StringComparer.Ordinal)
+        {
+            [UI.PatchNodes.Song] = () => Tracker.Player.SongStream,
+            [UI.PatchNodes.Fire] = () => _audio.PadBus.Handle
+        });
 
     /// <summary>Backing field for <see cref="DeskMaster"/>.</summary>
     private SourceStripViewModel? deskMaster;
@@ -2121,6 +2140,8 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
 
         ControlLink.Song = () => Tracker.Song?.Controls;
         ControlLink.SongChanged = Tracker.ControlsChanged;
+
+        Tracker.Player.StateChanged += (_, _) => Patchbay.Read();
 
         ControlLink.SongChanging = () => Tracker.ControlsChanging();
 

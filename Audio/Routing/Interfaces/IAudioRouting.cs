@@ -68,6 +68,35 @@ public interface IAudioRouting
     bool TakeAside(AudioRoute route);
 
     /// <summary>
+    /// Takes off anything the source has got back onto since it was taken aside.
+    /// </summary>
+    /// <remarks>
+    /// **An arrangement over somebody else's graph does not stay made.** A stream is remade
+    /// whenever the program owning it opens a new one, reloads a page or is moved between
+    /// outputs, and what remakes it is the system's own session manager, which knows nothing
+    /// about this and wires it straight back to the speakers. The source is then playing in two
+    /// places at once, out of its own output and a buffer later through here, which is what it
+    /// sounds like rather than what it looks like: the same audio twice, slightly apart.
+    ///
+    /// So the arrangement is held on the clock that already keeps the capture standing. What is
+    /// taken off is only what has come back, never the whole thing again: putting the links back
+    /// and pulling them out each time would let the source out of the desk for a fraction of a
+    /// second on every reading, which is audible.
+    ///
+    /// Where nothing is standing at all, this takes the source aside outright, since the picker
+    /// chooses what is playing on somebody's behalf and a switch turned on before a source
+    /// existed would otherwise wait for a choice that is never coming. A source that is not the
+    /// one supposed to be aside is refused rather than unplugged.
+    ///
+    /// **Who holds it differs per machine and the caller does not have to know.** Where the
+    /// arrangement is a wire it has to be held here; where it is a standing instruction about
+    /// where a program plays, the system holds it and false is the honest answer.
+    /// </remarks>
+    /// <param name="route">The source that is supposed to be aside, as the picker offers it.</param>
+    /// <returns>True where something had crept back and was taken off again.</returns>
+    bool HoldAside(AudioRoute route);
+
+    /// <summary>
     /// Puts back whatever was taken aside, and does nothing where nothing was.
     /// </summary>
     /// <remarks>

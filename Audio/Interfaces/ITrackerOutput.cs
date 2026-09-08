@@ -57,6 +57,20 @@ public interface ITrackerOutput : IDisposable
     bool IsRunning { get; }
 
     /// <summary>
+    /// The stream itself, so it can be moved from one bus to another, and nought while it is shut.
+    /// </summary>
+    /// <remarks>
+    /// **Here because where the song goes is a decision somebody makes on the patchbay**, and the
+    /// only way to act on it is to take this off one bus and put it on another. Everything else
+    /// about the stream is answered by this interface in words; this is the one thing that has to
+    /// be the handle itself, since a bus takes a channel rather than a description of one.
+    ///
+    /// Read and never written. Which bus it is on is the caller's business and the stream is not
+    /// told: it goes on rendering whatever pulls it, which is what makes moving it safe.
+    /// </remarks>
+    int Handle { get; }
+
+    /// <summary>
     /// The loudest thing this stream is putting out, 0 to 1. The tracker's half of the main
     /// output meter; the pads are the other half and are their own channels.
     /// </summary>

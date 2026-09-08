@@ -71,4 +71,19 @@ public interface IMonitorFeed
 
     /// <summary>Takes the path down, and does nothing twice.</summary>
     void Close();
+
+    /// <summary>
+    /// Whether what is on the recorder's bus is heard on the master.
+    /// </summary>
+    /// <remarks>
+    /// **The bus runs whether or not anybody is listening, and this decides whether it is heard.**
+    /// It was the path being opened and closed that did both jobs, which was enough while the
+    /// capture was the only thing on that bus. It is not any more: a source patched across from
+    /// the desk lives there too, and a channel nobody pulls is a channel that stops, so the bus
+    /// has to keep running with the switch off.
+    ///
+    /// Silence rather than a pause, deliberately. What is on the bus goes on being rendered; what
+    /// stops is anybody hearing it, which is what Hear it says.
+    /// </remarks>
+    bool Heard { get; set; }
 }

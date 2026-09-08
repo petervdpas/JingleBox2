@@ -199,33 +199,119 @@ public sealed class PipeWireRouting : IAudioRouting
     /// the source keeps whatever brought it here and loses everything else. Its own links are
     /// remembered first, so a run that breaks half of them can still put that half back.
     /// </remarks>
+    /// <summary>
+    /// What is supposed to be aside, so what has crept back can be told from what was never
+    /// taken off. Nothing while the arrangement is not standing.
+    /// </summary>
+    /// <remarks>
+    /// Kept beside <see cref="_moved"/> rather than read off it, because the two answer different
+    /// questions: the list is what came off, and a source picked before it had started playing
+    /// has an empty one and is still meant to be aside the moment it appears.
+    /// </remarks>
+    private AudioRoute? _aside;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Every link out of that node that is not into our own capture, which is the whole of it:
+    /// the source keeps whatever brought it here and loses everything else.
+    ///
+    /// What is supposed to be aside is remembered whether or not anything came off, since a
+    /// source that is not playing yet has no links to break and is still meant to be absorbed the
+    /// moment it starts: <see cref="HoldAside"/> is what answers for it then.
+    /// </remarks>
     public bool TakeAside(AudioRoute route)
     {
         if (route == null) return false;
 
         GiveBack();
 
+        _aside = route;
+
         return Guarded(false, deadline =>
         {
-            var away = _graph.LinksAway(
-                _graph.ParseLinks(Run(LinkTool, "-l")), route.Node, CapturePorts());
+            Forget();
 
-            if (away.Count == 0) return false;
-
-            foreach (var link in away)
+            if (PullAway(route, deadline) is not { } off)
             {
-                if (Expired(deadline)) break;
+                Log.Write(LogArea.Audio, () =>
+                    "routing: " + route.Node + " is not off anything yet, since this application's "
+                    + "own capture is not in the graph: it is taken aside as soon as it is");
 
-                _moved.Add(link);
-
-                Run(LinkTool, $"-d {Quote(link.From)} {Quote(link.To)}");
+                return false;
             }
 
             Log.Write(LogArea.Audio, () =>
-                "routing: took " + route.Node + " off " + _moved.Count + " link(s)");
+                "routing: took " + route.Node + " off " + off + " link(s)");
 
-            return _moved.Count > 0;
+            return off > 0;
         });
+    }
+
+    /// <inheritdoc/>
+    public bool HoldAside(AudioRoute route)
+    {
+        if (route == null) return false;
+        if (_aside is not { } aside) return TakeAside(route);
+        if (!string.Equals(aside.Node, route.Node, StringComparison.Ordinal)) return false;
+
+        return Guarded(false, deadline =>
+        {
+            int held = _moved.Count;
+
+            if (PullAway(route, deadline) is not { } off || off <= held) return false;
+
+            Log.Write(LogArea.Audio, () =>
+                "routing: " + route.Node + " had got back onto " + (off - held)
+                + " link(s) of its own and was taken off again");
+
+            return true;
+        });
+    }
+
+    /// <summary>
+    /// Breaks every link taking that node's audio anywhere but here, and answers how many are
+    /// off in all.
+    /// </summary>
+    /// <remarks>
+    /// One walk for both taking a source aside and holding it there, since they are the same act
+    /// and differ only in whether anything is expected to be found. A link is remembered once
+    /// however often it comes back, because putting one back is running the tool again and two
+    /// runs over one pair leave two links where there was one.
+    ///
+    /// **Nothing whatever is cut while our own capture cannot be seen, and that is the guard the
+    /// whole thing turns on.** What makes this safe is knowing which of a source's links is the
+    /// one bringing it here, and that is decided by handing our capture's ports in: handed none,
+    /// every link looks like somebody else's and the one to keep is cut with the rest. Our
+    /// capture appears in the graph only once the input is really listening, which is a moment
+    /// after it is asked for, so a switch thrown before then read an empty list and took the
+    /// source off everything, this application included.
+    ///
+    /// Nothing rather than nought, so a caller can tell "there was nothing to take off" from "I
+    /// could not tell what was mine". The arrangement is remembered either way and
+    /// <see cref="HoldAside"/> makes it on the next reading, by which time the capture is there.
+    /// </remarks>
+    /// <param name="route">The source being kept to itself.</param>
+    /// <param name="deadline">The clock the whole operation is running against.</param>
+    /// <returns>How many links are off in all, or nothing where our capture could not be seen.</returns>
+    private int? PullAway(AudioRoute route, Stopwatch deadline)
+    {
+        var capture = CapturePorts();
+
+        if (capture.Count == 0) return null;
+
+        var away = _graph.LinksAway(
+            _graph.ParseLinks(Run(LinkTool, "-l")), route.Node, capture);
+
+        foreach (var link in away)
+        {
+            if (Expired(deadline)) break;
+
+            if (!_moved.Contains(link)) _moved.Add(link);
+
+            Run(LinkTool, $"-d {Quote(link.From)} {Quote(link.To)}");
+        }
+
+        return _moved.Count;
     }
 
     /// <inheritdoc/>
@@ -236,6 +322,8 @@ public sealed class PipeWireRouting : IAudioRouting
     /// </remarks>
     public void GiveBack()
     {
+        _aside = null;
+
         if (_moved.Count == 0) return;
 
         var back = _moved.ToArray();
@@ -359,6 +447,23 @@ public sealed class PipeWireRouting : IAudioRouting
     /// readable means nothing to route into, which the callers already handle as an empty
     /// answer, and throwing here would cost the page rather than the reading.
     /// </remarks>
+    /// <summary>
+    /// Throws away what was remembered of the graph, so the next question is asked of the machine.
+    /// </summary>
+    /// <remarks>
+    /// **The one moment the remembered graph is worse than useless is just after something has
+    /// changed.** It is kept for two seconds because the shape of a graph does not move that
+    /// fast, which is true while nothing is happening and false at exactly the moment a switch is
+    /// thrown: the same gesture opens the input, and a snapshot taken a moment before that has no
+    /// capture of ours in it. Reading a stale one there means the guard sees no capture, refuses
+    /// to cut anything, and the source stays on its own output until the next reading.
+    /// </remarks>
+    private void Forget()
+    {
+        _sinceSnapshot.Reset();
+        _captureNodes = null;
+    }
+
     private void ReadGraph()
     {
         if (_captureNodes != null && _sinceSnapshot.IsRunning && _sinceSnapshot.Elapsed < SnapshotLifetime) return;

@@ -510,8 +510,17 @@ public sealed class RecordingService : IRecordingService, IDisposable
 
             _hearing = value;
 
-            if (value) OpenMonitor();
-            else _monitor?.Close();
+            if (value)
+            {
+                OpenMonitor();
+
+                return;
+            }
+
+            if (_monitor == null) return;
+
+            _monitor.Heard = false;
+            _monitor.Close();
         }
     }
 
@@ -526,6 +535,8 @@ public sealed class RecordingService : IRecordingService, IDisposable
     /// </remarks>
     private void OpenMonitor()
     {
+        if (_monitor != null) _monitor.Heard = _hearing;
+
         if (!_hearing || _monitor == null || !_capturing) return;
 
         _monitor.Insert = _effect;

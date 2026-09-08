@@ -261,6 +261,25 @@ public sealed class WindowsLoopbackRouting : IAudioRouting
 
     /// <inheritdoc/>
     /// <remarks>
+    /// **The system holds this one, so there is nothing to hold here.** What is set on a graph is
+    /// a wire, which the session manager remakes the moment a stream is; what is set here is a
+    /// standing instruction about where a program plays, which its next stream follows without
+    /// anybody asking again. So the answer is false rather than nought work done: nothing had
+    /// crept back, because nothing can.
+    ///
+    /// The one thing there is to do is the case where the arrangement was never made, which is a
+    /// source the picker chose on somebody's behalf: that went through no choice, so a switch
+    /// already on has nothing standing behind it.
+    /// </remarks>
+    public bool HoldAside(AudioRoute route)
+    {
+        if (route == null || _aside != null) return false;
+
+        return TakeAside(route);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
     /// The program is forgotten whatever the call answered, since a program that has since ended
     /// cannot be given anything back and trying again on every source change would be this
     /// application arguing with the system for the rest of the session.

@@ -49,6 +49,14 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// </remarks>
     private readonly IPatchedIn? _patched;
 
+    /// <summary>What makes the busses agree with the picture, or nothing where nobody does.</summary>
+    /// <remarks>
+    /// **The picture is the description and this is what executes it.** Optional, so a patchbay
+    /// can be built and put a question to without an engine: what it costs is a cable that is
+    /// drawn and carries nothing.
+    /// </remarks>
+    private readonly IPatchedAudio? _audio;
+
     /// <summary>Where the mix leaves, or nothing where nobody has said.</summary>
     /// <remarks>
     /// Optional, so a patchbay can be built and put a question to without an engine: what it
@@ -70,6 +78,7 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// <param name="graph">What blocks and cables those make.</param>
     /// <param name="flow">Which cables that makes live.</param>
     /// <param name="patched">What of ours is patched into the input, and where that is kept.</param>
+    /// <param name="audio">What makes the busses agree with what is drawn.</param>
     public PatchbayViewModel(
         IInputSource input,
         IOutputChosen? output = null,
@@ -77,13 +86,15 @@ public sealed partial class PatchbayViewModel : ObservableObject
         IAudioFlowing? flowing = null,
         IPatchGraph? graph = null,
         IPatchFlow? flow = null,
-        IPatchedIn? patched = null)
+        IPatchedIn? patched = null,
+        IPatchedAudio? audio = null)
     {
         _input = input;
         _output = output;
         _places = places;
         _flowing = flowing;
         _patched = patched;
+        _audio = audio;
         _graph = graph ?? new PatchGraph();
         _flow = flow ?? new PatchFlow();
 
@@ -155,6 +166,8 @@ public sealed partial class PatchbayViewModel : ObservableObject
         Nodes = Laid(scene.Nodes);
         Links = scene.Links;
 
+        _audio?.Follow(scene);
+
         Pulse();
 
         if (Selected is not { } picked)
@@ -205,7 +218,7 @@ public sealed partial class PatchbayViewModel : ObservableObject
             return;
         }
 
-        var level = _flowing.Level(picked.Id);
+        var level = _flowing.Level(new SignalPoint(picked.Id, ""));
 
         Metered = level.Known;
         LevelLeft = level.Left;
@@ -358,7 +371,7 @@ public sealed partial class PatchbayViewModel : ObservableObject
         else kept.Remove(node);
 
         Says = recorder
-            ? $"{Named(node)} goes to the recorder and no longer to the desk. It is not in the take yet."
+            ? $"{Named(node)} goes to the recorder and no longer to the desk. Hear it plays it; it is not in the take file yet."
             : $"{Named(node)} goes to the desk again.";
 
         Read();

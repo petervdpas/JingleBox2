@@ -216,6 +216,36 @@ public sealed class MonitorFeed : IMonitorFeed
         lock (_lock) CloseLocked();
     }
 
+    /// <summary>Backing field for <see cref="Heard"/>.</summary>
+    private bool _heard;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The bus's own level rather than its mute, since the mute belongs to the IN strip and is
+    /// somebody's to press: two things writing one switch is the fault this codebase keeps paying
+    /// for, and here it would read as a mute that will not stay put.
+    ///
+    /// **Written every time and not only when it changes.** A switch that only acts on a change
+    /// never acts at all where the state it starts in is the state nobody set: this begins false,
+    /// so the level was never written, and the bus sat at unity with a patched source on it going
+    /// straight to the master. The bus is opened silent for the same reason, since this is built
+    /// the first time somebody asks for it and a source can be patched across before then.
+    /// </remarks>
+    public bool Heard
+    {
+        get { lock (_lock) return _heard; }
+
+        set
+        {
+            lock (_lock)
+            {
+                _heard = value;
+
+                _bus.Level = value ? 1f : 0f;
+            }
+        }
+    }
+
     /// <summary>Takes the path down with the lock held.</summary>
     /// <remarks>
     /// Off the bus before it is freed, or the bus is left holding a handle to nothing and the

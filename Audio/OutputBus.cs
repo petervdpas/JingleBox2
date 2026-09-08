@@ -304,6 +304,8 @@ public sealed class OutputBus : IOutputBus
 
             try
             {
+                RemoveLocked(source);
+
                 took = BassMix.MixerAddChannel(_handle, source, BassFlags.MixerChanBuffer);
             }
             catch (Exception ex)
@@ -384,7 +386,19 @@ public sealed class OutputBus : IOutputBus
     /// <inheritdoc/>
     public bool Holds(int source)
     {
-        lock (_lock) return _sources.Contains(source);
+        lock (_lock)
+        {
+            if (_handle == 0 || source == 0) return false;
+
+            try
+            {
+                return BassMix.ChannelGetMixer(source) == _handle;
+            }
+            catch (Exception)
+            {
+                return _sources.Contains(source);
+            }
+        }
     }
 
     /// <inheritdoc/>

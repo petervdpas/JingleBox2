@@ -1,0 +1,123 @@
+using System;
+using System.Threading;
+using JingleBox2.Audio.Routing;
+using JingleBox2.Audio.Routing.Enums;
+using JingleBox2.Audio.Routing.Records;
+using Xunit;
+
+namespace JingleBox2.Tests;
+
+/// <summary>
+/// A source taken aside is kept there, on the clock that already keeps the capture standing.
+/// </summary>
+/// <remarks>
+/// **Taking a source aside is not a thing that stays done.** The graph belongs to the machine
+/// rather than to this application, and its session manager wires a stream back to the speakers
+/// whenever the stream is remade: a new tab, a page reloaded, one video ending and the next
+/// starting. The capture was already put back every couple of seconds for exactly that reason and
+/// the other half was not, so the source came back onto its own output while it was still
+/// arriving here. Two paths to the speakers, one of them a few tens of milliseconds late, which
+/// is a slap rather than a level doubling and is how it was reported.
+///
+/// **A test here turns the switch off before it ends**, and that is not tidiness: while it is on
+/// the page holds the input open and watches the graph, which is a clock that keeps running, and
+/// a test that walked away from one would leave it ticking under every test after it.
+///
+/// The tools are not run, the rule <see cref="TakeAsideTests"/> keeps: `pw-link` rewires the
+/// machine the suite is running on, and a test that silences somebody's browser while they work
+/// is a worse thing than an untested line.
+///
+/// **What is not covered here is the settling clock**, which keeps asking for a few seconds after
+/// the switch is thrown while the graph is still moving. It is a `DispatcherTimer`, and a test
+/// process has no loop to tick one, so a test over it would assert nothing and pass. What is
+/// covered is everything the clock calls into: that a reading holds the arrangement, that it says
+/// so, that the switch being off holds nothing, and that a routing which cannot see its own
+/// capture unplugs nothing whatever.
+/// </remarks>
+public sealed class HoldAsideTests
+{
+    /// <summary>Long enough for a double to answer, short enough to fail rather than hang.</summary>
+    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(5);
+
+    /// <summary>Waits for something the page does off the drawing thread, or gives up.</summary>
+    private static bool Within(Func<bool> done)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        while (clock.Elapsed < Patience)
+        {
+            if (done()) return true;
+
+            Thread.Sleep(10);
+        }
+
+        return done();
+    }
+
+    /// <summary>Reading the graph holds the arrangement while the switch is on.</summary>
+    [Fact]
+    public void A_reading_holds_a_source_that_is_supposed_to_be_aside()
+    {
+        var bench = new RecorderBench();
+
+        bench.Page.TakeAside = true;
+        bench.Page.RefreshRoutes();
+
+        Assert.True(
+            Within(() => bench.Wiring.Held > 0),
+            "the arrangement was never held, so a source that got back onto its own output stays there");
+
+        bench.Page.TakeAside = false;
+    }
+
+    /// <summary>And says so where something really had come back, since that is not nothing.</summary>
+    [Fact]
+    public void A_source_that_crept_back_is_said_out_loud()
+    {
+        var bench = new RecorderBench();
+
+        bench.Wiring.CreptBack = true;
+        bench.Page.TakeAside = true;
+        bench.Page.RefreshRoutes();
+
+        Assert.True(
+            Within(() => bench.Page.Status.Contains("taken off again", StringComparison.OrdinalIgnoreCase)),
+            "nothing was said about a source that had got back onto its own output");
+
+        bench.Page.TakeAside = false;
+    }
+
+    /// <summary>And touches nothing at all while the switch is off, which is every ordinary run.</summary>
+    [Fact]
+    public void A_reading_with_the_switch_off_holds_nothing()
+    {
+        var bench = new RecorderBench();
+
+        bench.Page.RefreshRoutes();
+
+        Assert.True(Within(() => bench.Page.Routes.Count > 0), "the graph was never read");
+
+        Assert.Equal(0, bench.Wiring.Held);
+    }
+
+    /// <summary>
+    /// A routing that cannot see its own capture unplugs nothing, which is the guard the whole
+    /// thing turns on.
+    /// </summary>
+    /// <remarks>
+    /// What makes taking a source aside safe is knowing which of its links is the one bringing it
+    /// here, and that is decided by handing our capture's ports in. Handed none, every link looks
+    /// like somebody else's and the one to keep is cut with the rest: the source goes silent
+    /// everywhere at the moment somebody asked to hear it here. On a machine with no graph there
+    /// are never any capture ports, so this is that case asked where it can be asked.
+    /// </remarks>
+    [Fact]
+    public void A_routing_that_cannot_answer_unplugs_nothing()
+    {
+        var routing = new NoAudioRouting();
+        var firefox = new AudioRoute("Firefox", "Firefox", AudioRouteKind.Application);
+
+        Assert.False(routing.TakeAside(firefox));
+        Assert.False(routing.HoldAside(firefox));
+    }
+}

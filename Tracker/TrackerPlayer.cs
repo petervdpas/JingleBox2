@@ -57,6 +57,9 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// <summary>The one stream everything sounds through, and the mixer behind it.</summary>
     private readonly Audio.Interfaces.ITrackerOutput _synth = new Audio.TrackerOutput();
 
+    /// <inheritdoc/>
+    public int SongStream => _synth.Handle;
+
     /// <summary>Guards the song and its sequencer, which are replaced whole when a pass starts.</summary>
     private readonly object _lock = new();
 

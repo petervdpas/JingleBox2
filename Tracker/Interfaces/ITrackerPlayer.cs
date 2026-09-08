@@ -217,6 +217,18 @@ public interface ITrackerPlayer : IDisposable
     int SampleRate { get; }
 
     /// <summary>
+    /// The song's own stream, so it can be moved from one bus to another, and nought while the
+    /// tracker is not running.
+    /// </summary>
+    /// <remarks>
+    /// **Where the song goes is a decision made on the patchbay**, and the only way to act on it
+    /// is to take this off the desk's bus and put it on the recorder's. Passed straight through
+    /// from <see cref="Audio.Interfaces.ITrackerOutput.Handle"/>, since the player owns the
+    /// output and nothing above it can reach one otherwise.
+    /// </remarks>
+    int SongStream { get; }
+
+    /// <summary>
     /// Asks the engine to run at a rate, or at the device's own. Only heard before the first
     /// note, so it comes from settings when the tracker is built.
     /// </summary>

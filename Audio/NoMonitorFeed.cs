@@ -28,4 +28,8 @@ public sealed class NoMonitorFeed : IMonitorFeed
     public void Close()
     {
     }
+
+    /// <inheritdoc/>
+    /// <remarks>Remembered and nothing else, since there is no bus here to be heard on.</remarks>
+    public bool Heard { get; set; }
 }

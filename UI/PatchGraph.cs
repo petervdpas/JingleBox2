@@ -37,33 +37,41 @@ public sealed class PatchGraph : IPatchGraph
     /// <inheritdoc/>
     public string OwnNode => RecordNode;
 
-    /// <summary>What each block is called underneath, written out one per line.</summary>
+    /// <summary>What each block is called underneath, from the one place that says.</summary>
     /// <remarks>
-    /// An id is what a port names its block by and what a place is remembered by, so each one is
-    /// a literal a reader and a search can both find rather than a word built out of pieces.
+    /// **The words themselves are in <see cref="PatchNodes"/> and are not written again here.**
+    /// An id is what a port names its block by, what a place is remembered by, what decides which
+    /// cable is live and what a level is looked up by, so four halves of this application spell
+    /// the same handful of words. They were written out in each of them, with a remark in each
+    /// saying that was deliberate; it is the shape this codebase keeps paying for, and the way it
+    /// fails is a block whose meter reads nothing because a word was typed differently in one of
+    /// the four.
+    ///
+    /// Named again as locals rather than used inline, since what this file is about is the
+    /// picture and `RecordNode` reads better in it than the full path does.
     /// </remarks>
-    private const string RecordNode = "record";
+    private const string RecordNode = PatchNodes.Record;
 
     /// <inheritdoc cref="RecordNode"/>
-    private const string TrackerNode = "tracker";
+    private const string TrackerNode = PatchNodes.Tracker;
 
     /// <inheritdoc cref="RecordNode"/>
-    private const string FireNode = "fire";
+    private const string FireNode = PatchNodes.Fire;
 
     /// <inheritdoc cref="RecordNode"/>
-    private const string SongNode = "song";
+    private const string SongNode = PatchNodes.Song;
 
     /// <inheritdoc cref="RecordNode"/>
-    private const string MixerNode = "mixer";
+    private const string MixerNode = PatchNodes.Mixer;
 
     /// <inheritdoc cref="RecordNode"/>
-    private const string OutputNode = "output";
+    private const string OutputNode = PatchNodes.Output;
 
     /// <summary>What a source's own point is called.</summary>
-    private const string OutName = "out";
+    private const string OutName = PatchPorts.Out;
 
     /// <summary>What the point the recorder listens at is called.</summary>
-    private const string CaptureName = "capture";
+    private const string CaptureName = PatchPorts.Capture;
 
     /// <inheritdoc/>
     public PatchPort OwnInput => new(RecordNode, CaptureName, PatchSide.In, PatchChannels.Stereo);
@@ -79,30 +87,30 @@ public sealed class PatchGraph : IPatchGraph
     /// will hold rather than what anybody hears.
     /// </remarks>
     private static readonly PatchPort RecordOut =
-        new(RecordNode, "takes", PatchSide.Out, PatchChannels.Stereo, Fixed: true);
+        new(RecordNode, PatchPorts.Takes, PatchSide.Out, PatchChannels.Stereo, Fixed: true);
 
     /// <summary>Where a take arrives on the desk.</summary>
     private static readonly PatchPort MixerTakes =
-        new(MixerNode, "takes", PatchSide.In, PatchChannels.Stereo, Fixed: true);
+        new(MixerNode, PatchPorts.Takes, PatchSide.In, PatchChannels.Stereo, Fixed: true);
 
     /// <summary>What the tracker gives out where the song has no tracks at all.</summary>
     /// <remarks>
     /// A block with nothing on it would be a block nobody can read: a song is always going to
     /// have tracks, and what this covers is the moment before one has been opened.
     /// </remarks>
-    private const string WholeMix = "mix";
+    private const string WholeMix = PatchPorts.Mix;
 
     /// <summary>The pads, on their way to the desk.</summary>
     private static readonly PatchPort FireOut =
-        new(FireNode, "pads", PatchSide.Out, PatchChannels.Stereo, Fixed: true);
+        new(FireNode, PatchPorts.Pads, PatchSide.Out, PatchChannels.Stereo, Fixed: true);
 
     /// <summary>Where the pads arrive on it.</summary>
     private static readonly PatchPort MixerPads =
-        new(MixerNode, "pads", PatchSide.In, PatchChannels.Stereo, Fixed: true);
+        new(MixerNode, PatchPorts.Pads, PatchSide.In, PatchChannels.Stereo, Fixed: true);
 
     /// <summary>What the whole desk sums to.</summary>
     private static readonly PatchPort MixerOut =
-        new(MixerNode, "master", PatchSide.Out, PatchChannels.Stereo, Fixed: true);
+        new(MixerNode, PatchPorts.Master, PatchSide.Out, PatchChannels.Stereo, Fixed: true);
 
     /// <summary>
     /// What the song sums to, which is the one pair the desk hears from the tracker.
@@ -115,15 +123,15 @@ public sealed class PatchGraph : IPatchGraph
     /// strip the song is really summed on with no block at all.
     /// </remarks>
     private static readonly PatchPort SongOut =
-        new(SongNode, "song", PatchSide.Out, PatchChannels.Stereo, Fixed: true);
+        new(SongNode, PatchPorts.Song, PatchSide.Out, PatchChannels.Stereo, Fixed: true);
 
     /// <summary>Where the song arrives on the desk.</summary>
     private static readonly PatchPort MixerSong =
-        new(MixerNode, "song", PatchSide.In, PatchChannels.Stereo, Fixed: true);
+        new(MixerNode, PatchPorts.Song, PatchSide.In, PatchChannels.Stereo, Fixed: true);
 
     /// <summary>Where that lands on the machine.</summary>
     private static readonly PatchPort OutputIn =
-        new(OutputNode, "playback", PatchSide.In, PatchChannels.Stereo, Fixed: true);
+        new(OutputNode, PatchPorts.Playback, PatchSide.In, PatchChannels.Stereo, Fixed: true);
 
     /// <summary>
     /// One track's pair, on the tracker and again on the desk.

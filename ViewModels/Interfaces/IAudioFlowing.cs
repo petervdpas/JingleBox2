@@ -23,18 +23,28 @@ public interface IAudioFlowing
     System.Collections.Generic.IReadOnlyList<string> Tracks { get; }
 
     /// <summary>
-    /// What one block is putting out, for the meter beside its details.
+    /// What one point of the routing is carrying.
     /// </summary>
     /// <remarks>
-    /// **The tracker answers with its tracks joined**, one meter for the lot rather than one per
-    /// track: what somebody wants to know from a block is whether audio is coming out of it, and
-    /// thirty two meters stacked in a sidebar is a page nobody can read. The tracks are told
-    /// apart on the picture, by which cables are drawn solid.
+    /// **This is the routing table's own question, asked in the routing table's own words**, and
+    /// that is what makes the picture and the meters one model rather than two that agree by
+    /// luck. A patchbay block is a node, a connection point on it is a port, and a
+    /// <see cref="UI.Records.SignalPoint"/> is exactly that pair. It took a node before, so the
+    /// two halves shared a vocabulary and said so nowhere, and the day a port was renamed on one
+    /// side the other went quietly to nought.
     ///
-    /// Read off the strips the mixer is already polling, so nothing is measured twice.
+    /// A block as a whole is a point with no port, which is what the sidebar's own meter asks
+    /// for. **The tracker answers that with its tracks joined**, one meter for the lot rather
+    /// than one per track: what somebody wants to know from a block is whether audio is coming
+    /// out of it, and thirty two meters stacked in a sidebar is a page nobody can read. The
+    /// tracks are told apart on the picture, by which cables are drawn solid.
+    ///
+    /// A point this application measures nothing about answers nothing rather than nought, which
+    /// is every block on the machine: a bar sitting at nought reads as silence rather than as a
+    /// question nobody can answer.
     /// </remarks>
-    /// <param name="node">Which block, by its id.</param>
-    UI.Records.PatchLevel Level(string node);
+    /// <param name="point">Which point, as a block and one of its connection points.</param>
+    UI.Records.PatchLevel Level(UI.Records.SignalPoint point);
 
     /// <summary>
     /// The strip one of a block's outputs is, so its mute and its solo can be reached.

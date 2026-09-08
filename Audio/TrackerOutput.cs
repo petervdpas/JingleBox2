@@ -72,6 +72,16 @@ public sealed class TrackerOutput(IRenderCost? cost = null) : ITrackerOutput
     /// <summary>The BASS stream, or 0 when it is not open.</summary>
     private int _handle;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Read under the lock the rest of the stream's life is kept under, so a caller moving it
+    /// between busses cannot be handed one that is being closed at that moment.
+    /// </remarks>
+    public int Handle
+    {
+        get { lock (_lock) return _handle; }
+    }
+
     /// <summary>Whether this has been thrown away, so nothing opens the stream again after.</summary>
     private bool _disposed;
 

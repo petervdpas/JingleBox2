@@ -378,13 +378,13 @@ public class PatchbayViewTests
         public JingleBox2.UI.Records.PatchSignals Signals =>
             new(false, false, false, Sounding, false);
 
-        /// <summary>What each block is putting out, for whoever wants to say.</summary>
-        public System.Collections.Generic.Dictionary<string, JingleBox2.UI.Records.PatchLevel> Levels { get; } =
-            new(System.StringComparer.Ordinal);
+        /// <summary>What each point is carrying, for whoever wants to say.</summary>
+        public System.Collections.Generic.Dictionary<JingleBox2.UI.Records.SignalPoint, JingleBox2.UI.Records.PatchLevel> Levels { get; } =
+            new();
 
         /// <inheritdoc/>
-        public JingleBox2.UI.Records.PatchLevel Level(string node) =>
-            Levels.TryGetValue(node, out var level) ? level : default;
+        public JingleBox2.UI.Records.PatchLevel Level(JingleBox2.UI.Records.SignalPoint point) =>
+            Levels.TryGetValue(point, out var level) ? level : default;
 
         /// <summary>The strips answering for each block and output, where anything does.</summary>
         public System.Collections.Generic.Dictionary<(string Node, string Port), IStripSwitches> Strips { get; } =
@@ -401,7 +401,7 @@ public class PatchbayViewTests
     {
         var flowing = new Playing("TR-01");
 
-        flowing.Levels["tracker"] = new JingleBox2.UI.Records.PatchLevel(true, 0.4f, 0.6f);
+        flowing.Levels[new JingleBox2.UI.Records.SignalPoint("tracker", "")] = new JingleBox2.UI.Records.PatchLevel(true, 0.4f, 0.6f);
 
         var bay = new PatchbayViewModel(new Bench(), null, null, flowing)
         {
@@ -425,7 +425,7 @@ public class PatchbayViewTests
     {
         var flowing = new Playing();
 
-        flowing.Levels["mixer"] = new JingleBox2.UI.Records.PatchLevel(true, 0.9f, 0.9f);
+        flowing.Levels[new JingleBox2.UI.Records.SignalPoint("mixer", "")] = new JingleBox2.UI.Records.PatchLevel(true, 0.9f, 0.9f);
 
         var bay = new PatchbayViewModel(new Bench(), null, null, flowing);
 

@@ -36,5 +36,9 @@ public sealed class NoAudioRouting : IAudioRouting
     public bool TakeAside(AudioRoute route) => false;
 
     /// <inheritdoc/>
+    /// <remarks>Nothing was ever taken aside, so nothing can have come back.</remarks>
+    public bool HoldAside(AudioRoute route) => false;
+
+    /// <inheritdoc/>
     public void GiveBack() { }
 }

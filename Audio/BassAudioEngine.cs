@@ -355,6 +355,8 @@ public sealed class BassAudioEngine : IAudioEngine
             throw new InvalidOperationException(
                 "The input's bus could not be opened, so nothing can be played.");
 
+        _monitorBus.Level = 0f;
+
         _output.Add(_padBus.Handle);
         _output.Add(_takeBus.Handle);
         _output.Add(_monitorBus.Handle);

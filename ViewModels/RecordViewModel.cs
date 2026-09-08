@@ -1756,6 +1756,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             PreferWhatIsPlaying();
             RestorePreferred(current);
+
+            await HoldAsideAsync();
         }
         catch (Exception ex)
         {
@@ -1766,6 +1768,31 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             _readingRoute = false;
             _refreshingRoutes = false;
         }
+    }
+
+    /// <summary>
+    /// Keeps a source that is supposed to be aside off its own output, on the clock that is
+    /// already keeping the capture standing.
+    /// </summary>
+    /// <remarks>
+    /// **Taking a source aside is not a thing that stays done.** The graph belongs to the machine
+    /// rather than to this application, and its session manager wires a stream back to the
+    /// speakers whenever the stream is remade: a new tab, a page reloaded, a program moved
+    /// between outputs. The capture was already put back every couple of seconds for exactly that
+    /// reason and the other half of the arrangement was not, so the source came back onto its own
+    /// output while it was still arriving here. What that sounds like is the same audio twice
+    /// with a buffer between the two, which is how it was reported.
+    ///
+    /// Said on the status line only where something really had come back, since a line that
+    /// appeared every two seconds saying nothing happened would be worse than none. Off the
+    /// drawing thread, like everything else here that runs the tools.
+    /// </remarks>
+    private async System.Threading.Tasks.Task HoldAsideAsync()
+    {
+        if (!TakeAside || SelectedRoute is not { } source) return;
+
+        if (await Task.Run(() => _routing.HoldAside(source)))
+            Status = $"{source.Display} had got back onto its own output and was taken off again.";
     }
 
     /// <summary>
@@ -1965,8 +1992,118 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         _standing = wanted;
 
-        if (wanted) Watch();
-        else LetGo();
+        if (wanted)
+        {
+            Watch();
+            WatchRoutes(reading: false);
+            Settle();
+
+            return;
+        }
+
+        StopSettling();
+        LetGo();
+        LetRoutesGo();
+    }
+
+    /// <summary>The clock that keeps asking while the graph is still moving, or nothing.</summary>
+    private DispatcherTimer? _settling;
+
+    /// <summary>When the settling began, so it can stop on its own.</summary>
+    private readonly System.Diagnostics.Stopwatch _settled = new();
+
+    /// <summary>How often the arrangement is checked while the graph is still settling.</summary>
+    /// <remarks>
+    /// Fast enough that nobody hears the gap, slow enough that it is a handful of tool runs
+    /// rather than a spin: a fifth of a second is under what a hand notices and is four readings
+    /// in the time the ordinary clock takes one.
+    /// </remarks>
+    private static readonly TimeSpan SettleInterval = TimeSpan.FromMilliseconds(200);
+
+    /// <summary>How long that goes on before the ordinary clock is left to it.</summary>
+    /// <remarks>
+    /// Long enough for a capture to appear in the graph and for the session manager to finish
+    /// whatever it was doing, and short enough that a machine where this never succeeds is not
+    /// running tools at this rate for the rest of the session.
+    /// </remarks>
+    private static readonly TimeSpan SettleFor = TimeSpan.FromSeconds(4);
+
+    /// <summary>
+    /// Keeps asking for a few seconds after the switch is thrown, while the graph is still moving.
+    /// </summary>
+    /// <remarks>
+    /// **One shutter is not enough, because the same gesture that closes it also moves the graph
+    /// it is closing on.** Turning the switch on opens the input, and this application's capture
+    /// appears in the graph a moment after that is asked for; turning it off puts the source's own
+    /// links back, and the session manager takes a moment to make them. So the reading taken at
+    /// the instant of the gesture is a reading of a graph that has not finished changing, and the
+    /// ordinary clock is two seconds away, which is two seconds of the source playing in two
+    /// places.
+    ///
+    /// It costs a couple of tool runs a fifth of a second for four seconds and then stops itself.
+    /// Nothing here is a retry of a failure: each reading takes off whatever has come back since
+    /// the last one, so a graph that settles at once is three readings that find nothing.
+    /// </remarks>
+    private void Settle()
+    {
+        _settled.Restart();
+
+        if (_settling != null)
+        {
+            _settling.Start();
+
+            return;
+        }
+
+        _settling = new DispatcherTimer { Interval = SettleInterval };
+
+        _settling.Tick += (_, _) =>
+        {
+            if (_settled.Elapsed > SettleFor)
+            {
+                StopSettling();
+
+                return;
+            }
+
+            HoldAsideNow();
+        };
+
+        _settling.Start();
+    }
+
+    /// <summary>Stops asking, for a switch that has gone off or an arrangement that is made.</summary>
+    private void StopSettling()
+    {
+        _settling?.Stop();
+        _settled.Reset();
+    }
+
+    /// <summary>Whether a reading is already out, so they cannot pile up on each other.</summary>
+    private bool _holding;
+
+    /// <summary>
+    /// Takes off whatever the source has got back onto, off the drawing thread.
+    /// </summary>
+    /// <remarks>
+    /// One at a time: the tools take longer than the settling clock's own interval on a busy
+    /// machine, and without the guard the readings would queue up behind each other and go on
+    /// long after the graph had stopped moving.
+    /// </remarks>
+    private async void HoldAsideNow()
+    {
+        if (_holding) return;
+
+        try
+        {
+            _holding = true;
+
+            await HoldAsideAsync();
+        }
+        finally
+        {
+            _holding = false;
+        }
     }
 
     /// <inheritdoc/>
@@ -2279,13 +2416,31 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// appears in the graph once it is listening: reading first would show a graph with nothing
     /// to connect to.
     /// </remarks>
-    public void WatchRoutes()
+    public void WatchRoutes() => WatchRoutes(reading: true);
+
+    /// <summary>
+    /// Starts watching the graph, and says whether to read it at once as well as on the clock.
+    /// </summary>
+    /// <remarks>
+    /// **A page wants the reading now and a switch does not.** A page carrying the picker has a
+    /// list to fill and somebody looking at it, so it reads as it opens; a switch has neither,
+    /// and the reading it would force lands a moment later and writes the chosen source back out
+    /// of the picker. Thrown at the same moment somebody is changing the source, that arrives
+    /// after the change and puts the old one back, which is a picker that will not stay put.
+    ///
+    /// The clock is the same either way and its first tick is a couple of seconds off, which is
+    /// also about when the input a switch has just opened appears in the graph. So the switch
+    /// loses nothing by waiting for it.
+    /// </remarks>
+    /// <param name="reading">Whether to read the graph at once as well as starting the clock.</param>
+    private void WatchRoutes(bool reading)
     {
         _watchingRoutes++;
 
         if (_watchingRoutes > 1) return;
 
-        RefreshRoutes();
+        if (reading) RefreshRoutes();
+
         StartRouteWatch();
     }
 
