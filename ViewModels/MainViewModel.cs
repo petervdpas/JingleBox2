@@ -840,7 +840,6 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             Record.MaxGainDb,
             () => Record.RecordGainDb,
             value => Record.RecordGainDb = value,
-            () => (Record.LevelLeft, Record.LevelRight),
             _audio.MonitorBus,
             ApplySolo,
             source: Record);
@@ -906,19 +905,98 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Every block this application owns has something to read; a block on the machine has not,
-    /// since what somebody else's program is putting out is not something we measure. The output
-    /// reads the master, because what leaves is what the desk summed.
+    /// The whole block, which is one of the points on the table like any other: a block is asked
+    /// for its own reading and the table is the one place that says what a reading is.
     /// </remarks>
-    public UI.Records.PatchLevel Level(string node) => node switch
+    public UI.Records.PatchLevel Level(string node) => Measure(new UI.Records.SignalPoint(node, ""));
+
+    /// <summary>Backing field for <see cref="Levels"/>.</summary>
+    private UI.Interfaces.ISignalTable? levels;
+
+    /// <inheritdoc cref="UI.Interfaces.ISignalTable"/>
+    /// <remarks>
+    /// Built once and kept, since what is watching a point outlives any page: the three strips
+    /// this holds are watched from here for the life of the application.
+    /// </remarks>
+    public UI.Interfaces.ISignalTable Levels => levels ??= Watched();
+
+    /// <summary>Builds the table and puts the desk's own meters on it.</summary>
+    /// <remarks>
+    /// **The listeners write into the strips rather than the strips reading for themselves.**
+    /// That is the whole of the change: what each of these reads is exactly what it read before,
+    /// measured in one place instead of three, so the desk and the picture cannot end up showing
+    /// one point differently.
+    /// </remarks>
+    private UI.Interfaces.ISignalTable Watched()
     {
-        "record" => Meter(RecorderInput),
-        "fire" => Meter(PadsStrip),
-        "tracker" => Joined(),
-        "mixer" => Master(),
-        "output" => Master(),
+        var table = new UI.SignalTable(Measure);
+
+        table.Watch(CapturePoint, Onto(RecorderInput));
+        table.Watch(TakesPoint, Onto(RecorderPlay));
+        table.Watch(PadsPoint, Onto(PadsStrip));
+
+        table.Watch(MasterPoint, Onto(DeskMaster));
+
+        return table;
+    }
+
+    /// <summary>Puts a reading onto one strip's meter.</summary>
+    private static Action<UI.Records.PatchLevel> Onto(SourceStripViewModel strip) =>
+        level => strip.Show(level.Left, level.Right);
+
+    /// <summary>Where the input is listening, which is what the IN strip shows.</summary>
+    private static readonly UI.Records.SignalPoint CapturePoint =
+        new(UI.PatchNodes.Record, UI.PatchPorts.Capture);
+
+    /// <summary>The take bus, which is what the PLAY strip shows.</summary>
+    private static readonly UI.Records.SignalPoint TakesPoint =
+        new(UI.PatchNodes.Record, UI.PatchPorts.Takes);
+
+    /// <summary>The pad bus, which is what the PADS strip shows.</summary>
+    private static readonly UI.Records.SignalPoint PadsPoint =
+        new(UI.PatchNodes.Fire, UI.PatchPorts.Pads);
+
+    /// <summary>What the whole desk sums to, which is what the MASTER strip shows.</summary>
+    private static readonly UI.Records.SignalPoint MasterPoint =
+        new(UI.PatchNodes.Mixer, UI.PatchPorts.Master);
+
+    /// <summary>
+    /// What one point on the routing table is carrying, which is the one place that says.
+    /// </summary>
+    /// <remarks>
+    /// **The desk and the output are what everything is summed onto**, which is the output bus,
+    /// and that is the one reading on here that is not what the meter beside it used to show.
+    /// They were the song's master, which is a strip and not the desk: it sums the tracker's
+    /// tracks and has never heard of the pads, a take being auditioned or the input being
+    /// listened to. So a browser coming through the input lit the meter on the recorder's block
+    /// and left the desk and the output reading nought while it was audibly playing, which reads
+    /// as a broken meter rather than as a meter measuring something else.
+    ///
+    /// A point nothing here knows about answers nothing rather than nought, which is what keeps a
+    /// block on the machine from drawing a meter that cannot move.
+    /// </remarks>
+    /// <param name="point">The place on the table.</param>
+    private UI.Records.PatchLevel Measure(UI.Records.SignalPoint point) => (point.Node, point.Port) switch
+    {
+        (UI.PatchNodes.Record, UI.PatchPorts.Capture) => new(true, Record.LevelLeft, Record.LevelRight),
+        (UI.PatchNodes.Record, UI.PatchPorts.Takes) => Reading(_audio.TakeBus),
+        (UI.PatchNodes.Record, "") => new(true, Record.LevelLeft, Record.LevelRight),
+        (UI.PatchNodes.Fire, UI.PatchPorts.Pads) => Reading(_audio.PadBus),
+        (UI.PatchNodes.Fire, "") => Reading(_audio.PadBus),
+        (UI.PatchNodes.Tracker, "") => Joined(),
+        (UI.PatchNodes.Mixer, UI.PatchPorts.Master) => Reading(_audio.Output),
+        (UI.PatchNodes.Mixer, "") => Reading(_audio.Output),
+        (UI.PatchNodes.Output, "") => Reading(_audio.Output),
         _ => default
     };
+
+    /// <summary>One bus, as an answer this table can give.</summary>
+    private static UI.Records.PatchLevel Reading(Audio.Interfaces.IOutputBus bus)
+    {
+        var (left, right) = bus.Reading;
+
+        return new UI.Records.PatchLevel(true, left, right);
+    }
 
     /// <inheritdoc/>
     /// <remarks>
@@ -928,7 +1006,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     public IStripSwitches? Switches(string node, string port) => node switch
     {
         "tracker" => Track(port),
-        "mixer" => Tracker.MasterStrip,
+        "mixer" => DeskMaster,
         "fire" => PadsStrip,
         "record" => RecorderPlay,
         _ => null
@@ -942,10 +1020,6 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
 
         return null;
     }
-
-    /// <summary>One strip's meter, as an answer this page can give.</summary>
-    private static UI.Records.PatchLevel Meter(SourceStripViewModel strip) =>
-        new(true, (float)strip.Left, (float)strip.Right);
 
     /// <summary>
     /// Every track at once, which is what a block putting out a whole song is doing.
@@ -969,12 +1043,6 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         return new UI.Records.PatchLevel(true, left, right);
     }
 
-    /// <summary>What the desk summed, which is also what leaves the machine.</summary>
-    private UI.Records.PatchLevel Master() =>
-        Tracker.MasterStrip is { } master
-            ? new UI.Records.PatchLevel(true, (float)master.Left, (float)master.Right)
-            : new UI.Records.PatchLevel(true, 0, 0);
-
     /// <summary>Whether a strip's meter is showing anything worth calling sound.</summary>
     private static bool Loud(SourceStripViewModel strip) =>
         Math.Max(strip.Left, strip.Right) > Hearable;
@@ -991,6 +1059,40 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// this application or is this application.
     /// </remarks>
     public PatchbayViewModel Patchbay => patchbay ??= new PatchbayViewModel(Record, this, new Config.PatchPlaces(_cfg, _store), this);
+
+    /// <summary>Backing field for <see cref="DeskMaster"/>.</summary>
+    private SourceStripViewModel? deskMaster;
+
+    /// <summary>
+    /// The desk's master, which is what everything on this application is summed onto.
+    /// </summary>
+    /// <remarks>
+    /// **There are two masters and they are in series, which is what a desk has always had.** The
+    /// song has one and it is the tracker's: the tracks are summed onto it, it carries the song's
+    /// own effect chain, its automation and the saturation, and it travels in the file. This one
+    /// is the desk's: the song arrives on it as one source beside the pads, a take being
+    /// auditioned and the input being listened to, and what leaves it is what the machine plays.
+    /// Pulling the song's down changes the song wherever it is opened; pulling this one down
+    /// turns down everything this installation is making a sound with.
+    ///
+    /// It was one strip doing both jobs and doing neither: the strip on the right was the song's,
+    /// so a desk with four sources on it had a master that could only hear one of them, and its
+    /// meter read nought while a browser was audibly playing through the input.
+    ///
+    /// **No solo**, since soloing everything is what it is already doing, and the solos beside it
+    /// are worked out against the sub-busses rather than against this. Nothing kept between runs,
+    /// which is what the pads' and the take's faders already do: a desk level is about this
+    /// session rather than about the work.
+    /// </remarks>
+    public SourceStripViewModel DeskMaster =>
+        deskMaster ??= new SourceStripViewModel(
+            "MASTER",
+            "Everything this application is playing, on its way out of the machine.",
+            _gain.MinimumDecibels,
+            _gain.MaximumDecibels,
+            () => _gain.ToDecibels(_audio.Output.Level),
+            value => _audio.Output.Level = (float)_gain.ToAmplitude(value),
+            _audio.Output);
 
     /// <summary>Backing field for <see cref="RecorderPlay"/>.</summary>
     private SourceStripViewModel? recorderPlay;
@@ -1036,7 +1138,6 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             _gain.MaximumDecibels,
             () => _gain.ToDecibels(bus.Level),
             value => bus.Level = (float)_gain.ToAmplitude(value),
-            () => bus.Reading,
             bus,
             ApplySolo);
 
@@ -1104,12 +1205,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// anything is sounding. These can sound with the transport stopped, since a pad and a take
     /// audition owe the song nothing, so they are read whenever the page is up.
     /// </remarks>
-    public void ReadSourceMeters()
-    {
-        RecorderInput.ReadMeter();
-        RecorderPlay.ReadMeter();
-        PadsStrip.ReadMeter();
-    }
+    public void ReadSourceMeters() => Levels.Read();
 
     /// <summary>What the switch means, said plainly enough to choose by.</summary>
     public string OverlapPluginsHint =>

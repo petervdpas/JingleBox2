@@ -269,7 +269,7 @@
             <!-- What the master makes move over the pattern. Under the mixer rather than under the
                  pattern, because the master is not a track and the panel down there is about the
                  track the cursor is in. -->
-            <views:FoldStrip DockPanel.Dock="Bottom" Title="master automation"
+            <views:FoldStrip DockPanel.Dock="Bottom" Title="song master automation"
                              IsOpen="{Binding ShowsMasterLanes, Mode=TwoWay}"
                              StripHeight="{Binding MasterLanesHeight, Mode=TwoWay}">
               <views:AutomationStrip DataContext="{Binding MasterLanes}" />
@@ -281,16 +281,33 @@
             <!-- The topmost of the two, so this is the one that carries the room above the pair:
              docked from the bottom the automation goes lowest and this stands over it, against
              the row of faders. -->
-        <views:FoldStrip DockPanel.Dock="Bottom" Title="master effects" Margin="0,10,0,0"
+        <views:FoldStrip DockPanel.Dock="Bottom" Title="song master effects" Margin="0,10,0,0"
                              IsOpen="{Binding ShowsMasterChain, Mode=TwoWay}"
                              StripHeight="{Binding MasterChainHeight, Mode=TwoWay}">
               <views:PluginStrip DataContext="{Binding MasterEffect}" />
             </views:FoldStrip>
 
-            <!-- The master stands apart from the tracks and on the right, where the sum of a row
-                 belongs. Outside the scroller, so it stays where it is however many tracks the song
-                 has and however far along them you have scrolled: it is the one strip you always
-                 want to be able to see. -->
+            <!-- **Two masters, in series, which is what a desk has always had.** MASTER is the
+                 desk's: everything on this page is summed onto it and what leaves it is what the
+                 machine plays. SONG is the tracker's: the tracks are summed onto it, it carries
+                 the song's own chain, its automation and the saturation, and it travels in the
+                 file. Pulling SONG down changes the song wherever it is opened; pulling MASTER
+                 down turns down everything this installation is making a sound with.
+
+                 It was one strip doing both jobs and doing neither, so a desk with four sources on
+                 it had a master that could only hear one of them, and its meter read nought while
+                 a browser was audibly playing through the input.
+
+                 Both stand apart from the tracks and on the right, and outside the scroller so
+                 they stay put however far along the tracks you have gone. MASTER is docked first
+                 so it lands furthest out, with the song arriving into it from its left, which is
+                 the order the audio takes. -->
+            <ContentControl DockPanel.Dock="Right" Margin="12,0,0,0"
+                            IsVisible="{Binding $parent[views:MixerView].DeskMaster,
+                                        Converter={x:Static ObjectConverters.IsNotNull}}"
+                            Content="{Binding $parent[views:MixerView].DeskMaster}"
+                            ContentTemplate="{StaticResource SourceStrip}" />
+
             <!-- In a ContentControl so the visibility is asked of the tracker while the strip
                  itself is given the master: a DataContext set on the same element would take the
                  binding beside it with it. The same reason the tracker holds its rack page that
@@ -305,7 +322,7 @@
                          with the tracks beside it. It has no side chain, so its last row is empty. -->
                     <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto">
                       <Border Grid.Row="0" Classes="badge" HorizontalAlignment="Center"
-                              ToolTip.Tip="The whole mix, after every track.">
+                              ToolTip.Tip="Everything the song sums to, after every track and before the desk.">
                         <TextBlock Text="{Binding Label}" />
                       </Border>
 

@@ -170,18 +170,55 @@ public partial class MixerView : UserControl
     /// </remarks>
     private void Sources_DropDownOpened(object? sender, System.EventArgs e) => Sources?.RefreshRoutes();
 
-    /// <summary>Reads the three meters again, on the drawing thread.</summary>
+    /// <summary>Takes one reading of the routing table, on the drawing thread.</summary>
     /// <remarks>
-    /// Through the strips themselves rather than through the page's own context: they are handed
-    /// in from outside and the page's context is the song, which knows nothing about them.
+    /// One call for every meter on the page rather than one per strip: the table measures each
+    /// point once and tells whoever is watching it, so the strips and the block picked on the
+    /// patchbay come off the same reading and cannot disagree.
+    ///
+    /// The cables are pulsed beside it, since which of them is live is a question about the
+    /// picture rather than a level.
     /// </remarks>
     private void Read()
     {
-        (RecorderInput as ViewModels.SourceStripViewModel)?.ReadMeter();
-        (RecorderPlay as ViewModels.SourceStripViewModel)?.ReadMeter();
-        (PadsStrip as ViewModels.SourceStripViewModel)?.ReadMeter();
+        Levels?.Read();
 
         (Patchbay as ViewModels.PatchbayViewModel)?.Pulse();
+    }
+
+    /// <summary>The desk's master, as a strip. See <see cref="RecorderInputProperty"/>.</summary>
+    public static readonly StyledProperty<object?> DeskMasterProperty =
+        AvaloniaProperty.Register<MixerView, object?>(nameof(DeskMaster));
+
+    /// <summary>
+    /// The strip over what everything is summed onto, on its way out of the machine.
+    /// </summary>
+    /// <remarks>
+    /// Handed in like the other three, and for the same reason: it belongs to the application
+    /// rather than to the song this page is bound to. The song's own master comes off the song
+    /// and is the strip beside it.
+    /// </remarks>
+    public object? DeskMaster
+    {
+        get => GetValue(DeskMasterProperty);
+        set => SetValue(DeskMasterProperty, value);
+    }
+
+    /// <summary>The one table of what each point on the routing is carrying.</summary>
+    public static readonly StyledProperty<UI.Interfaces.ISignalTable?> LevelsProperty =
+        AvaloniaProperty.Register<MixerView, UI.Interfaces.ISignalTable?>(nameof(Levels));
+
+    /// <inheritdoc cref="LevelsProperty"/>
+    /// <remarks>
+    /// Handed in the way the strips are and for the same reason: what the meters on this page
+    /// show belongs to the application rather than to the song it is bound to. A page built
+    /// without one draws its meters at nought, which is what a page with nothing measuring for it
+    /// should do.
+    /// </remarks>
+    public UI.Interfaces.ISignalTable? Levels
+    {
+        get => GetValue(LevelsProperty);
+        set => SetValue(LevelsProperty, value);
     }
 
     /// <summary><inheritdoc cref="Input" path="/summary"/></summary>

@@ -10,16 +10,15 @@ namespace JingleBox2.ViewModels;
 /// <remarks>
 /// A track's strip is <see cref="TrackStripViewModel"/> and has a pan, a mute, a solo, ducking
 /// and a place in the song. None of that is true here. What these three have is a level and a
-/// meter, so that is what this is, and the three differ only in what the level writes to and
-/// where the meter reads from, which are handed in.
+/// meter, so that is what this is, and the three differ only in what the level writes to, which
+/// is handed in.
 ///
 /// Handed in rather than subclassed, because there is no behaviour to override: the recording
 /// input's level goes into the recorder's gain and never reaches the output bus at all, while
 /// the pads' and the take's are bus levels. Three classes would be three copies of a fader.
 ///
-/// The meter is written from outside by whatever is polling, exactly as a track's is, since what
-/// the meters are about is whether anything is sounding at all and that is a question about the
-/// page rather than about one strip.
+/// The meter is written from outside, exactly as a track's is: there is one table of what each
+/// point on the routing is carrying, and a strip is told its point rather than measuring it.
 /// </remarks>
 public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.IStripSwitches
 {
@@ -28,9 +27,6 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
 
     /// <summary>Writes where the level has been put.</summary>
     private readonly Action<double> _write;
-
-    /// <summary>What the meter should show, as two peaks from 0 to 1.</summary>
-    private readonly Func<(float Left, float Right)> _meter;
 
     /// <summary>Told after a solo moves, so the whole row can be worked out again.</summary>
     /// <remarks>
@@ -55,7 +51,6 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
     /// <param name="maximum">The top of it.</param>
     /// <param name="read">Where the level stands now.</param>
     /// <param name="write">Where to put it when the fader moves.</param>
-    /// <param name="meter">What is going through, for the meter.</param>
     /// <param name="bus">
     /// The bus underneath, which is what gives the strip a pan and a mute. Nothing for a strip
     /// that is over something else, which is the recording input.
@@ -72,7 +67,6 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
         double maximum,
         Func<double> read,
         Action<double> write,
-        Func<(float Left, float Right)> meter,
         Audio.Interfaces.IOutputBus? bus = null,
         Action? soloed = null,
         Interfaces.IInputSource? source = null)
@@ -89,7 +83,6 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
 
         _read = read;
         _write = write;
-        _meter = meter;
     }
 
     /// <summary>What the badge says.</summary>
@@ -240,17 +233,21 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
     }
 
     /// <summary>
-    /// Reads the meter again, called by whatever is polling the page.
+    /// Shows a reading on the meter, given by whatever is watching this strip's point.
     /// </summary>
     /// <remarks>
-    /// The reading is taken once and put into both, rather than the meter being asked twice: the
-    /// two sides of one reading have to come from the same moment or a mono source drawn as
-    /// stereo flickers between them.
+    /// Both sides at once rather than one property apiece, since the two halves of one reading
+    /// have to come from the same moment: set separately, a mono source drawn as stereo flickers
+    /// between them.
+    ///
+    /// The strip reads nothing itself, and that is the arrangement rather than a detail. There is
+    /// one table of what each point on the routing is carrying and every meter is told from it,
+    /// so two meters over one point cannot end up showing it differently.
     /// </remarks>
-    public void ReadMeter()
+    /// <param name="l">The left side's peak, nought to one.</param>
+    /// <param name="r">The right side's.</param>
+    public void Show(float l, float r)
     {
-        var (l, r) = _meter();
-
         Left = l;
         Right = r;
     }

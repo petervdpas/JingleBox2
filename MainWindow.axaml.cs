@@ -505,6 +505,8 @@ public partial class MainWindow : Window
     {
         if (DataContext is not ViewModels.MainViewModel main || Mixer == null) return;
 
+        Mixer.Levels = main.Levels;
+        Mixer.DeskMaster = main.DeskMaster;
         Mixer.RecorderInput = main.RecorderInput;
         Mixer.Patchbay = main.Patchbay;
         Mixer.Input = main.Record;

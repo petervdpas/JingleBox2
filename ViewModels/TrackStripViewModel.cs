@@ -165,11 +165,18 @@ public sealed class TrackStripViewModel : ObservableObject, Interfaces.IStripSwi
     public bool IsMaster => Track < 0;
 
     /// <summary>
-    /// What is written at the top of the strip: MASTER, or the track in the same two-digit form
-    /// the pattern header and the instrument badges use.
+    /// What is written at the top of the strip: SONG, or the track in the same two-digit form the
+    /// pattern header and the instrument badges use.
     /// </summary>
+    /// <remarks>
+    /// **The song's master says SONG because MASTER is the desk's.** This strip is the sum of the
+    /// tracks and nothing else: it carries the song's effect chain, its automation and the
+    /// saturation, and it travels in the file. What the pads, a take and the input being listened
+    /// to are also summed onto is the desk, one further along, and it is the strip on the right.
+    /// One word for both is what left a master reading nought while a browser was audibly playing.
+    /// </remarks>
     public string Label => IsMaster
-        ? "MASTER"
+        ? "SONG"
         : "TR-" + (Track + 1).ToString("00", CultureInfo.InvariantCulture);
 
     /// <summary>Backing field for <see cref="InstrumentName"/>.</summary>
