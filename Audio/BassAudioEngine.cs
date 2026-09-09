@@ -442,23 +442,6 @@ public sealed class BassAudioEngine : IAudioEngine
     }
 
     /// <inheritdoc/>
-    public bool Feed(int stream, int rate)
-    {
-        int device;
-
-        lock (_lock)
-        {
-            var (kind, index) = _outputs.Which(_currentDeviceId);
-
-            if (kind != Enums.AudioOutputKind.Asio) return false;
-
-            device = index;
-        }
-
-        return _asio.Open(device, stream, rate);
-    }
-
-    /// <inheritdoc/>
     public int OutputFrames => _asio.Frames;
 
     /// <inheritdoc/>

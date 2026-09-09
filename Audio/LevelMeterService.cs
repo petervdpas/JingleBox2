@@ -1,4 +1,3 @@
-using ManagedBass;
 using System;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Records;
@@ -43,40 +42,6 @@ public sealed class LevelMeterService : ILevelMeterService
         }
 
         return new StereoLevel(Math.Clamp(left, 0, 1), Math.Clamp(right, 0, 1));
-    }
-
-    /// <inheritdoc/>
-    /// <remarks>
-    /// BASS packs the two sides into one value, the left in the high word and the right in the
-    /// low, and answers -1 for a channel that is not playing.
-    /// </remarks>
-    public StereoLevel GetStereoFromHandle(int channelHandle)
-    {
-        if (channelHandle == 0) return StereoLevel.Silent;
-
-        int level = Bass.ChannelGetLevel(channelHandle);
-        if (level < 0 || level == -1) return StereoLevel.Silent;
-
-        float left = ((level >> 16) & 0xFFFF) / 32768f;
-        float right = (level & 0xFFFF) / 32768f;
-
-        return new StereoLevel(Math.Clamp(left, 0, 1), Math.Clamp(right, 0, 1));
-    }
-
-    /// <inheritdoc/>
-    public float GetLevelFromHandle(int channelHandle)
-    {
-        if (channelHandle == 0) return 0;
-
-        int level = Bass.ChannelGetLevel(channelHandle);
-        if (level >= 0 && level != -1)
-        {
-            int left = (level >> 16) & 0xFFFF;
-            int right = level & 0xFFFF;
-            float peak = Math.Max(left, right) / 32768f;
-            return Math.Clamp(peak, 0, 1);
-        }
-        return 0;
     }
 
     /// <summary>One level said twice, which is what a mono signal reads as on a two bar meter.</summary>

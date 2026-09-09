@@ -86,13 +86,16 @@ public interface IOutputBus : IDisposable
     /// What is leaving this bus, as two peaks from 0 to 1, and silence where it is not open.
     /// </summary>
     /// <remarks>
-    /// **Which call this makes depends on where the bus stands, and the wrong one eats the
-    /// audio.** A bus that plays itself can be measured the ordinary way, from its playback
-    /// buffer. A bus that is a source on another one is a decoding channel, and there the
-    /// ordinary call measures by decoding data out and throwing it away, so a meter would take
-    /// blocks the mix never gets. That is not a theory: it is what the tracker's own meter did for
-    /// an afternoon, and it presented as the whole song wandering out of time rather than as
-    /// anything to do with a meter.
+    /// **Read off the audio going through the bus, so it is one answer wherever the bus stands
+    /// and on every platform.** A bus here is driven in one of three ways: it plays itself, it is
+    /// a source on another bus, or a driver pulls it. Every call BASS has for a level is right
+    /// for one of those and wrong for the other two, and the third is what made this worth
+    /// writing down: a bus a driver pulls is plugged into no mixer and is not playing itself
+    /// either, so both calls decline and the meter reads nought while the audio is perfectly
+    /// audible. That is an ASIO driver holding the output, which exists on Windows alone.
+    ///
+    /// What it reads is what is on the bus before the bus's own fader and mute, which is what
+    /// every call it replaces read as well.
     /// </remarks>
     (float Left, float Right) Reading { get; }
 

@@ -194,13 +194,7 @@ public sealed class RecorderBench
         public float GetLevelFromBytes(byte[]? data) => 0f;
 
         /// <inheritdoc/>
-        public float GetLevelFromHandle(int channelHandle) => 0f;
-
-        /// <inheritdoc/>
         public StereoLevel GetStereoFromBytes(byte[]? data, int channels) => new(0f, 0f);
-
-        /// <inheritdoc/>
-        public StereoLevel GetStereoFromHandle(int channelHandle) => new(0f, 0f);
     }
 
     /// <summary>A waveform service nothing here asks anything of.</summary>

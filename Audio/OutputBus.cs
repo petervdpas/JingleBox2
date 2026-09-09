@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
@@ -45,12 +46,38 @@ public sealed class OutputBus : IOutputBus
     /// <summary>Whether it is silenced, kept for the same reason.</summary>
     private bool _mute;
 
-    /// <summary>Whether a driver or another bus pulls this one, rather than it playing itself.</summary>
+    /// <summary>
+    /// The peak reader hung on the bus, kept because BASS holds it and calls it later.
+    /// </summary>
     /// <remarks>
-    /// Remembered from the opening, because it is what decides how this bus can be metered and
-    /// there is no way to ask a handle which it is.
+    /// Made once and kept, since a delegate made at the call to <c>Bass.ChannelSetDSP</c> is
+    /// collected while BASS is still holding it, and the next block is then a crash inside the
+    /// library.
     /// </remarks>
-    private bool _pulled;
+    private readonly DSPProcedure _peakProcedure;
+
+    /// <summary>The peak reader's own handle, or nought while the bus is not open.</summary>
+    private int _peak;
+
+    /// <summary>What the last block peaked at on the left, written by whichever thread mixes.</summary>
+    private volatile float _left;
+
+    /// <summary>And on the right.</summary>
+    private volatile float _right;
+
+    /// <summary>The block as BASS wrote it, kept so a reading does not allocate per block.</summary>
+    private float[] _block = Array.Empty<float>();
+
+    /// <summary>How loud a block was, which is the whole of what a meter reads.</summary>
+    private readonly IStereoPeak _peaks;
+
+    /// <summary>Builds a bus that is not open.</summary>
+    /// <param name="peaks">How a block is measured, or the ordinary walk.</param>
+    public OutputBus(IStereoPeak? peaks = null)
+    {
+        _peaks = peaks ?? new StereoPeak();
+        _peakProcedure = ReadPeak;
+    }
 
     /// <inheritdoc/>
     public bool Present
@@ -163,8 +190,6 @@ public sealed class OutputBus : IOutputBus
         {
             CloseLocked();
 
-            _pulled = pulled;
-
             var flags = BassFlags.Float | BassFlags.MixerNonStop | (pulled ? BassFlags.Decode : BassFlags.Default);
 
             try
@@ -187,6 +212,8 @@ public sealed class OutputBus : IOutputBus
             }
 
             SayLevelLocked();
+
+            WatchLocked();
 
             Bass.ChannelSetAttribute(_handle, ChannelAttribute.Pan, (float)_pan);
 
@@ -262,32 +289,103 @@ public sealed class OutputBus : IOutputBus
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// The bus reads itself, which is the whole of why it is the same answer everywhere. Nothing
+    /// here asks BASS what the level is, because that question has a different right form for
+    /// each of the three ways a bus can be driven and one of the three only happens on Windows.
+    /// </remarks>
     public (float Left, float Right) Reading
     {
         get
         {
-            int handle;
-            bool pulled;
-
             lock (_lock)
-            {
-                handle = _handle;
-                pulled = _pulled;
-            }
+                if (_handle == 0) return (0, 0);
 
-            if (handle == 0) return (0, 0);
-
-            int raw = pulled
-                ? ManagedBass.Mix.BassMix.ChannelGetLevel(handle)
-                : Bass.ChannelGetLevel(handle);
-
-            if (raw == -1) return (0, 0);
-
-            float left = ((raw >> 16) & 0xFFFF) / 32768f;
-            float right = (raw & 0xFFFF) / 32768f;
-
-            return (Math.Clamp(left, 0f, 1f), Math.Clamp(right, 0f, 1f));
+            return (_left, _right);
         }
+    }
+
+    /// <summary>Puts the peak reader on the bus, with the lock already held.</summary>
+    /// <remarks>
+    /// **A bus is metered from the audio going through it and never by asking BASS for a level,
+    /// and that is what makes the answer the same on every platform.** There are three ways a bus
+    /// here is driven and the ordinary call is right for exactly one of them. A bus that plays
+    /// itself can be asked, and the answer costs nothing. A bus that is a source on another one
+    /// is a decoding channel, where the ordinary call measures by decoding data out and throwing
+    /// it away, so the mix loses whatever the meter took: that is not a theory, it is what the
+    /// tracker's own meter did for an afternoon, and it presented as the whole song wandering out
+    /// of time rather than as anything to do with a meter. The add-on's own call is the answer
+    /// there, and it is the answer only there, because it wants a channel that is plugged into a
+    /// mixer and refuses anything else.
+    ///
+    /// The third way is the one that was left reading nought. **A bus a driver pulls is plugged
+    /// into nothing**: it is a decoding channel, so the ordinary call would eat the audio, and it
+    /// is a source on no mixer, so the add-on's call answers that it is not available. That is an
+    /// ASIO driver holding the output, which exists on Windows and nowhere else, so the meters on
+    /// the desk and on the patchbay went dead there with the audio playing perfectly.
+    ///
+    /// A reader on the block has none of those cases in it. It runs where the audio is, whatever
+    /// is pulling it, it takes nothing out of the mix, and it needs to know nothing about how the
+    /// bus was opened. What it reads is what is on the bus before the bus's own fader and mute,
+    /// which is what the calls it replaces read as well.
+    /// </remarks>
+    private void WatchLocked()
+    {
+        _left = 0;
+        _right = 0;
+
+        _peak = Bass.ChannelSetDSP(_handle, _peakProcedure);
+
+        if (_peak == 0)
+            Log.Write(LogArea.Audio, () => "bus: the meter would not go on the bus: " + Bass.LastError);
+    }
+
+    /// <summary>Takes the peak reader off, with the lock already held.</summary>
+    /// <remarks>
+    /// Freeing the stream would take it with it. Said out loud all the same, because the reading
+    /// has to fall to nought as well: a bus that is closed while something was going through it
+    /// would otherwise leave its last peak standing on a meter for the rest of the session.
+    /// </remarks>
+    private void UnwatchLocked()
+    {
+        if (_handle != 0 && _peak != 0) Bass.ChannelRemoveDSP(_handle, _peak);
+
+        _peak = 0;
+
+        _left = 0;
+        _right = 0;
+    }
+
+    /// <summary>One block on its way through, measured and left exactly as it was.</summary>
+    /// <remarks>
+    /// On whichever thread is mixing, so it allocates nothing once it has a block to copy into
+    /// and grows only where a longer one arrives.
+    ///
+    /// The bus is float and stereo, which is how it is opened, so the block is pairs, and how
+    /// loud a block of those is is <see cref="IStereoPeak"/> rather than a walk written out here:
+    /// that is the half that can be put a question to without a sound card.
+    /// </remarks>
+    /// <param name="handle">The reader's own handle, which is not used.</param>
+    /// <param name="channel">The bus, which is not used.</param>
+    /// <param name="buffer">The block.</param>
+    /// <param name="length">How many bytes of it there are.</param>
+    /// <param name="user">Nothing was handed over.</param>
+    private void ReadPeak(int handle, int channel, IntPtr buffer, int length, IntPtr user)
+    {
+        if (buffer == IntPtr.Zero || length <= 0) return;
+
+        int floats = length / sizeof(float);
+
+        if (floats < 2) return;
+
+        if (_block.Length < floats) _block = new float[floats];
+
+        Marshal.Copy(buffer, _block, 0, floats);
+
+        var (left, right) = _peaks.Of(_block, floats);
+
+        _left = left;
+        _right = right;
     }
 
     /// <inheritdoc/>
@@ -494,6 +592,8 @@ public sealed class OutputBus : IOutputBus
             Log.Write(LogArea.Audio, () => "bus: " + _sources.Count + " source(s) taken off as the bus closes");
 
         _sources.Clear();
+
+        UnwatchLocked();
 
         try
         {

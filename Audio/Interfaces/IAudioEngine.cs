@@ -70,18 +70,6 @@ public interface IAudioEngine : IDisposable
     string OutputsMissing => "";
 
     /// <summary>
-    /// Puts a decoding stream on the chosen driver, for an output that has to be fed.
-    /// </summary>
-    /// <remarks>
-    /// False where the chosen output is the system's, which plays its own streams and needs
-    /// nobody to pull them, and false where the driver refused. A caller that is told no has a
-    /// stream nothing is pulling, and its answer is to play it the ordinary way.
-    /// </remarks>
-    /// <param name="stream">The decoding stream to pull from.</param>
-    /// <param name="rate">The rate the mix is made at.</param>
-    bool Feed(int stream, int rate) => false;
-
-    /// <summary>
     /// How many frames a block is on the output that is really running, or nought where the
     /// output does not decide that for itself.
     /// </summary>

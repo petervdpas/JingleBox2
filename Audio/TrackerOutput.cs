@@ -192,6 +192,12 @@ public sealed class TrackerOutput(IRenderCost? cost = null) : ITrackerOutput
     /// Kept rather than asked, because <see cref="Level"/> is read from the drawing thread on a
     /// timer and has no audio engine to put the question to. Volatile because the thread that
     /// sets it is not the thread that reads it.
+    ///
+    /// **Those two are the whole of it, and there used to be a third.** The mix could be handed
+    /// straight to an ASIO driver, which left it decoding and pulled by something that is not a
+    /// mixer, and that is the one arrangement neither of the calls in <see cref="Level"/> can
+    /// read: the meter would have had to eat the audio to answer at all. It has been dead since
+    /// the driver was given the bus instead of the mix, so it is gone rather than guarded.
     /// </remarks>
     private volatile bool _onBus;
 
@@ -204,6 +210,10 @@ public sealed class TrackerOutput(IRenderCost? cost = null) : ITrackerOutput
     /// channel's buffer instead, and its documentation says exactly why in one line, that the
     /// mixer does not miss out on any data. That is what the
     /// <see cref="ManagedBass.BassFlags.MixerChanBuffer"/> given to every source is for.
+    ///
+    /// There is no third case here and that is what keeps this pair honest: the mix is a source
+    /// on the bus, or the bus refused it and it plays itself. A stream a driver pulls is neither,
+    /// and this stream is never that, because what the driver is given is the bus.
     ///
     /// It is worth saying what this sounded like, because nothing about it sounds like a meter.
     /// The status bar polls this several times a second, so several times a second a piece of the
@@ -268,15 +278,11 @@ public sealed class TrackerOutput(IRenderCost? cost = null) : ITrackerOutput
             if (_sizes.UpdateThreads > 0)
                 Bass.Configure(Configuration.UpdateThreads, _sizes.UpdateThreads);
 
-            bool onBus = audio.Output.IsOpen;
-            bool driven = onBus || audio.OutputKind == Enums.AudioOutputKind.Asio;
-
             _onBus = false;
 
             _procedure = Fill;
             _handle = Bass.CreateStream(SampleRate, Channels,
-                driven ? BassFlags.Float | BassFlags.Decode : BassFlags.Float,
-                _procedure, IntPtr.Zero);
+                BassFlags.Float | BassFlags.Decode, _procedure, IntPtr.Zero);
 
             Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
                 _handle == 0
@@ -295,41 +301,30 @@ public sealed class TrackerOutput(IRenderCost? cost = null) : ITrackerOutput
 
             StartMixingAhead();
 
-            if (onBus)
+            audio.Output.BufferMs = BufferMs;
+
+            if (audio.Output.Add(_handle))
             {
-                audio.Output.BufferMs = BufferMs;
-
-                if (audio.Output.Add(_handle))
-                {
-                    _onBus = true;
-
-                    Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
-                        () => "the tracker is on the output bus, which holds " + BufferMs + " ms");
-
-                    return;
-                }
+                _onBus = true;
 
                 Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
-                    "the bus would not take the tracker; playing it the ordinary way instead");
+                    () => "the tracker is on the output bus, which holds " + BufferMs + " ms");
+
+                return;
             }
 
-            if (!onBus && driven && audio.Feed(_handle, SampleRate)) return;
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
+                "the bus would not take the tracker; playing it the ordinary way instead");
 
-            if (driven)
+            Bass.StreamFree(_handle);
+
+            _procedure = Fill;
+            _handle = Bass.CreateStream(SampleRate, Channels, BassFlags.Float, _procedure, IntPtr.Zero);
+
+            if (_handle == 0)
             {
-                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
-                    "the driver would not take the mix; playing it the ordinary way instead");
-
-                Bass.StreamFree(_handle);
-
-                _procedure = Fill;
-                _handle = Bass.CreateStream(SampleRate, Channels, BassFlags.Float, _procedure, IntPtr.Zero);
-
-                if (_handle == 0)
-                {
-                    _procedure = null;
-                    return;
-                }
+                _procedure = null;
+                return;
             }
 
             Bass.ChannelSetAttribute(_handle, ChannelAttribute.Buffer, BufferMs / 1000f);
