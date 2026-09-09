@@ -81,15 +81,32 @@ public class WidenTests
     /// A tone is the wrong signal for this and measuring on one is what sent the first version of
     /// this effect wrong. Two taps of a sine subtracted give a comb, so the side signal swings
     /// with the tap separation and reads as the depth knob controlling the amount; on broadband
-    /// material it is flat, which is the truth. Seeded, so the same numbers come back on every
-    /// machine and twice running.
+    /// material it is flat, which is the truth.
+    ///
+    /// **The numbers are made here rather than asked of the runtime**, and that is deliberate.
+    /// The figures this file pins are properties of the effect, so the material they are measured
+    /// on has to be the same everywhere or they are properties of whatever generated it.
+    /// <c>System.Random</c> with a seed happens to be stable today, because seeded construction
+    /// keeps an older algorithm on purpose, but that is a promise somebody else makes and could
+    /// take back. Eight lines of arithmetic that cannot change is the whole cost of not depending
+    /// on it, and the suite runs on Linux as well as here.
+    ///
+    /// The upper bits are taken rather than the whole word: the low bits of a linear congruential
+    /// generator have short cycles, and a low bit that alternates would put a tone in what is
+    /// supposed to be noise.
     /// </remarks>
     private static Func<int, float> Noise()
     {
-        var random = new Random(7);
         var made = new float[Rate * 2];
 
-        for (int at = 0; at < made.Length; at++) made[at] = (float)((random.NextDouble() * 1.2) - 0.6);
+        uint state = 7;
+
+        for (int at = 0; at < made.Length; at++)
+        {
+            state = (state * 1664525u) + 1013904223u;
+
+            made[at] = (float)((((state >> 8) / (double)(1 << 24)) * 1.2) - 0.6);
+        }
 
         return at => made[at % made.Length];
     }

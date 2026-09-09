@@ -4206,9 +4206,49 @@ whole exercise and is worth writing down rather than summarising:
 - **A missing native library throws on the first call into it, not when the assembly loads**, so
   whether ASIO is there at all can only be found out by asking and seeing. `AsioDevices.Present`
   asks once and remembers, since the answer cannot change while the program runs and the question
-  costs a thrown exception where it is no. `Tests/AsioDevicesTests.cs` is that path and nothing
-  else: every machine the suite runs on has no ASIO, so what is pinned is that asking is safe,
-  the list is empty rather than an error, and opening one is refused rather than fatal
+  costs a thrown exception where it is no. `Tests/AsioDevicesTests.cs` is that path: asking is
+  safe, the list is empty rather than an error, and opening one is refused rather than fatal
+- **That paragraph used to say every machine the suite runs on has no ASIO, and it was not
+  true.** The machine it was written on has three drivers installed. What made it look true is
+  that `bassasio.dll` was copied beside the application and never beside the tests, so the first
+  call into it threw, the seam answered no, and three assertions were written on top of that
+  answer. **A test that reads as a fact about the code and is really a fact about a missing copy
+  step is worse than no test**, since it reports green for the rest of its life and nobody looks
+  again. Proved by adding the one missing `Copy` line to `Tests/JingleBox2.Tests.csproj`, at
+  which point `With_no_library_it_says_so` and `There_are_no_drivers_to_list` both failed at
+  once, on a machine where nothing whatever was wrong
+- **Fixing it went wrong once on the way, and that is the more useful half.** The replacement
+  asserted the driver list was not empty whenever the library reported itself present, which ran
+  two independent facts together: a library that loads and a driver that is installed. And
+  `bassasio.dll` **is checked into this repository**, so every Windows machine that clones it
+  reports present, and most of them have no ASIO driver at all. That test passed on the one
+  machine it was written on and would have failed for everybody else — the same fault as the
+  original, pointing the other way, introduced while fixing it. It lasted about ten minutes and
+  only because somebody asked whether a fresh clone would be surprised
+- So no test here claims how many drivers there are, since that is a fact about a machine.
+  What is asserted holds at nought and at three: the answer does not move under repeated asking,
+  there is a reason to show exactly when there is nothing here, no two drivers share an id,
+  anything listed is marked and numbered from `AudioOutputs.AsioFrom`, nonsense is refused,
+  nothing open has no block and no rate, and the list comes back the same way twice. What running
+  it on a machine with drivers buys is those same words meeting three real ones rather than an
+  empty list. One test is conditional, for the case with no library at all, which is what CI on
+  Linux runs and what the settings page has to survive
+- **The rule this leaves is worth more than the file.** A test may assert what the code decides
+  and must not assert what the machine happens to have, and the two are easy to mistake for one
+  another when only one machine has ever run it. The tell in both directions was the same: an
+  assertion that could only ever be true, or only ever false, wherever it was written
+- **Nothing in that file opens a driver, and the old file did.** `Open` reaches `BassAsio.Init`
+  before it can fail on anything else, and an ASIO driver is normally exclusive, so opening one
+  from a test takes the card off whatever had it: `Open(0, 12345, 48000)` was called twice and on
+  a machine with drivers it reached the hardware, grabbed it and let it go. What is exercised
+  instead is every refusal that happens above the init, which is the whole of what this seam
+  decides for itself
+- **The shape is worth more than the instance, and it is the shape this file already warns about
+  twice.** A native carried by hand is carried per output folder, and a test project has its own.
+  The application has three copy targets naming each library one by one; the test project had a
+  fourth naming three of the five, and the two it left out are the two nothing had ever tested.
+  `basswasapi.dll` is still not among them, which costs nothing today because no test reaches
+  WASAPI, and is the same gap waiting for the first one that does
 - **How big an ASIO block is is the driver's, and this program asks for nothing.** It used to pass
   the buffer slider's frame count straight into `BassAsio.Start`, so a card whose own panel was set
   to 256 was made to run blocks of 1024 because a slider about the system's output path happened to

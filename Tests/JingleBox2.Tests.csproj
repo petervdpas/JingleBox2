@@ -55,6 +55,18 @@
     <Copy SourceFiles="..\native\win-x64\bass.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="..\native\win-x64\bass_aac.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('..\native\win-x64\bass_aac.dll')" />
     <Copy SourceFiles="..\native\win-x64\bassmix.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('..\native\win-x64\bassmix.dll')" />
+    <!--
+      ASIO, which was the one this list was missing and the one it could least afford to. Three
+      of the ASIO tests asserted that there are no drivers at all, and they passed on a machine
+      with three of them installed: not because the machine has none, but because the library was
+      never beside the test binary, so the answer was always no. A test that reads as a fact about
+      the code and is really a fact about a missing copy step is worse than no test, which is what
+      the remarks above this target already say and what this line is the other half of.
+
+      Conditioned on existing, like the application's own copy of it: a checkout without the
+      library still builds, and the tests take their absent branch and say so.
+    -->
+    <Copy SourceFiles="..\native\win-x64\bassasio.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('..\native\win-x64\bassasio.dll')" />
   </Target>
 
 </Project>
