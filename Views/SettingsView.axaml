@@ -292,7 +292,11 @@
          often several ports with nearly identical names and only one of them carries the
          knobs; which one is a fact about the hardware and belongs in its file, not in
          somebody's guess. See Controllers/ControllerProfiles.cs. -->
-    <TabItem Header="Control Surfaces">
+    <!-- Called MIDI rather than Control Surfaces, because it is the MIDI page and has been for a
+         while: the old one held a pad mapping table, that went when the pads moved onto the link
+         layer, and what was left was the hardware and its jobs. The card inside keeps the older
+         name, since control surfaces is what that card is about and the clock below it is not. -->
+    <TabItem Header="MIDI">
         <ScrollViewer>
           <StackPanel Spacing="12">
 
@@ -472,6 +476,59 @@
             </Border>
 
           </views:Beside>
+
+          <!-- Whose clock the transport runs on, and which outputs are given it. Two settings
+               and not one: a machine either keeps its own time or follows somebody else's, which
+               has exactly two answers and has to be chosen; what it sends clock to is a separate
+               list, because being on your own clock has nothing to do with whether you are
+               passing time on to a drum machine. -->
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="cardTitle" Text="Clock" />
+                <views:HelpBadge Topic="settings.clock" />
+              </StackPanel>
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                         Text="Whether the transport keeps its own time or follows another machine's, and which outputs are sent this machine's clock. Nothing is sent until an output is ticked: clock arriving at a device nobody pointed it at is a device that starts running when its owner did not ask." />
+
+              <CheckBox Content="Follow another machine's clock"
+                        Margin="0,4,0,0"
+                        IsChecked="{Binding Midi.FollowsClock, Mode=TwoWay}"
+                        ToolTip.Tip="Off, the tracker keeps its own time, which is what every song has played on until now. On, the transport runs on clock arriving at one port: one port and not several, since a transport following two clocks is following neither." />
+
+              <StackPanel Spacing="4" Margin="0,4,0,0" IsVisible="{Binding Midi.FollowsClock}">
+                <TextBlock Classes="cardHint" Text="Following the clock on" />
+
+                <ComboBox Width="280"
+                          ItemsSource="{Binding Midi.ClockPorts}"
+                          SelectedItem="{Binding Midi.ClockPort, Mode=TwoWay}"
+                          PlaceholderText="Nothing chosen" />
+
+                <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                           Text="With no port chosen, or one that is not plugged in, the transport stays on its own clock rather than refusing to play: a cable left in the other room is not a decision to stop working." />
+              </StackPanel>
+
+              <TextBlock Classes="cardHint" Text="Send this machine's clock to" Margin="0,10,0,0" />
+
+              <ItemsControl ItemsSource="{Binding Midi.ClockOutputs}"
+                            IsVisible="{Binding Midi.HasClockOutputs}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ClockOutputViewModel">
+                    <CheckBox Content="{Binding Name}" IsChecked="{Binding IsDriven}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                         IsVisible="{Binding !Midi.HasClockOutputs}"
+                         Text="This machine is offering no MIDI outputs, so there is nothing to send a clock to." />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap" Margin="0,8,0,0"
+                         FontWeight="SemiBold"
+                         Text="{Binding Midi.ClockSaid}" />
+            </StackPanel>
+          </Border>
 
           </StackPanel>
         </ScrollViewer>

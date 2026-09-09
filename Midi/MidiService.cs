@@ -101,6 +101,25 @@ public sealed class MidiService : IMidiService
     }
 
     /// <inheritdoc/>
+    public IReadOnlyList<string> GetOutputDevices()
+    {
+        if (_access is null) return Array.Empty<string>();
+
+        try
+        {
+            return _access.Outputs
+                .Select(DisplayName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    /// <inheritdoc/>
     public IReadOnlyList<string> OpenDevices
     {
         get
@@ -230,6 +249,25 @@ public sealed class MidiService : IMidiService
 
             return false;
         }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The same open <see cref="Send"/> would have done, asked for early. Idempotent, since the
+    /// handle is kept: asking twice is the second answer handed back.
+    /// </remarks>
+    public bool OpenFor(string deviceIdOrName)
+    {
+        if (_access is null || string.IsNullOrWhiteSpace(deviceIdOrName)) return false;
+
+        string name = deviceIdOrName.Trim();
+
+        lock (_lock)
+        {
+            if (_outputs.ContainsKey(name)) return true;
+        }
+
+        return OpenOutput(name) != null;
     }
 
     /// <summary>

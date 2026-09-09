@@ -45,4 +45,39 @@ public sealed class MidiConfig
     /// song you open rather than of the one it was made in: see <see cref="ControlMapping"/>.
     /// </remarks>
     public List<ControlMapping> Controls { get; set; } = new();
+
+    /// <summary>
+    /// Whose clock the transport runs on: its own, or one named port's.
+    /// </summary>
+    /// <remarks>
+    /// Nought is its own, so every settings file written before this reads back as the tracker
+    /// keeping its own time, which is what it was doing.
+    /// </remarks>
+    public Enums.MidiClockSource ClockSource { get; set; } = Enums.MidiClockSource.Own;
+
+    /// <summary>
+    /// Which port's clock is followed, when one is.
+    /// </summary>
+    /// <remarks>
+    /// A name rather than an index, the same as everything else here, since a port's number moves
+    /// when something else is plugged in and its name does not. Meaningless while
+    /// <see cref="ClockSource"/> is its own, and kept anyway: unticking follow and ticking it
+    /// again should not make somebody find the port a second time.
+    /// </remarks>
+    public string? ClockPort { get; set; }
+
+    /// <summary>
+    /// Which outputs are sent clock, by name.
+    /// </summary>
+    /// <remarks>
+    /// **A list, and independent of <see cref="ClockSource"/>.** Any number of devices can be
+    /// driven at once, and whether this machine is keeping its own time has nothing to do with
+    /// whether it is passing time on: a transport following an external clock may still be the
+    /// only thing a drum machine is plugged into.
+    ///
+    /// Empty means nothing is sent, which is what a fresh installation does. Nothing here is
+    /// switched on for somebody: clock arriving at a device that was not expecting it is a device
+    /// that starts running when its owner did not ask.
+    /// </remarks>
+    public List<string> ClockOutputs { get; set; } = new();
 }

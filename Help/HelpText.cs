@@ -23,6 +23,9 @@ public sealed class HelpText : IHelpText
     public const string SettingsRecordingInput = "settings.recording-input";
     /// <summary>What each piece of hardware is allowed to do, and how one is pointed at a control.</summary>
     public const string SettingsControlSurfaces = "settings.control-surfaces";
+
+    /// <inheritdoc cref="SettingsControlSurfaces"/>
+    public const string SettingsClock = "settings.clock";
     /// <summary>Where the sound comes out, and what an ASIO driver is.</summary>
     public const string SettingsOutput = "settings.output";
     /// <summary>What this installation has, and how a box arrives or leaves.</summary>

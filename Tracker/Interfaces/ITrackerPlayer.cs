@@ -121,6 +121,25 @@ public interface ITrackerPlayer : IDisposable
     /// </remarks>
     AutomationPlayer? Automation { get; set; }
 
+    /// <summary>
+    /// What this machine puts on the wire when other gear runs on its clock, or nothing.
+    /// </summary>
+    /// <remarks>
+    /// **Settable rather than handed in**, because what it drives is a setting somebody changes
+    /// while the application is running, and the player has no business reading the settings
+    /// itself: something above it owns both and hands this over when the choice moves.
+    ///
+    /// Null and a deck driving nothing are the same thing, and both cost one comparison a line,
+    /// so a machine that has never opened the MIDI page pays nothing for this existing.
+    ///
+    /// The ticks are placed by the clock thread against the same stopwatch the lines are, which
+    /// is the whole reason this is here rather than on a thread of its own: a line is not a whole
+    /// number of ticks at every setting, and a second clock deriving ticks from the same tempo
+    /// would drift against the first. Two clocks that disagree is the fault a sync feature exists
+    /// to prevent.
+    /// </remarks>
+    Midi.Interfaces.IMidiClockDeck? ClockDeck { get; set; }
+
     /// <summary>Starts a song from that step, walking the order or staying on one pattern.</summary>
     /// <remarks>
     /// Whatever was running is taken down first, the recordings are read up front so the first

@@ -2,6 +2,10 @@ using System;
 using System.Collections.Generic;
 using JingleBox2.Midi;
 using JingleBox2.Midi.Enums;
+using JingleBox2.Config.Enums;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Audio.Records;
 using JingleBox2.Midi.Interfaces;
 
 namespace JingleBox2.Tests;
@@ -152,10 +156,16 @@ internal sealed class NoMidi : IMidiService
     public IReadOnlyList<string> GetInputDevices() => Array.Empty<string>();
 
     /// <inheritdoc/>
+    public IReadOnlyList<string> GetOutputDevices() => Array.Empty<string>();
+
+    /// <inheritdoc/>
     public IReadOnlyList<string> OpenDevices => Array.Empty<string>();
 
     /// <inheritdoc/>
     public bool Open(string device) => false;
+
+    /// <inheritdoc/>
+    public bool OpenFor(string device) => false;
 
     /// <inheritdoc/>
     public void Close(string device) { }
@@ -184,4 +194,131 @@ internal sealed class NoMidi : IMidiService
 
     /// <inheritdoc/>
     public void Dispose() { }
+}
+
+/// <summary>
+/// An audio engine that answers everything and plays nothing.
+/// </summary>
+/// <remarks>
+/// For a test that needs a real <c>TrackerPlayer</c>, and therefore a clock thread, and no
+/// hardware at all. Every member answers rather than throwing, which is the difference between
+/// this and <c>MissingSoundMachineTests.NoAudio</c>: that one throws on purpose, because what it
+/// is testing is that nothing reaches the audio at all, and an answer there would let a fault
+/// through unnoticed.
+///
+/// **Here rather than private to one test file**, because two test classes had already written
+/// the same silent engine out in full and a third was about to. The buses answer null, which is
+/// what a caller that only wants the transport to run never asks for.
+/// </remarks>
+internal sealed class SilentAudio : IAudioEngine
+{
+    /// <inheritdoc/>
+    public int PadCount => 0;
+
+    /// <inheritdoc/>
+    public float GetOutputLevel() => 0f;
+
+    /// <inheritdoc/>
+    public IEnumerable<AudioOutput> GetOutputDevices() => Array.Empty<AudioOutput>();
+
+    /// <inheritdoc/>
+    public void SetOutputDevice(int deviceId)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void EnsureInitialized()
+    {
+    }
+
+    /// <inheritdoc/>
+    public event EventHandler<PadPlaybackChanged>? PadPlaybackChanged { add { } remove { } }
+
+    /// <inheritdoc/>
+    public bool IsPadPlaying(int padIndex) => false;
+
+    /// <inheritdoc/>
+    public double GetPadProgress(int padIndex) => 0;
+
+    /// <inheritdoc/>
+    public float GetPadLevel(int padIndex) => 0f;
+
+    /// <inheritdoc/>
+    public float GetPadChannelVolume(int padIndex) => 0f;
+
+    /// <inheritdoc/>
+    public JingleBox2.Audio.Interfaces.IOutputBus Output => null!;
+
+    /// <inheritdoc/>
+    public JingleBox2.Audio.Interfaces.IOutputBus PadBus => null!;
+
+    /// <inheritdoc/>
+    public JingleBox2.Audio.Interfaces.IOutputBus TakeBus => null!;
+
+    /// <inheritdoc/>
+    public JingleBox2.Audio.Interfaces.IOutputBus MonitorBus => null!;
+
+    /// <inheritdoc/>
+    public JingleBox2.Audio.Interfaces.IMonitorFeed Monitor => null!;
+
+    /// <inheritdoc/>
+    public void PlaySample(int padIndex, string filePath, float volume)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void PlayStream(int padIndex, string url, float volume)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void StopSample(int padIndex)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void SetPadSource(int padIndex, PadSourceKind kind, string? source)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void SetPadVolume(int padIndex, float volume)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void SetPadLoop(int padIndex, bool loop)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void SetPadFadeIn(int padIndex, double seconds)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void SetPadFadeOut(int padIndex, double seconds)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void Resize(int newPadCount)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void SetPadInsert(int padIndex, IAudioInsert? insert)
+    {
+    }
+
+    /// <inheritdoc/>
+    public IAudioInsert? GetPadInsert(int padIndex) => null;
+
+    /// <inheritdoc/>
+    public int PadSampleRate(int padIndex) => 48000;
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+    }
 }

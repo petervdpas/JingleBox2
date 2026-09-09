@@ -90,6 +90,8 @@ public sealed partial class MidiViewModel : ObservableObject
         _cfg.Midi.Devices ??= new();
 
         ToggleMode = _cfg.Midi.ToggleMode;
+        clockSource = _cfg.Midi.ClockSource;
+        clockPort = _cfg.Midi.ClockPort;
 
         RefreshDevices();
 
@@ -108,6 +110,8 @@ public sealed partial class MidiViewModel : ObservableObject
             Devices.Add(new MidiPortViewModel(entry.Device, entry.IsConnected, entry.Role, OnDeviceRoleChanged, Forget));
 
         HasDevices = Devices.Count > 0;
+
+        RefreshClockOutputs();
 
         Regroup();
 
@@ -267,6 +271,155 @@ public sealed partial class MidiViewModel : ObservableObject
     /// the settings by the rows themselves, so this is the save and nothing more.
     /// </remarks>
     private void SaveMidi() => _store.Save(_cfg);
+
+    /// <summary>
+    /// Whose clock the transport runs on: its own, or one named port's.
+    /// </summary>
+    /// <remarks>
+    /// **One setting with two answers**, because a machine either keeps its own time or follows
+    /// somebody else's and there is no third answer. Deliberately not the same question as which
+    /// outputs are driven, which is a list below and is independent: a machine on its own clock
+    /// may drive two devices, and one following an external clock may pass it on.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FollowsClock))]
+    private MidiClockSource clockSource;
+
+    /// <summary>
+    /// The same setting as a tick, which is what the page offers.
+    /// </summary>
+    /// <remarks>
+    /// One box rather than two buttons, since there are exactly two answers and the unticked one
+    /// says itself: not following anybody is keeping your own time. It is also what every other
+    /// two-state setting on this page is drawn as.
+    ///
+    /// **Stored as <see cref="MidiClockSource"/> rather than as this bool**, which is not the
+    /// same fact written twice: what is kept has room for a third answer, and a settings file
+    /// holding a word rather than a flag can gain one without anything having to be converted.
+    /// </remarks>
+    public bool FollowsClock
+    {
+        get => ClockSource == MidiClockSource.Followed;
+        set => ClockSource = value ? MidiClockSource.Followed : MidiClockSource.Own;
+    }
+
+    /// <summary>The inputs a clock could be followed from.</summary>
+    public ObservableCollection<string> ClockPorts { get; } = new();
+
+    /// <summary>Which of them is followed, or nothing.</summary>
+    /// <remarks>
+    /// Kept when following is turned off rather than cleared, so turning it on again does not
+    /// make somebody find the port a second time.
+    /// </remarks>
+    [ObservableProperty] private string? clockPort;
+
+    /// <summary>Every output the machine has, with the driven ones ticked.</summary>
+    public ObservableCollection<ClockOutputViewModel> ClockOutputs { get; } = new();
+
+    /// <summary>True when there is any output at all to offer.</summary>
+    [ObservableProperty] private bool hasClockOutputs;
+
+    /// <summary>What the clock arrangement comes to, in one line for the page.</summary>
+    /// <remarks>
+    /// Said rather than left to be worked out from two controls, since the two together are the
+    /// thing somebody wants to check before a show and reading them apart is where a mistake
+    /// hides: following a port that is not plugged in looks the same as keeping your own time.
+    /// </remarks>
+    public string ClockSaid
+    {
+        get
+        {
+            int driven = ClockOutputs.Count(one => one.IsDriven);
+
+            string sending = driven == 0
+                ? "sending clock to nothing"
+                : "sending clock to " + driven + " output" + (driven == 1 ? "" : "s");
+
+            if (ClockSource == MidiClockSource.Own) return "Running on its own clock, " + sending + ".";
+
+            return string.IsNullOrWhiteSpace(ClockPort)
+                ? "Set to follow a clock with no port chosen, so it is running on its own, "
+                  + sending + "."
+                : "Following the clock on " + ClockPort + ", " + sending + ".";
+        }
+    }
+
+    /// <summary>Reads the outputs again, keeping whichever were ticked.</summary>
+    /// <remarks>
+    /// Called with the ports rather than only at startup, since an interface plugged in after the
+    /// page was opened should be there without a restart. A name that is stored and not on the
+    /// machine keeps its place in the settings and simply does not appear: a cable in the other
+    /// room is not a decision to stop driving it.
+    /// </remarks>
+    private void RefreshClockOutputs()
+    {
+        var stored = _cfg.Midi.ClockOutputs ??= new System.Collections.Generic.List<string>();
+
+        ClockOutputs.Clear();
+
+        foreach (string one in _midi.GetOutputDevices())
+        {
+            bool driven = stored.Any(name => string.Equals(name, one, StringComparison.OrdinalIgnoreCase));
+
+            ClockOutputs.Add(new ClockOutputViewModel(one, driven, OnClockOutputChanged));
+        }
+
+        HasClockOutputs = ClockOutputs.Count > 0;
+
+        ClockPorts.Clear();
+
+        foreach (string one in _midi.GetInputDevices()) ClockPorts.Add(one);
+
+        OnPropertyChanged(nameof(ClockSaid));
+    }
+
+    /// <summary>One output was ticked or unticked.</summary>
+    /// <remarks>
+    /// The whole list is written rather than the one row, since what is stored is the set of names
+    /// that are on and a set is not edited a member at a time without the two spellings drifting.
+    /// </remarks>
+    private void OnClockOutputChanged(ClockOutputViewModel row)
+    {
+        _cfg.Midi.ClockOutputs = ClockOutputs
+            .Where(one => one.IsDriven)
+            .Select(one => one.Name)
+            .ToList();
+
+        SaveMidi();
+
+        OnPropertyChanged(nameof(ClockSaid));
+
+        ClockChanged?.Invoke();
+    }
+
+    /// <summary>Told whenever the clock arrangement moves, so the transport can be handed it.</summary>
+    /// <remarks>
+    /// An event rather than this class reaching the player, which it has no business knowing
+    /// about: this page edits settings and something above it owns both.
+    /// </remarks>
+    public Action? ClockChanged { get; set; }
+
+    /// <summary>Whose clock it is moved, so it is stored and whoever drives is told.</summary>
+    partial void OnClockSourceChanged(MidiClockSource value)
+    {
+        _cfg.Midi.ClockSource = value;
+        SaveMidi();
+
+        OnPropertyChanged(nameof(ClockSaid));
+
+        ClockChanged?.Invoke();
+    }
+
+    /// <summary>The port followed moved, on the same terms.</summary>
+    partial void OnClockPortChanged(string? value)
+    {
+        _cfg.Midi.ClockPort = value;
+        SaveMidi();
+
+        OnPropertyChanged(nameof(ClockSaid));
+
+        ClockChanged?.Invoke();
+    }
 
     /// <summary>
     /// Says what arrived, so the page shows the wire.

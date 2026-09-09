@@ -38,11 +38,47 @@ public interface IMidiService : IDisposable
     /// <summary>Every input the machine is offering now, by name, sorted and without duplicates.</summary>
     IReadOnlyList<string> GetInputDevices();
 
+    /// <summary>
+    /// Every output the machine is offering now, on the same terms.
+    /// </summary>
+    /// <remarks>
+    /// **There was no way to ask this until something wanted to choose an output.** Everything
+    /// written out of here until now knew its destination without being told: a screen is written
+    /// to the port a profile names, and a control surface learns its output from whatever arrived
+    /// on the way in, which is the right answer there since a surface speaks and listens on one
+    /// port. Sending clock is the first job with a destination somebody has to pick, and a picker
+    /// needs a list.
+    ///
+    /// Kept apart from <see cref="GetInputDevices"/> rather than folded in with a direction on
+    /// each row, because the two are not one list: the four jobs a port can be given are all
+    /// things it does to us, and a port that plays no part in either direction has no business in
+    /// the other's list. The same hardware appears in both under nearly the same name and is two
+    /// ports, which is a fact about MIDI rather than something to tidy away.
+    /// </remarks>
+    IReadOnlyList<string> GetOutputDevices();
+
     /// <summary>The devices currently open, by name.</summary>
     IReadOnlyList<string> OpenDevices { get; }
 
     /// <summary>Opens a device and leaves the others alone. True when it is open afterwards.</summary>
     bool Open(string deviceIdOrName);
+
+    /// <summary>
+    /// Opens a device's output ahead of writing to it. True when it is open afterwards.
+    /// </summary>
+    /// <remarks>
+    /// **<see cref="Send"/> opens on demand, which is right everywhere but one place.** Opening a
+    /// MIDI output was measured at 80 ms on a real port and 197 on a software one, and the one
+    /// caller that cannot afford it is the clock: at 120 to the minute a tick is 20.8 ms, so an
+    /// open on the first tick of a pass is four to nine ticks missed, on the thread that also
+    /// triggers notes, at the moment somebody pressed play. The steady send is 0.24 ms and fits
+    /// there comfortably; the open does not.
+    ///
+    /// So anything that will write on a clock or an audio thread opens the port when it is chosen
+    /// rather than when it is first used. Everything else can go on letting <see cref="Send"/> do
+    /// it, since a screen being written to a moment late is nothing.
+    /// </remarks>
+    bool OpenFor(string deviceIdOrName);
 
     /// <summary>Closes one, and does nothing for a name that is not open.</summary>
     void Close(string deviceIdOrName);

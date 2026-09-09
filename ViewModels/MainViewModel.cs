@@ -278,6 +278,28 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     private PadDeck? _padDeck;
 
     /// <summary>
+    /// What goes on the wire when other gear runs on this machine's clock.
+    /// </summary>
+    /// <remarks>
+    /// Held here rather than made by either half, because it is what the settings page and the
+    /// transport have in common and neither owns the other: the page says which outputs, the
+    /// player says when.
+    /// </remarks>
+    private readonly Midi.Interfaces.IMidiClockDeck _clockDeck;
+
+    /// <summary>
+    /// Hands the deck whichever outputs are ticked, opening each one.
+    /// </summary>
+    /// <remarks>
+    /// Called once at startup and again whenever the setting moves, which is what makes ticking a
+    /// box take effect without a restart. **The opening happens here and never on the clock**:
+    /// opening a MIDI output was measured at eighty milliseconds on a real port, and a tick at
+    /// 120 to the minute lasts twenty. An open on the first tick of a pass is four ticks missed,
+    /// on the thread that also starts notes, at the moment somebody pressed play.
+    /// </remarks>
+    private void DriveTheClock() => _clockDeck.Drive(_cfg.Midi?.ClockOutputs);
+
+    /// <summary>
     /// What the four caps at the top of the window are working.
     /// </summary>
     /// <remarks>
@@ -2025,6 +2047,14 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         MachineShelf.Changed += () => Machines.Refresh();
 
         EffectShelf.Changed += () => Machines.Refresh();
+
+        _clockDeck = new Midi.MidiClockDeck(midiService);
+
+        Tracker.Player.ClockDeck = _clockDeck;
+
+        Midi.ClockChanged = DriveTheClock;
+
+        DriveTheClock();
 
         _padDeck = new PadDeck(Pads);
         Transport = new TransportSwitch(() => DeckForPage, Record, _padDeck, Tracker);
