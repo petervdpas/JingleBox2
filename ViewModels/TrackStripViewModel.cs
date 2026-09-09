@@ -36,18 +36,82 @@ public sealed class TrackStripViewModel : ObservableObject, Interfaces.IStripSwi
     private readonly Action _changed;
 
     /// <summary>
+    /// Told after the song moves one of these itself, playing a lane back.
+    /// </summary>
+    /// <remarks>
+    /// The sound and the picture want the same treatment either way; the undo step and the mark
+    /// saying there is something unsaved are what only a hand earns. Left out, a lane is
+    /// indistinguishable from a hand, which is what this application did until it was noticed
+    /// that playing a song marked it as changed.
+    /// </remarks>
+    private readonly Action _played;
+
+    /// <summary>
+    /// True while the write running is the song playing its own automation back.
+    /// </summary>
+    /// <remarks>
+    /// A depth flag rather than a second set of setters, so a lane and a hand travel through
+    /// exactly the same assignment, clamping and property change and cannot drift apart. Safe as
+    /// a plain field because every write to a strip lands on the drawing thread: a hardware
+    /// message and a lane both go through <see cref="Midi.Interfaces.IControlWrites"/> to get
+    /// here, so two of these are never in flight at once.
+    /// </remarks>
+    private bool _playing;
+
+    /// <summary>Runs one write as the song rather than as a hand.</summary>
+    /// <remarks>
+    /// Given the move to make rather than the value to make it with, so the caller hands over
+    /// the very same assignment a hand would have caused and there is no second spelling of
+    /// which value goes where.
+    /// </remarks>
+    /// <param name="move">The write, exactly as a hand would have made it.</param>
+    public void Played(Action move)
+    {
+        if (move is null) return;
+
+        _playing = true;
+
+        try
+        {
+            move();
+        }
+        finally
+        {
+            _playing = false;
+        }
+    }
+
+    /// <summary>Says the strip moved, to whichever of the two is right for this write.</summary>
+    private void Moved()
+    {
+        if (_playing) _played();
+        else _changed();
+    }
+
+    /// <summary>
     /// Builds a strip over one track's settings, or over the master when the track is -1.
     /// </summary>
     /// <remarks>
     /// Nothing keys the master and nothing is keyed off it, so it is given no ducking sources at
     /// all: everything has already been summed by the time the master is reached.
     /// </remarks>
-    public TrackStripViewModel(int track, TrackMix strip, string instrumentName, int trackCount, Action changed)
+    /// <param name="track">Which track this is, or -1 for the master.</param>
+    /// <param name="strip">The settings themselves, held by the song.</param>
+    /// <param name="instrumentName">What plays through it, for the badge.</param>
+    /// <param name="trackCount">How many tracks there are, for the ducking sources.</param>
+    /// <param name="changed">Told after a hand moves anything on the strip.</param>
+    /// <param name="played">
+    /// Told after the song moves something itself. Left out, a lane is treated as a hand, which
+    /// is what every caller with no automation behind it wants.
+    /// </param>
+    public TrackStripViewModel(int track, TrackMix strip, string instrumentName, int trackCount,
+                               Action changed, Action? played = null)
     {
         Track = track;
         _strip = strip;
         instrument = instrumentName;
         _changed = changed;
+        _played = played ?? changed;
 
         DuckKeys = track < 0 ? Array.Empty<DuckKey>() : BuildKeys(track, trackCount);
 
@@ -251,7 +315,7 @@ public sealed class TrackStripViewModel : ObservableObject, Interfaces.IStripSwi
 
             _strip.Mute = value;
             OnPropertyChanged();
-            _changed();
+            Moved();
         }
     }
 
@@ -297,7 +361,7 @@ public sealed class TrackStripViewModel : ObservableObject, Interfaces.IStripSwi
 
             _strip.Solo = value;
             OnPropertyChanged();
-            _changed();
+            Moved();
         }
     }
 
@@ -354,7 +418,7 @@ public sealed class TrackStripViewModel : ObservableObject, Interfaces.IStripSwi
             _strip.DuckFrom = track;
 
             OnPropertyChanged();
-            _changed();
+            Moved();
         }
     }
 
@@ -387,6 +451,6 @@ public sealed class TrackStripViewModel : ObservableObject, Interfaces.IStripSwi
         foreach (var name in changed)
             OnPropertyChanged(name);
 
-        _changed();
+        Moved();
     }
 }

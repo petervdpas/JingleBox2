@@ -228,7 +228,7 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
 
             if (_state != null) Send(BridgeCall.LoadState, _state);
 
-            foreach (var pair in _values) Send(BridgeCall.SetValue, _body.Number(pair.Key, pair.Value));
+            Send(BridgeCall.SetValues, _body.Values(_values));
 
             Send(BridgeCall.Flush, null);
 
@@ -265,6 +265,37 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
 
     /// <inheritdoc/>
     /// <remarks>
+    /// One round trip for the lot, which is the whole reason this is written out here rather
+    /// than left to the walk on the contract: that walk is one crossing per parameter, and a
+    /// plugin with five thousand of them turned writing a chain down into about a second of the
+    /// caller standing still.
+    ///
+    /// What comes back is written into the shadow copy, so a plugin that dies afterwards still
+    /// answers from what it last said. A plugin that cannot be asked hands back the shadow
+    /// itself, which is the last thing anybody set or the plugin reported and is a better answer
+    /// for a song being saved than an empty chain.
+    /// </remarks>
+    public IReadOnlyDictionary<uint, double> Values()
+    {
+        var answer = Ask(BridgeCall.Values, null);
+
+        if (answer.Call != BridgeCall.Values)
+        {
+            lock (_values) return new Dictionary<uint, double>(_values);
+        }
+
+        var values = _body.ReadValues(answer.Payload);
+
+        lock (_values)
+        {
+            foreach (var pair in values) _values[pair.Key] = pair.Value;
+        }
+
+        return values;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
     /// Only the plugin knows how it words a value, so there is nothing to fall back to: a
     /// plugin that cannot be asked gives an empty string and the panel prints the number.
     /// </remarks>
@@ -289,6 +320,28 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         lock (_values) _values[id] = value;
 
         Send(BridgeCall.SetValue, _body.Number(id, value));
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// One crossing for the lot, which is why this is written out here rather than left to the
+    /// walk on the contract: every message to the other side is answered, so that walk is one
+    /// round trip per parameter and a plugin with five thousand of them made opening a song into
+    /// about a second of standing still.
+    ///
+    /// The shadow is written before the message goes, exactly as the one at a time path does, so
+    /// what was asked for survives the plugin dying on the way and comes back with it.
+    /// </remarks>
+    public void SetValues(IReadOnlyDictionary<uint, double> values)
+    {
+        if (values.Count == 0) return;
+
+        lock (_values)
+        {
+            foreach (var pair in values) _values[pair.Key] = pair.Value;
+        }
+
+        Send(BridgeCall.SetValues, _body.Values(values));
     }
 
     /// <inheritdoc/>
@@ -666,7 +719,9 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
     /// </remarks>
     private static int Patience(BridgeCall call) => call switch
     {
-        BridgeCall.SaveState or BridgeCall.LoadState => PluginBridge.CallTimeoutMilliseconds,
+        BridgeCall.SaveState or BridgeCall.LoadState
+            or BridgeCall.Values or BridgeCall.SetValues =>
+            PluginBridge.CallTimeoutMilliseconds,
 
         _ => PluginBridge.QuickTimeoutMilliseconds
     };

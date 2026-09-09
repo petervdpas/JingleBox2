@@ -688,7 +688,9 @@ public sealed class ControlTargets : IControlTargets
 
         bool flips = mapping.Mix is MixControl.Mute or MixControl.Solo;
 
-        return new Target(name + " on " + Named(track), min, max, read, write, this, mapping, flips: flips);
+        return new Target(
+            name + " on " + Named(track), min, max, read, write, this, mapping, flips: flips,
+            played: value => strip.Played(() => write(value)));
     }
 
     /// <summary>
@@ -814,11 +816,16 @@ public sealed class ControlTargets : IControlTargets
         /// a transport key. It decides how the write travels to the drawing thread, and two
         /// presses inside one trip must both arrive where two positions must not.
         /// </param>
+        /// <param name="played">
+        /// Where a value goes when the song is playing its own automation back. Left out, a lane
+        /// writes exactly where a hand does, which is what everything but a mixer strip wants.
+        /// </param>
         public Target(string name, double min, double max, Func<double> read, Action<double> write,
                       ControlTargets desk, ControlMapping mapping, string unit = "", bool flips = false,
-                      bool pressed = false)
+                      bool pressed = false, Action<double>? played = null)
         {
             _pressed = pressed;
+            _played = played;
             Name = name;
             Min = min;
             Max = max;
@@ -894,6 +901,17 @@ public sealed class ControlTargets : IControlTargets
         /// and a press does not: see <see cref="IControlWrites"/>.
         /// </remarks>
         public void Set(double value) => _desk.Queue(_mapping, _write, value, _pressed);
+
+        /// <summary>Where a lane's write goes, when this target wanted a separate one.</summary>
+        private readonly Action<double>? _played;
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Queued exactly as <see cref="Set"/> is, and under the same mapping, so a lane and a
+        /// hand on the same control still coalesce against each other rather than both landing.
+        /// </remarks>
+        public void Played(double value) =>
+            _desk.Queue(_mapping, _played ?? _write, value, _pressed);
     }
 
     /// <summary>

@@ -28,6 +28,27 @@ public interface IPluginParameters
     /// </remarks>
     double ValueOf(uint id);
 
+    /// <summary>What every parameter stands at, by id.</summary>
+    /// <remarks>
+    /// The whole point of it is that a plugin in a process of its own answers this in one round
+    /// trip rather than one per parameter. Writing a chain down walks every parameter, and a
+    /// plugin with five thousand of them made that five thousand round trips: about a second of
+    /// the caller standing still, on every song save and every undo, measured pushing a block of
+    /// audio past its own budget.
+    ///
+    /// The walk here is what a plugin loaded into this process should do, since there is no
+    /// crossing to save and <see cref="ValueOf"/> is a call. A parameter that cannot be read is
+    /// left out rather than written down as nought, so a caller can tell silence from a reading.
+    /// </remarks>
+    IReadOnlyDictionary<uint, double> Values()
+    {
+        var values = new Dictionary<uint, double>();
+
+        foreach (var parameter in Parameters()) values[parameter.Id] = ValueOf(parameter.Id);
+
+        return values;
+    }
+
     /// <summary>How the plugin words a value: "-6.0 dB" rather than -6.</summary>
     /// <remarks>
     /// The only way a VST3 parameter can be printed at all, since every one of them is nought to
@@ -42,6 +63,21 @@ public interface IPluginParameters
     /// block rather than whenever a knob happens to be dragged.
     /// </remarks>
     void SetValue(uint id, double value);
+
+    /// <summary>Moves every one of these parameters.</summary>
+    /// <remarks>
+    /// <see cref="Values"/> the other way round, and it is here for the same reason: a plugin in
+    /// a process of its own answers this in one crossing, where the walk below is one apiece. A
+    /// chain being put back writes every parameter it saved, so opening a song or adding a plugin
+    /// with five thousand of them cost five thousand round trips.
+    ///
+    /// The walk is what a plugin loaded into this process should do, since there is no crossing
+    /// to save. Order is the caller's business: what arrives here is applied as it is given.
+    /// </remarks>
+    void SetValues(IReadOnlyDictionary<uint, double> values)
+    {
+        foreach (var pair in values) SetValue(pair.Key, pair.Value);
+    }
 
     /// <summary>
     /// The plugin moving one of its own knobs, in its own window. The parameter and its new

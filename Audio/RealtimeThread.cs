@@ -84,12 +84,97 @@ public sealed partial class RealtimeThread : IRealtimeThread
     [LibraryImport("libc", EntryPoint = "pthread_getschedparam")]
     private static partial int GetSchedule(IntPtr thread, out int policy, out SchedParam param);
 
+    /// <summary>
+    /// The switch that turns the Windows half off, which is a different mechanism and so a
+    /// different switch.
+    /// </summary>
+    /// <remarks>
+    /// Not <see cref="Variable"/>, deliberately, and the two are not two spellings of one thing.
+    /// That one guards the real-time scheduler, which runs a thread ahead of everything on the
+    /// machine and can starve the sound server it is feeding, so it is off until somebody asks.
+    /// This guards the multimedia class scheduler, which is what every audio program on Windows
+    /// uses, hands back a share rather than the machine, and is capped by the system itself. One
+    /// switch over both would mean either shipping the dangerous one on or leaving the ordinary
+    /// one off, and neither is what anybody wants.
+    ///
+    /// On unless it is turned off, which is the other way round from <see cref="Variable"/> and
+    /// is the whole of why: what was there before was nothing at all.
+    /// </remarks>
+    public const string WindowsVariable = "JB_MMCSS";
+
+    /// <summary>Whether the Windows half is wanted, which is yes unless it is refused outright.</summary>
+    private static bool WantedOnWindows =>
+        Environment.GetEnvironmentVariable(WindowsVariable) != "0";
+
+    /// <summary>What Windows calls the class an audio thread belongs in.</summary>
+    private const string ProAudio = "Pro Audio";
+
+    /// <summary>
+    /// Puts the calling thread in one of the system's multimedia classes. Nought means refused.
+    /// </summary>
+    /// <remarks>
+    /// The number handed in is the system's own index into the class, which it fills in and
+    /// which is passed back unchanged on a later call. Nought going in is what a caller with no
+    /// previous answer uses.
+    /// </remarks>
+    [LibraryImport("avrt.dll", EntryPoint = "AvSetMmThreadCharacteristicsW",
+                   StringMarshalling = StringMarshalling.Utf16)]
+    private static partial nint JoinClass(string task, ref uint index);
+
+    /// <summary>
+    /// What the system handed back, kept so the arrangement lasts as long as this does.
+    /// </summary>
+    /// <remarks>
+    /// Windows takes the arrangement away again when this handle is closed, so it has to outlive
+    /// the ask. It is never given back on purpose: the object is made on the thread it is about
+    /// and lives as long as that thread's own loop, and a thread that is ending is a thread whose
+    /// scheduling nobody cares about any more.
+    /// </remarks>
+    private nint _task;
+
+    /// <summary>
+    /// The same ask on Windows, which has its own mechanism for it and had none of this written.
+    /// </summary>
+    /// <remarks>
+    /// The real-time scheduler above is a Linux idea and there is no such thing here. What
+    /// Windows has instead is a class a thread says it belongs to, and the system then guarantees
+    /// that class a share of every interval rather than putting it in front of everything. Pro
+    /// Audio is the one meant for exactly this, and it is what every audio program on this
+    /// platform asks for.
+    ///
+    /// Nothing is thrown, including the library not being there: an answer of no is ordinary and
+    /// the program is correct without it.
+    /// </remarks>
+    private bool TakeOnWindows()
+    {
+        if (!WantedOnWindows) return false;
+
+        try
+        {
+            uint index = 0;
+
+            _task = JoinClass(ProAudio, ref index);
+
+            return _task != 0;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     /// <inheritdoc/>
+    /// <remarks>
+    /// Windows is answered first and on its own terms. It is not asking for the same thing, so it
+    /// is not behind the same switch: see <see cref="WindowsVariable"/>.
+    /// </remarks>
     public bool Take()
     {
+        if (OperatingSystem.IsWindows()) return TakeOnWindows();
+
         if (!Wanted) return false;
 
-        if (!OperatingSystem.IsLinux()) return TakeElsewhere();
+        if (!OperatingSystem.IsLinux()) return false;
 
         try
         {
@@ -109,19 +194,16 @@ public sealed partial class RealtimeThread : IRealtimeThread
     /// <inheritdoc/>
     public bool Possible => PossibleOn(OperatingSystem.IsLinux());
 
-    /// <summary>
-    /// The same ask on the platforms this one cannot make it on.
-    /// </summary>
-    /// <remarks>
-    /// Windows has its own answer for this, which is to say what the thread is for and let the
-    /// system schedule it accordingly, and it is not written here yet. Saying so is better than
-    /// a method that quietly answers false and reads as the system having refused.
-    /// </remarks>
-    private static bool TakeElsewhere() => false;
-
     /// <inheritdoc/>
+    /// <remarks>
+    /// Windows is what this holds rather than what the system says, since there is nothing to ask
+    /// it: the class a thread is in is not readable back, only the handle that keeps it.
+    /// </remarks>
     public string Said()
     {
+        if (OperatingSystem.IsWindows())
+            return _task != 0 ? "the " + ProAudio + " class" : "the ordinary scheduler";
+
         if (!OperatingSystem.IsLinux()) return "the ordinary scheduler";
 
         try

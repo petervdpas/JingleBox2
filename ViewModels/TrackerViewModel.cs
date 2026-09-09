@@ -3571,16 +3571,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         {
             var instrument = Song.InstrumentAt(Song.GetTrackInstrument(track));
             Strips.Add(new TrackStripViewModel(
-                track, Song.Mix[track], instrument?.Name ?? "", Song.TrackCount, OnMixChanged)
+                track, Song.Mix[track], instrument?.Name ?? "", Song.TrackCount,
+                OnMixChanged, OnMixPlayed)
             {
                 IsSelected = track == Cursor.Track
             });
         }
 
-        MasterStrip = new TrackStripViewModel(
-            TrackerPlayer.MasterStrip, Song.Master, "", Song.TrackCount, OnMixChanged);
-
-        MixShown?.Invoke();
+        ShowMaster();
     }
 
     /// <summary>
@@ -3599,10 +3597,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             strip.InstrumentName = instrument?.Name ?? "";
         }
 
-        MasterStrip = new TrackStripViewModel(
-            TrackerPlayer.MasterStrip, Song.Master, "", Song.TrackCount, OnMixChanged);
-
-        MixShown?.Invoke();
+        ShowMaster();
     }
 
     /// <summary>
@@ -3625,11 +3620,46 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         Changing("the mix");
 
-        _player.ApplyMix();
         MarkDirty();
 
+        OnMixPlayed();
+    }
+
+    /// <summary>
+    /// The same fader moving because the song is playing a lane back rather than because
+    /// somebody moved it.
+    /// </summary>
+    /// <remarks>
+    /// Everything a hand's move does except the two things only a hand earns: the undo step and
+    /// the mark saying there is something unsaved. Without this, playing a song wrote itself
+    /// into its own undo history and left it dirty for ever, so the rescue copy was written
+    /// every twenty seconds and each of those walked every plugin on every track.
+    ///
+    /// The sound and the picture are not left out. The mix still has to reach what is already
+    /// sounding, the master strip still has to read itself again, and a control surface still
+    /// wants its motor moved: a lane that moved the number and not the fader would look like a
+    /// lane that had not been played at all.
+    /// </remarks>
+    private void OnMixPlayed()
+    {
+        _player.ApplyMix();
+
+        ShowMaster();
+    }
+
+    /// <summary>
+    /// Builds the master strip again and says the mix has moved.
+    /// </summary>
+    /// <remarks>
+    /// Rebuilt rather than left alone because the master is made over the song's own
+    /// <c>Master</c> and anything holding one after a song is opened is holding the last song's.
+    /// It was written out in full in three places, one of them the path a fader drag and a lane
+    /// both run through, which is three chances for the three to stop agreeing.
+    /// </remarks>
+    private void ShowMaster()
+    {
         MasterStrip = new TrackStripViewModel(
-            TrackerPlayer.MasterStrip, Song.Master, "", Song.TrackCount, OnMixChanged);
+            TrackerPlayer.MasterStrip, Song.Master, "", Song.TrackCount, OnMixChanged, OnMixPlayed);
 
         MixShown?.Invoke();
     }

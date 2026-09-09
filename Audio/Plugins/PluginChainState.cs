@@ -172,10 +172,14 @@ public sealed class PluginChainState : IPluginChainState
                 Bypassed = device.Bypassed
             };
 
+            var values = effect.Values();
+
             foreach (var parameter in effect.Parameters())
             {
+                if (!values.TryGetValue(parameter.Id, out double value)) continue;
+
                 saved.Parameters[parameter.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)] =
-                    effect.ValueOf(parameter.Id);
+                    value;
             }
 
             if (patches) saved.State = effect.SaveState();
@@ -271,14 +275,18 @@ public sealed class PluginChainState : IPluginChainState
 
             if (saved.State is { Length: > 0 }) effect.LoadState(saved.State);
 
+            var wanted = new Dictionary<uint, double>(saved.Parameters.Count);
+
             foreach (var (id, value) in saved.Parameters)
             {
                 if (uint.TryParse(id, System.Globalization.NumberStyles.Integer,
                         System.Globalization.CultureInfo.InvariantCulture, out uint parameter))
                 {
-                    effect.SetValue(parameter, value);
+                    wanted[parameter] = value;
                 }
             }
+
+            effect.SetValues(wanted);
 
             effect.FlushParameters();
 

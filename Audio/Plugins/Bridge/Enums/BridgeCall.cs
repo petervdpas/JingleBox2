@@ -79,5 +79,35 @@ public enum BridgeCall : byte
     Edited = 24,
 
     /// <summary>Child to parent, unasked: everything about the plugin may have changed at once.</summary>
-    Reloaded = 25
+    Reloaded = 25,
+
+    /// <summary>
+    /// Parent to child: what every parameter stands at. Child to parent: the answer, which is
+    /// every id and its value.
+    /// </summary>
+    /// <remarks>
+    /// One call for the lot rather than <see cref="ValueOf"/> per parameter, and it is the same
+    /// member both ways for the same reason <see cref="Parameters"/> is: the question and the
+    /// answer are about one thing and a second name for the answer would be a second thing to
+    /// keep in step.
+    ///
+    /// It exists because writing a chain down asked one parameter at a time. A plugin with five
+    /// thousand of them cost five thousand round trips to save a song or take one undo step,
+    /// which is about a second of the caller standing still and was measured pushing a block of
+    /// audio past its own budget.
+    /// </remarks>
+    Values = 26,
+
+    /// <summary>Parent to child: move every one of these parameters, in one message.</summary>
+    /// <remarks>
+    /// <see cref="Values"/>'s other half, and it exists for the same measurement read the other
+    /// way round. Putting a chain back wrote one parameter at a time, and every one of those is a
+    /// round trip because the child answers everything: a plugin with five thousand parameters
+    /// cost five thousand of them to open a song or to add the plugin to a track.
+    ///
+    /// A separate member rather than <see cref="Values"/> with a payload on it. One name meaning
+    /// ask when it is empty and set when it is not is the kind of cleverness that is read wrongly
+    /// once and then carried for years.
+    /// </remarks>
+    SetValues = 27
 }

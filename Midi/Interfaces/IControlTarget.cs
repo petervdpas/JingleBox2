@@ -32,6 +32,26 @@ public interface IControlTarget
     void Set(double value);
 
     /// <summary>
+    /// Moves it because the song is playing its own automation back, rather than because a hand
+    /// moved something.
+    /// </summary>
+    /// <remarks>
+    /// The two are the same write and they are not the same act, and until this existed there
+    /// was no way to tell them apart: a lane replaying a fader called <see cref="Set"/>, the
+    /// mixer read that as somebody having moved it, and the song was marked as having unsaved
+    /// changes in it by the act of playing what it already held. From a chair that is a song
+    /// that can never be left alone, and it costs more than a flag: the rescue copy is written
+    /// every twenty seconds for ever, and each of those walks every plugin on every track.
+    ///
+    /// A hand and a lane still want the same sound and the same picture. What only a hand wants
+    /// is the undo step and the mark, so this exists to leave those out and nothing else.
+    ///
+    /// <see cref="Set"/> by default, so a target that has not thought about it behaves exactly
+    /// as it did and a lane pointed at one is no worse off than before.
+    /// </remarks>
+    void Played(double value) => Set(value);
+
+    /// <summary>
     /// Whether this is a switch: two states, rather than a range with values in between.
     /// </summary>
     /// <remarks>

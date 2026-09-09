@@ -183,7 +183,13 @@ public static class PluginHostProcess
 
         string folder = Environment.GetEnvironmentVariable(PluginBridge.LogFolderVariable) ?? "";
 
+        var clock = new ClockResolution();
+
+        clock.Take();
+
         Log.Open(folder.Length > 0 ? folder : new Files.AppFolder().Path(), _trace, LogArea.Plugins);
+
+        Log.Write(LogArea.Plugins, () => "waits here are measured against " + clock.Said());
 
         try
         {
@@ -558,6 +564,15 @@ public static class PluginHostProcess
                 control.Send(BridgeCall.Value, _body.Double(plugin.ValueOf(ask.Id)));
                 break;
             }
+
+            case BridgeCall.Values:
+                control.Send(BridgeCall.Values, _body.Values(plugin.Values()));
+                break;
+
+            case BridgeCall.SetValues:
+                plugin.SetValues(_body.ReadValues(payload));
+                control.Send(BridgeCall.Ok);
+                break;
 
             case BridgeCall.TextFor:
             {

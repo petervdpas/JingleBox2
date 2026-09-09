@@ -48,12 +48,22 @@ public sealed class PluginParameterViewModel : ObservableObject
     /// a value has nothing to save, and telling it about a move it caused by asking would be a
     /// chain that reports itself changed every time it is drawn.
     /// </param>
-    public PluginParameterViewModel(IPluginParameters effect, PluginParameter parameter, Action? changed = null)
+    /// <param name="value">
+    /// Where the parameter already stands, for a caller that has just read the whole plugin.
+    /// </param>
+    /// <remarks>
+    /// Left out, the plugin is asked, which for one in a process of its own is a round trip. A
+    /// caller building a panel is building up to <c>MaxShown</c> of these at once, so it reads
+    /// <see cref="IPluginParameters.Values"/> once and hands each row its own number: two
+    /// hundred and fifty six crossings for a page of knobs, or one.
+    /// </remarks>
+    public PluginParameterViewModel(
+        IPluginParameters effect, PluginParameter parameter, Action? changed = null, double? value = null)
     {
         _effect = effect;
         _parameter = parameter;
         _changed = changed;
-        _value = effect.ValueOf(parameter.Id);
+        _value = value ?? effect.ValueOf(parameter.Id);
     }
 
     /// <summary>What the plugin calls it, which is the label on the knob.</summary>

@@ -476,6 +476,49 @@ public sealed class BridgeBody : IBridgeBody
 
         return parameters.ToArray();
     }
+
+    /// <inheritdoc/>
+    public byte[] Values(System.Collections.Generic.IReadOnlyDictionary<uint, double> values)
+    {
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream, Encoding.UTF8);
+
+        writer.Write(values.Count);
+
+        foreach (var pair in values)
+        {
+            writer.Write(pair.Key);
+            writer.Write(pair.Value);
+        }
+
+        return stream.ToArray();
+    }
+
+    /// <inheritdoc/>
+    public System.Collections.Generic.IReadOnlyDictionary<uint, double> ReadValues(byte[] payload)
+    {
+        var values = new System.Collections.Generic.Dictionary<uint, double>();
+
+        try
+        {
+            using var stream = new MemoryStream(payload);
+            using var reader = new BinaryReader(stream, Encoding.UTF8);
+
+            int count = reader.ReadInt32();
+
+            for (int index = 0; index < count; index++)
+            {
+                uint id = reader.ReadUInt32();
+
+                values[id] = reader.ReadDouble();
+            }
+        }
+        catch (Exception)
+        {
+        }
+
+        return values;
+    }
 }
 
 /// <summary>

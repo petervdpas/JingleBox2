@@ -93,7 +93,7 @@ public sealed class AutomationPlayer : IAutomationPlayer
             if (value == known.Written) continue;
 
             known.Written = value;
-            target.Set(value);
+            target.Played(value);
         }
     }
 }

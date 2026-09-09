@@ -93,4 +93,22 @@ public interface IBridgeBody
     /// next to each other for that reason.
     /// </remarks>
     PluginParameter[] ReadParameters(byte[] payload);
+
+    /// <summary>Every parameter's id and what it stands at, as one message.</summary>
+    /// <remarks>
+    /// Ids and doubles alone, with none of a parameter's description in it: whoever asks this
+    /// already has <see cref="Parameters"/> and wants only the numbers that move.
+    /// </remarks>
+    byte[] Values(IReadOnlyDictionary<uint, double> values);
+
+    /// <summary>
+    /// Reads back what <see cref="Values"/> wrote, keeping however many pairs were whole.
+    /// </summary>
+    /// <remarks>
+    /// Grown rather than made to the count on the wire, and read inside one try, for the reason
+    /// <see cref="ReadParameters"/> is: a payload from a process that has just fallen over is
+    /// exactly what a damaged one looks like, and a count read off it would otherwise buy an
+    /// array of whatever four broken bytes happen to say.
+    /// </remarks>
+    IReadOnlyDictionary<uint, double> ReadValues(byte[] payload);
 }

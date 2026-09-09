@@ -456,6 +456,8 @@ public sealed partial class PluginControlsViewModel : ObservableObject
 
         Total = 0;
 
+        var values = Plugin.Values();
+
         foreach (var parameter in Plugin.Parameters())
         {
             if (parameter.IsHidden || parameter.IsBypass) continue;
@@ -464,7 +466,9 @@ public sealed partial class PluginControlsViewModel : ObservableObject
 
             if (Parameters.Count >= MaxShown) continue;
 
-            var row = new PluginParameterViewModel(Plugin, parameter, _changed);
+            var row = new PluginParameterViewModel(
+                Plugin, parameter, _changed,
+                values.TryGetValue(parameter.Id, out double stands) ? stands : null);
 
             Parameters.Add(row);
             _rows[parameter.Id] = row;

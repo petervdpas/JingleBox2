@@ -174,7 +174,14 @@ public partial class MainWindow : Window
 
         Audio.RealtimeThread.Wants(cfg.RealtimeAudio);
 
+        var clock = new Audio.ClockResolution();
+
+        clock.Take();
+
         Diagnostics.Log.Open(new Files.AppFolder().Path(), cfg.WriteLog, Areas(cfg));
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App,
+            () => "waits here are measured against " + clock.Said());
 
         Audio.TangentSwitch.Wants(cfg.FastDriveCurve);
         Audio.OverlapSwitch.Wants(cfg.OverlapPlugins);
