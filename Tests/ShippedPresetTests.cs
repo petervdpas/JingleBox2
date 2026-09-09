@@ -69,6 +69,7 @@ public class ShippedPresetTests
     [InlineData("Roaster")]
     [InlineData("Shifter")]
     [InlineData("Ringer")]
+    [InlineData("Widener")]
     public void Every_shipped_effect_brings_presets(string name)
     {
         string folder = Path.Combine(Shipped, name);

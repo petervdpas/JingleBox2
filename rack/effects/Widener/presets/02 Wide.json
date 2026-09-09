@@ -1,0 +1,10 @@
+{
+  "Name": "Wide",
+  "Effect": "effect.widener",
+  "width": 0.7,
+  "depth": 4.0,
+  "rate": 0.5,
+  "haas": 0.0,
+  "side": 0,
+  "mix": 1.0
+}

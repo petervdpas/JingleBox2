@@ -1,0 +1,10 @@
+{
+  "Name": "Half Open",
+  "Effect": "effect.widener",
+  "width": 0.7,
+  "depth": 3.0,
+  "rate": 0.4,
+  "haas": 0.0,
+  "side": 0,
+  "mix": 0.5
+}

@@ -29,6 +29,7 @@ public sealed class SoundEffectEngines : ISoundEffectEngines
             [Driven] = (id, rate, _) => new Drive(rate, id),
             [Shifted] = (id, rate, _) => new Shift(rate, id),
             [Ringed] = (id, rate, _) => new Ring(rate, id),
+            [Widened] = (id, rate, _) => new Widen(rate, id),
         };
 
     /// <summary>
@@ -57,6 +58,9 @@ public sealed class SoundEffectEngines : ISoundEffectEngines
     /// <remarks><inheritdoc cref="EchoBox" path="/remarks"/></remarks>
     public const string Ringer = "effect.ringer";
 
+    /// <inheritdoc cref="EchoBox"/>
+    public const string Widener = "effect.widener";
+
     /// <summary>A delay line, which is what EchoBox is a face over.</summary>
     /// <remarks>
     /// An engine name and not an effect id. It is written into the application because the class
@@ -80,6 +84,9 @@ public sealed class SoundEffectEngines : ISoundEffectEngines
     /// <summary>A ring modulator, which is what Ringer is a face over.</summary>
     /// <remarks><inheritdoc cref="Delayed" path="/remarks"/></remarks>
     public const string Ringed = "ring";
+
+    /// <inheritdoc cref="Delayed"/>
+    public const string Widened = "widen";
 
     /// <summary>What this run has registered, for turning an id into an engine.</summary>
     /// <remarks>

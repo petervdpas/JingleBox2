@@ -1,0 +1,10 @@
+{
+  "Name": "Drifting",
+  "Effect": "effect.widener",
+  "width": 0.6,
+  "depth": 4.5,
+  "rate": 0.08,
+  "haas": 0.0,
+  "side": 0,
+  "mix": 1.0
+}

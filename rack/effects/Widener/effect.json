@@ -1,0 +1,206 @@
+{
+  "Id": "effect.widener",
+  "Name": "Widener",
+  "Summary": "A mono source put across the room instead of in the middle of your head.",
+  "Author": "Peter van de Pas",
+  "Version": "1.0",
+  "Engine": "widen",
+  "Theme": {
+    "Accent": "#4FA8C2",
+    "Face": 0.68,
+    "Panel": 0.52,
+    "Edge": 0.1,
+    "Mark": 0.35,
+    "Row": 0.18,
+    "RowOver": 0.3,
+    "RowPicked": 0.58
+  },
+  "Parameters": [
+    {
+      "Key": "width",
+      "Name": "Width",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0.5,
+      "Step": 0.01
+    },
+    {
+      "Key": "depth",
+      "Name": "Depth",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 5,
+      "Default": 3,
+      "Step": 0.1
+    },
+    {
+      "Key": "rate",
+      "Name": "Rate",
+      "Unit": "Hz",
+      "Min": 0.05,
+      "Max": 2,
+      "Default": 0.35,
+      "Step": 0.01
+    },
+    {
+      "Key": "haas",
+      "Name": "Haas",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 35,
+      "Default": 0,
+      "Step": 0.5
+    },
+    {
+      "Key": "side",
+      "Name": "Haas on",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "mix",
+      "Name": "Mix",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 1,
+      "Step": 0.01
+    }
+  ],
+  "Panel": {
+    "Root": {
+      "Element": "Column",
+      "Parameter": "",
+      "Label": "",
+      "Properties": {
+        "gap": "10",
+        "align": "stretch"
+      },
+      "Children": [
+        {
+          "Element": "Menu",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "corner": "topRight"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Label",
+          "Parameter": "",
+          "Label": "Widener",
+          "Properties": {
+            "style": "section"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Preset",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {},
+          "Children": []
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Width"
+          },
+          "Children": [
+            {
+              "Element": "Strip",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "cell": "26",
+                "gap": "6",
+                "columns": "3 3 3 3 4 3"
+              },
+              "Children": [
+                {
+                  "Element": "Knob",
+                  "Parameter": "width",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How much side signal is made, which is how wide it sounds. This is the amount knob and Depth is not, which was measured rather than assumed. Opening a sound costs peak level, because the two sides are the middle plus and minus the side: about 1.8 dB a quarter of the way up, 3.4 at half, and 5.9 at the top."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "depth",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How far the two taps travel. Not the amount: on anything broadband the width is the same whatever this is set to, because two copies of a signal are unrelated at any separation past a few samples. What it changes is the character of the movement, which shows on sustained sounds."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "rate",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How quickly the two lengths move. Slow is a picture that drifts, which is what you want on a voice; fast enough and it stops reading as width and starts reading as movement."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "haas",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "A plain delay on one side. The strongest way to place a sound, because the ear decides where something is by which side reached it first, and the one that collapses: heard in mono the two arrivals add and comb whole bands out of the sound. Off unless you have listened to it folded down."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Choice",
+                  "Parameter": "side",
+                  "Label": "",
+                  "Properties": {
+                    "span": "4",
+                    "options": "Right,Left",
+                    "width": "100",
+                    "tip": "Which side the plain delay goes on, which decides which way the sound leans. The other side is the one that reaches the ear first, so a delay on the right leans the sound left."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "mix",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How much of what you hear has been opened. Kept back, the middle comes back: what is put back is the signal exactly as it arrived, so this is the one control here that can make the picture narrower again."
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
