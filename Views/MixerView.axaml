@@ -161,11 +161,17 @@
               </ComboBox>
             </StackPanel>
 
+            <!-- The tooltip says why when it is greyed, because it greys for two reasons that
+                 look identical: no output chosen under Send it to, which is a picker two lines
+                 up, and a machine that cannot move a program at all, which is nobody's to fix.
+                 ToolTip.ShowOnDisabled, or the one state where the sentence is worth reading is
+                 the one state nothing shows it. -->
             <CheckBox Content="Only here"
                       Classes="strip"
                       IsEnabled="{Binding Source.CanTakeAside}"
                       IsChecked="{Binding Source.TakeAside, Mode=TwoWay}"
-                      ToolTip.Tip="Take this source off its own output, so it is heard through JingleBox2 and nowhere else. Put back when you close the application." />
+                      ToolTip.ShowOnDisabled="True"
+                      ToolTip.Tip="{Binding Source.AsideHint}" />
           </StackPanel>
         </Grid>
       </Border>

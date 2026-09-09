@@ -16,7 +16,9 @@ IN is the desk's input channel and its fader is the input's own gain, so it deci
 what a take holds. At the foot of it are the source it is listening to, **Hear it**,
 which puts what is coming in through the Recording Effects chain and out of the
 master, and **Only here**, which takes that source off its own output so it is heard
-through this application and nowhere else. Its mute, its placement and a solo are
+through this application and nowhere else. On Windows that switch does not work at the
+moment and resting the pointer on it says why; there is a way to do the same thing by
+hand under Recording input in SETTINGS. Its mute, its placement and a solo are
 about what Hear it is sending; with that off, nothing of it is in the mix.
 
 The difference matters when you pull a fader down. A track is the song's, so moving it

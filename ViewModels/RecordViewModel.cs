@@ -1876,6 +1876,18 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// <summary>Whether this machine can take a source off everything but this application.</summary>
     public bool CanTakeAside => _routing.CanTakeAside;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The wording is here rather than in the routing, which answers why it cannot be done and
+    /// says nothing about what a switch is for; put together where the switch is drawn, so
+    /// neither half has to know about the other.
+    /// </remarks>
+    public string AsideHint =>
+        CanTakeAside
+            ? "Take this source off its own output, so it is heard through JingleBox2 and "
+              + "nowhere else. Put back when you close the application."
+            : "Not available: " + _routing.AsideNote + ".";
+
     /// <summary>Where a source is sent so nobody hears it, or nothing on a machine with a graph.</summary>
     private ISilentOutput? _silent;
 
@@ -1896,6 +1908,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         OnPropertyChanged(nameof(SilentOutputs));
         OnPropertyChanged(nameof(SilentOutput));
         OnPropertyChanged(nameof(CanTakeAside));
+        OnPropertyChanged(nameof(AsideHint));
     }
 
     /// <inheritdoc/>
@@ -1925,6 +1938,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             OnPropertyChanged();
             OnPropertyChanged(nameof(CanTakeAside));
+            OnPropertyChanged(nameof(AsideHint));
 
             Aside();
         }

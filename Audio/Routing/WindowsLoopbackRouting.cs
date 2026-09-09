@@ -236,6 +236,23 @@ public sealed class WindowsLoopbackRouting : IAudioRouting
 
     /// <inheritdoc/>
     /// <remarks>
+    /// The two halves of <see cref="CanTakeAside"/> said apart, because only one of them is
+    /// anybody's to fix. No output chosen is a picker two lines above the switch; no way to point
+    /// a program is this installation, and telling somebody to choose an output when the answer
+    /// would not be taken either is sending them somewhere pointless.
+    ///
+    /// The order is the order they can be acted on: what somebody can do first is said first.
+    /// </remarks>
+    public string AsideNote =>
+        !_output.CanPoint
+            ? "this build cannot tell Windows where a program plays"
+            : Silent() == null
+                ? "nothing is chosen under Send it to, and a source here is moved to another "
+                  + "output rather than unplugged, so there has to be one to move it to"
+                : "";
+
+    /// <inheritdoc/>
+    /// <remarks>
     /// **Only a program can be taken aside here.** A capture device is not something that plays,
     /// and an output's own playback is the whole of what a machine is doing rather than one
     /// program's share of it: taking either aside means nothing, so it is refused rather than

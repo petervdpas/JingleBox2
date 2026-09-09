@@ -53,6 +53,22 @@ public interface IAudioRouting
     bool CanTakeAside { get; }
 
     /// <summary>
+    /// Why a source cannot be taken aside, in words fit for a page. Empty where it can.
+    /// </summary>
+    /// <remarks>
+    /// **Greyed for two different reasons with no way to tell them apart is most of what made
+    /// this baffling.** A machine that cannot do it at all and a machine that can but has not
+    /// been told where to put the source are the same dead switch, and only one of them is
+    /// something somebody can act on: the second is a picker two lines up that nobody has
+    /// touched, and the first is not their fault at all.
+    ///
+    /// So the reason travels with the refusal rather than being worked out again by whatever is
+    /// drawing. It is a sentence rather than a code, since the only thing anybody does with it
+    /// is read it.
+    /// </remarks>
+    string AsideNote { get; }
+
+    /// <summary>
     /// Takes a source off everything but this application, and remembers where it was.
     /// </summary>
     /// <remarks>

@@ -186,6 +186,14 @@ public sealed class PipeWireRouting : IAudioRouting
     /// </remarks>
     public bool CanTakeAside => IsAvailable;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A graph needs nowhere to put a source, so there is only ever one thing to say: whether the
+    /// tools that move a link are here.
+    /// </remarks>
+    public string AsideNote =>
+        IsAvailable ? "" : "the tools that move a link are not on this machine";
+
     /// <summary>What was unplugged to take a source aside, so it can be put back.</summary>
     /// <remarks>
     /// Held rather than read again on the way back, because by then the links are gone and the

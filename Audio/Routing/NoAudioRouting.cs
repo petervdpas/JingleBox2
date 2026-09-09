@@ -33,6 +33,9 @@ public sealed class NoAudioRouting : IAudioRouting
     public bool CanTakeAside => false;
 
     /// <inheritdoc/>
+    public string AsideNote => "this machine has no way of moving a source off its own output";
+
+    /// <inheritdoc/>
     public bool TakeAside(AudioRoute route) => false;
 
     /// <inheritdoc/>

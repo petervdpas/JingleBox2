@@ -69,6 +69,9 @@ public class PatchbayViewTests
         public bool CanTakeAside => true;
 
         /// <inheritdoc/>
+        public string AsideHint => "";
+
+        /// <inheritdoc/>
         public bool TakeAside { get; set; }
 
         /// <inheritdoc/>

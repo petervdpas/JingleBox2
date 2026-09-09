@@ -70,6 +70,9 @@ public sealed class RecorderBench
         public bool CanTakeAside => true;
 
         /// <inheritdoc/>
+        public string AsideNote => "";
+
+        /// <inheritdoc/>
         public bool TakeAside(AudioRoute route)
         {
             Aside++;

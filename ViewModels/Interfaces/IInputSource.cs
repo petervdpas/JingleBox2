@@ -67,6 +67,18 @@ public interface IInputSource
     bool CanTakeAside { get; }
 
     /// <summary>
+    /// What to say about taking a source aside, whether it can be or not.
+    /// </summary>
+    /// <remarks>
+    /// One sentence for both states rather than a tooltip that goes stale when the switch greys.
+    /// Where it can be done this says what pressing it does; where it cannot it says why, because
+    /// **a switch greyed for two different reasons with no way to tell them apart is most of what
+    /// made this baffling**: no output chosen is a picker two lines up, and a machine that cannot
+    /// do it at all is nothing anybody can act on, and both looked identical.
+    /// </remarks>
+    string AsideHint { get; }
+
+    /// <summary>
     /// Whether the chosen source is taken off everything else, so it is heard through here alone.
     /// </summary>
     /// <remarks>

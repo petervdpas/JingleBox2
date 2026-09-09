@@ -17,6 +17,40 @@ namespace JingleBox2.Audio;
 /// **Undocumented means it can be gone tomorrow**, so every call is guarded and every failure is
 /// an answer rather than an exception: what is lost when it goes is a switch that stops working,
 /// not an application that will not run.
+///
+/// **It does not work on this runtime, and what stops it is not Windows.** Measured on .NET 10,
+/// Windows 11 26200:
+///
+/// - <c>[MarshalAs(UnmanagedType.HString)]</c> on the class id throws
+///   <c>MarshalDirectiveException: Cannot marshal &apos;parameter #1&apos;</c>. Built-in WinRT
+///   marshalling came out of the runtime in .NET 5 and this is what is left of it. **This is the
+///   one that fires**, on every start, so the switch has never worked here.
+/// - <c>ComInterfaceType.InterfaceIsIInspectable</c> throws
+///   <c>PlatformNotSupportedException</c> for the same reason, which is what is waiting once the
+///   first is fixed.
+///
+/// The interface itself is present and activates cleanly: building the class id by hand with
+/// <see cref="WindowsCreateString"/> and asking for it answers <c>hr = 0</c> and a real object.
+/// So the sentence this used to log, that the policy is not on this machine, was wrong and sent
+/// two people looking at the operating system for an hour.
+///
+/// **What is not known is the slot.** The way out is raw calls through the vtable, and that needs
+/// the offset of <see cref="IAudioPolicyConfig.SetPersistedDefaultAudioEndpoint"/> to be right,
+/// which is not a compile error and is a crash. The nineteen stubs below have never been checked
+/// against anything: probing found slot 24 answering <c>S_OK</c> for both roles and persisting
+/// nothing at all in
+/// <c>HKCU\Software\Microsoft\Internet Explorer\LowRegistry\Audio\PolicyConfig\PropertyStore</c>,
+/// which is where Windows keeps these, so **that slot is some other function that accepts the
+/// same arguments**. Slots 25 and 26 answer <c>E_INVALIDARG</c>.
+///
+/// **So the layout has to come from EarTrumpet or SoundSwitch rather than from a probe**, which
+/// is where the shape below came from in the first place. A number that answers <c>S_OK</c> and
+/// does nothing is worse than one that fails, and guessing at it on somebody&apos;s machine is
+/// calling an unknown function on an undocumented object.
+///
+/// Until then there is a route that needs none of this and works today, and it is in the help on
+/// the RECORD page: a virtual audio cable as the output the source is sent to, with Windows&apos;
+/// own Volume mixer doing the moving.
 /// </remarks>
 [SupportedOSPlatform("windows")]
 public sealed class WindowsProgramOutput : IProgramOutput
@@ -24,7 +58,13 @@ public sealed class WindowsProgramOutput : IProgramOutput
     /// <summary>The activatable class the factory comes out of.</summary>
     private const string PolicyConfig = "Windows.Media.Internal.AudioPolicyConfig";
 
-    /// <summary>Which direction is meant. Two is what the system calls playing out.</summary>
+    /// <summary>Which direction is meant. Nought is what the system calls playing out.</summary>
+    /// <remarks>
+    /// The system's own <c>EDataFlow</c>, where playing is nought, recording is one and both is
+    /// two. It said two here, which is the value for both and is not what this asks for; the
+    /// number was right and the sentence beside it was wrong, which next to a call placed by
+    /// slot is exactly the kind of thing that gets read instead of the code.
+    /// </remarks>
     private const int Render = 0;
 
     /// <summary>What the output is for. Both are set, since a program may ask under either.</summary>
@@ -129,16 +169,30 @@ public sealed class WindowsProgramOutput : IProgramOutput
         {
             var iid = typeof(IAudioPolicyConfig).GUID;
 
-            if (RoGetActivationFactory(PolicyConfig, ref iid, out object factory) != 0) return null;
+            int hr = RoGetActivationFactory(PolicyConfig, ref iid, out object factory);
+
+            if (hr != 0)
+            {
+                Log.Write(LogArea.Audio, () =>
+                    "outputs: the policy would not activate: 0x" + hr.ToString("X8"));
+
+                return null;
+            }
 
             _policy = factory as IAudioPolicyConfig;
             _refused = _policy == null;
+
+            if (_policy == null)
+                Log.Write(LogArea.Audio, () =>
+                    "outputs: the policy activated and would not be read as " + nameof(IAudioPolicyConfig));
 
             return _policy;
         }
         catch (Exception bad)
         {
-            Log.Write(LogArea.Audio, () => "outputs: the policy is not on this machine: " + bad.Message);
+            Log.Write(LogArea.Audio, () =>
+                "outputs: the policy could not be reached from this build: " + bad.Message
+                + " (the interface is on the machine; this is what stops us using it)");
 
             return null;
         }

@@ -32,12 +32,42 @@ the application.
 
 **On Windows it needs somewhere to send the source**, since there is no link to unplug:
 a program can only be pointed at another output. **Send it to** above the switch is where
-that is chosen, and a virtual cable is the usual answer. A spare socket nobody has
-speakers on does the same job. Until one is picked the switch stays grey.
+that is chosen. Until one is picked the switch stays grey, and resting the pointer on it
+says which of the two reasons it is grey for.
 
-What that sets is the same per-program output Windows keeps in Settings, Sound, Volume
-mixer, so it can be seen and undone there as well. It is put back when you pick another
-source or close the application.
+**And on Windows the switch does not work at all at the moment.** It reaches per-program
+output through an interface of Windows own that this application can no longer call: the
+marshalling it needs was taken out of .NET, and the switch has therefore never worked on
+this platform. The log says so on every start. It is not your machine and it is not a
+setting: the interface is there and answers, and the fault is on this side.
+
+## Doing it by hand on Windows
+
+The same thing, with no switch and nothing to install. It is two steps and it is what
+**Only here** was going to do for you.
+
+First, find an output nobody is listening to. Most machines already have one and it does
+not need anything plugged into it: a digital output with no cable in it, an HDMI socket
+with no screen on it, or a virtual output something else installed. Any output can be
+captured whether or not there is a speaker on the end of it.
+
+Then, in Windows: Settings, System, Sound, Volume mixer. Find the program, open it, and
+set **Output device** to that unused output. It stops coming out of your speakers the
+moment you do.
+
+Last, back here: set the IN strip **Source** to that same output, which the picker offers
+as one of the outputs it can record. Throw **Hear it** to bring it through the recording
+chain and out of the master.
+
+The program is now heard through JingleBox2 and nowhere else, which is what was wanted.
+Windows did the moving, so it is Windows that puts it back: set Output device to Default
+in the same place when you are done.
+
+**A virtual cable is only needed where there is no spare output.** VB-CABLE is the usual
+one. It is a zip rather than an installer to double click: inside is
+`VBCABLE_Setup_x64.exe`, it has to be run as administrator or it does nothing whatever
+and says nothing about it, and it wants a restart afterwards. Then CABLE Input is the
+output to send the program to, and CABLE Output is what to record.
 
 **The source is picked on the mixer**, at the foot of the IN strip, because that is
 the strip it is about. RECORD says what it is set to and does not set it, since one
