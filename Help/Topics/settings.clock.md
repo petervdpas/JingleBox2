@@ -42,6 +42,31 @@ An output that will not open is left out and said in the log. An output that sto
 is kept and tried again, so a cable knocked out and put back comes good on its own without a trip
 back here.
 
+## Passing a clock on
+
+Following a clock and sending one are not exclusive, and the case where you want both is ordinary:
+something else holds the time, this machine runs on it, and a third device is plugged into this one
+because there is nowhere else to plug it. Tick the output and it gets the clock.
+
+What it gets is the clock that arrived, passed straight on. Every tick, every start, continue and
+stop, and every song position pointer, put out again exactly as it came in. Nothing is worked out
+again on the way through, so a relocation lands on the same beat at both ends and a chain of
+machines does not drift a little further at each link.
+
+While you are following, the master owns the transport, so pressing play here does not announce a
+start to the devices you drive: what they hear is what the master said. Turn following off and this
+machine is the clock again, sending its own.
+
+## The one output you cannot drive
+
+A device with a MIDI in and a MIDI out shows up as a name in both lists, and the obvious way to set
+a chain up is to follow it and tick it. That would send its own clock straight back at it, which on
+a device that takes clock as well as sending it is a loop neither end can see.
+
+So the port you are following is left out of what is driven, whether or not it is ticked, and the
+line at the foot of the card says so when it happens. The tick is left where you put it: turn
+following off, or follow something else, and that output is driven again.
+
 ## What it costs
 
 Almost nothing, and it was measured rather than assumed. Sending one tick to a real port takes

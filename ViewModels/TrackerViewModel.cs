@@ -1662,6 +1662,46 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
     }
 
+    /// <summary>
+    /// Starts the transport at a line, which is what a master telling us to go means.
+    /// </summary>
+    /// <remarks>
+    /// **A start from outside is not the same as the button.** The button always begins at the
+    /// top of the pattern; a master says where, since it sends a position and then a continue,
+    /// and starting from the top regardless would put this a chorus out from everything else on
+    /// the desk. It is otherwise the same act, so it goes through the same call and reports
+    /// itself the same way.
+    ///
+    /// Held inside the pattern, since a pointer from a longer song than this one names a line
+    /// that is not there.
+    /// </remarks>
+    /// <param name="line">Which line to begin on.</param>
+    public void PlayFrom(int line)
+    {
+        try
+        {
+            Song.Normalize();
+
+            int lines = CurrentPattern?.Lines ?? 0;
+            int at = lines > 0 ? Math.Clamp(line, 0, lines - 1) : 0;
+
+            _player.Play(Song, new TrackerPosition(OrderIndex, at), PlayMode);
+
+            Status = "Following, from line " + at;
+        }
+        catch (Exception ex)
+        {
+            Status = $"Play failed: {ex.Message}";
+        }
+    }
+
+    /// <summary>Stops the transport, which is what a master saying stop means.</summary>
+    /// <remarks>
+    /// The ordinary stop and not a quieter one, so everything that hangs off the transport
+    /// stopping happens exactly as it does when somebody presses the button.
+    /// </remarks>
+    public void StopTransport() => Stop();
+
     /// <summary>Holds the clock where it is, so play carries on from the same line.</summary>
     private void Pause()
     {

@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using JingleBox2.Midi;
-using JingleBox2.Midi.Interfaces;
 using Xunit;
 
 namespace JingleBox2.Tests;

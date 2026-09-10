@@ -140,6 +140,25 @@ public interface ITrackerPlayer : IDisposable
     /// </remarks>
     Midi.Interfaces.IMidiClockDeck? ClockDeck { get; set; }
 
+    /// <summary>
+    /// Somebody else's clock, when the transport is running on one, or nothing.
+    /// </summary>
+    /// <remarks>
+    /// **The other half of <see cref="ClockDeck"/> and independent of it.** Driving other gear and
+    /// being driven are separate settings, so a transport following an external clock may still be
+    /// the only thing a drum machine is plugged into and pass that clock straight on.
+    ///
+    /// Where it is set, the pass waits on arriving ticks instead of on its own stopwatch, and a
+    /// line falls when the count reaches <see cref="Midi.Interfaces.IMidiClockGrid.TickOfLine"/>.
+    /// That is phase-locked by construction rather than by estimating a tempo, and it needs no
+    /// filtering: what a slave has to do is be on the beat the master is on, and counting the
+    /// beats it is told about is exactly that.
+    ///
+    /// **A clock that goes quiet holds the transport where it is.** That is not a case handled
+    /// here; it is what waiting for a tick that never comes already does.
+    /// </remarks>
+    Midi.Interfaces.IMidiClockFollow? ClockFollow { get; set; }
+
     /// <summary>Starts a song from that step, walking the order or staying on one pattern.</summary>
     /// <remarks>
     /// Whatever was running is taken down first, the recordings are read up front so the first

@@ -148,6 +148,9 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// <summary>How a line and a tick are related, which is arithmetic and holds nothing.</summary>
     private readonly IMidiClockGrid _grid = new MidiClockGrid();
 
+    /// <inheritdoc/>
+    public IMidiClockFollow? ClockFollow { get; set; }
+
     /// <summary>
     /// How many ticks have gone out since this pass began.
     /// </summary>
@@ -335,6 +338,14 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// that it has: from the top it is a plain start, and from anywhere else it is a position
     /// pointer and a continue, which is what stops the rest of the desk playing from its own bar
     /// one while this plays from line 32. Which of the two is the deck's to choose.
+    ///
+    /// **Nothing is said while this transport is following somebody else's clock**, and that is
+    /// what keeps a machine in the middle of a chain honest. Following, the go that moved this
+    /// transport was the master's, and it has already been passed on to the outputs at the moment
+    /// it arrived; announcing it again here would put a second start on the wire, worked out from
+    /// a line rather than carried, and the two would disagree about where to begin. **The pass
+    /// through is the whole of what is sent while following**, which is why the ticks below are
+    /// on the other branch of the wait as well.
     /// </remarks>
     /// <param name="at">Where the transport is beginning.</param>
     private void Said(TrackerPosition at)
@@ -342,6 +353,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
         var deck = ClockDeck;
 
         if (deck?.IsDriving != true) return;
+        if (ClockFollow?.IsFollowing == true) return;
 
         Song? song;
         lock (_lock) song = _song;
@@ -359,10 +371,16 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// without this a plain press of play sent a stop and then a start, and a stop byte where
     /// nothing was running says something untrue to everything listening. The state has not
     /// moved yet when this is called, so it is still the old one and is the right thing to ask.
+    ///
+    /// **And not while following, for the same reason said the other way round.** There the stop
+    /// that reaches the outputs is the master's own, passed on where it arrives; saying one here
+    /// as well would send two, and the second lands after this transport has already stopped
+    /// because of the first. See <see cref="Said"/>.
     /// </remarks>
     private void Hushed()
     {
         if (State == TrackerTransportState.Stopped) return;
+        if (ClockFollow?.IsFollowing == true) return;
 
         ClockDeck?.Halt();
     }
@@ -1211,6 +1229,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
         var position = Position;
         double nextLine = 0;
 
+        int lines = 0;
+
         while (!token.IsCancellationRequested)
         {
             if (generation != Volatile.Read(ref _generation)) return;
@@ -1229,7 +1249,18 @@ public sealed class TrackerPlayer : ITrackerPlayer
             position = next.Value;
 
             nextLine += song.Timing.SecondsPerLine;
-            if (!WaitUntil(clock, nextLine, token, song)) return;
+            lines++;
+
+            if (ClockFollow?.IsFollowing == true)
+            {
+                if (!ClockFollow.WaitFor(_grid.TickOfLine(lines, song.Timing.ClampedLinesPerBeat),
+                                         token))
+                    return;
+            }
+            else if (!WaitUntil(clock, nextLine, token, song))
+            {
+                return;
+            }
         }
 
         if (!token.IsCancellationRequested && generation == Volatile.Read(ref _generation))

@@ -32,6 +32,14 @@ public sealed class MidiClockDeck : IMidiClockDeck
     /// </remarks>
     private const int MostAtOnce = 64;
 
+    /// <summary>The most a position pointer can carry, being two seven-bit halves.</summary>
+    /// <remarks>
+    /// Written here as well as in <see cref="MidiClockGrid"/> because the two are answering
+    /// different questions: there it bounds a position worked out from a line, here it bounds one
+    /// that arrived off somebody else's wire, and nothing this side computed is involved.
+    /// </remarks>
+    private const int MostPointer = (1 << 14) - 1;
+
     /// <summary>Where the bytes go out.</summary>
     private readonly IMidiService _midi;
 
@@ -125,6 +133,39 @@ public sealed class MidiClockDeck : IMidiClockDeck
         var ports = _ports;
 
         if (ports.Length > 0) Put(ports, Halted);
+    }
+
+    /// <inheritdoc/>
+    public void Begin()
+    {
+        var ports = _ports;
+
+        if (ports.Length > 0) Put(ports, Start);
+    }
+
+    /// <inheritdoc/>
+    public void Resume()
+    {
+        var ports = _ports;
+
+        if (ports.Length > 0) Put(ports, Continue);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Held to what the message can carry rather than refused, since this is reached from the
+    /// thread a port delivers on: fourteen bits is the whole of a pointer, and a position past
+    /// that is a master saying something the wire cannot hold.
+    /// </remarks>
+    public void Place(int at)
+    {
+        var ports = _ports;
+
+        if (ports.Length == 0) return;
+
+        int pointer = Math.Clamp(at, 0, MostPointer);
+
+        Put(ports, new byte[] { 0xF2, (byte)(pointer & 0x7F), (byte)((pointer >> 7) & 0x7F) });
     }
 
     /// <summary>

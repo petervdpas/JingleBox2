@@ -75,4 +75,38 @@ public interface IMidiClockDeck
 
     /// <summary>The transport has stopped.</summary>
     void Halt();
+
+    /// <summary>
+    /// Sends a plain start, exactly as it arrived from the clock being followed.
+    /// </summary>
+    /// <remarks>
+    /// **This and the two members below it are the pass-through half, and they exist because
+    /// <see cref="Play"/> may not be used for it.** <see cref="Play"/> decides between a start and
+    /// a pointer-and-continue from where the transport is beginning, which is right when this
+    /// machine is the one deciding and wrong when another machine has already decided: told a
+    /// line, it would work a pointer out again from a line that was itself worked out from a
+    /// pointer, and <see cref="IMidiClockGrid.PointerFor"/> and
+    /// <see cref="IMidiClockGrid.LineAtPointer"/> are not each other's inverse at every setting.
+    /// At six lines to the beat, sixteenth 5 reads back as line 7 and line 7 reads out as
+    /// sixteenth 4, so a chain of three machines would lose a sixteenth on every relocation for
+    /// no reason but the arithmetic in the middle.
+    ///
+    /// So a message that arrived is put out again unchanged and nothing is recomputed. What
+    /// travels is the byte, which is the whole meaning of passing a clock on.
+    ///
+    /// <see cref="Ticks"/> and <see cref="Halt"/> serve both halves as they are: a tick carries
+    /// nothing that could be recomputed and a stop carries nothing either.
+    /// </remarks>
+    void Begin();
+
+    /// <summary>Sends a plain continue, exactly as it arrived.</summary>
+    /// <inheritdoc cref="Begin"/>
+    void Resume();
+
+    /// <summary>
+    /// Sends a song position pointer holding exactly the position that arrived.
+    /// </summary>
+    /// <inheritdoc cref="Begin"/>
+    /// <param name="at">The position in sixteenth notes, as the message carried it.</param>
+    void Place(int at);
 }

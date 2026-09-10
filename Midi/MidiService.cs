@@ -588,12 +588,42 @@ public sealed class MidiService : IMidiService
     /// </summary>
     /// <remarks>
     /// The transport as the specification has had it since 1983: one byte, no channel, no data.
-    /// Their siblings 0xF8 clock and 0xFE active sensing are dropped at the wire and never become
-    /// a message at all.
+    ///
+    /// **Clock is among them now and used not to be.** It was dropped at the wire, which was
+    /// right while nothing here could follow another machine's time and wrong the moment
+    /// something could: a transport running on somebody else's clock has to see the ticks. Its
+    /// sibling 0xFE active sensing is still dropped, since nothing has ever wanted it.
+    ///
+    /// Ninety six of these a second at a brisk tempo, so what reads them is expected to
+    /// short-circuit rather than let them walk the whole routing: see
+    /// <c>MidiDispatcher</c>.
     /// </remarks>
+    private const byte Clock = 0xF8;
+
+    /// <inheritdoc cref="Clock"/>
     private const byte Started = 0xFA;
+
+    /// <inheritdoc cref="Clock"/>
     private const byte Continued = 0xFB;
+
+    /// <inheritdoc cref="Clock"/>
     private const byte Stopped = 0xFC;
+
+    /// <summary>
+    /// Where in the song a master says to be, in sixteenth notes, as two seven-bit halves.
+    /// </summary>
+    /// <remarks>
+    /// **The only message here that is neither one byte nor open-ended**, and the reason it is
+    /// called out: everything else above 0xF0 that this does not read is stepped over one byte at
+    /// a time, which is right for a byte with no data behind it and wrong for this. Read as one
+    /// byte, its two data bytes are then walked over as though they were messages of their own,
+    /// which is harmless today only because nothing downstream reads them.
+    ///
+    /// It matters because a master sends this immediately before a continue, so getting its
+    /// length wrong is the position arriving as rubbish at the one moment it decides where every
+    /// device on the desk starts playing.
+    /// </remarks>
+    private const byte Positioned = 0xF2;
 
     /// <summary>
     /// A system exclusive message being collected, per device.
@@ -747,7 +777,7 @@ public sealed class MidiService : IMidiService
             {
                 used = 1;
 
-                return status is Started or Continued or Stopped
+                return status is Clock or Started or Continued or Stopped
                     ? new MidiMessage { Device = device, Type = MidiMessageType.Realtime, Channel = 0, Value = status, Data = 0, IsOn = false }
                     : null;
             }
@@ -755,6 +785,31 @@ public sealed class MidiService : IMidiService
             if (status >= 0xF0)
             {
                 lock (_lock) _running.Remove(device);
+
+                if (status == Positioned)
+                {
+                    if (at + 1 >= end)
+                    {
+                        used = end - start;
+
+                        return null;
+                    }
+
+                    int pointer = (data[at] & 0x7F) | ((data[at + 1] & 0x7F) << 7);
+
+                    used = 3;
+
+                    return new MidiMessage
+                    {
+                        Device = device,
+                        Type = MidiMessageType.Realtime,
+                        Channel = 0,
+                        Value = status,
+                        Data = pointer,
+                        IsOn = false
+                    };
+                }
+
                 used = 1;
                 return null;
             }

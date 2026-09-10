@@ -490,7 +490,7 @@
               </StackPanel>
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap"
-                         Text="Whether the transport keeps its own time or follows another machine's, and which outputs are sent this machine's clock. Nothing is sent until an output is ticked: clock arriving at a device nobody pointed it at is a device that starts running when its owner did not ask." />
+                         Text="Whether the transport keeps its own time or follows another machine's, and which outputs are sent a clock. Nothing is sent until an output is ticked: clock arriving at a device nobody pointed it at is a device that starts running when its owner did not ask. While following, what the ticked outputs get is the clock being followed, passed straight on." />
 
               <CheckBox Content="Follow another machine's clock"
                         Margin="0,4,0,0"
@@ -509,7 +509,8 @@
                            Text="With no port chosen, or one that is not plugged in, the transport stays on its own clock rather than refusing to play: a cable left in the other room is not a decision to stop working." />
               </StackPanel>
 
-              <TextBlock Classes="cardHint" Text="Send this machine's clock to" Margin="0,10,0,0" />
+              <TextBlock Classes="cardHint" Text="Send the clock to" Margin="0,10,0,0"
+                         ToolTip.Tip="On its own clock this machine's own time goes out. Following one, what goes out is the clock that is arriving, passed straight on: every tick, both ways of starting, the stop and the position, exactly as they came in. The port being followed is never driven, so a clock is not sent back to the machine it came from." />
 
               <ItemsControl ItemsSource="{Binding Midi.ClockOutputs}"
                             IsVisible="{Binding Midi.HasClockOutputs}">

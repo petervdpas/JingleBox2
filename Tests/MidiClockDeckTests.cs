@@ -327,4 +327,70 @@ public class MidiClockDeckTests
         Assert.Equal(96, bench.Sent.Count(one => one.Bytes[0] == 0xF8));
         Assert.Equal(0xFC, bench.Sent[^1].Bytes[0]);
     }
+
+    /// <summary>
+    /// The three pass-through members put the byte out and work nothing out again.
+    /// </summary>
+    /// <remarks>
+    /// The half used when this machine is passing on a clock it is itself running on, where
+    /// nothing may be re-derived. Read as bytes rather than as words, because what is being
+    /// asserted is what leaves the port.
+    /// </remarks>
+    [Fact]
+    public void Passing_on_puts_the_plain_bytes_out()
+    {
+        var bench = new Bench();
+        var deck = new MidiClockDeck(bench);
+
+        deck.Drive(new[] { "one" });
+
+        deck.Begin();
+        deck.Place(300);
+        deck.Resume();
+
+        Assert.Equal("FA F2 FB", bench.Statuses);
+
+        var pointer = bench.Sent[1].Bytes;
+
+        Assert.Equal(300, (pointer[1] & 0x7F) | ((pointer[2] & 0x7F) << 7));
+    }
+
+    /// <summary>A pointer past what the wire can hold is held at the top rather than wrapping.</summary>
+    /// <remarks>
+    /// Reached from the thread a port delivers on, so a throw would be that port's reader gone.
+    /// Wrapping is the failure that matters: fourteen bits taken modulo would put a device at the
+    /// top of a song at the moment the master said the end of one, which is a relocation landing
+    /// somewhere nobody asked for rather than an error anybody sees.
+    /// </remarks>
+    [Fact]
+    public void A_pointer_too_big_for_the_wire_is_held_at_the_top()
+    {
+        var bench = new Bench();
+        var deck = new MidiClockDeck(bench);
+
+        deck.Drive(new[] { "one" });
+
+        deck.Place(40000);
+        deck.Place(-5);
+
+        var most = bench.Sent[0].Bytes;
+        var least = bench.Sent[1].Bytes;
+
+        Assert.Equal(16383, (most[1] & 0x7F) | ((most[2] & 0x7F) << 7));
+        Assert.Equal(0, (least[1] & 0x7F) | ((least[2] & 0x7F) << 7));
+    }
+
+    /// <summary>Driving nothing, the pass-through half sends nothing either.</summary>
+    [Fact]
+    public void Passing_on_to_nothing_sends_nothing()
+    {
+        var bench = new Bench();
+        var deck = new MidiClockDeck(bench);
+
+        deck.Begin();
+        deck.Resume();
+        deck.Place(16);
+
+        Assert.Empty(bench.Sent);
+    }
 }

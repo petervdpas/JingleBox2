@@ -53,18 +53,93 @@ public class MidiDeliveryTests
     }
 
     /// <summary>
-    /// A realtime byte threaded between two messages is stepped over, not read as a note.
+    /// A realtime byte threaded between two messages costs neither of them.
     /// </summary>
     /// <remarks>
     /// A device sending clock puts one anywhere it likes, including between the messages of a
     /// chord. It has to cost the messages around it nothing.
+    ///
+    /// **This used to say the clock was dropped, and that changed on purpose.** It was dropped at
+    /// the wire while nothing here could follow another machine's time, and the moment something
+    /// could it had to arrive: a transport running on somebody else's clock has to see the ticks.
+    /// What has not changed, and is what this test was always really about, is that the notes
+    /// either side of it are untouched.
     /// </remarks>
     [Fact]
     public void A_clock_byte_between_two_messages_costs_neither()
     {
         var said = Read(0x80, 60, 0, 0xF8, 0x80, 64, 0);
 
+        Assert.Equal(new[] { "up 60", "realtime", "up 64" }, said);
+    }
+
+    /// <summary>Active sensing is still dropped, since nothing has ever wanted it.</summary>
+    /// <remarks>
+    /// Here beside the clock because the two were dropped together and only one of them stopped
+    /// being: a device sends sensing several times a second for ever, and a message nobody reads
+    /// arriving at that rate is the routing being walked for nothing.
+    /// </remarks>
+    [Fact]
+    public void Active_sensing_is_still_dropped()
+    {
+        var said = Read(0x80, 60, 0, 0xFE, 0x80, 64, 0);
+
         Assert.Equal(new[] { "up 60", "up 64" }, said);
+    }
+
+    /// <summary>
+    /// A song position pointer is read whole, with its two halves the right way round.
+    /// </summary>
+    /// <remarks>
+    /// **The one message here that is neither one byte nor open-ended.** Read as one byte its two
+    /// data bytes are walked over as though they were messages of their own, which costs nothing
+    /// visible and loses the position; and a master sends this immediately before a continue, so
+    /// losing it is every device on the desk starting in the wrong place.
+    ///
+    /// The note behind it is what says the length was right: read as one byte or as four, the
+    /// note either vanishes or arrives as rubbish.
+    /// </remarks>
+    [Fact]
+    public void A_song_position_pointer_is_read_whole()
+    {
+        var said = Read(0xF2, 0x20, 0x01, 0x80, 64, 0);
+
+        Assert.Equal(new[] { "realtime", "up 64" }, said);
+    }
+
+    /// <summary>
+    /// And the position it carries is its two halves, the low one first.
+    /// </summary>
+    /// <remarks>
+    /// The other way round is the failure that looks plausible: a device starts somewhere, just
+    /// not where it was told. 0x20 then 0x01 is 32 in the low half and 1 in the high, which is
+    /// 160 sixteenths; read backwards it is 4128, and both are numbers a song could contain.
+    /// </remarks>
+    [Theory]
+    [InlineData(0x20, 0x01, 160)]
+    [InlineData(0x00, 0x00, 0)]
+    [InlineData(0x7F, 0x00, 127)]
+    [InlineData(0x00, 0x01, 128)]
+    [InlineData(0x7F, 0x7F, 16383)]
+    public void The_pointer_carries_its_two_halves_low_one_first(int low, int high, int expected)
+    {
+        var service = new MidiService();
+        var data = new byte[] { 0xF2, (byte)low, (byte)high };
+
+        var message = service.Read("keyboard", data, 0, data.Length, out int used);
+
+        Assert.Equal(3, used);
+        Assert.NotNull(message);
+        Assert.Equal(expected, message!.Data);
+    }
+
+    /// <summary>And half a pointer at the end of a delivery costs nothing before it.</summary>
+    [Fact]
+    public void Half_a_pointer_does_not_cost_the_messages_before_it()
+    {
+        var said = Read(0x80, 60, 0, 0xF2, 0x20);
+
+        Assert.Equal(new[] { "up 60" }, said);
     }
 
     /// <summary>

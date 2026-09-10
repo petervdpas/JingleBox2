@@ -288,6 +288,16 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     private readonly Midi.Interfaces.IMidiClockDeck _clockDeck;
 
     /// <summary>
+    /// Somebody else's clock, when the transport is set to run on one.
+    /// </summary>
+    /// <remarks>
+    /// Held here for the same reason the deck is: the settings page says whose clock and which
+    /// port, the dispatcher feeds it what arrives, and the player waits on it. None of the three
+    /// owns the other two.
+    /// </remarks>
+    private readonly Midi.Interfaces.IMidiClockFollow _clockFollow = new Midi.MidiClockFollow();
+
+    /// <summary>
     /// Hands the deck whichever outputs are ticked, opening each one.
     /// </summary>
     /// <remarks>
@@ -297,7 +307,75 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// 120 to the minute lasts twenty. An open on the first tick of a pass is four ticks missed,
     /// on the thread that also starts notes, at the moment somebody pressed play.
     /// </remarks>
-    private void DriveTheClock() => _clockDeck.Drive(_cfg.Midi?.ClockOutputs);
+    /// <summary>
+    /// Makes the master's start, continue and stop move this transport.
+    /// </summary>
+    /// <remarks>
+    /// Following a clock is no use without them: ticks say how fast and these say whether at all.
+    ///
+    /// **Both arrive on the port's own thread**, so the work is handed to the thread things are
+    /// drawn on, which is where every other message that ends at a view model already goes.
+    ///
+    /// A start is from the top and a continue is from wherever the pointer said, which is read
+    /// back through the same grid the sending half uses so the two ends cannot disagree about
+    /// what a sixteenth is. Stopping goes through the ordinary stop, so everything that hangs off
+    /// the transport stopping happens exactly as it does when somebody presses the button.
+    /// </remarks>
+    private void WhenTheMasterSays()
+    {
+        _clockFollow.Began += fromTheTop => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            int line = fromTheTop
+                ? 0
+                : new JingleBox2.Midi.MidiClockGrid().LineAtPointer(
+                    _clockFollow.Pointer, Tracker.Song.Timing.ClampedLinesPerBeat);
+
+            Tracker.PlayFrom(line);
+        });
+
+        _clockFollow.Ended += () => Avalonia.Threading.Dispatcher.UIThread.Post(Tracker.StopTransport);
+    }
+
+    private void DriveTheClock()
+    {
+        var midi = _cfg.Midi;
+
+        _clockDeck.Drive(midi?.ClockDriven);
+
+        bool following = midi?.ClockSource == JingleBox2.Midi.Enums.MidiClockSource.Followed
+                         && !string.IsNullOrWhiteSpace(midi?.ClockPort);
+
+        _clockFollow.Follow(following);
+
+        SaidTheEcho(midi);
+    }
+
+    /// <summary>
+    /// Says out loud where an output was ticked and is not driven because it is the clock.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="JingleBox2.Midi.MidiConfig.ClockDriven"/> drops the followed port so a clock
+    /// cannot be echoed at the machine that sent it, and a tick that quietly does nothing is
+    /// exactly the sort of thing somebody spends an evening on. It is the ordinary way to set this
+    /// up wrong, too: a device that both sends and takes clock is one name in both lists.
+    ///
+    /// Nothing is said in the ordinary case, which is every machine driving something other than
+    /// what it follows, and every machine on its own clock.
+    /// </remarks>
+    /// <param name="midi">The settings as they now stand, or nothing.</param>
+    private void SaidTheEcho(JingleBox2.Midi.MidiConfig? midi)
+    {
+        if (midi is null) return;
+        if (midi.ClockDriven.Count == midi.ClockOutputs.Count) return;
+
+        string said = "'" + midi.ClockPort + "' is the clock being followed, so this machine's own "
+                      + "clock is not sent back to it.";
+
+        Bus.Say(said);
+
+        JingleBox2.Diagnostics.Log.Write(JingleBox2.Diagnostics.Enums.LogArea.Midi,
+            () => "clock: " + said);
+    }
 
     /// <summary>
     /// What the four caps at the top of the window are working.
@@ -2051,6 +2129,9 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         _clockDeck = new Midi.MidiClockDeck(midiService);
 
         Tracker.Player.ClockDeck = _clockDeck;
+        Tracker.Player.ClockFollow = _clockFollow;
+
+        WhenTheMasterSays();
 
         Midi.ClockChanged = DriveTheClock;
 
@@ -2227,7 +2308,9 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
                 transport.Handle(msg);
 
                 mackie.Handle(msg);
-            });
+            },
+            follow: _clockFollow,
+            deck: _clockDeck);
 
         var screen = new ControllerScreens(
             () => new MidiPortBindings().DevicesWith(_cfg.Midi.Devices, MidiPortBindings.EveryRole),

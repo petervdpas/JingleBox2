@@ -177,11 +177,31 @@ public class MidiWireTests
         Assert.Null(Read(service, "d", 74, 11));
     }
 
-    /// <summary>A clock byte on its own is nothing to read, and is not an error either.</summary>
+    /// <summary>Active sensing on its own is nothing to read, and is not an error either.</summary>
+    /// <remarks>
+    /// This used to be the clock, and the clock stopped being nothing: it is a message now,
+    /// because a transport can follow another machine's time and has to see the ticks. Sensing
+    /// took its place here because it is the one byte in that family nothing has ever wanted.
+    /// </remarks>
     [Fact]
     public void A_real_time_byte_is_ignored_without_ending_the_run()
     {
-        Assert.Null(Read(new MidiService(), "d", 0xF8));
+        Assert.Null(Read(new MidiService(), "d", 0xFE));
+    }
+
+    /// <summary>And the clock is a message, which is what lets a transport follow one.</summary>
+    /// <remarks>
+    /// The value is the status byte itself, since these carry no channel and no data: what a
+    /// reader has to tell apart is which of the family arrived.
+    /// </remarks>
+    [Fact]
+    public void A_clock_byte_is_read_as_realtime()
+    {
+        var message = Read(new MidiService(), "d", 0xF8);
+
+        Assert.NotNull(message);
+        Assert.Equal(JingleBox2.Midi.Enums.MidiMessageType.Realtime, message!.Type);
+        Assert.Equal(0xF8, message.Value);
     }
 
     /// <summary>An empty delivery and a null buffer are both answered rather than thrown at.</summary>
@@ -235,16 +255,21 @@ public class MidiWireTests
     }
 
     /// <summary>
-    /// The clock and active sensing are dropped at the wire without a word.
+    /// Active sensing is dropped at the wire without a word.
     /// </summary>
     /// <remarks>
-    /// At twenty four clocks a beat, a line logged per byte would drown the ones the log is kept
-    /// for.
+    /// A device sends it several times a second for ever and nothing here has ever wanted it, so
+    /// a line logged per byte would drown the ones the log is kept for.
+    ///
+    /// **The clock was in this list and is not any more.** It is dropped no longer, because
+    /// following another machine's time means seeing the ticks; what keeps it from drowning the
+    /// routing instead is that whoever reads it takes it and passes it no further.
     /// </remarks>
     [Theory]
-    [InlineData(0xF8)]
     [InlineData(0xFE)]
-    public void The_clock_and_active_sensing_are_read_as_nothing(byte status) =>
+    [InlineData(0xF9)]
+    [InlineData(0xFD)]
+    public void The_bytes_nothing_wants_are_read_as_nothing(byte status) =>
         Assert.Null(Read(new MidiService(), "d", status));
 
     /// <summary>

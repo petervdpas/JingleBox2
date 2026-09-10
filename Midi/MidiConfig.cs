@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace JingleBox2.Midi;
 
@@ -80,4 +82,44 @@ public sealed class MidiConfig
     /// that starts running when its owner did not ask.
     /// </remarks>
     public List<string> ClockOutputs { get; set; } = new();
+
+    /// <summary>
+    /// The outputs that are really driven, which is <see cref="ClockOutputs"/> without the port
+    /// being followed.
+    /// </summary>
+    /// <remarks>
+    /// **The one rule that keeps a clock from being echoed at the machine that sent it.** A device
+    /// with a MIDI in and a MIDI out is one port name in the input list and one in the output
+    /// list, and where the two read the same the obvious way to set this up is to follow it and
+    /// tick it. Every tick would then go straight back, and a device that recognises clock as well
+    /// as sending it is in a loop neither end can see. Nothing is named here and nothing is
+    /// looked up: the port that is followed is whatever somebody chose, and it is that one that is
+    /// left out.
+    ///
+    /// Read here rather than guarded at the wire because this is the one place both answers are
+    /// already in hand, and because it is a decision about the setting rather than about a
+    /// message: what the settings page shows ticked is what somebody asked for, and what is driven
+    /// is what that can honestly mean. Left out silently would be a tick doing nothing with no
+    /// explanation, so whoever calls this says which was dropped.
+    ///
+    /// Compared without regard to case, like every other port name here. With nothing followed it
+    /// is <see cref="ClockOutputs"/> exactly, which is every machine on its own clock.
+    /// </remarks>
+    [JsonIgnore]
+    public IReadOnlyList<string> ClockDriven
+    {
+        get
+        {
+            if (ClockSource != Enums.MidiClockSource.Followed) return ClockOutputs;
+            if (string.IsNullOrWhiteSpace(ClockPort)) return ClockOutputs;
+
+            var kept = new List<string>(ClockOutputs.Count);
+
+            foreach (string one in ClockOutputs)
+                if (!string.Equals(one, ClockPort, StringComparison.OrdinalIgnoreCase))
+                    kept.Add(one);
+
+            return kept;
+        }
+    }
 }

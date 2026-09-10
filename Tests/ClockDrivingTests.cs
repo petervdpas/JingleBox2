@@ -64,6 +64,24 @@ public class ClockDrivingTests
             lock (Said) Said.Add("halt");
         }
 
+        /// <inheritdoc/>
+        public void Begin()
+        {
+            lock (Said) Said.Add("begin");
+        }
+
+        /// <inheritdoc/>
+        public void Resume()
+        {
+            lock (Said) Said.Add("resume");
+        }
+
+        /// <inheritdoc/>
+        public void Place(int at)
+        {
+            lock (Said) Said.Add("place " + at);
+        }
+
         /// <summary>What was said, as one string.</summary>
         public string Words
         {
