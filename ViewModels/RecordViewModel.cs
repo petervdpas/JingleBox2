@@ -1916,11 +1916,41 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     }
 
     /// <inheritdoc/>
-    public bool NeedsSilentOutput => _silent is { } silent && silent.Outputs.Count > 0;
+    public bool NeedsSilentOutput => SilentOutputs.Count > 0;
 
     /// <inheritdoc/>
-    public IReadOnlyList<Audio.Records.AudioEndpoint> SilentOutputs =>
-        _silent?.Outputs ?? Array.Empty<Audio.Records.AudioEndpoint>();
+    /// <remarks>
+    /// **Never this application's own output**, which it used to offer and which is the single
+    /// worst answer in the list. A source is sent somewhere so that nobody hears it; sent to the
+    /// device JingleBox2 is playing through it is not quieted at all, it arrives on top of
+    /// everything else and out of the same speakers. The picker was showing the Model 12 while the
+    /// Model 12 was the output in SETTINGS.
+    ///
+    /// It had the settings in its hand the whole time and only ever read the half about which
+    /// output is the quiet one, never the half about which output is ours. Audio goes out as well
+    /// as in and a picker about outputs has to know both.
+    ///
+    /// By name, since the list and the output picker are two different enumerations and the name
+    /// is the only half they share: the same trade-off
+    /// <see cref="Audio.Routing.Interfaces.IAudioRouting.IsOurOutput"/> already names.
+    /// </remarks>
+    public IReadOnlyList<Audio.Records.AudioEndpoint> SilentOutputs
+    {
+        get
+        {
+            var all = _silent?.Outputs ?? Array.Empty<Audio.Records.AudioEndpoint>();
+
+            if (string.IsNullOrWhiteSpace(PlayingOut)) return all;
+
+            var kept = new List<Audio.Records.AudioEndpoint>(all.Count);
+
+            foreach (var one in all)
+                if (!string.Equals(one.Name.Trim(), PlayingOut.Trim(), StringComparison.OrdinalIgnoreCase))
+                    kept.Add(one);
+
+            return kept;
+        }
+    }
 
     /// <inheritdoc/>
     public Audio.Records.AudioEndpoint? SilentOutput
@@ -2138,6 +2168,9 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             playingOut = value;
 
             Listening();
+
+            OnPropertyChanged(nameof(SilentOutputs));
+            OnPropertyChanged(nameof(NeedsSilentOutput));
         }
     }
 
@@ -2331,11 +2364,47 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         if (_preferredRoute != null) return;
 
-        var playing = Routes.FirstOrDefault(r => r.Kind == Audio.Routing.Enums.AudioRouteKind.Monitor);
+        var chosen = Chosen() ?? Routes.FirstOrDefault(
+            r => r.Kind == Audio.Routing.Enums.AudioRouteKind.Monitor);
 
-        if (playing == null) return;
+        if (chosen == null) return;
 
-        SelectedRoute = playing;
+        SelectedRoute = chosen;
+    }
+
+    /// <summary>
+    /// The capture device named in the settings, where the machine is offering it.
+    /// </summary>
+    /// <remarks>
+    /// **Audio goes in as well as out, and only the output half was being read.** There is an
+    /// input in the settings and this page has always had it, and the first source was picked as
+    /// whatever an output happened to be playing whether or not somebody had chosen a microphone.
+    /// So a machine set up to record a microphone opened on the desktop's own playback, which is
+    /// a picker that ignores the setting two pages away that exists to answer exactly this.
+    ///
+    /// By name, which is how <see cref="JingleBox2.Config.AppConfig.RecordInputDevice"/> is
+    /// stored and for the reason written there: a device's number moves when hardware is plugged
+    /// in and its name does not.
+    ///
+    /// Nothing where no input has been chosen or where the one that was is not here, and then
+    /// what an output is playing is still the answer, which is what this did before and is what
+    /// somebody usually wants on a machine that has never been set up.
+    /// </remarks>
+    private Audio.Routing.Records.AudioRoute? Chosen()
+    {
+        string wanted = _cfg.RecordInputDevice;
+
+        if (string.IsNullOrWhiteSpace(wanted)) return null;
+
+        foreach (var route in Routes)
+        {
+            if (route.Kind != Audio.Routing.Enums.AudioRouteKind.Input) continue;
+
+            if (string.Equals(route.Name.Trim(), wanted.Trim(), StringComparison.OrdinalIgnoreCase))
+                return route;
+        }
+
+        return null;
     }
 
     /// <summary>

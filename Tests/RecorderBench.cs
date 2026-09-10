@@ -257,10 +257,13 @@ public sealed class RecorderBench
     /// <summary>The machine's wiring, so a test can count what was moved.</summary>
     public Rewiring Wiring { get; } = new();
 
+    /// <summary>The settings the page is built over, so a test can name an input before it opens.</summary>
+    public AppConfig Settings { get; } = new();
+
     /// <summary>The page itself.</summary>
     public RecordViewModel Page { get; }
 
     /// <summary>Builds the page over the doubles.</summary>
     public RecorderBench() =>
-        Page = new RecordViewModel(Recorder, new Flat(), new Blank(), new ConfigStore(), new AppConfig(), Wiring);
+        Page = new RecordViewModel(Recorder, new Flat(), new Blank(), new ConfigStore(), Settings, Wiring);
 }
