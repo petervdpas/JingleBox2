@@ -99,13 +99,16 @@ public class RealtimeThreadTests : IDisposable
     /// Both platforms are answered, whichever one is running the tests.
     /// </summary>
     /// <remarks>
-    /// The reason the rule takes the platform rather than looking it up. Windows has its own way
-    /// of saying a thread is for audio and this application does not use it yet, so the honest
-    /// answer there is no and the settings page can say why instead of offering a switch that
-    /// does nothing.
+    /// The reason the rule takes the platform rather than looking it up. The real-time scheduler
+    /// is a Linux idea and there is no such thing on Windows, so the honest answer there is no
+    /// and the settings page can say why instead of offering a switch that does nothing.
+    ///
+    /// **Which is not the same as Windows arranging nothing.** It asks for the multimedia class
+    /// scheduler instead, on every run and without this switch, so what is pinned here is the
+    /// absence of this mechanism rather than the absence of any.
     /// </remarks>
     [Fact]
-    public void Only_linux_has_an_answer_for_this_so_far()
+    public void Only_linux_has_a_real_time_scheduler()
     {
         IRealtimeThread thread = new RealtimeThread();
 

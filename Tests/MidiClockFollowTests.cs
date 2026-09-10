@@ -11,7 +11,7 @@ namespace JingleBox2.Tests;
 /// </summary>
 /// <remarks>
 /// Two threads meet in this type, so the tests use two: one standing in for the port that ticks
-/// and one for the transport that waits. That is the whole reason it is a seam of its own — the
+/// and one for the transport that waits. That is the whole reason it is a seam of its own: the
 /// decisions in it can be put a question to without a port, a device, or a clock thread.
 ///
 /// **The one worth reading is <see cref="Silence_holds_the_transport_rather_than_stopping_it"/>.**

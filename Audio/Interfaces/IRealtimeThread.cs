@@ -47,9 +47,15 @@ public interface IRealtimeThread
     /// <remarks>
     /// Asked with the platform rather than reading it, the same rule the audio defaults keep: a
     /// machine running Linux can then be asked what Windows would have said, and the settings
-    /// page can be checked on either. Windows has its own way of saying a thread is for audio and
-    /// it is not written here yet, so the honest answer there is no, and a switch that cannot do
-    /// anything should say so rather than sit there being ticked.
+    /// page can be checked on either.
+    ///
+    /// **Not the same question as whether the threads are scheduled for audio, which they are
+    /// everywhere.** The real-time scheduler is a Linux idea and there is no such thing on
+    /// Windows, so the honest answer there is no and a switch that cannot do anything should say
+    /// so rather than sit there being ticked. What Windows has instead is the multimedia class
+    /// scheduler, which <see cref="Take"/> asks for on every run without going near this switch:
+    /// see <c>RealtimeThread.WindowsVariable</c> for why one tick over both would have to ship
+    /// either the dangerous half on or the ordinary half off.
     /// </remarks>
     /// <param name="linux">True on Linux, false elsewhere.</param>
     bool PossibleOn(bool linux);

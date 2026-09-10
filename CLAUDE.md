@@ -2818,6 +2818,40 @@ whole exercise and is worth writing down rather than summarising:
   half, and its screen is Arturia's alone
 - `MidiService.Send` opens an output on demand and answers false for a device with none, so a
   controller with no output still costs nothing
+- **A job in SETTINGS was the only reason a port was opened, and following a clock is a second
+  one.** The outputs a clock is sent to are opened where the setting is applied, deliberately and
+  said out loud in its own remarks, since opening a port was measured at eighty milliseconds and
+  a tick lasts twenty. The input side had no such step: ports are opened by `ApplyBindings`,
+  which opened exactly what had been given a job, while the picker offers **every** input on the
+  machine to choose a clock from. So choosing a port that had no job opened nothing, no tick ever
+  arrived, the transport sat waiting for a clock that was not coming, and the page went on saying
+  it was following. From a chair that is a sync feature that does not work, with nothing anywhere
+  saying why
+- `IMidiPortBindings.Listening` is what has to be open, which is what has a job plus the clock
+  being followed, and it is a rule rather than a walk inside the page so it can be asked without
+  a window. **The two reasons are deliberately not folded into one**: following a port's clock is
+  not giving it a job, so the port is opened and its role stays `None`, and what arrives on it
+  goes to the clock and no further. Whether that keyboard should also play the pads is somebody's
+  own decision and this does not make it for them. Opened from `ApplyBindings` rather than beside
+  the clock's own setup because that is the one place that **closes** ports too: opened anywhere
+  else, the next pass through would find a port with no job and shut it again
+- The clock port is left out where it already holds a job, since a port opened twice is a port
+  closed once, and that is the ordinary case rather than a corner: a keyboard that is both the
+  clock and the thing the notes are played on is one name in both lists. Compared without regard
+  to case and trimmed first, like every other port name here. `Tests/MidiPortBindingTests.cs`
+  holds the twelve, and three of them fail with the rule taken back out
+- **And the real-time tick's own help had gone stale in four places.** Windows grew the
+  multimedia class scheduler, `Pro Audio` through `avrt.dll`, which is asked for on every run and
+  is not behind that tick; the tick is `SCHED_FIFO`, which only Linux has, so `PossibleOn` greys
+  it there and rightly. What the sentence beside it still said is that Windows "has its own way of
+  saying a thread is for audio and this application does not use it", which by then was the
+  opposite of the truth: it does, on every start, and somebody reading that would go looking for a
+  setting to turn on something that was already on. `IRealtimeThread.PossibleOn`,
+  `MainViewModel.RealtimeAvailable`, `RealtimeHint` and the test's own remarks all said it, which
+  is the shape this file keeps naming: **a paragraph describing work still to do outliving the
+  work**, and four copies of it because the sentence was worth repeating and nothing made them
+  meet. The tell was the same as every other time, which is that the document disagreed with the
+  code
 - `docs/hardware-integration.md` is mostly a plan, and the rule in it governs everything here:
   plain MIDI is the floor, not a fallback. A controller nobody has written anything about works
   today, taught by hovering a knob and touching the hardware, so a profile may add names, shape
@@ -4222,7 +4256,7 @@ whole exercise and is worth writing down rather than summarising:
   two independent facts together: a library that loads and a driver that is installed. And
   `bassasio.dll` **is checked into this repository**, so every Windows machine that clones it
   reports present, and most of them have no ASIO driver at all. That test passed on the one
-  machine it was written on and would have failed for everybody else — the same fault as the
+  machine it was written on and would have failed for everybody else: the same fault as the
   original, pointing the other way, introduced while fixing it. It lasted about ten minutes and
   only because somebody asked whether a fresh clone would be surprised
 - So no test here claims how many drivers there are, since that is a fact about a machine.

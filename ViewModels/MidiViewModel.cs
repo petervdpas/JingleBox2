@@ -187,12 +187,21 @@ public sealed partial class MidiViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Opens exactly the devices that were given a job, and closes the rest. Nothing else holds
-    /// a port open, so the role list is the single source of truth for what is listening.
+    /// Opens exactly the ports that have to be listened to, and closes the rest. Nothing else
+    /// holds a port open, so this is the single source of truth for what is listening.
     /// </summary>
+    /// <remarks>
+    /// Which ports those are is <see cref="IMidiPortBindings.Listening"/> rather than a walk of
+    /// its own, since it is a rule about the settings and worth being able to ask without a
+    /// window. What is here is the opening and the closing.
+    ///
+    /// It is also why the clock port is opened from here rather than from wherever the clock is
+    /// set up: this is the one place that closes ports too, so a port opened anywhere else would
+    /// be shut again by the next pass through.
+    /// </remarks>
     private void ApplyBindings()
     {
-        var wanted = _bindings.DevicesWith(_cfg.Midi.Devices, MidiPortBindings.EveryRole);
+        var wanted = _bindings.Listening(_cfg.Midi);
 
         foreach (var open in _midi.OpenDevices)
         {
@@ -400,9 +409,16 @@ public sealed partial class MidiViewModel : ObservableObject
     public Action? ClockChanged { get; set; }
 
     /// <summary>Whose clock it is moved, so it is stored and whoever drives is told.</summary>
+    /// <remarks>
+    /// The ports follow, because turning following on is a reason to listen to one and turning
+    /// it off takes that reason away: see <see cref="ApplyBindings"/>.
+    /// </remarks>
     partial void OnClockSourceChanged(MidiClockSource value)
     {
         _cfg.Midi.ClockSource = value;
+
+        ApplyBindings();
+
         SaveMidi();
 
         OnPropertyChanged(nameof(ClockSaid));
@@ -411,9 +427,16 @@ public sealed partial class MidiViewModel : ObservableObject
     }
 
     /// <summary>The port followed moved, on the same terms.</summary>
+    /// <remarks>
+    /// The ports follow here as well, and this is the one that closes as much as it opens: the
+    /// port that was being followed loses the only reason it was open, unless it also has a job.
+    /// </remarks>
     partial void OnClockPortChanged(string? value)
     {
         _cfg.Midi.ClockPort = value;
+
+        ApplyBindings();
+
         SaveMidi();
 
         OnPropertyChanged(nameof(ClockSaid));

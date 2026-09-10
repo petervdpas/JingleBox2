@@ -44,6 +44,33 @@ public interface IMidiPortBindings
     IReadOnlyList<string> DevicesWith(IEnumerable<MidiPortBinding>? bindings, MidiPortRole role);
 
     /// <summary>
+    /// Every port that has to be open: everything with a job, and the clock being followed.
+    /// </summary>
+    /// <remarks>
+    /// **A job is not the only reason to listen to a port, and it was treated as one.** The
+    /// clock a transport follows arrives at an input like everything else, and the page offers
+    /// every port on the machine to choose it from rather than only the ones with a job, so
+    /// choosing a port that had none opened nothing at all: no tick arrived, the transport
+    /// waited for a clock that was not coming, and the settings went on saying it was following.
+    /// From a chair that is a sync feature that does not work, with nothing anywhere saying why.
+    ///
+    /// **The two reasons are deliberately not folded into one.** Following a port's clock is not
+    /// giving it a job in SETTINGS and must not appear to have: what arrives on it goes to the
+    /// clock and no further, which is <c>MidiDispatcher</c>'s business, and whether that device
+    /// should also drive the pads is somebody's own decision that this must not make for them.
+    /// So the port is opened and its role stays None.
+    ///
+    /// The clock port is last, since it is the reason that was added rather than the ordinary
+    /// one, and it is left out where it already has a job: a port opened twice is a port closed
+    /// once. Compared without regard to case, like every other port name here.
+    ///
+    /// Nothing is listened to for a clock while the transport is on its own, and nothing where
+    /// no port was chosen, which is every installation that has not asked to follow anything.
+    /// </remarks>
+    /// <param name="cfg">The MIDI settings as they stand, or null.</param>
+    IReadOnlyList<string> Listening(MidiConfig? cfg);
+
+    /// <summary>
     /// The list the settings page shows: everything connected, then anything bound that is not
     /// plugged in right now.
     /// </summary>

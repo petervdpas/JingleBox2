@@ -823,9 +823,14 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
 
     /// <summary>Whether this platform has an answer for real-time scheduling at all.</summary>
     /// <remarks>
-    /// Windows has its own way of saying a thread is for audio and it is not written here yet, so
-    /// the switch is shown but cannot be moved there: a control that does nothing is worse than a
-    /// control that says why.
+    /// The real-time scheduler is a Linux idea, so the switch is shown and cannot be moved
+    /// anywhere else: a control that does nothing is worse than a control that says why.
+    ///
+    /// **It is not the question of whether the threads are scheduled for audio at all**, which
+    /// they ask to be on every platform. Windows says it the other way, through the multimedia
+    /// class scheduler, and that is asked for on every run without this switch, so a greyed tick
+    /// there means this particular mechanism is absent rather than that nothing was arranged.
+    /// <see cref="RealtimeHint"/> is where that is said to somebody looking at it.
     /// </remarks>
     public bool RealtimeAvailable => _realtime.Possible;
 
@@ -1392,8 +1397,11 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// <summary>What the switch means, said plainly enough to choose by.</summary>
     public string RealtimeHint =>
         !RealtimeAvailable
-            ? "Not on this system yet. Windows has its own way of saying a thread is for audio " +
-              "and this application does not use it, so there is nothing to switch on here."
+            ? "Nothing to switch here, and nothing missing. This tick is the real-time " +
+              "scheduler, which only Linux has. On Windows the mixing thread and each plugin's " +
+              "audio thread already ask to be treated as audio, through the system's own Pro " +
+              "Audio class, which hands back a share of every interval rather than the machine " +
+              "and needs nobody's permission. The log says which of the two you got."
             : _cfg.RealtimeAudio
                 ? "The mixing thread and each plugin's own audio thread run ahead of everything " +
                   "else on the machine, which is what every serious audio application here does. " +

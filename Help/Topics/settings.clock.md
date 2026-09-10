@@ -17,8 +17,8 @@ own and answers to nothing outside. The tempo in the song is the tempo.
 
 ## Following another machine
 
-On, the transport runs on MIDI clock arriving at one port. One port and not several — a transport
-following two clocks is following neither.
+On, the transport runs on MIDI clock arriving at one port. One port and not several, since a
+transport following two clocks is following neither.
 
 With no port chosen, or one that is not plugged in, the transport stays on its own clock rather
 than refusing to play. A cable left in the other room is not a decision to stop working, and the
@@ -75,8 +75,8 @@ the port is the expensive part at 80 ms or more, so it happens when you tick the
 while the music is running.
 
 Ticks are placed within about a tenth of a millisecond of where they belong. What happens after
-that — the operating system's own buffering, and a MIDI cable that carries a byte in 320
-microseconds — is beyond anything this program can see or control.
+that (the operating system's own buffering, and a MIDI cable that carries a byte in 320
+microseconds) is beyond anything this program can see or control.
 
 ## Lines and ticks
 

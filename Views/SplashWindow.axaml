@@ -44,7 +44,20 @@
              VerticalAlignment="Center"
              Source="{svg:SvgImage avares://JingleBox2/Assets/splash.svg}" />
 
-      <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,10,0" Spacing="2">
+      <!-- The room down the right is the drawing's own, said again on this side.
+
+           The artwork is 290 wide and carries about 14 of transparent margin inside it, so the
+           18 this grid leaves comes out as 32 from the window to the horn. Nothing was leaving
+           the same on the right: the column is as wide as the widest thing in it, that was the
+           status line rather than the title, and the difference showed as 99 from the "x" to the
+           edge against 32 on the left, 32 above and 25 below. One side of a frame three times
+           the other three reads as a layout that did not finish, which is what the title's own
+           note says about the title.
+
+           So the title is what sets the column, and the 14 here is the drawing's own margin
+           given back on the other side. Whichever of the two is wider, the gap from the last
+           letter to the border is this margin plus the grid's and nothing else. -->
+      <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,14,0" Spacing="2">
         <!-- One word, since that is the name. Set to fill the width it has: a title with a
              third of the window empty beside it reads as a layout that did not finish.
 
@@ -69,8 +82,14 @@
              A width of its own rather than one the words decide. The window sizes itself to
              what is in it, so a long name arriving would move the whole thing sideways while
              somebody is reading it; at a fixed width the layout is settled by the first frame
-             and only the words inside it change. -->
-        <TextBlock x:Name="DoingText" Text="Starting" FontSize="13" Width="300"
+             and only the words inside it change.
+
+             The number is the title's own width rather than a round one, so that this is never
+             the widest thing in the column and the room down the right stays the drawing's
+             margin said back. It was 300, which was 74 wider than the title and was the whole
+             of why that side of the frame was three times the other three. Under it by a hair
+             on a wider face, and the title simply governs instead. -->
+        <TextBlock x:Name="DoingText" Text="Starting" FontSize="13" Width="226"
                    TextWrapping="Wrap"
                    Foreground="#EBD7FF" Opacity="0.65" Margin="0,2,0,0" />
 
@@ -80,7 +99,7 @@
 
              Always there, empty or not, so the block is the same height throughout and the
              window does not grow the first time something is said under a heading. -->
-        <TextBlock x:Name="UnderText" Text="" FontSize="13" Width="288"
+        <TextBlock x:Name="UnderText" Text="" FontSize="13" Width="214"
                    TextWrapping="Wrap"
                    Foreground="#EBD7FF" Opacity="0.9" Margin="12,1,0,0" />
 

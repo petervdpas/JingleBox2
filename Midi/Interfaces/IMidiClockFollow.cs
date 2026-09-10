@@ -16,7 +16,7 @@ namespace JingleBox2.Midi.Interfaces;
 /// decision this type exists to encode, and it costs no code at all: waiting for a tick that
 /// never comes is holding. The pass stays on its line, whatever is sounding goes on sounding and
 /// decays as it would, and when ticks start again it carries on from where it was. The
-/// alternative — deciding after some length of silence that the master has gone and stopping —
+/// alternative, deciding after some length of silence that the master has gone and stopping,
 /// would mean picking that length, and any length is wrong: a master paused for a bar and a
 /// master unplugged look identical on the wire and only one of them wants the music to stop.
 ///

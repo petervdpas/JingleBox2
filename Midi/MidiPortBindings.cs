@@ -51,6 +51,29 @@ public sealed class MidiPortBindings : IMidiPortBindings
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Built on <see cref="DevicesWith"/> rather than walking the bindings again, so what has a
+    /// job means one thing here and there.
+    /// </remarks>
+    public IReadOnlyList<string> Listening(MidiConfig? cfg)
+    {
+        if (cfg is null) return Array.Empty<string>();
+
+        var open = new List<string>(DevicesWith(cfg.Devices, EveryRole));
+
+        if (cfg.ClockSource != MidiClockSource.Followed) return open;
+
+        string? clock = cfg.ClockPort?.Trim();
+
+        if (string.IsNullOrWhiteSpace(clock)) return open;
+        if (open.Contains(clock, NameComparer)) return open;
+
+        open.Add(clock);
+
+        return open;
+    }
+
+    /// <inheritdoc/>
     public IReadOnlyList<string> DevicesWith(IEnumerable<MidiPortBinding>? bindings, MidiPortRole role)
     {
         if (bindings is null || role == MidiPortRole.None) return Array.Empty<string>();
