@@ -32,4 +32,15 @@ public sealed class NoMonitorFeed : IMonitorFeed
     /// <inheritdoc/>
     /// <remarks>Remembered and nothing else, since there is no bus here to be heard on.</remarks>
     public bool Heard { get; set; }
+
+    /// <inheritdoc/>
+    /// <remarks>Nothing is listened to here, so nothing ever rings.</remarks>
+    public event System.Action? Rang
+    {
+        add { }
+        remove { }
+    }
+
+    /// <inheritdoc/>
+    public bool HearsTheRoom { get; set; }
 }

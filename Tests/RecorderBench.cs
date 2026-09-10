@@ -29,6 +29,9 @@ public sealed class RecorderBench
     /// <summary>What an output is playing, which may not: listening to it is a loop.</summary>
     public static readonly AudioRoute Speakers = new("Speakers.monitor", "Speakers", AudioRouteKind.Monitor);
 
+    /// <summary>A capture device, which is the only kind that has ever been near a room.</summary>
+    public static readonly AudioRoute Microphone = new("Mic", "Microphone", AudioRouteKind.Input);
+
     /// <summary>A routing that answers yes and writes down what it was asked.</summary>
     public sealed class Rewiring : IAudioRouting
     {
@@ -42,7 +45,7 @@ public sealed class RecorderBench
         public bool IsAvailable => true;
 
         /// <inheritdoc/>
-        public IReadOnlyList<AudioRoute> GetRoutes() => new[] { Firefox, Speakers };
+        public IReadOnlyList<AudioRoute> GetRoutes() => new[] { Firefox, Speakers, Microphone };
 
         /// <summary>What was last connected, which is what the graph would then be showing.</summary>
         /// <remarks>
@@ -96,11 +99,37 @@ public sealed class RecorderBench
 
         /// <inheritdoc/>
         public void GiveBack() => Back++;
+
+        /// <summary>
+        /// What this subsystem will say about whose output a monitor is.
+        /// </summary>
+        /// <remarks>
+        /// Set by a test rather than worked out, since what is being exercised is what the page
+        /// does with each of the three answers and not how any real subsystem reaches one.
+        /// Nothing by default, which is the cautious answer and is what every test written before
+        /// this one was leaning on.
+        /// </remarks>
+        public bool? Ours;
+
+        /// <inheritdoc/>
+        public bool? IsOurOutput(AudioRoute source, string? output) => Ours;
     }
 
     /// <summary>A recorder that captures nothing and remembers what it was told.</summary>
     public sealed class Deaf : IRecordingService
     {
+        /// <inheritdoc/>
+        /// <remarks>Written down so a test can read what the page decided about the source.</remarks>
+        public bool HearsTheRoom { get; set; }
+
+        /// <inheritdoc/>
+        /// <remarks>Nothing rings here: there is no room and no speaker.</remarks>
+        public event System.Action? Rang
+        {
+            add { }
+            remove { }
+        }
+
         /// <inheritdoc/>
         public IReadOnlyList<string> GetInputDevices() => Array.Empty<string>();
 

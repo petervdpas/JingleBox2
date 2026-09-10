@@ -44,4 +44,8 @@ public sealed class NoAudioRouting : IAudioRouting
 
     /// <inheritdoc/>
     public void GiveBack() { }
+
+    /// <inheritdoc/>
+    /// <remarks>Nothing is known here, so nothing is claimed, which reads as a loop.</remarks>
+    public bool? IsOurOutput(AudioRoute source, string? output) => null;
 }

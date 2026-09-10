@@ -221,4 +221,27 @@ public interface IRecordingService
     /// effect on a fresh capture. Does nothing when nothing is open.
     /// </summary>
     void ReopenInput();
+
+    /// <summary>
+    /// Said when what was being listened to started to ring and listening was stopped for it.
+    /// </summary>
+    /// <remarks>
+    /// **The stopping is done here rather than left to whoever hears this**, since the room is
+    /// ringing while the message travels and nothing about drawing a page should be between the
+    /// two. What is left for a listener is saying so.
+    ///
+    /// Raised on the thread the capture arrives on.
+    /// </remarks>
+    event System.Action? Rang;
+
+    /// <summary>
+    /// Whether the chosen source could pick a room up, so the ring detector is worth running.
+    /// </summary>
+    /// <remarks>
+    /// A fact about the source rather than about the recorder, the same way
+    /// <see cref="HearsCapture"/> is: only a capture device has ever been near the air, so an
+    /// output's own playback and a program's audio are never watched. See
+    /// <see cref="IMonitorFeed.HearsTheRoom"/>.
+    /// </remarks>
+    bool HearsTheRoom { get; set; }
 }

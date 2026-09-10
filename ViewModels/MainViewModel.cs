@@ -2211,6 +2211,8 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
 
         if (SelectedOutputDevice != null)
         {
+            Record.PlayingOut = SelectedOutputDevice.Name;
+
             _audio.SetOutputDevice(SelectedOutputDevice.Id);
             Tracker.ReopenAudio();
         }
@@ -2658,6 +2660,8 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
                 Tracker.ReopenAudio();
 
                 SaySoloable();
+
+                Record.PlayingOut = SelectedOutputDevice.Name;
 
                 Record.OutputMoved();
 

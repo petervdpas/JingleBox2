@@ -12,7 +12,7 @@ public sealed class AudioRoutingFactory : IAudioRoutingFactory
         var pipewire = new PipeWireRouting();
         if (pipewire.IsAvailable) return pipewire;
 
-        var loopback = new WindowsLoopbackRouting(recording, silent);
+        var loopback = new WindowsRouting(recording, silent);
         if (loopback.IsAvailable) return loopback;
 
         return new NoAudioRouting();

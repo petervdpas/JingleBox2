@@ -35,6 +35,18 @@ public class ProgramCaptureTests
     /// <summary>A recorder that answers plainly and writes down what was set on it.</summary>
     private sealed class Bench : IRecordingService
     {
+        /// <inheritdoc/>
+        /// <remarks>Written down so a test can read what the page decided about the source.</remarks>
+        public bool HearsTheRoom { get; set; }
+
+        /// <inheritdoc/>
+        /// <remarks>Nothing rings here: there is no room and no speaker.</remarks>
+        public event System.Action? Rang
+        {
+            add { }
+            remove { }
+        }
+
         /// <summary>The programs it will say are playing.</summary>
         public List<AudioProgram> Playing { get; } = new();
 
@@ -148,7 +160,7 @@ public class ProgramCaptureTests
         var bench = new Bench();
         bench.Playing.Add(new AudioProgram(4321, "firefox"));
 
-        var routes = new WindowsLoopbackRouting(bench).GetRoutes();
+        var routes = new WindowsRouting(bench).GetRoutes();
 
         if (!OperatingSystem.IsWindows())
         {
@@ -173,7 +185,7 @@ public class ProgramCaptureTests
         var bench = new Bench();
         bench.Playing.Add(new AudioProgram(4321, "firefox"));
 
-        var routes = new WindowsLoopbackRouting(bench).GetRoutes();
+        var routes = new WindowsRouting(bench).GetRoutes();
 
         if (!OperatingSystem.IsWindows()) return;
 
@@ -198,7 +210,7 @@ public class ProgramCaptureTests
         bench.Playing.Add(new AudioProgram(4321, "firefox"));
         bench.Outputs.Add(new LoopbackDevice(3, "Speakers"));
 
-        var routing = new WindowsLoopbackRouting(bench);
+        var routing = new WindowsRouting(bench);
         var routes = routing.GetRoutes();
 
         routing.Connect(routes.Single(r => r.Node == "program:4321"));
@@ -227,7 +239,7 @@ public class ProgramCaptureTests
     {
         var bench = new Bench();
 
-        var routing = new WindowsLoopbackRouting(bench);
+        var routing = new WindowsRouting(bench);
 
         Assert.False(routing.Connect(new AudioRoute("program:not-a-number", "?", AudioRouteKind.Application)));
         Assert.Null(bench.LoopbackProgram);

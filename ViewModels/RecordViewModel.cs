@@ -645,6 +645,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         _recordingService.GainDb = cfg.RecordGainDb;
         _gainLoaded = true;
 
+        _recordingService.Rang += Ringing;
+
         RefreshDevices();
         _deviceLoaded = true;
 
@@ -2118,10 +2120,55 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         }
     }
 
+    /// <summary>
+    /// What this application plays out of, by name, so a loop can be told from a second card.
+    /// </summary>
+    /// <remarks>
+    /// Told rather than looked up, because the page has no engine and no device list: whoever owns
+    /// the output picker knows which one is chosen and is the only thing that hears it move.
+    ///
+    /// **Said again whenever it moves**, or the answer goes stale in the one direction that
+    /// matters: an output changed to the very card the source is a monitor of would go on being
+    /// heard, which is the loop this exists to refuse. See <see cref="OutputMoved"/>.
+    /// </remarks>
+    public string? PlayingOut
+    {
+        get => playingOut;
+        set
+        {
+            if (string.Equals(playingOut, value, StringComparison.Ordinal)) return;
+
+            playingOut = value;
+
+            Listening();
+        }
+    }
+
+    /// <summary>Backing field for <see cref="PlayingOut"/>.</summary>
+    private string? playingOut;
+
     /// <inheritdoc/>
+    /// <remarks>
+    /// Two questions and the second one belongs to the routing. Anything that is not an output's
+    /// own playback cannot come back round however it is named, which is a microphone, a line in
+    /// and a program; what an output is playing can, but only where that output is the one this
+    /// application plays out of. Another output's is the ordinary way anybody records a second
+    /// program and goes back to nowhere.
+    ///
+    /// **Which output it is is asked of the subsystem rather than worked out here**, because the
+    /// names come from whatever wired the machine up and only the subsystem knows how its own
+    /// work: see <see cref="Audio.Routing.Interfaces.IAudioRouting.IsOurOutput"/>. It has three
+    /// answers and the comparison is against <c>false</c> deliberately, so that cannot tell falls
+    /// in with ours: being wrong that way is a switch that does nothing, and being wrong the other
+    /// way is a room full of feedback at whatever the master is set to.
+    ///
+    /// It used to read the kind alone and refuse every monitor, which is right on a machine with
+    /// one output and silently wrong on a machine with two: the switch was on, the source was
+    /// chosen, the capture was left off the recorder's bus, and the line said it was a loop.
+    /// </remarks>
     public bool CanHear =>
-        SelectedRoute is not { } source ||
-        source.Kind != Audio.Routing.Enums.AudioRouteKind.Monitor;
+        SelectedRoute is not { Kind: Audio.Routing.Enums.AudioRouteKind.Monitor } source ||
+        _routing.IsOurOutput(source, PlayingOut) == false;
 
     /// <summary>
     /// Turns listening off where the source that has just been chosen cannot be listened to.
@@ -2148,12 +2195,35 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         OnPropertyChanged(nameof(CanHear));
 
         _recordingService.HearsCapture = CanHear;
+        _recordingService.HearsTheRoom =
+            SelectedRoute?.Kind == Audio.Routing.Enums.AudioRouteKind.Input;
 
         if (CanHear || !_recordingService.Hearing) return;
 
-        Status = "What an output is playing cannot be heard through the desk, since that is a loop. "
+        Status = "'" + (SelectedRoute?.Name ?? "That output") + "' is what this application plays "
+            + "out of, so what it is playing cannot also be heard through it: that is a loop. "
             + "Anything else the recorder is carrying still is.";
     }
+
+    /// <summary>
+    /// Says why listening stopped, in words somebody can act on.
+    /// </summary>
+    /// <remarks>
+    /// **What it says is what to do, not what happened.** This is for whoever has just discovered
+    /// a monitor path by accident, so naming the phenomenon would be the least useful sentence
+    /// available: the two things that actually end it are headphones and distance.
+    ///
+    /// Handed to the drawing thread, since it arrives on the one the capture is on and everything
+    /// under it draws.
+    /// </remarks>
+    private void Ringing() => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+    {
+        OnPropertyChanged(nameof(Hearing));
+
+        Status = "That started to ring, so listening stopped. It happens when what is coming out of "
+            + "the speakers reaches the microphone again. Use headphones, or move the microphone "
+            + "away from the speakers, then tick Hear it once more.";
+    });
 
     /// <summary>Backing field for <see cref="TakeAside"/>.</summary>
     private bool takeAside;
@@ -2229,6 +2299,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     public void OutputMoved()
     {
+        Listening();
+
         if (!TakeAside) return;
 
         TakeAside = false;
@@ -2306,6 +2378,20 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     ///
     /// What was applied is then shown, with the reading guard up so that showing it does not
     /// count as a fresh choice and start the whole thing again.
+    ///
+    /// **The loop is said again at the end, and it has to be, because this is what was writing
+    /// over it.** Choosing a source says whether it can be heard at once, since by then the audio
+    /// would already be going round; this then ran and put "Taking audio from" and "Recording
+    /// from" on the line after it, so the one sentence explaining why nothing is heard was on the
+    /// screen for as long as it took a thread to be given a core. From a chair that is a source
+    /// that is silent with nothing anywhere saying why, which is exactly what the switch was
+    /// reported as.
+    ///
+    /// It cost a test the day it was found, and the way it cost it is worth keeping: the test
+    /// passed by relying on this method still being in flight when the source changed under it, so
+    /// it was green for a reason that had nothing to do with what it was about. **A race can be
+    /// stably won as well as stably lost**, and the tell was that it failed three times out of
+    /// three after a change that only made the work either side of it a little longer.
     /// </remarks>
     /// <param name="route">The input to wire up, taken from the picker or from what was preferred last.</param>
     /// <param name="announce">
@@ -2329,6 +2415,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             if (connected) Status = $"Recording from {route.Display}";
             else if (announce) Status = $"{route.Name} is not giving anything to record yet. It will be picked up as soon as it does.";
+
+            Listening();
         }
         catch (Exception ex)
         {

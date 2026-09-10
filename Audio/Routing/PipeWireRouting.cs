@@ -597,4 +597,20 @@ public sealed class PipeWireRouting : IAudioRouting
 
         return null;
     }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// **Nothing, deliberately, which reads as a loop and is what this machine already did.** A
+    /// monitor here is named with the node's own description, or with the node id where it has
+    /// none, and the output is whatever the audio library calls the device. Those are two
+    /// registries rather than two spellings of one, so a name that matches proves the case and a
+    /// name that does not prove nothing at all: the dangerous answer is the confident no.
+    ///
+    /// It can be answered properly and the graph is where: this application's own output node is
+    /// linked to a sink, and which sink that is is the whole of the question. What stops it being
+    /// written here is that it cannot be tried from the machine this was written on, and a guess
+    /// at it would be a guess about feedback in somebody's room. Until then every monitor source
+    /// is refused a place on the recorder's bus, exactly as before this existed.
+    /// </remarks>
+    public bool? IsOurOutput(AudioRoute source, string? output) => null;
 }

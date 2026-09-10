@@ -23,6 +23,35 @@ public sealed class MonitorFeed : IMonitorFeed
     /// <summary>A block through the chain, the same pass a pad's chain goes through.</summary>
     private readonly IInsertPass _pass;
 
+    /// <summary>What listens for the room starting to ring.</summary>
+    private readonly IFeedbackWatch _watch;
+
+    /// <inheritdoc/>
+    public event Action? Rang;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Read under the lock beside <c>Heard</c>, since both are set from the thread things are
+    /// drawn on and read on the one the capture arrives on.
+    /// </remarks>
+    public bool HearsTheRoom
+    {
+        get { lock (_lock) return _hearsTheRoom; }
+
+        set
+        {
+            lock (_lock)
+            {
+                _hearsTheRoom = value;
+
+                if (value) _watch.Clear();
+            }
+        }
+    }
+
+    /// <summary>Backing field for <see cref="HearsTheRoom"/>.</summary>
+    private bool _hearsTheRoom;
+
     /// <summary>Held while the stream is made, hooked or let go.</summary>
     private readonly object _lock = new();
 
@@ -78,11 +107,17 @@ public sealed class MonitorFeed : IMonitorFeed
     /// <param name="bus">The monitor bus, which is the IN strip's own.</param>
     /// <param name="floats">How a captured block is read, or the ordinary rule.</param>
     /// <param name="pass">How a block goes through the chain, or the ordinary one.</param>
-    public MonitorFeed(IOutputBus bus, IStereoFloats? floats = null, IInsertPass? pass = null)
+    /// <param name="watch">
+    /// What listens for the room ringing, or the ordinary one. Handed in so the path can be put a
+    /// question to with a watch that never fires, or one that always does.
+    /// </param>
+    public MonitorFeed(IOutputBus bus, IStereoFloats? floats = null, IInsertPass? pass = null,
+                       IFeedbackWatch? watch = null)
     {
         _bus = bus;
         _floats = floats ?? new StereoFloats();
         _pass = pass ?? new InsertPass();
+        _watch = watch ?? new FeedbackWatch();
         _dspProcedure = OnDsp;
     }
 
@@ -111,6 +146,7 @@ public sealed class MonitorFeed : IMonitorFeed
 
             _stream = made;
             _width = Math.Max(1, channels);
+            _rate = Math.Max(1, rate);
             _mostWaiting = (int)(Math.Max(1, rate) * MostWaitingSeconds) * StreamChannels * sizeof(float);
             _saidFull = false;
 
@@ -131,6 +167,8 @@ public sealed class MonitorFeed : IMonitorFeed
     public void Push(byte[] data, int bytes)
     {
         if (data == null || bytes <= 0) return;
+
+        bool rang = false;
 
         lock (_lock)
         {
@@ -161,7 +199,11 @@ public sealed class MonitorFeed : IMonitorFeed
             Bass.StreamPutData(_stream, _ready, written * sizeof(float));
 
             Attach();
+
+            rang = _heard && _hearsTheRoom && _watch.Ringing(_ready, written, _rate);
         }
+
+        if (rang) Rang?.Invoke();
     }
 
     /// <summary>How wide the capture handing blocks over is.</summary>
@@ -170,6 +212,9 @@ public sealed class MonitorFeed : IMonitorFeed
     /// about its own width. Set when the path is opened, which is when the capture is.
     /// </remarks>
     private int _width = 2;
+
+    /// <summary>What the capture handing blocks over is running at.</summary>
+    private int _rate = 44100;
 
     /// <summary>How many bytes are waiting to be pulled, which is what the library answers to nothing.</summary>
     private int Waiting()
@@ -240,6 +285,8 @@ public sealed class MonitorFeed : IMonitorFeed
             lock (_lock)
             {
                 _heard = value;
+
+                if (value) _watch.Clear();
 
                 _bus.Level = value ? 1f : 0f;
             }

@@ -86,4 +86,43 @@ public interface IMonitorFeed
     /// stops is anybody hearing it, which is what Hear it says.
     /// </remarks>
     bool Heard { get; set; }
+
+    /// <summary>
+    /// Said the moment what is being listened to has started to ring.
+    /// </summary>
+    /// <remarks>
+    /// **Acoustic feedback, which is the one loop nothing about the wiring can see**: the signal
+    /// leaves through a speaker and comes back through a microphone, and the only evidence is in
+    /// the audio. Watched here rather than anywhere else because this is the only path in the
+    /// application where that can happen — a delay at the top of its feedback knob is somebody's
+    /// sound and must never be caught by this.
+    ///
+    /// Raised on the thread the capture arrives on, so whoever answers it is expected to get
+    /// itself somewhere else before touching anything that draws.
+    ///
+    /// Said once and then latched. Setting <see cref="Heard"/> true again is what arms it, which
+    /// is the deliberate act of asking to listen after having been told why it stopped.
+    /// </remarks>
+    event System.Action? Rang;
+
+    /// <summary>
+    /// Whether what is being listened to could pick a room up, which is the only thing that rings.
+    /// </summary>
+    /// <remarks>
+    /// **The gate that makes the ring detector possible rather than merely careful.** Acoustic
+    /// feedback needs a microphone: something has to hear the speakers. A capture device might;
+    /// what an output is playing and what a program is playing cannot, because neither has ever
+    /// been near the air in the room. So on those two the question is not asked at all rather
+    /// than asked and answered no.
+    ///
+    /// **Structure beats a threshold, and this was arrived at the expensive way.** Every attempt
+    /// to separate a ring from music by its shape alone was a number that had to be tuned, and
+    /// each one that was tuned was wrong on somebody's material: a low swell off a second card
+    /// read as a lone tone five times in twenty seconds. None of that judgement was needed, since
+    /// nothing that source carries can ever come back through the air.
+    ///
+    /// False unless something says otherwise, so a path nobody has described is quiet rather than
+    /// opinionated.
+    /// </remarks>
+    bool HearsTheRoom { get; set; }
 }

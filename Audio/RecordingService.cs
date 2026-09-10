@@ -497,10 +497,50 @@ public sealed class RecordingService : IRecordingService, IDisposable
     public void TakeFrom(Interfaces.IOutputBus bus) => _tap.Follow(bus);
 
     /// <inheritdoc/>
+    /// <inheritdoc/>
+    public event Action? Rang;
+
+    /// <inheritdoc/>
+    public bool HearsTheRoom
+    {
+        get => _hearsTheRoom;
+
+        set
+        {
+            _hearsTheRoom = value;
+
+            if (_monitor != null) _monitor.HearsTheRoom = value;
+        }
+    }
+
+    /// <summary>Backing field for <see cref="HearsTheRoom"/>.</summary>
+    private bool _hearsTheRoom;
+
+    /// <summary>
+    /// Stops listening because the room has started to ring, and says so.
+    /// </summary>
+    /// <remarks>
+    /// Hearing is put down rather than ducked, which is what was asked for and is the right answer
+    /// for who this happens to: somebody who does not yet know what a monitor path is should have
+    /// to ask for it again rather than have it creep back and ring a second time.
+    /// </remarks>
+    private void Ringing()
+    {
+        Hearing = false;
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
+            () => "monitor: what is coming in started to ring, so listening was stopped");
+
+        Rang?.Invoke();
+    }
+
+    /// <inheritdoc/>
     public void HearThrough(Interfaces.IMonitorFeed monitor)
     {
         _monitor = monitor;
         _monitor.Insert = _effect;
+        _monitor.Rang += Ringing;
+        _monitor.HearsTheRoom = _hearsTheRoom;
     }
 
     /// <summary>Backing field for <see cref="Hearing"/>.</summary>

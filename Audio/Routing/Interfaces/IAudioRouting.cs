@@ -121,4 +121,31 @@ public interface IAudioRouting
     /// this program has closed is the worst thing this feature could do.
     /// </remarks>
     void GiveBack();
+
+    /// <summary>
+    /// Whether that source is this application's own output coming back, so far as this
+    /// subsystem can tell.
+    /// </summary>
+    /// <remarks>
+    /// **Asked here because only the subsystem knows how its own names work.** What an output is
+    /// playing can be captured, and hearing that through the same output sends it round again;
+    /// hearing a *different* output's is the ordinary way anybody records another program and goes
+    /// round nothing. Telling the two apart means matching a source against a device, and the two
+    /// are named by whatever wired this machine up.
+    ///
+    /// On Windows both halves come out of the same endpoint naming, so they can be compared. On a
+    /// graph they need not: a node carries the description its owner gave it and the output is
+    /// whatever the audio library calls the device, and those are two different registries. So the
+    /// question is put to each subsystem rather than answered once above them with a comparison
+    /// that happens to work on the machine it was written on.
+    ///
+    /// **Nothing is a fourth answer.** Cannot tell is a real state and it is not the same as no:
+    /// whoever asks is expected to read it as a loop, since being wrong the other way is a room
+    /// full of feedback at whatever the master is set to. A subsystem that has not been taught to
+    /// tell says nothing rather than guessing.
+    /// </remarks>
+    /// <param name="source">The source that has been chosen.</param>
+    /// <param name="output">What this application plays out of, by name.</param>
+    /// <returns>True where it is ours, false where it is another output's, nothing where it cannot be told.</returns>
+    bool? IsOurOutput(AudioRoute source, string? output);
 }

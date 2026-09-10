@@ -21,7 +21,7 @@ namespace JingleBox2.Audio.Routing;
 /// Setting the recorder's loopback device reopens the capture, so a route picked here is heard
 /// straight away rather than the next time the input happens to be opened.
 /// </remarks>
-public sealed class WindowsLoopbackRouting : IAudioRouting
+public sealed class WindowsRouting : IAudioRouting
 {
     /// <summary>
     /// In front of an output's number, for a route that records what that output is playing.
@@ -59,7 +59,7 @@ public sealed class WindowsLoopbackRouting : IAudioRouting
     /// What tells the system where a program plays. Defaulted to the machine's own, so a caller
     /// who does not care pays nothing and a test can hand one in.
     /// </param>
-    public WindowsLoopbackRouting(
+    public WindowsRouting(
         IRecordingService recording,
         ISilentOutput? silent = null,
         IProgramOutput? output = null)
@@ -319,5 +319,24 @@ public sealed class WindowsLoopbackRouting : IAudioRouting
             if (string.Equals(output.Id, chosen, StringComparison.Ordinal)) return chosen;
 
         return null;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Answered by the name, and here that is sound rather than a hopeful guess: a monitor route
+    /// is built from <c>GetLoopbackDevices</c> and the output picker is built from the same
+    /// endpoints, so both halves are the system's own word for the same device. The indices are
+    /// not comparable and the names are, which is why it is the name that is read.
+    ///
+    /// Trimmed and without regard to case, like every other name compared here. With no output
+    /// chosen there is nothing to compare it against, which is the cannot-tell answer rather than
+    /// a no.
+    /// </remarks>
+    public bool? IsOurOutput(AudioRoute source, string? output)
+    {
+        if (source is null) return null;
+        if (string.IsNullOrWhiteSpace(output)) return null;
+
+        return string.Equals(source.Name.Trim(), output.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 }
