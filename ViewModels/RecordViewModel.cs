@@ -1878,9 +1878,17 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         Listening();
 
-        if (_readingRoute || value == null) return;
+        if (_readingRoute) return;
+
+        if (value == null)
+        {
+            Agree();
+
+            return;
+        }
 
         _preferredRoute = value;
+
         ApplyRoute(value, announce: true);
 
         Agree();
@@ -1958,10 +1966,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             Standing();
             Agree();
-
-            Status = value
-                ? "What is coming in is being heard through the desk."
-                : "The input is no longer being heard.";
         }
     }
 
@@ -2189,11 +2193,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         _recordingService.HearsTheRoom =
             SelectedRoute?.Kind == Audio.Routing.Enums.AudioRouteKind.Input;
 
-        if (CanHear || !_recordingService.Hearing) return;
-
-        Status = "'" + (SelectedRoute?.Name ?? "That output") + "' is what this application plays "
-            + "out of, so what it is playing cannot also be heard through it: that is a loop. "
-            + "Anything else the recorder is carrying still is.";
     }
 
     /// <summary>
@@ -2231,10 +2230,41 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     private void Agree()
     {
-        string said = _input.Set(SelectedRoute, Hearing, PlayingOut);
+        _aside = _input.Set(SelectedRoute, Hearing, PlayingOut);
+
+        Said(connected: true);
+    }
+
+    /// <summary>What became of taking the chosen source off its own output.</summary>
+    /// <remarks>
+    /// Kept because the act and the wording happen at different moments: the arrangement is made
+    /// the instant somebody chooses, and whether the source is really giving anything is only
+    /// known once a connection has come back. Without this the second sentence would have to make
+    /// the arrangement again to know what to say, which is giving a source back and taking it off
+    /// again for the sake of a word.
+    /// </remarks>
+    private Audio.Routing.Enums.InputAside _aside;
+
+    /// <summary>
+    /// Puts the input channel's one sentence on the status line.
+    /// </summary>
+    /// <remarks>
+    /// **Said twice on a route change and from one place both times, which is not the fault this
+    /// replaced.** The first is the outcome as it is known at once and the second is the same
+    /// sentence with the connection's answer in it, so the later one is strictly better informed
+    /// rather than merely later. What was there before was five different writers whose order
+    /// depended on when a thread came back.
+    /// </remarks>
+    /// <param name="connected">Whether the source is really giving anything yet.</param>
+    private void Said(bool connected)
+    {
+        string said = _words.Line(SelectedRoute, Hearing, CanHear, _aside, connected);
 
         if (said.Length > 0) Status = said;
     }
+
+    /// <summary>The one place the input channel's own wording lives.</summary>
+    private readonly Audio.Routing.Interfaces.IInputWords _words = new Audio.Routing.InputWords();
 
     /// <summary>
     /// Puts a source that was taken aside back, and says so.
@@ -2363,7 +2393,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         try
         {
             _applyingRoute = true;
-            if (announce) Status = $"Taking audio from {route.Name}...";
+            if (announce) Status = _words.Taking(route);
 
             bool connected = await Task.Run(() => _routing.Connect(route));
 
@@ -2372,10 +2402,9 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             if (connected && showing != null) SelectedRoute = showing;
             _readingRoute = false;
 
-            if (connected) Status = $"Recording from {route.Display}";
-            else if (announce) Status = $"{route.Name} is not giving anything to record yet. It will be picked up as soon as it does.";
-
             Listening();
+
+            Said(connected);
         }
         catch (Exception ex)
         {

@@ -38,12 +38,17 @@ public sealed class OutputMovedTests
 
         bench.Page.SelectedRoute = RecorderBench.Firefox;
 
+        int back = bench.Wiring.Back;
+
         Assert.True(bench.Wiring.Aside > 0, "the source was never taken off its own output");
 
         bench.Page.OutputMoved();
 
         Assert.Null(bench.Page.SelectedRoute);
-        Assert.True(bench.Wiring.Back > 0, "the machine was never put back");
+        Assert.True(bench.Wiring.Back > back,
+            "nothing was put back when the output moved; giving back was only ever the one that "
+            + "happens on the way into choosing a source, so this passed while a browser stayed "
+            + "unplugged");
     }
 
     /// <summary>And it says so, since a source put back silently reads as a fault.</summary>

@@ -41,7 +41,7 @@ public sealed class InputPath : IInputPath
     }
 
     /// <inheritdoc/>
-    public string Set(AudioRoute? source, bool heard, string? playingOut)
+    public InputAside Set(AudioRoute? source, bool heard, string? playingOut)
     {
         Source = source;
         Heard = heard;
@@ -49,20 +49,13 @@ public sealed class InputPath : IInputPath
 
         _routing.GiveBack();
 
-        if (source == null) return "";
-
-        if (!CanHear(source, playingOut))
-            return source.Display + " is what this application plays out of, so what it is "
-                + "playing cannot also be heard through it: that is a loop.";
-
-        if (!_routing.TakeAside(source))
-            return source.Display + " could not be taken off its own output.";
+        if (source == null) return InputAside.Nothing;
+        if (!CanHear(source, playingOut)) return InputAside.Nothing;
+        if (!_routing.TakeAside(source)) return InputAside.Refused;
 
         _moved = true;
 
-        return heard
-            ? source.Display + " is coming through the desk and nowhere else."
-            : source.Display + " is on the input, off its own output, and is not being heard.";
+        return InputAside.Moved;
     }
 
     /// <summary>Whether the source that is held was really taken off its own output.</summary>

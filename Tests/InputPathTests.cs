@@ -210,11 +210,11 @@ public sealed class InputPathTests
         var route = new Route { Ours = true };
         var path = new InputPath(route);
 
-        string said = path.Set(Speakers, heard: true, Out);
+        var aside = path.Set(Speakers, heard: true, Out);
 
         Assert.Equal(0, route.Aside);
         Assert.False(path.CanHear(Speakers, Out));
-        Assert.Contains("loop", said, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(JingleBox2.Audio.Routing.Enums.InputAside.Nothing, aside);
     }
 
     /// <summary>Cannot tell is read as ours, since the other way round is a room full of it.</summary>
@@ -263,15 +263,19 @@ public sealed class InputPathTests
     }
 
     /// <summary>A machine that cannot take a source aside says so rather than pretending.</summary>
+    /// <remarks>
+    /// Answered as what happened rather than as a sentence about it: refused and never tried are
+    /// different things and the words for them are <c>IInputWords</c>'s.
+    /// </remarks>
     [Fact]
     public void A_machine_that_cannot_move_a_source_says_so()
     {
         var route = new Route { Can = false };
         var path = new InputPath(route);
 
-        string said = path.Set(Firefox, heard: true, Out);
-
-        Assert.Contains("could not be taken off", said, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(
+            JingleBox2.Audio.Routing.Enums.InputAside.Refused,
+            path.Set(Firefox, heard: true, Out));
     }
 
     /// <summary>The arrangement is held over anything that creeps back.</summary>

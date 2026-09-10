@@ -62,8 +62,7 @@ public interface IInputPath
     bool CanHear(AudioRoute? source, string? playingOut);
 
     /// <summary>
-    /// Makes the machine agree with the two facts, and says what happened in words for a status
-    /// line.
+    /// Makes the machine agree with the two facts, and says what became of the taking.
     /// </summary>
     /// <remarks>
     /// Told both at once rather than one at a time, because they are one arrangement: a source
@@ -72,12 +71,18 @@ public interface IInputPath
     ///
     /// Whatever was taken aside is put back first, whichever way either fact went, since a source
     /// that is no longer the input has no business staying unplugged from its own output.
+    ///
+    /// **It answered in prose and now answers what happened**, because the prose was the fault.
+    /// Five things wrote the status line during one gesture and the last one won by accident, so
+    /// the sentence this used to return was written and thrown away a millisecond later on both
+    /// paths anybody uses. The words are <see cref="IInputWords"/>'s alone now, and this says only
+    /// what it did.
     /// </remarks>
     /// <param name="source">What the input is now pointed at, or nothing.</param>
     /// <param name="heard">Whether Hear it is on.</param>
     /// <param name="playingOut">What this application plays out of, by name, for the loop test.</param>
-    /// <returns>A sentence for the status line, or empty where there is nothing worth saying.</returns>
-    string Set(AudioRoute? source, bool heard, string? playingOut);
+    /// <returns>What became of taking the source off its own output.</returns>
+    Enums.InputAside Set(AudioRoute? source, bool heard, string? playingOut);
 
     /// <summary>
     /// Puts back anything that has crept onto its own output since, and says whether any had.
