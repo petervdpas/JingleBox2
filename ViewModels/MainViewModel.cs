@@ -114,6 +114,15 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// <summary>The pads' sound, shared with the tracker rather than opened twice.</summary>
     private readonly IAudioEngine _audio;
 
+    /// <summary>
+    /// The recorder, kept for the one thing above it that has to reach it: the output moving.
+    /// </summary>
+    /// <remarks>
+    /// Every stream on a device goes when that device does, and the path the input is heard
+    /// through is one of them. Nothing else here would know to ask for it again.
+    /// </remarks>
+    private readonly IRecordingService _recording;
+
     /// <summary>Where the settings are written, which is the same file for all of them.</summary>
     private readonly ConfigStore _store;
 
@@ -2076,6 +2085,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null)
     {
         _machines = machines;
+        _recording = recordingService;
         _effects = effects ?? new SoundDevices.SoundEffects.SoundEffectProjects();
         _audio = audio;
         _store = store;
@@ -2643,9 +2653,10 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// device.
     /// </summary>
     /// <remarks>
-    /// Changing the device closes the old one, which takes the tracker's stream with it, so the
-    /// tracker is asked to open its stream again straight afterwards. Nothing else would notice
-    /// until the next note, which is a long way from here.
+    /// Changing the device closes the old one, which takes every stream on it with it, so the two
+    /// that are held elsewhere are asked for again straight afterwards: the tracker's, or nothing
+    /// would notice until the next note, and the path the input is heard through, or Hear it goes
+    /// on saying it is on and nothing comes out for the rest of the session.
     /// </remarks>
     private void OnMainChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -2658,6 +2669,8 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
                 _audio.SetOutputDevice(SelectedOutputDevice.Id);
 
                 Tracker.ReopenAudio();
+
+                _recording.ReopenMonitor();
 
                 SaySoloable();
 

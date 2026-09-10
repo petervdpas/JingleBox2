@@ -171,6 +171,28 @@ public interface IRecordingService
     void HearThrough(IMonitorFeed monitor);
 
     /// <summary>
+    /// Makes the path onto the input's bus again, after the audio device has been taken down.
+    /// </summary>
+    /// <remarks>
+    /// **Opening another output frees everything the old one had, and the path onto the input's
+    /// bus is one of those things.** It is a stream on that device like any other, so the handle
+    /// this side is holding afterwards is a stream that no longer exists: what is captured is
+    /// pushed into nothing, and the dead handle is put on the new bus where it sits carrying
+    /// silence. From a chair that is Hear it working until somebody picks another output and
+    /// never again, whatever the tick says, with nothing anywhere saying why. Turning the tick off
+    /// and on did not help either, since that writes a level rather than making a stream.
+    ///
+    /// So it is said out loud by whoever moved the output, the same way the tracker is asked for
+    /// its stream again: nothing else can know, because being freed is not something a stream is
+    /// told about.
+    ///
+    /// Nothing happens where the input is not open, and nothing happens twice: the path is closed
+    /// before it is made, so this can be said whenever the output moves without anybody asking
+    /// what state it was in.
+    /// </remarks>
+    void ReopenMonitor();
+
+    /// <summary>
     /// Says which bus everything pointed at RECORD lands on, so a take can be written off it.
     /// </summary>
     /// <remarks>

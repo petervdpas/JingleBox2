@@ -30,6 +30,23 @@ public sealed class BassAudioEngine : IAudioEngine
     /// <summary>How a device number names one out of two lists. Holds nothing.</summary>
     private readonly Interfaces.IAudioOutputs _outputs = new AudioOutputs();
 
+    /// <summary>What says whether an endpoint can be had, which is asked by having it.</summary>
+    private readonly Interfaces.IOutputProbe _probe;
+
+    /// <summary>Which of them are worth offering on a machine with a sound server.</summary>
+    private readonly Interfaces.ISoundServerOutput _server = new SoundServerOutput();
+
+    /// <summary>
+    /// This application as a node on the sound server's graph, where there is one.
+    /// </summary>
+    /// <remarks>
+    /// The second thing that can pull the mix, beside a driver, and it is arranged exactly as a
+    /// driver is: the library is opened on its own silent device, the mix is made a decoding
+    /// stream, and this takes blocks out of it. Absent everywhere but Linux, where everything
+    /// below simply goes the way it always did.
+    /// </remarks>
+    private readonly Interfaces.IPipeWireOutput _pipe = new PipeWireOutput();
+
     /// <summary>
     /// Everything this application plays, summed, which is the only way anything leaves.
     /// </summary>
@@ -130,12 +147,18 @@ public sealed class BassAudioEngine : IAudioEngine
     /// <param name="padCount">How many pads there are, which <see cref="Resize"/> can change.</param>
     /// <param name="deviceRate">What to open the card at, or nought for the default.</param>
     /// <param name="rate">The rule that decides, handed in so it can be asked without a card.</param>
+    /// <param name="probe">
+    /// What says whether an endpoint can be opened, or the real one. Handed in so the list can be
+    /// asked for on a machine with no card, and so a test can offer a device that refuses.
+    /// </param>
     public BassAudioEngine(
         int padCount = 8,
         int deviceRate = 0,
-        Interfaces.IOutputRate? rate = null)
+        Interfaces.IOutputRate? rate = null,
+        Interfaces.IOutputProbe? probe = null)
     {
         _deviceRate = (rate ?? new OutputRate()).Chosen(deviceRate);
+        _probe = probe ?? new OutputProbe(_deviceRate);
 
         _padStreams = new int[padCount];
         _padKinds = new PadSourceKind[padCount];
@@ -251,6 +274,26 @@ public sealed class BassAudioEngine : IAudioEngine
     /// them in: the system's is what everything already uses and ASIO is the deliberate choice.
     /// A machine with no ASIO library adds nothing and says nothing, since that is every Linux
     /// machine and it is not news.
+    ///
+    /// **Every endpoint is opened before it is offered, and the ones that will not open are left
+    /// out.** The library's list says what the machine has, which is not what is free: where a
+    /// sound server is playing through a card, it holds that card and nothing else may have it.
+    /// Offered anyway, picking one got as far as the attempt and came back as a failed init drawn
+    /// as a stack trace across the settings page, over a choice this had just made. What is left
+    /// out is said in the log, since a device somebody can see in the system's own settings and
+    /// not here is worth being able to account for.
+    ///
+    /// The one this application already holds is not probed: opening it again means taking the
+    /// sound down to ask a question whose answer is yes. The ASIO drivers are not either, since a
+    /// driver is not a device the library opens at all.
+    ///
+    /// **What is offered is written down as well as what is not**, which is the half that was
+    /// missing. A list that only says what it refused cannot be read against what somebody is
+    /// looking at, and on a machine with a sound server the interesting entries are the ones
+    /// nobody expects: the server's own, beside the card it is playing through and beside the
+    /// system's idea of a default, all three named almost the same and behaving completely
+    /// differently. Which of them the system calls default is said too, since that is the one
+    /// this picks when nothing is stored.
     /// </remarks>
     public IReadOnlyList<AudioOutput> GetOutputDevices()
     {
@@ -259,12 +302,57 @@ public sealed class BassAudioEngine : IAudioEngine
         for (int i = 0; Bass.GetDeviceInfo(i, out var info); i++)
         {
             if (!info.IsEnabled) continue;
+
+            if (i != _currentDeviceId && !Opens(i))
+            {
+                int refused = i;
+                string named = info.Name;
+
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
+                    "outputs: '" + named + "' (" + refused + ") will not open, so it is not offered: "
+                    + "something else on this machine has it");
+
+                continue;
+            }
+
+            int offered = i;
+            string called = info.Name;
+            bool standard = info.IsDefault;
+
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
+                "outputs: " + offered + " '" + called + "' is offered"
+                + (standard ? ", and is the one the system calls default" : ""));
+
             list.Add(new AudioOutput(i, info.Name));
         }
 
         list.AddRange(_asio.Devices);
 
         return list;
+    }
+
+    /// <summary>Whether that endpoint can be had, with anything thrown read as no.</summary>
+    /// <remarks>
+    /// **One device that cannot be asked about is one device.** This list is read while the
+    /// settings page is being built, so something thrown out of a probe is the application failing
+    /// to start rather than an endpoint quietly missing from a picker. The real probe already
+    /// answers rather than throws; this is here because the contract is a seam and the next thing
+    /// behind it need not be so careful.
+    /// </remarks>
+    /// <param name="device">The library's own index for it.</param>
+    private bool Opens(int device)
+    {
+        try
+        {
+            return _probe.Opens(device);
+        }
+        catch (Exception bad)
+        {
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Audio,
+                "an output could not be asked about, so it is not offered", bad);
+
+            return false;
+        }
     }
 
     IEnumerable<AudioOutput> IAudioEngine.GetOutputDevices() => GetOutputDevices();
@@ -287,6 +375,26 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <summary>
+    /// Two channels and no more, whatever the card says it has.
+    /// </summary>
+    /// <remarks>
+    /// **The library opens a device with as many channels as the card claims speakers**, so that
+    /// a caller can place a sound on one of them. Nothing here ever does: every bus, every stream
+    /// and the whole mix are stereo, so all that arrangement buys is a stream shaped like
+    /// somebody's speaker layout with the two channels we use at the front of it.
+    ///
+    /// **On a sound server that is not a harmless difference.** An interface set to a surround
+    /// profile is four channels out and six in, so the stream that appeared in the graph was four
+    /// ports wide with two of them silent, and the capture six wide: what the machine's own
+    /// patchbay showed was nothing like the two cables the picture in here draws, and whether the
+    /// two we filled were the two anybody was listening to was left to whatever mapped them.
+    ///
+    /// Asked of the system rather than assumed: <c>default</c> reports <c>CHANNELS: [1 64]</c>
+    /// here, so the width is ours to choose and the card's profile is not a constraint on it.
+    /// </remarks>
+    private const DeviceInitFlags Stereo = DeviceInitFlags.Stereo;
+
     /// <summary>Lets the current device go and opens one, with the lock held.</summary>
     /// <param name="deviceId">Which output, numbered across both lists.</param>
     private void OpenLocked(int deviceId)
@@ -296,6 +404,7 @@ public sealed class BassAudioEngine : IAudioEngine
         CloseBussesLocked();
 
         _asio.Close();
+        _pipe.Close();
 
         if (_currentDeviceId >= 0)
             Bass.Free();
@@ -304,12 +413,30 @@ public sealed class BassAudioEngine : IAudioEngine
 
         var (kind, index) = _outputs.Which(deviceId);
 
-        if (!Bass.Init(kind == Enums.AudioOutputKind.Asio ? SilentDevice : index, _deviceRate))
+        string named = Bass.GetDeviceInfo(index, out var about) ? about.Name : "";
+
+        bool driven = kind == Enums.AudioOutputKind.Asio;
+        bool served = !driven && _pipe.Present && _server.Is(named, about.IsDefault);
+
+        int opened = driven || served ? SilentDevice : index;
+
+        if (!Bass.Init(opened, _deviceRate, Stereo))
             throw new InvalidOperationException($"Bass.Init failed: {Bass.LastError}");
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
+        {
+            string called = served || driven ? named
+                : Bass.GetDeviceInfo(opened, out var info) ? info.Name : "unnamed";
+
+            return "outputs: opened " + opened + " '" + called + "' at " + _deviceRate + " Hz"
+                + (driven ? ", silently, since a driver is pulling" : "")
+                + (served ? ", silently, since the sound server is pulling" : "")
+                + (opened == SilentDevice ? "  (this device plays nothing)" : "");
+        });
 
         LoadPlugins();
 
-        OpenBussesLocked(kind == Enums.AudioOutputKind.Asio, index);
+        OpenBussesLocked(driven || served, index, served);
     }
 
     /// <summary>
@@ -326,7 +453,8 @@ public sealed class BassAudioEngine : IAudioEngine
     /// routes.
     ///
     /// A driver that will not take the bus leaves everything open and silent rather than half
-    /// wired, and says so.
+    /// wired, and says so, and the sound server is the same in every respect: it is the second
+    /// thing that can pull, and where it does the library plays nothing itself.
     ///
     /// **A bus that will not open throws rather than being worked around.** There was a second
     /// path once, where a pad played at the card on its own, and it was reached by a setting
@@ -336,9 +464,13 @@ public sealed class BassAudioEngine : IAudioEngine
     /// puts it on that pad. Playing the pads a different way and losing solo, pan, mute and
     /// ASIO in silence is the alternative, and it is worse.
     /// </remarks>
-    /// <param name="pulled">Whether an ASIO driver drives the output rather than BASS playing it.</param>
+    /// <param name="pulled">Whether something pulls the output rather than BASS playing it.</param>
     /// <param name="device">Which ASIO driver, where one is being used.</param>
-    private void OpenBussesLocked(bool pulled, int device)
+    /// <param name="served">
+    /// Whether the puller is the sound server rather than a driver. Asked first, since a machine
+    /// with a server has no driver and the two are never both true.
+    /// </param>
+    private void OpenBussesLocked(bool pulled, int device, bool served = false)
     {
         _output.BufferMs = StartingBufferMs();
 
@@ -360,6 +492,15 @@ public sealed class BassAudioEngine : IAudioEngine
         _output.Add(_padBus.Handle);
         _output.Add(_takeBus.Handle);
         _output.Add(_monitorBus.Handle);
+
+        if (served)
+        {
+            if (!_pipe.Open(_output.Handle, _deviceRate))
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
+                    "bus: the sound server would not take the bus, so nothing will be heard");
+
+            return;
+        }
 
         if (pulled)
         {

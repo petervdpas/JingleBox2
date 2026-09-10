@@ -22,47 +22,55 @@ public sealed class OutputMovedTests
     /// <summary>The page over doubles, since nothing here is about audio.</summary>
     private static RecorderBench Bench() => new();
 
-    /// <summary>The source is put back and the input is left pointed at nothing.</summary>
+    /// <summary>
+    /// The output moving takes the source off its new own output again, and keeps it.
+    /// </summary>
     /// <remarks>
-    /// **Where the sound comes out is half of what taking a source aside means.** The source is
-    /// off its own output on the promise that it is coming through this application instead, and
-    /// what "here" is, is the output in SETTINGS: pick another and the arrangement stands over a
-    /// device nobody is listening to, with the source still unplugged from its own. So it is put
-    /// back rather than carried over, and the input is left with nothing chosen, which is the one
-    /// state that cannot be quietly wrong.
+    /// **The arrangement is made again rather than thrown away.** It used to clear the source
+    /// outright, which was defensible while taking one aside was a switch somebody set: the
+    /// promise had been made about an output nobody was listening to any more. It is not now that
+    /// choosing the source is the arrangement, and what it came to was the input silently emptying
+    /// itself whenever the output picker was touched, with the source handed back to its own
+    /// speakers, which is heard as the sound coming back.
     /// </remarks>
     [Fact]
-    public void The_output_moving_puts_a_source_back()
+    public void The_output_moving_takes_the_source_aside_again()
     {
         var bench = Bench();
 
         bench.Page.SelectedRoute = RecorderBench.Firefox;
 
-        int back = bench.Wiring.Back;
+        int aside = bench.Wiring.Aside;
 
-        Assert.True(bench.Wiring.Aside > 0, "the source was never taken off its own output");
-
+        bench.Page.PlayingOut = "Some other output";
         bench.Page.OutputMoved();
 
-        Assert.Null(bench.Page.SelectedRoute);
-        Assert.True(bench.Wiring.Back > back,
-            "nothing was put back when the output moved; giving back was only ever the one that "
-            + "happens on the way into choosing a source, so this passed while a browser stayed "
-            + "unplugged");
+        Assert.Equal(RecorderBench.Firefox, bench.Page.SelectedRoute);
+        Assert.True(bench.Wiring.Aside > aside, "the source was not taken off its own output again");
     }
 
-    /// <summary>And it says so, since a source put back silently reads as a fault.</summary>
+    /// <summary>
+    /// Unless the output has moved onto the source, which is hearing an output through itself.
+    /// </summary>
+    /// <remarks>
+    /// The one case that really does end the arrangement, and it is answered against the new
+    /// output rather than the old, since that is what has just moved. Said on the status line,
+    /// because a source that goes back to its own speakers with nothing saying why reads as this
+    /// application having dropped it.
+    /// </remarks>
     [Fact]
-    public void It_says_why_the_source_went_back()
+    public void It_says_so_when_the_output_moves_onto_the_source()
     {
         var bench = Bench();
 
-        bench.Page.SelectedRoute = RecorderBench.Firefox;
+        bench.Wiring.Ours = true;
+        bench.Page.SelectedRoute = RecorderBench.Speakers;
         bench.Page.Status = string.Empty;
 
+        bench.Page.PlayingOut = RecorderBench.Speakers.Name;
         bench.Page.OutputMoved();
 
-        Assert.Contains("put back", bench.Page.Status, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("loop", bench.Page.Status, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Nothing happens where nothing was chosen, which is the ordinary run.</summary>
@@ -76,7 +84,7 @@ public sealed class OutputMovedTests
         bench.Page.OutputMoved();
 
         Assert.Null(bench.Page.SelectedRoute);
-        Assert.Equal(0, bench.Wiring.Back);
+        Assert.Equal(0, bench.Wiring.Aside);
         Assert.Equal("still here", bench.Page.Status);
     }
 }

@@ -543,6 +543,20 @@ public sealed class RecordingService : IRecordingService, IDisposable
         _monitor.HearsTheRoom = _hearsTheRoom;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Closed and made again rather than asked whether it is open, because the answer would be
+    /// yes: the stream was freed with the device and this side still holds its number.
+    /// </remarks>
+    public void ReopenMonitor()
+    {
+        if (_monitor == null) return;
+
+        _monitor.Close();
+
+        OpenMonitor();
+    }
+
     /// <summary>Backing field for <see cref="Hearing"/>.</summary>
     private volatile bool _hearing;
 

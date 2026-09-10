@@ -231,12 +231,26 @@ public sealed class MonitorFeed : IMonitorFeed
     /// Asked on every block rather than once, because the bus is made again whenever the output
     /// device changes and a source added to the bus that was there before is a source on a
     /// stream nobody plays. It is a lookup in a small set beside a block of audio.
+    ///
+    /// **The level is written here as well, and that is the same fault said twice rather than
+    /// two.** A bus that has been made again is a fresh one, opened silent on purpose; the level
+    /// this last wrote went with the old one. <see cref="Heard"/> writes it when the switch moves
+    /// and nothing wrote it when the bus moved, so picking another output with Hear it on left
+    /// the tick sitting on and the path silent for the rest of the session, with nothing to do
+    /// about it but turn the tick off and on again. Written where the stream is put back, which
+    /// is exactly the moment the bus is known to be a new one.
     /// </remarks>
     private void Attach()
     {
         if (_stream == 0 || !_bus.IsOpen || _bus.Holds(_stream)) return;
 
+        _bus.Level = _heard ? 1f : 0f;
+
         _bus.Add(_stream);
+
+        Log.Write(LogArea.Audio, () =>
+            "monitor: the input is on the desk again at " + _bus.Level
+            + (_heard ? "" : ", which is nothing, since Hear it is off"));
     }
 
     /// <summary>
@@ -290,6 +304,11 @@ public sealed class MonitorFeed : IMonitorFeed
 
                 _bus.Level = value ? 1f : 0f;
             }
+
+            Log.Write(LogArea.Audio, () =>
+                value
+                    ? "monitor: Hear it is on, so the input's bus is at full"
+                    : "monitor: Hear it is off, so the input's bus is at nothing");
         }
     }
 

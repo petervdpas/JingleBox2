@@ -131,9 +131,10 @@ public sealed class PipeWireRouting : IAudioRouting
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Everything already feeding the capture is taken off first. PipeWire mixes what arrives
-    /// at a port rather than replacing it, so leaving the old link in place would put the
-    /// previous source underneath the new one and both would be recorded.
+    /// Everything already feeding the capture is taken off first, on every port of it rather than
+    /// on the two a source is wired into: see <see cref="EveryCapturePort"/>. PipeWire mixes what
+    /// arrives at a port rather than replacing it, so leaving a link in place puts whatever was
+    /// there underneath the new source and both are recorded.
     ///
     /// The two sides are matched by channel and linked as a pair. A source with only one of
     /// them simply does not link on that side rather than being doubled into both, since a
@@ -148,11 +149,13 @@ public sealed class PipeWireRouting : IAudioRouting
             var capture = CapturePorts();
             if (capture.Count == 0) return false;
 
+            var everything = EveryCapturePort();
+
             foreach (var link in _graph.ParseLinks(Run(LinkTool, "-l")))
             {
                 if (Expired(deadline)) return false;
 
-                if (capture.Any(p => p.Node == link.To.Node && p.Port == link.To.Port))
+                if (everything.Any(p => p.Node == link.To.Node && p.Port == link.To.Port))
                     Run(LinkTool, $"-d {Quote(link.From)} {Quote(link.To)}");
             }
 
@@ -419,6 +422,37 @@ public sealed class PipeWireRouting : IAudioRouting
         return _graph.ParsePorts(Run(LinkTool, "-i"))
             .Where(p => captureNodes.Contains(p.Node))
             .Where(p => _graph.IsStereoAudio(p.Port))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Every port on our capture, and not only the two a source is wired into.
+    /// </summary>
+    /// <remarks>
+    /// **Two cables are put on and however many are there have to come off**, which is not the
+    /// same list. The library opens a device as wide as the card claims speakers, so on an
+    /// interface set to a surround profile our capture appears in the graph six ports wide: the
+    /// two a stereo source is wired into, and four nobody here has any use for.
+    ///
+    /// The session manager does have a use for them. It connects a new capture stream to whatever
+    /// the machine calls the default source, and it fills every port it can, so the four this
+    /// application never looks at were quietly carrying the interface's own inputs the whole time.
+    /// Clearing only the two meant the chosen source arrived on top of a microphone nobody asked
+    /// for, and the machine's own patchbay showed a picture nothing like the two cables drawn in
+    /// here. It is what "the graph is not identical" turned out to be.
+    ///
+    /// So the wiring is asked of the whole node and the linking is still asked of the pair: what
+    /// goes on is a stereo source, and what comes off is everything.
+    /// </remarks>
+    private IReadOnlyList<PipeWirePort> EveryCapturePort()
+    {
+        if (!IsAvailable) return Array.Empty<PipeWirePort>();
+
+        var captureNodes = OwnCaptureNodes();
+        if (captureNodes.Count == 0) return Array.Empty<PipeWirePort>();
+
+        return _graph.ParsePorts(Run(LinkTool, "-i"))
+            .Where(p => captureNodes.Contains(p.Node))
             .ToList();
     }
 

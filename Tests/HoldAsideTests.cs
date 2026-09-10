@@ -76,10 +76,14 @@ public sealed class HoldAsideTests
 
         bench.Wiring.CreptBack = true;
         bench.Page.SelectedRoute = RecorderBench.Firefox;
-        bench.Page.RefreshRoutes();
 
         Assert.True(
-            Within(() => bench.Page.Status.Contains("taken off again", StringComparison.OrdinalIgnoreCase)),
+            Within(() =>
+            {
+                bench.Page.RefreshRoutes();
+
+                return bench.Page.Status.Contains("taken off again", StringComparison.OrdinalIgnoreCase);
+            }),
             "nothing was said about a source that had got back onto its own output");
     }
 

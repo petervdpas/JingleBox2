@@ -106,6 +106,12 @@ public class ProgramCaptureTests
         /// <inheritdoc/>
         public void HearThrough(JingleBox2.Audio.Interfaces.IMonitorFeed monitor) { }
 
+        /// <summary>How many times the path was asked for again.</summary>
+        public int Remade { get; private set; }
+
+        /// <inheritdoc/>
+        public void ReopenMonitor() => Remade++;
+
         /// <inheritdoc/>
         public void TakeFrom(JingleBox2.Audio.Interfaces.IOutputBus bus) { }
 

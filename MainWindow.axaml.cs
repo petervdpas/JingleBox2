@@ -178,10 +178,17 @@ public partial class MainWindow : Window
 
         clock.Take();
 
+        var width = new Audio.SoundServerWidth();
+
+        width.Ask();
+
         Diagnostics.Log.Open(new Files.AppFolder().Path(), cfg.WriteLog, Areas(cfg));
 
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App,
             () => "waits here are measured against " + clock.Said());
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
+            () => "outputs: what is opened here is " + width.Said());
 
         Audio.TangentSwitch.Wants(cfg.FastDriveCurve);
         Audio.OverlapSwitch.Wants(cfg.OverlapPlugins);

@@ -206,6 +206,12 @@ public sealed class RecorderBench
         /// <inheritdoc/>
         public void HearThrough(IMonitorFeed monitor) => Told = monitor;
 
+        /// <summary>How many times the path was asked for again.</summary>
+        public int Remade { get; private set; }
+
+        /// <inheritdoc/>
+        public void ReopenMonitor() => Remade++;
+
         /// <inheritdoc/>
         public void TakeFrom(IOutputBus bus) { }
 

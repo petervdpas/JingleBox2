@@ -1799,9 +1799,18 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// Said on the status line only where something really had come back, since a line that
     /// appeared every two seconds saying nothing happened would be worse than none. Off the
     /// drawing thread, like everything else here that runs the tools.
+    ///
+    /// **Nothing is held while a route is still being applied**, and that is about the words as
+    /// much as the wiring. Applying one runs the tools off this thread and writes its own line
+    /// when it comes back, so a hold that ran in the middle of it had the useful sentence, that a
+    /// source crept back and was taken off again, overwritten a moment later by the routine one.
+    /// Which of the two landed last depended on how busy the machine was. The reading happens
+    /// every couple of seconds, so what is skipped here is said by the next one.
     /// </remarks>
     private async System.Threading.Tasks.Task HoldAsideAsync()
     {
+        if (_applyingRoute) return;
+
         if (SelectedRoute is not { } source) return;
 
         if (await Task.Run(() => _input.Hold()))
@@ -2310,28 +2319,43 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// output is the one the source was taken off or the one it was sent to, which is a source
     /// silenced into the very thing it is being played back through.
     ///
-    /// So it is put back rather than followed. Following would mean deciding on somebody's behalf
-    /// that the arrangement still holds, and this one reaches out of the application and quiets
-    /// another program: the rule the switch already keeps is that it goes on only when somebody
-    /// says so, and this is that rule at the other moment.
+    /// **So the arrangement is made again against the new output rather than thrown away.** It
+    /// used to clear the source outright, which was defensible while taking one aside was a switch
+    /// somebody set: the promise had been made about an output nobody was listening to any more.
+    /// It is not now that choosing the source is the arrangement, and what it came to was the
+    /// input silently emptying itself every time the output picker was touched, with the source
+    /// handed back to its own speakers, which is heard as the sound coming back.
     ///
-    /// Said on the status line, because a switch that turns itself off with nothing anywhere
-    /// saying why reads as a switch that does not stay put. Nothing at all where it was never on,
-    /// so picking a device on an ordinary machine is silent.
+    /// **The one case that really does end it is the new output being the source**, which is
+    /// hearing an output through itself. The path answers that through <see cref="CanHear"/>, and
+    /// it answers it with the new output rather than the old, since that is what has just moved:
+    /// so it puts the source back and says why, which is the one thing here worth a line on the
+    /// status bar. Everything else is said in the log, since re-taking a source off an output it
+    /// was already off is not news.
     /// </remarks>
     public void OutputMoved()
     {
         Listening();
 
-        if (SelectedRoute == null) return;
+        if (SelectedRoute is not { } source) return;
 
-        SelectedRoute = null;
+        Agree();
 
-        Status = "The source was put back, since the output changed.";
+        if (CanHear)
+        {
+            Diagnostics.Log.Write(
+                Diagnostics.Enums.LogArea.Audio,
+                () => "routing: the output moved, so the source was taken off its own again");
+
+            return;
+        }
+
+        Status = source.Display + " is what this application now plays out of, so it has been "
+            + "put back: hearing an output through itself is a loop.";
 
         Diagnostics.Log.Write(
             Diagnostics.Enums.LogArea.Audio,
-            () => "routing: the output moved, so the source was put back on its own");
+            () => "routing: the output moved onto the source, so the source was put back");
     }
 
     /// <summary>Whether the first reading of the graph has already been answered.</summary>

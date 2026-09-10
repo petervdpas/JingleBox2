@@ -141,6 +141,32 @@ public sealed class InputPathTests
         Assert.Equal(1, route.Aside);
     }
 
+    /// <summary>
+    /// The tick moving is not a reason to rewire anything.
+    /// </summary>
+    /// <remarks>
+    /// Where a source plays is settled by choosing it, so a press of Hear it must not give it
+    /// back and take it off again: the log showed a pair of tool runs against the graph on every
+    /// press, which is the source out of the desk and back for a moment each time.
+    /// </remarks>
+    [Fact]
+    public void Hearing_moving_rewires_nothing()
+    {
+        var route = new Route();
+        var path = new InputPath(route);
+
+        path.Set(Firefox, heard: false, Out);
+
+        int aside = route.Aside;
+        int back = route.Back;
+
+        for (int press = 0; press < 10; press++)
+            path.Set(Firefox, heard: press % 2 == 0, Out);
+
+        Assert.Equal(aside, route.Aside);
+        Assert.Equal(back, route.Back);
+    }
+
     /// <summary>And the source stays off its own output when the tick goes off again.</summary>
     /// <remarks>
     /// Unticking says stop putting it through the desk, not hand it back to the speakers. A
@@ -156,7 +182,7 @@ public sealed class InputPathTests
         path.Set(Firefox, heard: true, Out);
         path.Set(Firefox, heard: false, Out);
 
-        Assert.Equal(2, route.Aside);
+        Assert.Equal(1, route.Aside);
         Assert.Equal(Firefox, route.Took);
     }
 
@@ -325,6 +351,93 @@ public sealed class InputPathTests
 
         Assert.False(path.Hold());
         Assert.Equal(0, route.Held);
+    }
+
+    /// <summary>
+    /// Being told the same thing again moves nothing at all.
+    /// </summary>
+    /// <remarks>
+    /// **The one that cost a hardware device.** The graph is read on a clock and every reading
+    /// ends by saying what the input is pointed at, which is almost always what it was pointed at
+    /// a second ago. Acted on, that gives the source back and takes it off again on every reading:
+    /// the source out of its own speakers for a fraction of a second, once a second, and a pair of
+    /// tool runs against somebody's graph at that rate. The card being rewired that often answered
+    /// busy when it was picked as the output, and the log showed the pair of lines once a second
+    /// for as long as the page was up.
+    /// </remarks>
+    [Fact]
+    public void The_same_question_twice_moves_nothing_the_second_time()
+    {
+        var route = new Route();
+        var path = new InputPath(route);
+
+        path.Set(Firefox, heard: false, Out);
+
+        int aside = route.Aside;
+        int back = route.Back;
+
+        for (int again = 0; again < 20; again++) path.Set(Firefox, heard: false, Out);
+
+        Assert.Equal(aside, route.Aside);
+        Assert.Equal(back, route.Back);
+    }
+
+    /// <summary>And it answers the same thing rather than claiming nothing happened.</summary>
+    /// <remarks>
+    /// A caller asking twice wants the same answer both times: told nothing on the second, a page
+    /// would wipe the line it had just written about what the input is doing.
+    /// </remarks>
+    [Fact]
+    public void The_same_question_twice_answers_the_same_way()
+    {
+        var route = new Route();
+        var path = new InputPath(route);
+
+        var first = path.Set(Firefox, heard: false, Out);
+
+        Assert.Equal(first, path.Set(Firefox, heard: false, Out));
+    }
+
+    /// <summary>A question that really changed is acted on.</summary>
+    /// <remarks>
+    /// The other half, and the one that fails if the answer is remembered too eagerly: the tick
+    /// moving is a different question, and so is a different source.
+    /// </remarks>
+    [Fact]
+    public void A_question_that_changed_is_acted_on()
+    {
+        var route = new Route();
+        var path = new InputPath(route);
+
+        path.Set(Firefox, heard: false, Out);
+        path.Set(Firefox, heard: false, Out);
+
+        int aside = route.Aside;
+
+        path.Set(Player, heard: true, Out);
+
+        Assert.True(route.Aside > aside, "another source was read as the same question");
+    }
+
+    /// <summary>Giving back forgets what was asked, so the next question is a real one.</summary>
+    /// <remarks>
+    /// Otherwise the source is put back on the way out and the next identical choice is answered
+    /// out of memory, leaving it playing where it was with the strip saying it is the desk's.
+    /// </remarks>
+    [Fact]
+    public void Giving_back_forgets_what_was_asked()
+    {
+        var route = new Route();
+        var path = new InputPath(route);
+
+        path.Set(Firefox, heard: true, Out);
+        path.GiveBack();
+
+        int aside = route.Aside;
+
+        path.Set(Firefox, heard: true, Out);
+
+        Assert.True(route.Aside > aside, "the source was never taken off its own output again");
     }
 
     /// <summary>Giving back is the way out, and it reaches the machine.</summary>
