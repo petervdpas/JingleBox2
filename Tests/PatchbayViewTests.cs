@@ -66,14 +66,8 @@ public class PatchbayViewTests
         public void LetRoutesGo() => Watching--;
 
         /// <inheritdoc/>
-        public bool CanTakeAside => true;
-
         /// <inheritdoc/>
-        public string AsideHint => "";
-
         /// <inheritdoc/>
-        public bool TakeAside { get; set; }
-
         /// <inheritdoc/>
         public bool Hearing { get; set; }
 

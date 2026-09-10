@@ -60,14 +60,12 @@ public sealed class HoldAsideTests
     {
         var bench = new RecorderBench();
 
-        bench.Page.TakeAside = true;
+        bench.Page.SelectedRoute = RecorderBench.Firefox;
         bench.Page.RefreshRoutes();
 
         Assert.True(
             Within(() => bench.Wiring.Held > 0),
             "the arrangement was never held, so a source that got back onto its own output stays there");
-
-        bench.Page.TakeAside = false;
     }
 
     /// <summary>And says so where something really had come back, since that is not nothing.</summary>
@@ -77,14 +75,12 @@ public sealed class HoldAsideTests
         var bench = new RecorderBench();
 
         bench.Wiring.CreptBack = true;
-        bench.Page.TakeAside = true;
+        bench.Page.SelectedRoute = RecorderBench.Firefox;
         bench.Page.RefreshRoutes();
 
         Assert.True(
             Within(() => bench.Page.Status.Contains("taken off again", StringComparison.OrdinalIgnoreCase)),
             "nothing was said about a source that had got back onto its own output");
-
-        bench.Page.TakeAside = false;
     }
 
     /// <summary>And touches nothing at all while the switch is off, which is every ordinary run.</summary>

@@ -79,6 +79,16 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// <summary>What the system has wired to the input, which is not what somebody chose.</summary>
     private readonly IAudioRouting _routing;
 
+    /// <summary>
+    /// What the IN strip does to the machine, which is the source and the tick as one thing.
+    /// </summary>
+    /// <remarks>
+    /// Built here from the same route this page was handed, so there is one of it and it is the
+    /// only thing that reaches out and moves somebody else's audio about. The page keeps the two
+    /// facts because it draws them; what they come to is not its business.
+    /// </remarks>
+    private readonly Audio.Routing.Interfaces.IInputPath _input;
+
     /// <summary>Who to ask whether a recording is spoken for. Null before the rack exists.</summary>
     private ISampleUsage? _sampleUsage;
 
@@ -626,6 +636,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         _preview = new Waveform.WaveformPlayer(takes);
 
         _routing = routing;
+        _input = new Audio.Routing.InputPath(routing);
 
         _cfg = cfg;
         _recordingService = recordingService;
@@ -1791,9 +1802,9 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     private async System.Threading.Tasks.Task HoldAsideAsync()
     {
-        if (!TakeAside || SelectedRoute is not { } source) return;
+        if (SelectedRoute is not { } source) return;
 
-        if (await Task.Run(() => _routing.HoldAside(source)))
+        if (await Task.Run(() => _input.Hold()))
             Status = $"{source.Display} had got back onto its own output and was taken off again.";
     }
 
@@ -1872,23 +1883,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         _preferredRoute = value;
         ApplyRoute(value, announce: true);
 
-        Aside();
+        Agree();
     }
-
-    /// <summary>Whether this machine can take a source off everything but this application.</summary>
-    public bool CanTakeAside => _routing.CanTakeAside;
-
-    /// <inheritdoc/>
-    /// <remarks>
-    /// The wording is here rather than in the routing, which answers why it cannot be done and
-    /// says nothing about what a switch is for; put together where the switch is drawn, so
-    /// neither half has to know about the other.
-    /// </remarks>
-    public string AsideHint =>
-        CanTakeAside
-            ? "Take this source off its own output, so it is heard through JingleBox2 and "
-              + "nowhere else. Put back when you close the application."
-            : "Not available: " + _routing.AsideNote + ".";
 
     /// <summary>Where a source is sent so nobody hears it, or nothing on a machine with a graph.</summary>
     private ISilentOutput? _silent;
@@ -1909,8 +1905,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         OnPropertyChanged(nameof(NeedsSilentOutput));
         OnPropertyChanged(nameof(SilentOutputs));
         OnPropertyChanged(nameof(SilentOutput));
-        OnPropertyChanged(nameof(CanTakeAside));
-        OnPropertyChanged(nameof(AsideHint));
     }
 
     /// <inheritdoc/>
@@ -1939,10 +1933,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             _silent.Chosen = value?.Id;
 
             OnPropertyChanged();
-            OnPropertyChanged(nameof(CanTakeAside));
-            OnPropertyChanged(nameof(AsideHint));
 
-            Aside();
+            Agree();
         }
     }
 
@@ -1965,6 +1957,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             OnPropertyChanged();
 
             Standing();
+            Agree();
 
             Status = value
                 ? "What is coming in is being heard through the desk."
@@ -2000,7 +1993,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     private void Standing()
     {
-        bool wanted = Hearing || TakeAside;
+        bool wanted = SelectedRoute is not null || Hearing;
 
         if (wanted == _standing) return;
 
@@ -2166,9 +2159,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// one output and silently wrong on a machine with two: the switch was on, the source was
     /// chosen, the capture was left off the recorder's bus, and the line said it was a loop.
     /// </remarks>
-    public bool CanHear =>
-        SelectedRoute is not { Kind: Audio.Routing.Enums.AudioRouteKind.Monitor } source ||
-        _routing.IsOurOutput(source, PlayingOut) == false;
+    public bool CanHear => _input.CanHear(SelectedRoute, PlayingOut);
 
     /// <summary>
     /// Turns listening off where the source that has just been chosen cannot be listened to.
@@ -2225,56 +2216,24 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             + "away from the speakers, then tick Hear it once more.";
     });
 
-    /// <summary>Backing field for <see cref="TakeAside"/>.</summary>
-    private bool takeAside;
-
     /// <summary>
-    /// Whether the chosen source is taken off everything else, so it is heard through here alone.
+    /// Makes the machine agree with the source and the switch, and says what happened.
     /// </summary>
     /// <remarks>
-    /// **Off unless somebody says so**, because it changes somebody else's program rather than
-    /// this one: a browser that went silent everywhere the moment it was picked as a source
-    /// would read as this application having broken it. On is the radio case, where what is on
-    /// air must not also be coming out of the desk speakers a buffer later.
+    /// **The one place this page tells the input path anything.** Three things move the two facts
+    /// it holds and every one of them ends here, so what the machine is doing can never disagree
+    /// with what the strip is showing. What it comes to is
+    /// <see cref="Audio.Routing.Interfaces.IInputPath"/>'s business and none of it is here: this
+    /// hands over the two facts and puts the sentence that comes back on the status line.
     ///
-    /// Kept for the session rather than in the settings, deliberately. What it does is undone on
-    /// the way out, so a switch that came back on at the next start would take a source aside
-    /// before anybody had asked for anything.
+    /// It was <c>Aside</c> and it was the act itself, giving a source back and taking the chosen
+    /// one off its own output. That is the module's now, which is what leaves this two lines.
     /// </remarks>
-    public bool TakeAside
+    private void Agree()
     {
-        get => takeAside;
-        set
-        {
-            if (takeAside == value) return;
+        string said = _input.Set(SelectedRoute, Hearing, PlayingOut);
 
-            takeAside = value;
-
-            OnPropertyChanged();
-
-            Standing();
-            Aside();
-        }
-    }
-
-    /// <summary>
-    /// Makes the machine agree with the switch and the source.
-    /// </summary>
-    /// <remarks>
-    /// Whatever was taken aside is put back first, whichever way the switch went: a source that
-    /// is no longer the one being recorded has no business staying unplugged from its own
-    /// output, and that is the same call either way.
-    /// </remarks>
-    private void Aside()
-    {
-        _routing.GiveBack();
-
-        if (!TakeAside || SelectedRoute is not { } source) return;
-
-        if (_routing.TakeAside(source))
-            Status = $"{source.Display} is coming here and nowhere else.";
-        else
-            Status = $"{source.Display} could not be taken off its own output.";
+        if (said.Length > 0) Status = said;
     }
 
     /// <summary>
@@ -2301,9 +2260,9 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     {
         Listening();
 
-        if (!TakeAside) return;
+        if (SelectedRoute == null) return;
 
-        TakeAside = false;
+        SelectedRoute = null;
 
         Status = "The source was put back, since the output changed.";
 
@@ -2569,7 +2528,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// machine, so a browser left silent after this program has closed is the worst thing this
     /// feature could do, and there is nothing on the screen by then to say what happened.
     /// </remarks>
-    private void GiveRoutesBack() => _routing.GiveBack();
+    private void GiveRoutesBack() => _input.GiveBack();
 
     /// <summary>How many pages carrying the source picker are on screen.</summary>
     /// <remarks>

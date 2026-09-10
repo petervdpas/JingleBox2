@@ -22,10 +22,9 @@ namespace JingleBox2.Audio.Interfaces;
 /// late, which on an ordinary machine is tens of milliseconds. A desk avoids that by not going
 /// near a computer, and the only thing that moves it here is the buffer sizes in SETTINGS.
 ///
-/// Off unless somebody says so, and not remembered between runs, for the reason
-/// <see cref="ViewModels.Interfaces.IInputSource.TakeAside"/> is not: the ordinary source is
-/// what an output is playing, and playing that back into the output is a loop. A switch that
-/// came back on at the next start would make one before anybody had asked for anything.
+/// Off unless somebody says so, and not remembered between runs: the ordinary source is what an
+/// output is playing, and playing that back into the output is a loop. A switch that came back on
+/// at the next start would make one before anybody had asked for anything.
 /// </remarks>
 public interface IMonitorFeed
 {

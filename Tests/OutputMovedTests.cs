@@ -22,29 +22,37 @@ public sealed class OutputMovedTests
     /// <summary>The page over doubles, since nothing here is about audio.</summary>
     private static RecorderBench Bench() => new();
 
-    /// <summary>A source taken aside is put back and the switch goes off.</summary>
+    /// <summary>The source is put back and the input is left pointed at nothing.</summary>
+    /// <remarks>
+    /// **Where the sound comes out is half of what taking a source aside means.** The source is
+    /// off its own output on the promise that it is coming through this application instead, and
+    /// what "here" is, is the output in SETTINGS: pick another and the arrangement stands over a
+    /// device nobody is listening to, with the source still unplugged from its own. So it is put
+    /// back rather than carried over, and the input is left with nothing chosen, which is the one
+    /// state that cannot be quietly wrong.
+    /// </remarks>
     [Fact]
     public void The_output_moving_puts_a_source_back()
     {
         var bench = Bench();
 
-        bench.Page.TakeAside = true;
+        bench.Page.SelectedRoute = RecorderBench.Firefox;
 
-        Assert.True(bench.Page.TakeAside);
+        Assert.True(bench.Wiring.Aside > 0, "the source was never taken off its own output");
 
         bench.Page.OutputMoved();
 
-        Assert.False(bench.Page.TakeAside, "the switch stayed on over an output it was never set up for");
+        Assert.Null(bench.Page.SelectedRoute);
         Assert.True(bench.Wiring.Back > 0, "the machine was never put back");
     }
 
-    /// <summary>And it says so, since a switch that turns itself off silently reads as a fault.</summary>
+    /// <summary>And it says so, since a source put back silently reads as a fault.</summary>
     [Fact]
-    public void It_says_why_the_switch_went_off()
+    public void It_says_why_the_source_went_back()
     {
         var bench = Bench();
 
-        bench.Page.TakeAside = true;
+        bench.Page.SelectedRoute = RecorderBench.Firefox;
         bench.Page.Status = string.Empty;
 
         bench.Page.OutputMoved();
@@ -52,9 +60,9 @@ public sealed class OutputMovedTests
         Assert.Contains("put back", bench.Page.Status, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>Nothing whatever happens where nothing was taken aside, which is the ordinary run.</summary>
+    /// <summary>Nothing happens where nothing was chosen, which is the ordinary run.</summary>
     [Fact]
-    public void An_output_moving_with_nothing_aside_touches_nothing()
+    public void An_output_moving_with_nothing_chosen_touches_nothing()
     {
         var bench = Bench();
 
@@ -62,7 +70,7 @@ public sealed class OutputMovedTests
 
         bench.Page.OutputMoved();
 
-        Assert.False(bench.Page.TakeAside);
+        Assert.Null(bench.Page.SelectedRoute);
         Assert.Equal(0, bench.Wiring.Back);
         Assert.Equal("still here", bench.Page.Status);
     }

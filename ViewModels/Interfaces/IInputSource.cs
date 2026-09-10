@@ -58,37 +58,6 @@ public interface IInputSource
     /// <summary>Says one of those pages has gone.</summary>
     void LetRoutesGo();
 
-    /// <summary>Whether this machine can take a source off everything but this application.</summary>
-    /// <remarks>
-    /// False is an ordinary answer about the machine rather than about this application: on a
-    /// graph the links are moved, and where there is no graph a program can only be pointed at
-    /// another output, so there has to be one to point it at.
-    /// </remarks>
-    bool CanTakeAside { get; }
-
-    /// <summary>
-    /// What to say about taking a source aside, whether it can be or not.
-    /// </summary>
-    /// <remarks>
-    /// One sentence for both states rather than a tooltip that goes stale when the switch greys.
-    /// Where it can be done this says what pressing it does; where it cannot it says why, because
-    /// **a switch greyed for two different reasons with no way to tell them apart is most of what
-    /// made this baffling**: no output chosen is a picker two lines up, and a machine that cannot
-    /// do it at all is nothing anybody can act on, and both looked identical.
-    /// </remarks>
-    string AsideHint { get; }
-
-    /// <summary>
-    /// Whether the chosen source is taken off everything else, so it is heard through here alone.
-    /// </summary>
-    /// <remarks>
-    /// **Capturing a source and taking it aside are two different acts.** Every program that
-    /// records does the first; a browser captured is still playing out of the speakers, which is
-    /// right for streaming and wrong on air. Off unless somebody says so, since it changes
-    /// somebody else's program rather than this one.
-    /// </remarks>
-    bool TakeAside { get; set; }
-
     /// <summary>
     /// Whether what is coming in is heard through the desk while it comes in.
     /// </summary>
