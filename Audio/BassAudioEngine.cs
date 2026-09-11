@@ -466,8 +466,7 @@ public sealed class BassAudioEngine : IAudioEngine, Interfaces.IRecordingSource
 
         int opened = _outlet.Pulls ? SilentDevice : index;
 
-        if (!Bass.Init(opened, _deviceRate, Stereo))
-            throw new InvalidOperationException($"Bass.Init failed: {Bass.LastError}");
+        if (!Bass.Init(opened, _deviceRate, Stereo)) opened = Instead(opened);
 
         _opened = true;
 
@@ -484,6 +483,44 @@ public sealed class BassAudioEngine : IAudioEngine, Interfaces.IRecordingSource
         LoadPlugins();
 
         OpenBussesLocked();
+    }
+
+    /// <summary>
+    /// What to open when the one that was asked for would not.
+    /// </summary>
+    /// <remarks>
+    /// **Only where nobody chose it.** A device somebody picked in SETTINGS that will not open is
+    /// something they have to be told about, and refusing is how they are told; the system's own
+    /// default is not a choice anybody made, it is the answer to "whatever this machine plays
+    /// through", and a machine that plays through nothing is a machine that should still run.
+    ///
+    /// It is not a corner. A build server has no card at all, and so does a virtual machine, a
+    /// container and a laptop with the audio switched off in its firmware: the library's own
+    /// number for the default answers <c>Driver</c> on every one of them, and before this that
+    /// exception came out of the first pad anybody pressed. The silent device is always there and
+    /// is what the application ran on for years.
+    ///
+    /// Said out loud rather than quietly, since the difference between this and a working
+    /// machine is that nothing will ever be heard.
+    /// </remarks>
+    /// <param name="asked">The device that would not open.</param>
+    /// <returns>The device that is open instead.</returns>
+    /// <exception cref="InvalidOperationException">Nothing would open, the silent device included.</exception>
+    private int Instead(int asked)
+    {
+        var why = Bass.LastError;
+
+        if (asked != DefaultOutput)
+            throw new InvalidOperationException($"Bass.Init failed: {why}");
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
+            "outputs: the system's own default would not open (" + why
+            + "), so the silent device is opened instead and nothing will be heard");
+
+        if (!Bass.Init(SilentDevice, _deviceRate, Stereo))
+            throw new InvalidOperationException($"Bass.Init failed: {Bass.LastError}");
+
+        return SilentDevice;
     }
 
     /// <summary>
