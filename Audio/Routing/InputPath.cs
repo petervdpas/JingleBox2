@@ -134,7 +134,10 @@ public sealed class InputPath : IInputPath
     private bool _meant;
 
     /// <inheritdoc/>
-    public bool Hold() => _meant && Source is { } source && _routing.HoldAside(source);
+    public bool Aside => _meant && Source != null;
+
+    /// <inheritdoc/>
+    public bool Hold() => Aside && Source is { } source && _routing.HoldAside(source);
 
     /// <inheritdoc/>
     /// <remarks>

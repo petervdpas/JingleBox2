@@ -27,12 +27,12 @@ namespace JingleBox2.Tests;
 /// machine the suite is running on, and a test that silences somebody's browser while they work
 /// is a worse thing than an untested line.
 ///
-/// **What is not covered here is the settling clock**, which keeps asking for a few seconds after
-/// the switch is thrown while the graph is still moving. It is a `DispatcherTimer`, and a test
-/// process has no loop to tick one, so a test over it would assert nothing and pass. What is
-/// covered is everything the clock calls into: that a reading holds the arrangement, that it says
-/// so, that the switch being off holds nothing, and that a routing which cannot see its own
-/// capture unplugs nothing whatever.
+/// **What the page owns here is the reading and not the holding.** Keeping a source off its own
+/// output belongs to <c>IInputArrangement</c>, which has a clock of its own for the length of the
+/// session and is asked about in <see cref="InputArrangementTests"/>, including the sentence said
+/// when something has crept back. What is covered here is what the page is still answerable for:
+/// that the arrangement is made and held while the switches are on, that the switch being off
+/// holds nothing, and that a routing which cannot see its own capture unplugs nothing whatever.
 /// </remarks>
 public sealed class HoldAsideTests
 {
@@ -70,25 +70,6 @@ public sealed class HoldAsideTests
                 return bench.Wiring.Held > 0;
             }),
             "the arrangement was never held, so a source that got back onto its own output stays there");
-    }
-
-    /// <summary>And says so where something really had come back, since that is not nothing.</summary>
-    [Fact]
-    public void A_source_that_crept_back_is_said_out_loud()
-    {
-        var bench = new RecorderBench();
-
-        bench.Wiring.CreptBack = true;
-        bench.Page.SelectedRoute = RecorderBench.Firefox;
-
-        Assert.True(
-            Within(() =>
-            {
-                bench.Page.RefreshRoutes();
-
-                return bench.Page.Status.Contains("taken off again", StringComparison.OrdinalIgnoreCase);
-            }),
-            "nothing was said about a source that had got back onto its own output");
     }
 
     /// <summary>And touches nothing at all while the switch is off, which is every ordinary run.</summary>

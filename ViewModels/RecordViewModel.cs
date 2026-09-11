@@ -385,9 +385,35 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     public void Finished()
     {
         StopPreview();
+
+        _arrangement.PutBack -= Crept;
+        _arrangement.Dispose();
+
         GiveRoutesBack();
         _scratch.Sweep();
     }
+
+    /// <summary>
+    /// What this page has asked for: the source, the monitor, and what we play out of.
+    /// </summary>
+    /// <remarks>
+    /// **The page writes this and nothing else.** What the machine is wired to is worked out
+    /// from it by <see cref="_arrangement"/>, which watches it, so no page decides where
+    /// anybody's audio goes by being drawn or put away.
+    /// </remarks>
+    private readonly Audio.Routing.Interfaces.IInputSetting _setting;
+
+    /// <summary>
+    /// What keeps the machine matching that setting, whichever page is in front.
+    /// </summary>
+    /// <remarks>
+    /// **Deliberately not the graph watch the pages start and stop.** Reading the graph fills a
+    /// picker somebody is looking at, so it belongs to a page; making and holding the arrangement
+    /// is about the machine, and a browser that comes back onto the speakers because somebody
+    /// changed tab is the worst thing this feature can do. See
+    /// <see cref="Audio.Routing.Interfaces.IInputArrangement"/>.
+    /// </remarks>
+    private readonly Audio.Routing.Interfaces.IInputArrangement _arrangement;
 
     /// <summary>What the plugins on the chain are holding inside themselves, in chain order.</summary>
     /// <remarks>
@@ -657,6 +683,9 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         _routing = routing;
         _input = new Audio.Routing.InputPath(routing);
+        _setting = new Audio.Routing.InputSetting();
+        _arrangement = new Audio.Routing.InputArrangement(_setting, _input);
+        _arrangement.PutBack += Crept;
 
         _cfg = cfg;
         _recordingService = recordingService;
@@ -2082,8 +2111,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             RestorePreferred(current);
 
             Arrange();
-
-            await HoldAsideAsync();
         }
         catch (Exception ex)
         {
@@ -2094,40 +2121,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             _readingRoute = false;
             _refreshingRoutes = false;
         }
-    }
-
-    /// <summary>
-    /// Keeps a source that is supposed to be aside off its own output, on the clock that is
-    /// already keeping the capture standing.
-    /// </summary>
-    /// <remarks>
-    /// **Taking a source aside is not a thing that stays done.** The graph belongs to the machine
-    /// rather than to this application, and its session manager wires a stream back to the
-    /// speakers whenever the stream is remade: a new tab, a page reloaded, a program moved
-    /// between outputs. The capture was already put back every couple of seconds for exactly that
-    /// reason and the other half of the arrangement was not, so the source came back onto its own
-    /// output while it was still arriving here. What that sounds like is the same audio twice
-    /// with a buffer between the two, which is how it was reported.
-    ///
-    /// Said on the status line only where something really had come back, since a line that
-    /// appeared every two seconds saying nothing happened would be worse than none. Off the
-    /// drawing thread, like everything else here that runs the tools.
-    ///
-    /// **Nothing is held while a route is still being applied**, and that is about the words as
-    /// much as the wiring. Applying one runs the tools off this thread and writes its own line
-    /// when it comes back, so a hold that ran in the middle of it had the useful sentence, that a
-    /// source crept back and was taken off again, overwritten a moment later by the routine one.
-    /// Which of the two landed last depended on how busy the machine was. The reading happens
-    /// every couple of seconds, so what is skipped here is said by the next one.
-    /// </remarks>
-    private async System.Threading.Tasks.Task HoldAsideAsync()
-    {
-        if (_applyingRoute) return;
-
-        if (SelectedRoute is not { } source) return;
-
-        if (await Task.Run(() => _input.Hold()))
-            Status = $"{source.Display} had got back onto its own output and was taken off again.";
     }
 
     /// <summary>
@@ -2199,6 +2192,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         OnPropertyChanged(nameof(CaptureFrom));
 
         Listening();
+
+        Standing();
 
         if (_readingRoute) return;
 
@@ -2341,11 +2336,17 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// other. One reason at most from here, which is what <see cref="_standing"/> is: the two
     /// switches are one arrangement.
     ///
-    /// **The graph is watched for as long as the arrangement stands**, and the settling clock
-    /// runs with it. Reading the graph is what puts the chosen source back on the capture and
-    /// holds it off its own output against a session manager that keeps rewiring it, and neither
-    /// is worth anything once nothing is chosen and nothing is being listened to. So the watch,
-    /// the clock and the input go up and come down together.
+    /// **Both switches are reasons, and for a long time only one of them said so.** This was
+    /// called when Hear it moved and not when a source was chosen, although the rule above counts
+    /// both: a source picked with Hear it off registered no reason at all, so the only thing
+    /// keeping the input open and the graph read was whichever page happened to be on screen.
+    ///
+    /// The graph is watched for as long as the arrangement stands, which is what keeps the picker
+    /// true and the chosen source on the capture. Holding that source off its own output is
+    /// deliberately not in here: that is
+    /// <see cref="Audio.Routing.Interfaces.IInputArrangement"/>, which has a clock of its own for
+    /// the length of the session, because a browser let back onto the speakers by a page being
+    /// put away is audio going out that nobody asked for.
     /// </remarks>
     private void Standing()
     {
@@ -2359,114 +2360,12 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         {
             Watch();
             WatchRoutes(reading: false);
-            Settle();
 
             return;
         }
 
-        StopSettling();
         LetGo();
         LetRoutesGo();
-    }
-
-    /// <summary>The clock that keeps asking while the graph is still moving, or nothing.</summary>
-    private DispatcherTimer? _settling;
-
-    /// <summary>When the settling began, so it can stop on its own.</summary>
-    private readonly System.Diagnostics.Stopwatch _settled = new();
-
-    /// <summary>How often the arrangement is checked while the graph is still settling.</summary>
-    /// <remarks>
-    /// Fast enough that nobody hears the gap, slow enough that it is a handful of tool runs
-    /// rather than a spin: a fifth of a second is under what a hand notices and is four readings
-    /// in the time the ordinary clock takes one.
-    /// </remarks>
-    private static readonly TimeSpan SettleInterval = TimeSpan.FromMilliseconds(200);
-
-    /// <summary>How long that goes on before the ordinary clock is left to it.</summary>
-    /// <remarks>
-    /// Long enough for a capture to appear in the graph and for the session manager to finish
-    /// whatever it was doing, and short enough that a machine where this never succeeds is not
-    /// running tools at this rate for the rest of the session.
-    /// </remarks>
-    private static readonly TimeSpan SettleFor = TimeSpan.FromSeconds(4);
-
-    /// <summary>
-    /// Keeps asking for a few seconds after the switch is thrown, while the graph is still moving.
-    /// </summary>
-    /// <remarks>
-    /// **One shutter is not enough, because the same gesture that closes it also moves the graph
-    /// it is closing on.** Turning the switch on opens the input, and this application's capture
-    /// appears in the graph a moment after that is asked for; turning it off puts the source's own
-    /// links back, and the session manager takes a moment to make them. So the reading taken at
-    /// the instant of the gesture is a reading of a graph that has not finished changing, and the
-    /// ordinary clock is two seconds away, which is two seconds of the source playing in two
-    /// places.
-    ///
-    /// It costs a couple of tool runs a fifth of a second for four seconds and then stops itself.
-    /// Nothing here is a retry of a failure: each reading takes off whatever has come back since
-    /// the last one, so a graph that settles at once is three readings that find nothing.
-    /// </remarks>
-    private void Settle()
-    {
-        _settled.Restart();
-
-        if (_settling != null)
-        {
-            _settling.Start();
-
-            return;
-        }
-
-        _settling = new DispatcherTimer { Interval = SettleInterval };
-
-        _settling.Tick += (_, _) =>
-        {
-            if (_settled.Elapsed > SettleFor)
-            {
-                StopSettling();
-
-                return;
-            }
-
-            HoldAsideNow();
-        };
-
-        _settling.Start();
-    }
-
-    /// <summary>Stops asking, for a switch that has gone off or an arrangement that is made.</summary>
-    private void StopSettling()
-    {
-        _settling?.Stop();
-        _settled.Reset();
-    }
-
-    /// <summary>Whether a reading is already out, so they cannot pile up on each other.</summary>
-    private bool _holding;
-
-    /// <summary>
-    /// Takes off whatever the source has got back onto, off the drawing thread.
-    /// </summary>
-    /// <remarks>
-    /// One at a time: the tools take longer than the settling clock's own interval on a busy
-    /// machine, and without the guard the readings would queue up behind each other and go on
-    /// long after the graph had stopped moving.
-    /// </remarks>
-    private async void HoldAsideNow()
-    {
-        if (_holding) return;
-
-        try
-        {
-            _holding = true;
-
-            await HoldAsideAsync();
-        }
-        finally
-        {
-            _holding = false;
-        }
     }
 
     /// <summary>
@@ -2598,7 +2497,25 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// there. The arrangement itself costs nothing when it already stands, so the two want
     /// different rates and are two calls.
     /// </remarks>
-    private void Arrange() => _aside = _input.Set(SelectedRoute, Hearing, PlayingOut);
+    /// <summary>
+    /// Says that the machine had put a source back onto its own output and it was taken off again.
+    /// </summary>
+    /// <remarks>
+    /// It arrives on the arrangement's own clock, which is not the drawing thread, and the status
+    /// line is read by the screen: handed over rather than written where it lands. Worth showing
+    /// at all because it means something outside this application is undoing what it arranged.
+    /// </remarks>
+    /// <param name="source">What had come back.</param>
+    private void Crept(Audio.Routing.Records.AudioRoute source) =>
+        Dispatcher.UIThread.Post(() =>
+            Status = $"{source.Display} had got back onto its own output and was taken off again.");
+
+    private void Arrange()
+    {
+        _setting.Say(SelectedRoute, Hearing, PlayingOut);
+
+        _aside = _arrangement.Aside;
+    }
 
     /// <summary>What became of taking the chosen source off its own output.</summary>
     /// <remarks>

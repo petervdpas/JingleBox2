@@ -92,6 +92,22 @@ public interface IInputPath
     Enums.InputAside Set(AudioRoute? source, bool heard, string? playingOut);
 
     /// <summary>
+    /// Whether a source is supposed to be off its own output at this moment.
+    /// </summary>
+    /// <remarks>
+    /// **What has to keep being true, rather than what has been done.** Taking a source aside is
+    /// not a thing that stays done: the graph belongs to the machine and its session manager
+    /// wires a stream back to the speakers whenever the stream is remade. So something has to go
+    /// on holding it, and this is how whatever runs that clock knows it is still needed.
+    ///
+    /// It says nothing about whether the source is being heard through the desk. A source is
+    /// taken aside by being chosen, and Hear it decides what the desk does with it afterwards:
+    /// the dangerous case is exactly the quiet one, where somebody has a browser lined up for
+    /// later and it starts playing out of the speakers because nobody was holding it.
+    /// </remarks>
+    bool Aside { get; }
+
+    /// <summary>
     /// Puts back anything that has crept onto its own output since, and says whether any had.
     /// </summary>
     /// <remarks>
