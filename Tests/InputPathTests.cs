@@ -459,4 +459,61 @@ public sealed class InputPathTests
 
         Assert.True(route.Back > back);
     }
+
+    /// <summary>
+    /// A take that came off nothing is still held, which is what repairs it.
+    /// </summary>
+    /// <remarks>
+    /// The fault this whole pair is here for, and the state it was reported in. Every reason a
+    /// take finds nothing to pull is a passing one, so the clock that already keeps the capture
+    /// standing has to look at the source again; recorded as never moved, it would not, and the
+    /// source stayed on its own speakers for the rest of the session.
+    /// </remarks>
+    [Fact]
+    public void A_take_that_came_off_nothing_is_still_held()
+    {
+        var route = new Route { Can = false };
+        var path = new InputPath(route);
+
+        Assert.Equal(InputAside.Refused, path.Set(Firefox, heard: false, Out));
+
+        Assert.True(path.Hold());
+        Assert.Equal(1, route.Held);
+    }
+
+    /// <summary>Asking the same thing again after a refusal really asks again.</summary>
+    /// <remarks>
+    /// A refusal is not an arrangement, so it is not an answer worth keeping: held as one, the
+    /// tick, the picker and the output moving would each have been told that nothing had changed.
+    /// </remarks>
+    [Fact]
+    public void The_same_question_after_a_refusal_is_asked_again()
+    {
+        var route = new Route { Can = false };
+        var path = new InputPath(route);
+
+        Assert.Equal(InputAside.Refused, path.Set(Firefox, heard: false, Out));
+
+        route.Can = true;
+
+        Assert.Equal(InputAside.Moved, path.Set(Firefox, heard: true, Out));
+        Assert.Equal(1, route.Aside);
+    }
+
+    /// <summary>A source that was deliberately left alone is still never held.</summary>
+    /// <remarks>
+    /// The other half of the same field, and the reason it cannot simply be dropped: holding a
+    /// source this decided not to touch would unplug it on the next reading.
+    /// </remarks>
+    [Fact]
+    public void A_source_that_cannot_be_heard_is_never_held()
+    {
+        var route = new Route { Ours = true };
+        var path = new InputPath(route);
+
+        Assert.Equal(InputAside.Nothing, path.Set(Speakers, heard: false, Out));
+
+        Assert.False(path.Hold());
+        Assert.Equal(0, route.Held);
+    }
 }

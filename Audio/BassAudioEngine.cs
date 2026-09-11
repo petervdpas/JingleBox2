@@ -444,7 +444,9 @@ public sealed class BassAudioEngine : IAudioEngine
 
         var (kind, index) = _outputs.Which(deviceId);
 
-        string named = Bass.GetDeviceInfo(index, out var about) ? about.Name : "";
+        int describes = index >= 0 ? index : DefaultIndex();
+
+        string named = Bass.GetDeviceInfo(describes, out var about) ? about.Name : "";
 
         bool driven = kind == Enums.AudioOutputKind.Asio;
         bool served = !driven && _pipe.Present && _server.Is(named, about.IsDefault);
@@ -458,7 +460,7 @@ public sealed class BassAudioEngine : IAudioEngine
 
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
         {
-            string called = served || driven ? named
+            string called = named.Length > 0 ? named
                 : Bass.GetDeviceInfo(opened, out var info) ? info.Name : "unnamed";
 
             return "outputs: opened " + opened + " '" + called + "' at " + _deviceRate + " Hz"
@@ -1003,6 +1005,32 @@ public sealed class BassAudioEngine : IAudioEngine
     /// <see cref="SilentDevice"/>, which is nought and plays nothing at all.
     /// </remarks>
     private const int DefaultOutput = -1;
+
+    /// <summary>
+    /// Which row the library marks as the system's own default.
+    /// </summary>
+    /// <remarks>
+    /// **<see cref="DefaultOutput"/> is a request rather than a row, and only the request can be
+    /// opened with it.** <c>Bass.Init</c> reads a number below nought as "whatever this machine
+    /// plays through" and answers; <c>Bass.GetDeviceInfo</c> is asked for a row and there is no
+    /// row minus one, so it says no. Everything worked out from that description is then wrong in
+    /// the same direction: the device has no name, it is not marked as the default, and the test
+    /// for the sound server is asked about nothing and answers no. So the one output a settings
+    /// file holds before anybody has picked one is the one output that could never be recognised
+    /// as the server, and this application played the bus itself on a machine whose whole graph
+    /// was waiting to pull it.
+    ///
+    /// Nought is skipped, since that is the device that plays nothing and is never anybody's
+    /// default. Minus one comes back where the library marks none, which leaves the description
+    /// exactly as empty as it was and decides nothing.
+    /// </remarks>
+    private static int DefaultIndex()
+    {
+        for (int i = SilentDevice + 1; Bass.GetDeviceInfo(i, out var about); i++)
+            if (about.IsDefault) return i;
+
+        return DefaultOutput;
+    }
 
 
     /// <summary>

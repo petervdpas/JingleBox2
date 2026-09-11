@@ -1746,6 +1746,16 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     ///
     /// One reading at a time: the timer fires every two seconds and the tools can take longer
     /// than that, so without the guard the readings would pile up on each other.
+    ///
+    /// **Every reading ends by asking for the arrangement, which is what covers starting up.**
+    /// A source is chosen once and read back for ever after, and this page only ever told the
+    /// input path about a choice: at startup there is none, since the source comes off the graph
+    /// rather than out of the picker, so nothing asked for it to be taken off its own output and
+    /// it sat on its own speakers until something else happened to change. Asking here costs
+    /// nothing where the arrangement already stands, since the path answers the same question
+    /// with the same answer and moves nothing, and it is the retry where the last attempt was
+    /// refused. Silently, through <see cref="Arrange"/> rather than <see cref="Agree"/>, since
+    /// nobody did anything and there is nothing to tell them.
     /// </remarks>
     public async void RefreshRoutes()
     {
@@ -1769,6 +1779,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             PreferWhatIsPlaying();
             RestorePreferred(current);
+
+            Arrange();
 
             await HoldAsideAsync();
         }
@@ -2269,10 +2281,23 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     private void Agree()
     {
-        _aside = _input.Set(SelectedRoute, Hearing, PlayingOut);
+        Arrange();
 
         Said(connected: true);
     }
+
+    /// <summary>
+    /// Makes the machine agree with the source and the switch, without saying anything.
+    /// </summary>
+    /// <remarks>
+    /// **The act on its own, for the reading pass, because the sentence is not wanted there.**
+    /// <see cref="Said"/> writes the status line whenever it has something to say, which is right
+    /// where somebody has just done something and wrong on a clock: asked every two seconds it
+    /// would pin the bar to the input's own sentence and rub out whatever else the page had put
+    /// there. The arrangement itself costs nothing when it already stands, so the two want
+    /// different rates and are two calls.
+    /// </remarks>
+    private void Arrange() => _aside = _input.Set(SelectedRoute, Hearing, PlayingOut);
 
     /// <summary>What became of taking the chosen source off its own output.</summary>
     /// <remarks>

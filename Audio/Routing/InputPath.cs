@@ -58,6 +58,12 @@ public sealed class InputPath : IInputPath
     /// The answer is kept beside the question, since a caller asking the same thing twice wants
     /// the same answer and not a claim that nothing happened.
     ///
+    /// **A refusal is not an arrangement, so it is not one of the questions this holds.** Asked
+    /// the same thing again after a take that did not come off, this answers it as though it were
+    /// the first time, which is what makes every way in a way back: picking the source again, or
+    /// the tick, or the output moving. Held as an answer, the one lost take would have stood for
+    /// the rest of the session and every one of those would have been told nothing happened.
+    ///
     /// **Hear it is not part of the question, deliberately.** Where a source plays is settled by
     /// choosing it and the tick has nothing to say about that: counted in, every press would give
     /// the source back and take it off again, letting it out of the desk and back for a moment on
@@ -80,13 +86,13 @@ public sealed class InputPath : IInputPath
 
         string asking = (source?.Node ?? "") + "\n" + (playingOut ?? "");
 
-        if (_everAsked && asking == _asked) return _answered;
+        if (_everAsked && asking == _asked && _answered != InputAside.Refused) return _answered;
 
         _everAsked = true;
         _asked = asking;
 
         Source = source;
-        _moved = false;
+        _meant = false;
 
         _routing.GiveBack();
 
@@ -100,25 +106,35 @@ public sealed class InputPath : IInputPath
     {
         if (source == null) return InputAside.Nothing;
         if (!CanHear(source, playingOut)) return InputAside.Nothing;
-        if (!_routing.TakeAside(source)) return InputAside.Refused;
 
-        _moved = true;
+        _meant = true;
 
-        return InputAside.Moved;
+        return _routing.TakeAside(source) ? InputAside.Moved : InputAside.Refused;
     }
 
-    /// <summary>Whether the source that is held was really taken off its own output.</summary>
+    /// <summary>Whether the source that is held is meant to be off its own output.</summary>
     /// <remarks>
-    /// **Held rather than worked out again, because holding is not the same question as taking.**
-    /// A source that could not be heard was never moved, and the route's own hold takes a source
-    /// aside outright where it is holding nothing: asked about one it never touched, it would
-    /// unplug it on the next reading, which is a source silenced by a rule that had already
-    /// decided to leave it alone.
+    /// **Meant rather than done, and that difference is the whole of why holding works.** Every
+    /// reason a take does not come off is a passing one: this application's own capture is not in
+    /// the graph yet, so there is no link to break; the source is not playing at that instant, so
+    /// it has none either; or a reading of the graph was still running and the door was shut.
+    /// <see cref="Hold"/> is what answers for all three, on the clock that is already keeping the
+    /// capture standing, and the route's own hold says so in as many words: what is supposed to
+    /// be aside is remembered whether or not anything came off.
+    ///
+    /// Written down as done, that promise was never kept. One take that found nothing to pull
+    /// left this believing it had never moved the source, so holding would not look at it again,
+    /// and the source stayed on its own speakers for the rest of the session: Hear it made no
+    /// difference in either position and nothing anywhere said why.
+    ///
+    /// What it still does not cover is a source this decided to leave alone. One that cannot be
+    /// heard was never meant to be aside, and holding it would unplug it on the next reading,
+    /// which is a source silenced by a rule that had already decided not to touch it.
     /// </remarks>
-    private bool _moved;
+    private bool _meant;
 
     /// <inheritdoc/>
-    public bool Hold() => _moved && Source is { } source && _routing.HoldAside(source);
+    public bool Hold() => _meant && Source is { } source && _routing.HoldAside(source);
 
     /// <inheritdoc/>
     /// <remarks>
@@ -128,7 +144,7 @@ public sealed class InputPath : IInputPath
     public void GiveBack()
     {
         _everAsked = false;
-        _moved = false;
+        _meant = false;
 
         _routing.GiveBack();
     }
