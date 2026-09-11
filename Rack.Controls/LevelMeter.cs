@@ -220,6 +220,8 @@ public class LevelMeter : ThemedControl
     /// </remarks>
     private void Moved()
     {
+        if (!Seen()) return;
+
         var room = Bars(Bounds.Width, Bounds.Height);
 
         double along = Orientation == Orientation.Vertical ? room.Height : room.Width;
@@ -479,7 +481,7 @@ public class LevelMeter : ThemedControl
     /// </remarks>
     private void NextFrame()
     {
-        if (_waiting || TopLevel.GetTopLevel(this) is not { } top) return;
+        if (_waiting || !Seen() || TopLevel.GetTopLevel(this) is not { } top) return;
 
         _waiting = true;
 
@@ -488,6 +490,36 @@ public class LevelMeter : ThemedControl
             _waiting = false;
             InvalidateVisual();
         });
+    }
+
+    /// <summary>
+    /// Whether any of this meter is somewhere somebody could see it.
+    /// </summary>
+    /// <remarks>
+    /// **A meter that is not on the screen is still being told what the audio is doing**, and
+    /// before this it asked for a frame about it. There are two ways to be out of sight and both
+    /// happen constantly here: a page that is not the tab in front, and a strip scrolled off the
+    /// side of the mixer, which is most of them on a song with a dozen tracks.
+    ///
+    /// It matters more than the drawing it saves. A profile of the running application says the
+    /// render loop spends about two fifths of its time starting and finishing each frame, before
+    /// anything is drawn at all, so a frame asked for by something nobody can see costs that
+    /// whole fixed price to show nothing.
+    ///
+    /// The window's own edge is what it is measured against rather than any scroller in between,
+    /// since a strip clipped away by one is outside the window too, and asking the window is one
+    /// question rather than a walk up the tree.
+    /// </remarks>
+    /// <returns>True where some of it is inside the window.</returns>
+    private bool Seen()
+    {
+        if (!IsEffectivelyVisible || Bounds.Width < 1 || Bounds.Height < 1) return false;
+
+        if (TopLevel.GetTopLevel(this) is not { } window) return false;
+
+        if (this.TransformToVisual(window) is not { } onto) return false;
+
+        return new Rect(Bounds.Size).TransformToAABB(onto).Intersects(new Rect(window.Bounds.Size));
     }
 
     /// <summary>Follows the level up at once, and back down at a readable rate.</summary>
