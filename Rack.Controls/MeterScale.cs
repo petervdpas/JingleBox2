@@ -49,4 +49,17 @@ public sealed class MeterScale : IMeterScale
 
         return Math.Max(level, Math.Pow(10, fallen / 20));
     }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Rounded down, so the answer is the pixel the bar fills to rather than the one it is
+    /// nearest. Anything that is not a number, and a meter with no room, land on nought: there
+    /// is nothing to draw either way and nothing to redraw for.
+    /// </remarks>
+    public int Step(double amplitude, double minimumDecibels, double pixels)
+    {
+        if (double.IsNaN(amplitude) || double.IsNaN(pixels) || pixels < 1) return 0;
+
+        return (int)(Position(amplitude, minimumDecibels) * pixels);
+    }
 }

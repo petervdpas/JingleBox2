@@ -144,6 +144,12 @@ public partial class MixerView : UserControl
     private void Bay_Loaded(object? sender, RoutedEventArgs e)
     {
         if (sender is not PatchbayView bay) return;
+
+        _bay = bay;
+
+
+        _bay = bay;
+
         if (bay.DataContext is not ViewModels.PatchbayViewModel patch) return;
 
         bay.Wired -= patch.Plug;
@@ -214,8 +220,24 @@ public partial class MixerView : UserControl
     {
         Levels?.Read();
 
-        (Patchbay as ViewModels.PatchbayViewModel)?.Pulse();
+        if (_bay is { IsEffectivelyVisible: true })
+            (Patchbay as ViewModels.PatchbayViewModel)?.Pulse();
     }
+
+    /// <summary>
+    /// The patchbay's own picture, while it is the tab in front.
+    /// </summary>
+    /// <remarks>
+    /// **Kept so that it is not drawn while nobody is looking at it.** The picture is on the
+    /// second tab of this page, and what a pulse does is work out which cables are carrying audio
+    /// and hand the answer over: twenty times a second, that is the whole picture invalidated
+    /// whether or not it is the tab in front. Measured on an empty application, this page cost
+    /// 15% of a core sitting still and the other pages cost six.
+    ///
+    /// Asked of the control rather than of the tab, since what matters is whether the thing is
+    /// on the screen and a tab is only one of the ways it might not be.
+    /// </remarks>
+    private PatchbayView? _bay;
 
     /// <summary>The desk's master, as a strip. See <see cref="RecorderInputProperty"/>.</summary>
     public static readonly StyledProperty<object?> DeskMasterProperty =

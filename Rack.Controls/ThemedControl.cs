@@ -57,7 +57,7 @@ public abstract class ThemedControl : Control
         ActualThemeVariantChanged += OnThemeChanged;
         ResourcesChanged += OnResourcesChanged;
 
-        InvalidateVisual();
+        Repaint();
     }
 
     /// <summary>Stops listening, so a control off the tree is not kept alive by the theme.</summary>
@@ -69,12 +69,37 @@ public abstract class ThemedControl : Control
         ResourcesChanged -= OnResourcesChanged;
     }
 
+    /// <summary>
+    /// The colours moved, so anything kept from the last painting is the wrong colours now.
+    /// </summary>
+    /// <remarks>
+    /// **The door for a control that keeps its brushes**, which is what a control drawn many
+    /// times a second has to do: a brush made inside <c>Render</c> is a native object made and
+    /// finalised on every frame, and a page of meters doing that is the finalizer queue's whole
+    /// day. Anything kept has to be let go of exactly here, since this is the one moment the
+    /// colours it was built from stop being true.
+    ///
+    /// Called on the way in as well, so a control attached into a theme it has not seen starts
+    /// with nothing kept.
+    /// </remarks>
+    protected virtual void ThemeMoved()
+    {
+    }
+
+    /// <summary>Lets go of what was kept and asks to be drawn again.</summary>
+    private void Repaint()
+    {
+        ThemeMoved();
+
+        InvalidateVisual();
+    }
+
     /// <summary>The theme variant moved, so whatever was painted is the wrong colours now.</summary>
-    private void OnThemeChanged(object? sender, EventArgs e) => InvalidateVisual();
+    private void OnThemeChanged(object? sender, EventArgs e) => Repaint();
 
     /// <summary>
     /// A resource dictionary somewhere above changed, which is how a whole theme is swapped
     /// rather than a variant flipped.
     /// </summary>
-    private void OnResourcesChanged(object? sender, ResourcesChangedEventArgs e) => InvalidateVisual();
+    private void OnResourcesChanged(object? sender, ResourcesChangedEventArgs e) => Repaint();
 }

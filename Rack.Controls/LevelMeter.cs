@@ -133,12 +133,113 @@ public class LevelMeter : ThemedControl
     /// <summary>Whether a frame has already been asked for, so one is not asked for twice.</summary>
     private bool _waiting;
 
-    /// <summary>Says which properties change the picture. None of them changes the size.</summary>
+    /// <summary>
+    /// The colours the kept brushes were built from, or nothing while none are kept.
+    /// </summary>
+    /// <remarks>
+    /// **Everything below is kept because this control is drawn many times a second.** A brush
+    /// or a pen made inside <c>Render</c> becomes a native drawing object that is made on every
+    /// frame and let go of by the finalizer afterwards: a mixer page carries a dozen of these
+    /// meters, each one was making about ten of them per frame, and the cost turned up in a
+    /// profile of the running application as the finalizer thread and the render loop.
+    ///
+    /// They are let go of in <see cref="ThemeMoved"/>, which is the one moment the colours they
+    /// were built from stop being true, and rebuilt on the next frame. The reading itself is not
+    /// in here: what moves is the length of the bar, not what it is painted with.
+    /// </remarks>
+    private ThemePalette? _painted;
+
+    /// <summary>How far down the scale the kept gradients were built for.</summary>
+    /// <remarks>
+    /// The middle stop of the gradient sits where the warning level falls on the scale, which
+    /// moves with the meter's own floor. Kept beside the colours so a strip with a different
+    /// floor rebuilds rather than drawing somebody else's gradient.
+    /// </remarks>
+    private double _paintedFloor;
+
+    /// <summary>The trough a bar is drawn in, and the line round it.</summary>
+    private IBrush? _trough;
+
+    /// <inheritdoc cref="_trough"/>
+    private IPen? _rim;
+
+    /// <summary>The three colours a level is worth, as brushes: quiet, warm, and over.</summary>
+    private IBrush? _quiet;
+
+    /// <inheritdoc cref="_quiet"/>
+    private IBrush? _warm;
+
+    /// <inheritdoc cref="_quiet"/>
+    private IBrush? _over;
+
+    /// <summary>The two gradients a bar is filled with once it is past the warning level.</summary>
+    private IBrush? _warmFill;
+
+    /// <inheritdoc cref="_warmFill"/>
+    private IBrush? _overFill;
+
+    /// <summary>
+    /// Says which properties change the picture. None of them changes the size.
+    /// </summary>
+    /// <remarks>
+    /// **The two readings are deliberately not in here.** They arrive twenty times a second and
+    /// almost never move the bar: what changes is the fourth decimal of a level, and repainting
+    /// for that is a dozen meters redrawn sixty times a second to show the same picture. They go
+    /// through <see cref="Moved"/> instead, which asks whether the bar would land anywhere new.
+    /// </remarks>
     static LevelMeter()
     {
         AffectsRender<LevelMeter>(
-            LeftProperty, RightProperty, StereoProperty, OrientationProperty, ShowClipProperty,
+            StereoProperty, OrientationProperty, ShowClipProperty,
             MinimumDecibelsProperty, ShowPeakProperty);
+    }
+
+    /// <summary>Which pixel each bar was last drawn to, so a reading that moves none is dropped.</summary>
+    private int _shownLeft = -1;
+
+    /// <inheritdoc cref="_shownLeft"/>
+    private int _shownRight = -1;
+
+    /// <inheritdoc/>
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property == LeftProperty || change.Property == RightProperty) Moved();
+    }
+
+    /// <summary>
+    /// Asks to be drawn again, but only where the picture would be different.
+    /// </summary>
+    /// <remarks>
+    /// Two things count as different. The bar landing on another pixel is the ordinary one; a
+    /// reading at or over full scale is the other, and it is checked separately because the top
+    /// of the bar is one pixel however far past it the reading goes, and the clip lamp latches
+    /// on the reading rather than on the picture. A clip missed because the bar was already
+    /// against the top is the one thing this may not do.
+    /// </remarks>
+    private void Moved()
+    {
+        var room = Bars(Bounds.Width, Bounds.Height);
+
+        double along = Orientation == Orientation.Vertical ? room.Height : room.Width;
+
+        if (ShowClip && Loudest() >= MeterScale.ClipAmplitude)
+        {
+            InvalidateVisual();
+
+            return;
+        }
+
+        int left = _scale.Step(Left, MinimumDecibels, along);
+        int right = Stereo ? _scale.Step(Right, MinimumDecibels, along) : 0;
+
+        if (left == _shownLeft && right == _shownRight) return;
+
+        _shownLeft = left;
+        _shownRight = right;
+
+        InvalidateVisual();
     }
 
     /// <inheritdoc cref="ShowClipProperty"/>
@@ -237,7 +338,7 @@ public class LevelMeter : ThemedControl
         double height = Bounds.Height;
         if (width <= 1 || height <= 1) return;
 
-        var palette = ThemePalette.From(this);
+        var palette = Paint();
         double now = _clock.Elapsed.TotalSeconds;
 
         bool over = ShowClip && _clip.Saw(Loudest(), now);
@@ -404,14 +505,11 @@ public class LevelMeter : ThemedControl
 
         double radius = Math.Min(3, Math.Min(area.Width, area.Height) / 2);
 
-        context.DrawRectangle(
-            new SolidColorBrush(palette.Background),
-            new Pen(palette.BorderBrush, 1),
-            new RoundedRect(area, radius));
+        context.DrawRectangle(_trough, _rim, new RoundedRect(area, radius));
 
         double filled = _scale.Position(level, MinimumDecibels);
         if (filled > 0)
-            context.DrawRectangle(Fill(palette, level), null, new RoundedRect(Portion(area, filled), radius));
+            context.DrawRectangle(Fill(level), null, new RoundedRect(Portion(area, filled), radius));
 
         if (!ShowPeak || peak <= 0) return;
 
@@ -440,7 +538,7 @@ public class LevelMeter : ThemedControl
     /// </remarks>
     private void DrawPeakMark(DrawingContext context, ThemePalette palette, Rect area, double at, double peak)
     {
-        var brush = new SolidColorBrush(ColourFor(palette, peak));
+        if (Worth(peak) is not { } brush) return;
 
         if (Orientation == Orientation.Vertical)
         {
@@ -453,15 +551,75 @@ public class LevelMeter : ThemedControl
         context.FillRectangle(brush, new Rect(x, area.Y, 2, area.Height));
     }
 
+    /// <summary>Which of the kept fills a level is worth.</summary>
+    /// <param name="level">The reading, nought to one.</param>
+    /// <returns>The brush, or nothing before the first painting.</returns>
+    private IBrush? Fill(double level) =>
+        level < WarnAmplitude ? _quiet
+        : level >= MeterScale.ClipAmplitude || level >= HotAmplitude ? _overFill
+        : _warmFill;
+
+    /// <summary>Which of the three kept brushes a level is worth.</summary>
+    /// <param name="level">The reading, nought to one.</param>
+    /// <returns>The brush, or nothing before the first painting.</returns>
+    private IBrush? Worth(double level) =>
+        level >= MeterScale.ClipAmplitude || level >= HotAmplitude ? _over
+        : level >= WarnAmplitude ? _warm
+        : _quiet;
+
+    /// <summary>
+    /// The colours this is drawn in, built once and kept until the theme moves.
+    /// </summary>
+    /// <remarks>
+    /// The gradient is the expensive one and is the reason this exists: three stops and a brush
+    /// object per bar per frame, where the only thing that actually changes between frames is
+    /// how much of the bar is filled in.
+    /// </remarks>
+    /// <returns>The palette, which the drawing still reads colours out of directly.</returns>
+    private ThemePalette Paint()
+    {
+        var palette = ThemePalette.From(this);
+
+        if (_painted is { } was && was.Equals(palette) && Math.Abs(_paintedFloor - MinimumDecibels) < 0.001)
+            return palette;
+
+        _painted = palette;
+        _paintedFloor = MinimumDecibels;
+
+        _trough = new SolidColorBrush(palette.Background);
+        _rim = new Pen(new SolidColorBrush(palette.Border), 1);
+
+        _quiet = new SolidColorBrush(palette.Accent);
+        _warm = new SolidColorBrush(Warn);
+        _over = new SolidColorBrush(Hot);
+
+        _warmFill = Gradient(palette, Warn);
+        _overFill = Gradient(palette, Hot);
+
+        return palette;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Everything kept goes, since every one of them was built out of colours that have just
+    /// stopped being true. The next frame builds them again.
+    /// </remarks>
+    protected override void ThemeMoved()
+    {
+        base.ThemeMoved();
+
+        _painted = null;
+    }
+
     /// <summary>
     /// A gradient rather than one flat colour, so the top of a loud bar reddens while the
     /// quiet part stays where it was: the eye reads the change, not just the height.
     /// </summary>
-    private IBrush Fill(ThemePalette palette, double level)
+    /// <param name="palette">The theme's colours.</param>
+    /// <param name="top">What the loud end of the bar goes.</param>
+    /// <returns>The brush.</returns>
+    private IBrush Gradient(ThemePalette palette, Color top)
     {
-        var top = ColourFor(palette, level);
-        if (level < WarnAmplitude) return new SolidColorBrush(top);
-
         var start = Orientation == Orientation.Vertical
             ? new RelativePoint(0.5, 1, RelativeUnit.Relative)
             : new RelativePoint(0, 0.5, RelativeUnit.Relative);

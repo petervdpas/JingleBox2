@@ -24,6 +24,25 @@ public interface IMeterScale
     double Position(double amplitude, double minimumDecibels = DefaultMinimumDecibels, bool decibels = true);
 
     /// <summary>
+    /// Which pixel along a meter of that length a reading lands on.
+    /// </summary>
+    /// <remarks>
+    /// **What a meter is asked to redraw for.** A reading arrives twenty times a second and
+    /// almost never lands anywhere new: the level moves in the fourth decimal while the bar
+    /// stays exactly where it was, and a control that repaints on the value rather than on the
+    /// picture is redrawing a dozen meters sixty times a second to show the same thing. Asked
+    /// this instead, it repaints when the bar actually moves.
+    ///
+    /// The screen's own pixels rather than a tolerance somebody picked: what matters is whether
+    /// anybody could see the difference, and that is what a pixel is.
+    /// </remarks>
+    /// <param name="amplitude">The reading.</param>
+    /// <param name="minimumDecibels">The bottom of this meter's scale.</param>
+    /// <param name="pixels">How long the bar is, in pixels.</param>
+    /// <returns>The pixel it fills to, which is nought for a meter with no room.</returns>
+    int Step(double amplitude, double minimumDecibels, double pixels);
+
+    /// <summary>
     /// A peak mark that falls back at a steady rate rather than sticking. Held for a moment
     /// first, so a transient is readable before it starts to drop.
     /// </summary>
