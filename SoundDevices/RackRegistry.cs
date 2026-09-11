@@ -16,11 +16,11 @@ namespace JingleBox2.SoundDevices;
 /// pointed elsewhere by a test and by the portable build and neither of those asks anybody's
 /// permission.
 ///
-/// What a subclass supplies is the four things that differ between one kind of box and another:
-/// how a folder is read into a manifest, whether this build will have what it read, how a
-/// shipped one is taken, and the word the log calls it by. Everything else here is folders.
+/// What a subclass supplies is the four things that differ between one kind of sound device and
+/// another: how a folder is read into a manifest, whether this build will have what it read, how
+/// a shipped one is taken, and the word the log calls it by. Everything else here is folders.
 /// </remarks>
-/// <typeparam name="T">The manifest a box of this kind is read into.</typeparam>
+/// <typeparam name="T">The manifest a sound device of this kind is read into.</typeparam>
 public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackProject
 {
     /// <summary>How two paths are compared, which is a fact about the disc and not about here.</summary>
@@ -83,7 +83,7 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
     /// The folder both worlds' folders sit inside, beside the program and under the app folder.
     /// </summary>
     /// <remarks>
-    /// The rack is what this installation has, and there are two kinds of box on it, so they are
+    /// The rack is what this installation has, and there are two kinds of sound device on it, so
     /// kept together: <c>rack/machines</c> and <c>rack/effects</c> rather than two folders at the
     /// top of everything. Written out rather than built, so the one folder name this depends on
     /// can be found by looking for it.
@@ -99,7 +99,7 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
     /// <summary>Where these used to live, before the two worlds were kept together.</summary>
     private string Was => Path.Combine(_folder.Path(), FolderName);
 
-    /// <summary>Reads one folder into a manifest, or nothing when there is no box in it.</summary>
+    /// <summary>Reads a folder into a manifest, or nothing when it holds no device.</summary>
     /// <param name="folder">The folder to read.</param>
     protected abstract T? Open(string folder);
 
@@ -108,7 +108,7 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
     /// </summary>
     /// <remarks>
     /// The engine gate. An id this build has nothing behind is refused here, which is what keeps
-    /// a folder from a later version off the rack rather than on it as a box that cannot sound.
+    /// a folder from a later version off the rack rather than on it as one that cannot sound.
     /// </remarks>
     /// <param name="project">What was read off the disc.</param>
     protected abstract bool Register(T project);
@@ -121,14 +121,15 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
     protected virtual void Forget() { }
 
     /// <summary>
-    /// Puts a shipped box into the installed folder, under a folder named for its id.
+    /// Puts a shipped sound device into the installed folder.
     /// </summary>
     /// <remarks>
-    /// A plain copy, which is all a box whose folder is only files needs. A world that has more
-    /// to do about it than copy, because it also arrives as a zip and has to be named around a
-    /// folder that is already there, overrides this.
+    /// A plain copy, into a folder of the same name the shipped one has, which is all a sound
+    /// device whose folder is only files needs. A world that has more to do about it than copy,
+    /// because it also arrives as a zip and has to be named around a folder that is already
+    /// there, overrides this.
     /// </remarks>
-    /// <param name="project">The shipped box being taken.</param>
+    /// <param name="project">The shipped sound device being taken.</param>
     /// <returns>False when nothing was taken, which is written to the log by the caller.</returns>
     protected virtual bool Take(T project)
     {
@@ -153,7 +154,7 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
 
     /// <inheritdoc/>
     /// <remarks>
-    /// By the box's id and not by the path, which is the correction this needed. A box is
+    /// By the sound device's id and not by the path. One is
     /// installed into a folder named after its id, since that is the one name that cannot collide
     /// by accident, and it ships in a folder named whatever whoever made it called it: OddSkilla
     /// ships in <c>OddSkilla</c> and installs as <c>machine.oddskilla</c>. Comparing the paths
@@ -161,7 +162,7 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
     /// the truth and meant a song packed for somebody else carried a copy of the presets they
     /// already had.
     ///
-    /// So the folder the file is in is read for its id, the shipped box with that id is looked
+    /// So the folder the file is in is read for its id, the shipped one with that id is looked
     /// up, and the question is whether the same file is in there.
     /// </remarks>
     public bool Ships(string path)
@@ -265,7 +266,7 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
     /// cost a trip to SETTINGS before it could be seen at all, and the panel it draws stayed
     /// hidden behind the hand written one with nothing saying why.
     ///
-    /// So the offer is what is recorded, not the folder. A shipped box this installation has
+    /// So the offer is what is recorded, not the folder. A shipped device this installation has
     /// never been offered is put on the rack; one it has been offered is left alone whether or
     /// not it is still there, which is what keeps something somebody threw out thrown out.
     ///
@@ -359,7 +360,7 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
     }
 
     /// <summary>
-    /// Brings an installed box up to date with the one that ships, where that is newer.
+    /// Brings an installed sound device up to date with the one that ships, where that is newer.
     /// </summary>
     /// <remarks>
     /// File by file, and nothing is deleted. What ships is overwritten because that is the thing;
@@ -399,7 +400,7 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
     }
 
     /// <summary>
-    /// Which shipped boxes this installation has already been offered.
+    /// Which shipped sound devices this installation has already been offered.
     /// </summary>
     /// <remarks>
     /// No file means this installation is either brand new or older than the file. Whatever it
@@ -426,7 +427,7 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
     /// <summary>Writes the offer down, so the next start does not make it again.</summary>
     /// <remarks>
     /// A write that fails is logged and let go. The worst that comes of it is everything shipped
-    /// being offered once more on the next start, which is a box coming back rather than one
+    /// being offered once more on the next start, which is one coming back rather than one
     /// going missing.
     /// </remarks>
     /// <param name="offered">Every id this installation has now been offered.</param>

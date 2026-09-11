@@ -500,7 +500,7 @@ public sealed class ControlTargets : IControlTargets
     /// </summary>
     /// <remarks>
     /// One link kind and two places to look, in that order, because to a hardware knob a
-    /// soundmachine and an effect are the same thing: a box on the rack with a face and an id.
+    /// soundmachine and an effect are the same thing: a device on the rack with a face and an id.
     /// Which of the two it is decides where it is found and nothing else, and a link that names
     /// neither answers nothing, which is the ordinary case for a knob pointed at something the
     /// track you are on has not got.
@@ -588,8 +588,8 @@ public sealed class ControlTargets : IControlTargets
     /// The knob itself, once which effect and which of its knobs have both been settled.
     /// </summary>
     /// <remarks>
-    /// One builder for both ways of arriving at a box, the face in front and the chain of the
-    /// track you are on, because everything after "which box" is the same question: does this
+    /// One builder for both ways of arriving at a device, the face in front and the chain of the
+    /// track you are on, because everything after "which device" is the same question: does this
     /// effect really have that parameter, what is it called, and what are its ends.
     ///
     /// Written through the values rather than into the engine, and that is not a detail. The

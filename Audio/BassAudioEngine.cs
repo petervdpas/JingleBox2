@@ -62,9 +62,9 @@ public sealed class BassAudioEngine : IAudioEngine
     /// Everything this application plays, summed, which is the only way anything leaves.
     /// </summary>
     /// <remarks>
-    /// Three of them because there are three things that make sound and each is one strip: the
-    /// pads are one source however many are down, the take being auditioned is another, and the
-    /// tracker sums its own tracks and arrives as the third. A sub-bus is what makes that true,
+    /// A strip apiece for the things that make sound: the pads are one source however many are
+    /// down, the take being auditioned is another, the recording input is the third, and the
+    /// tracker sums its own tracks and arrives as the fourth. A sub-bus is what makes that true,
     /// since a mixer stream is itself a decoding channel and can be plugged into another one, and
     /// its level is the strip's fader.
     /// </remarks>
@@ -459,12 +459,9 @@ public sealed class BassAudioEngine : IAudioEngine
     }
 
     /// <summary>
-    /// Opens the bus and its two sub-busses, with the lock held and BASS already up.
+    /// Opens the bus and its three sub-busses, with the lock held and BASS already up.
     /// </summary>
     /// <remarks>
-    /// Nothing at all while the switch is off, which is what keeps the old path exactly as it
-    /// was.
-    ///
     /// The order matters and is the order of the audio: the sub-busses are made first and plugged
     /// into the output, so that a pad played before the tracker has ever started still has
     /// somewhere to go. What is played, or handed to the driver, is the output and never a source
@@ -475,13 +472,11 @@ public sealed class BassAudioEngine : IAudioEngine
     /// wired, and says so, and the sound server is the same in every respect: it is the second
     /// thing that can pull, and where it does the library plays nothing itself.
     ///
-    /// **A bus that will not open throws rather than being worked around.** There was a second
-    /// path once, where a pad played at the card on its own, and it was reached by a setting
-    /// somebody could turn off; the setting is gone and so is the path. What is left that can
-    /// fail is BASSmix not being beside the program, and on that machine nothing can be summed
-    /// at all: saying so where the output is opened reaches the pad that was pressed, which
-    /// puts it on that pad. Playing the pads a different way and losing solo, pan, mute and
-    /// ASIO in silence is the alternative, and it is worse.
+    /// **A bus that will not open throws rather than being worked around.** The one thing that
+    /// can fail is BASSmix not being beside the program, and on that machine nothing can be
+    /// summed at all: saying so where the output is opened reaches the pad that was pressed,
+    /// which puts the message on that pad. Playing the pads a second way and losing solo, pan,
+    /// mute and ASIO in silence is the alternative, and it is worse.
     /// </remarks>
     /// <param name="pulled">Whether something pulls the output rather than BASS playing it.</param>
     /// <param name="device">Which ASIO driver, where one is being used.</param>
@@ -908,8 +903,11 @@ public sealed class BassAudioEngine : IAudioEngine
 
     /// <summary>A pad has reached its end, on BASS's own thread.</summary>
     /// <remarks>
-    /// A stream is made to free itself, and BASS lets the handle go once this returns, so the
-    /// reference to it is dropped here rather than being kept and reused after it is dead.
+    /// The reference is dropped rather than the stream being freed, and only where the pad is
+    /// still holding this very handle: the sync arrives on the mixing thread and is handed to the
+    /// pool, so by the time this runs the pad may have been pressed again and be on a new stream.
+    /// Freeing here would then free the stream that is playing. The handle itself is let go where
+    /// the pad next needs one, or by <see cref="FreeStreamLocked"/>.
     /// </remarks>
     /// <param name="handle">The sync this came from.</param>
     /// <param name="channel">The channel that ended.</param>
@@ -965,13 +963,19 @@ public sealed class BassAudioEngine : IAudioEngine
     /// </remarks>
     private readonly int _deviceRate;
 
-    /// <summary>Opens BASS on the default output if nothing has. Called holding the lock.</summary>
+    /// <summary>Opens BASS if nothing has, so that a pad pressed first still has somewhere to go.</summary>
+    /// <remarks>
+    /// On device <see cref="SilentDevice"/>, which is the one that plays nothing. Nothing else is
+    /// known here: which output somebody chose is the settings' answer and reaches this class
+    /// through <c>SetOutputDevice</c>, which is what every ordinary start does before a pad can
+    /// be pressed. This is the path where that has not happened.
+    /// </remarks>
     private void EnsureInitLocked()
     {
         if (_currentDeviceId >= 0) return;
 
         if (!Bass.Init(0, _deviceRate))
-            throw new InvalidOperationException($"Bass.Init default device failed: {Bass.LastError}");
+            throw new InvalidOperationException($"Bass.Init failed: {Bass.LastError}");
         _currentDeviceId = 0;
 
         LoadPlugins();
@@ -1089,8 +1093,9 @@ public sealed class BassAudioEngine : IAudioEngine
     /// <summary>Stops a pad and lets its stream go. Called holding the lock.</summary>
     /// <remarks>
     /// The effect stays with the pad, but the hook it is hung on belongs to the stream that is
-    /// going. BASS may have freed the handle already, since a stream frees itself at its end, so
-    /// it is asked what state the channel is in rather than being told to stop regardless.
+    /// going. The channel is asked what state it is in rather than being told to stop regardless,
+    /// since a pad that reached its own end is already stopped and stopping it again is a call
+    /// answered with an error nobody reads.
     /// </remarks>
     private void FreeStreamLocked(int padIndex)
     {
@@ -1184,9 +1189,14 @@ public sealed class BassAudioEngine : IAudioEngine
     }
 
     /// <summary>
-    /// The longest block the pad effects are prepared for. BASS hands out far less than this;
-    /// anything longer is left alone rather than allocated for on the audio thread.
+    /// How big the scratch buffer a pad's effect works in is, in frames.
     /// </summary>
+    /// <remarks>
+    /// Not a limit on the block: a longer one is worked through in pieces this size, since the
+    /// first block BASS asks for is the whole playback buffer and skipping it would be the start
+    /// of every pad playing dry. It is how much is allocated once, off the audio thread, so that
+    /// nothing on the audio thread has to allocate at all.
+    /// </remarks>
     private const int MaxDspFrames = 8192;
 
     /// <summary>Takes the effect's hook off a pad's stream. Called holding the lock.</summary>

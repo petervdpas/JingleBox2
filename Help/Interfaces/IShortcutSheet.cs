@@ -20,7 +20,13 @@ namespace JingleBox2.Help.Interfaces;
 /// </remarks>
 public interface IShortcutSheet
 {
-    /// <summary>The system's four, as markdown, one line to a shortcut.</summary>
+    /// <summary>Every key that cannot be moved, as markdown, one line to a shortcut.</summary>
+    /// <remarks>
+    /// <see cref="JingleBox2.Shortcuts.Interfaces.ISystemKeys.All"/> is what it walks: the four
+    /// doors the application hangs on every window, the four fixed actions delivered through the
+    /// map, and every row of the pattern's own table, which is two dozen lines in all. A key
+    /// added to any of the three turns up here without anybody being told.
+    /// </remarks>
     string System { get; }
 
     /// <summary>The pages along the top and the key each is on, or that it is on none.</summary>

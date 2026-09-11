@@ -7,7 +7,7 @@ namespace JingleBox2.SoundDevices.Interfaces;
 /// </summary>
 /// <remarks>
 /// A face can carry artwork, and the artwork is files: a logo, a plate, a picture of the thing
-/// itself. They live in an <c>images</c> folder inside the box's own folder and are named
+/// itself. They live in an <c>images</c> folder inside the device's own folder and are named
 /// <c>image1</c>, <c>image2</c> and so on, so the panel names one by what it is called in there
 /// and the two find each other again on whatever disc they land on.
 ///
@@ -16,7 +16,7 @@ namespace JingleBox2.SoundDevices.Interfaces;
 /// renumbered so the folder has no gaps, and removed one at a time when the last element showing
 /// one has gone. Written for machines first, and not one line of it was about a machine.
 ///
-/// Anything in the folder that is not one of ours is left alone throughout. A box is a folder
+/// Anything in the folder that is not one of ours is left alone throughout. A device is a folder
 /// somebody can put things in, and tidying is not a licence to rearrange it.
 /// </remarks>
 public interface IPanelImages

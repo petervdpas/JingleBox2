@@ -476,10 +476,14 @@ public sealed class MidiService : IMidiService
     /// found running status, where every message after the first arrived two bytes long and
     /// vanished without a word.
     ///
-    /// What is dropped on purpose is dropped in silence. The clock and active sensing arrive
-    /// dozens of times a second from any device with a sequencer in it, and a piece of a system
-    /// exclusive message arrives whenever one is long; reporting either as unread would drown the
-    /// very lines this log is kept for. See <see cref="Chatter"/>.
+    /// What is dropped on purpose is dropped in silence. Active sensing arrives dozens of times
+    /// a second from any device with a sequencer in it, and a piece of a system exclusive message
+    /// arrives whenever one is long; reporting either as unread would drown the very lines this
+    /// log is kept for. See <see cref="Chatter"/>.
+    ///
+    /// The clock is read rather than dropped, since a transport following an external master has
+    /// to be given the ticks, so it never reaches here as something unread: <c>MidiDispatcher</c>
+    /// answers it and stops.
     ///
     /// A system exclusive message is the one kind printed whole, because they are rare and
     /// because this is how a device's identity gets into a controller file: plug it in, ask, and
@@ -512,9 +516,13 @@ public sealed class MidiService : IMidiService
     /// Telling those two apart is the whole point of the line this guards. A message nobody
     /// reads is worth a line; the clock is not, at twenty four of them a beat.
     ///
-    /// Four bytes are chatter by number: 0xF8 clock, 0xF9 which is undefined, 0xFE active sensing
-    /// and 0xFF reset, with 0xFD undefined beside them. Everything below 0x80 is a piece of a
-    /// system exclusive message that has not finished arriving, and 0xF0 is the start of one.
+    /// Five bytes are chatter by number: 0xF8 clock, 0xF9 and 0xFD which are undefined, 0xFE
+    /// active sensing and 0xFF reset. Everything below 0x80 is a piece of a system exclusive
+    /// message that has not finished arriving, and 0xF0 is the start of one.
+    ///
+    /// The clock is in that list for one path only, since <c>Read</c> answers it everywhere else:
+    /// a clock byte arriving in the middle of a system exclusive message, which is exactly what a
+    /// device sending clock does while it answers an identity request.
     /// </remarks>
     private bool Chatter(byte[]? data, int start, int length)
     {
@@ -616,8 +624,9 @@ public sealed class MidiService : IMidiService
     /// **The only message here that is neither one byte nor open-ended**, and the reason it is
     /// called out: everything else above 0xF0 that this does not read is stepped over one byte at
     /// a time, which is right for a byte with no data behind it and wrong for this. Read as one
-    /// byte, its two data bytes are then walked over as though they were messages of their own,
-    /// which is harmless today only because nothing downstream reads them.
+    /// byte, its two data bytes would be walked over as though they were messages of their own,
+    /// and each of them is under 0x80, so the second would be taken for a running status note. It
+    /// is read whole instead, three bytes, and the pointer goes out in <c>Data</c>.
     ///
     /// It matters because a master sends this immediately before a continue, so getting its
     /// length wrong is the position arriving as rubbish at the one moment it decides where every

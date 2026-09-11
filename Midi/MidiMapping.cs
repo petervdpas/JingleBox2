@@ -23,7 +23,13 @@ namespace JingleBox2.Midi;
 /// </remarks>
 public sealed class MidiMapping
 {
-    /// <summary>Which pad, counted from nought. Up to sixteen of them, as SETTINGS allows.</summary>
+    /// <summary>Which pad, counted from nought.</summary>
+    /// <remarks>
+    /// As many as the matrix holds, which is <c>PadMatrix.Usual</c> or <c>PadMatrix.Most</c> with
+    /// the extended switch on. No number is refused here: this reads a file somebody already has,
+    /// and a row for a pad the matrix no longer has is carried over with the rest rather than
+    /// dropped.
+    /// </remarks>
     public int PadIndex { get; set; }
 
     /// <summary>A note or a controller. Both are buttons on the hardware people use for this.</summary>

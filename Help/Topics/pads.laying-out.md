@@ -25,8 +25,8 @@ an atmosphere wants.
 
 ## Hitting one
 
-Toggle mode is in SETTINGS, under Control Surfaces, and it decides what a second hit
-means: on, a pad keeps playing until it is hit again; off, it plays for as long as
+Toggle mode is in SETTINGS, on the MIDI tab under Pad behaviour, and it decides what a
+second hit means: on, a pad keeps playing until it is hit again; off, it plays for as long as
 the pad is held. It is the same answer for the mouse and for a pad box.
 
 A playing pad keeps its own colour and walks through the ones either side of it, so a
@@ -42,8 +42,9 @@ profiles rather than two applications.
 
 ## Pointing hardware at one
 
-There is no table of notes to fill in. Rest the pointer on a pad on FIRE, hold
-`Ctrl+Shift+M`, and hit the pad on your box. It lands on the same layer every other
+There is no table of notes to fill in. Press `Ctrl+Shift+M`, rest the pointer on a pad
+on FIRE, and hit the pad on your box. The key turns the mode over rather than being
+held, so press it again when you are done. It lands on the same layer every other
 link does and turns up on MIDI CC under a card headed Pads.
 
 A fresh installation has nothing pointed at the pads, deliberately: a pad nobody has

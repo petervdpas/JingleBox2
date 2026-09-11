@@ -28,10 +28,14 @@ public sealed class TrackMixer : ITrackMixer
     public const int MaxVoices = 48;
 
     /// <summary>
-    /// The level a single voice comes out at. High enough to sit next to a sample played at
-    /// its own level; several voices at once are held in by the saturation below rather than
-    /// by leaving headroom nobody ever uses.
+    /// The level the whole mix comes out at, applied once to the sum.
     /// </summary>
+    /// <remarks>
+    /// High enough to sit next to a sample played at its own level; a mix that goes past full
+    /// scale is held in by the saturation after it rather than by leaving headroom nobody ever
+    /// uses. The track meters are scaled by it too, so a meter reads what left rather than what
+    /// the bus held.
+    /// </remarks>
     public const float MasterGain = 0.9f;
 
     /// <summary>As many tracks as a song can have, so a strip always has a bus of its own.</summary>
@@ -145,8 +149,6 @@ public sealed class TrackMixer : ITrackMixer
 
     /// <summary>How loud the audition plays, which is applied as its scratch is added in.</summary>
     private float _previewGain = 1f;
-
-    /// <summary>How long the last block was, so the busses are only rebuilt when it changes.</summary>
 
     /// <summary>What one strip's side chain is set to.</summary>
     /// <param name="Depth">How far down the strip goes when the key is at full scale, 0 to 1.</param>
@@ -1049,7 +1051,11 @@ public sealed class TrackMixer : ITrackMixer
     }
 
     /// <inheritdoc/>
-    /// <remarks>An audition carries its choke group, so two pads that cannot both ring still cannot.</remarks>
+    /// <remarks>
+    /// The voice carries its choke group, so whatever it is cut by later can see it, and nothing
+    /// here cuts anything: choking is done where a note is played on a track, and an audition is
+    /// not on a track. Two pads in one group tapped on a panel both ring.
+    /// </remarks>
     public double Preview(
         DrumPad pad, SynthPatch patch, SampleData sample, Note note, float gain,
         double holdSeconds, string audition,
@@ -1207,12 +1213,13 @@ public sealed class TrackMixer : ITrackMixer
     /// emptied outside.
     ///
     /// **One thread renders at a time, and a second one asking is given silence rather than a
-    /// place in a queue.** Everything the mixing uses is sized from the frame count it was
-    /// called with, so two threads rendering at once with different counts is not a race over a
-    /// value, it is one of them shortening the arrays the other is halfway through: the bus, the
-    /// loose bus and the scratch are all reallocated by <see cref="EnsureBusses"/> whenever the
-    /// block size changes. It crashed inside the loop that adds the preview onto the loose bus,
-    /// which is simply the first place a shortened array is indexed.
+    /// place in a queue.** Everything the mixing uses is sized from the frame count it was called
+    /// with, so two threads rendering at once with different counts is not a race over a value, it
+    /// is one of them replacing the arrays the other is halfway through: the busses and the loose
+    /// bus are grown by <see cref="EnsureBusses"/> and the preview scratch by
+    /// <see cref="PrepareBusses"/> whenever a block arrives longer than any before it. It crashed
+    /// inside the loop that adds the preview onto the loose bus, which is simply the first place a
+    /// replaced array is indexed.
     ///
     /// It was never meant to have two, and for almost all of a run it does not: either the sound
     /// card's own thread renders in step, or a thread of its own renders ahead into a queue, and
@@ -2049,13 +2056,12 @@ public sealed class TrackMixer : ITrackMixer
     /// at.
     /// </summary>
     /// <remarks>
-    /// **Grow only.** It held the last block's frame count and rebuilt every buffer here whenever
-    /// the next block was a different length. That is not a rare event, and this machine's own log
-    /// says so in as many words: <c>the tracker stream is asking for between 8 and 529 frames at a
-    /// time</c>. So the loose bus and one bus per sounding track were thrown away and allocated
-    /// again on very nearly every callback, tens of kilobytes at a time, thousands of times a
-    /// second, on the one thread with a deadline. The collector then runs during the mix, and a
-    /// collection stops every managed thread in the process including that one.
+    /// **Grow only**, and that is the whole of why it exists. A block is not one size: this
+    /// machine's own log says <c>the tracker stream is asking for between 8 and 529 frames at a
+    /// time</c>, so a buffer sized to the last block would be thrown away and allocated again on
+    /// very nearly every callback, tens of kilobytes at a time, thousands of times a second, on
+    /// the one thread with a deadline. The collector then runs during the mix, and a collection
+    /// stops every managed thread in the process including that one.
     ///
     /// Measured rather than argued: twelve blocks of shifting size allocate nought bytes grown,
     /// and three hundred thousand sized to the last block. See

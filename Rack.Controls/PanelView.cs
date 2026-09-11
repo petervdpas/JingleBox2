@@ -33,14 +33,16 @@ namespace JingleBox2.Rack.Controls;
 ///
 /// Two jobs in one control, which is why <see cref="Designing"/> exists. Playing a machine and
 /// laying one out want the same picture and opposite pointers: a knob you can turn cannot also
-/// be a knob you can pick up, so in designing mode the controls stop listening to the pointer
-/// and a transparent skin over each element takes the press instead. The alternative, a second
+/// be a knob you can pick up, so in designing mode the controls stop listening to the pointer and
+/// the press is answered by asking which element the pointer is over. The alternative, a second
 /// control that draws a preview of the panel, means two drawings to keep in step and a designer
 /// that lies about what the panel will look like.
 ///
 /// Anything it does not understand it leaves out. An element whose kind this version has never
 /// heard of, or one wired to a parameter the machine does not have, draws nothing and does not
-/// complain, so a panel saved by a later designer still opens here with the parts that do exist.
+/// complain while the panel is being played, so a panel saved by a later designer still opens
+/// here with the parts that do exist. While it is being laid out the same element draws a
+/// stand-in saying what it is waiting for, since there the gap is the thing being worked on.
 /// </remarks>
 public class PanelView : Decorator
 {
@@ -162,17 +164,19 @@ public class PanelView : Decorator
         AvaloniaProperty.Register<PanelView, IPanelMenu?>(nameof(Menu));
 
     /// <summary>
-    /// The machine's own folder, which is what the pictures on its panel are named against.
+    /// Asks for the panel to be built again, and decides nothing else.
     /// </summary>
     /// <remarks>
-    /// A machine travels as a folder, so a picture on its face is a file in that folder and the
-    /// description says no more than the name of it. Where the folder is is the host's to know
-    /// and nobody else's: the same machine sits somewhere different on every disc it is ever
-    /// copied to, and a path written into machine.json would be wrong for all of them.
+    /// **The folder a face's pictures are named against is the face's own**, which is
+    /// <c>Face.Folder</c>, and that is what the picture parts are resolved against. A sound
+    /// device travels as a folder, so a picture on its face is a file in that folder and the
+    /// description says no more than the name of it; where the folder is is the host's to know,
+    /// since the same device sits somewhere different on every disc it is copied to. A face with
+    /// no folder draws a picture's frame and says so rather than going looking relative to
+    /// wherever the program happens to have been started.
     ///
-    /// Nothing here means no pictures, which is the state a panel is in when whatever put it on
-    /// screen has no folder to offer. A picture then draws its frame and says so, rather than
-    /// going looking for a file relative to wherever the program happens to have been started.
+    /// This property is in the rebuild list, so writing it redraws the panel. Nothing reads its
+    /// value.
     /// </remarks>
     public static readonly StyledProperty<string?> AssetsProperty =
         AvaloniaProperty.Register<PanelView, string?>(nameof(Assets));
@@ -885,7 +889,7 @@ public class PanelView : Decorator
     }
 
     /// <summary>
-    /// The size the description asks for, on the element itself rather than on the skin round it.
+    /// The size the description asks for, set on the control the element was built into.
     /// </summary>
     /// <remarks>
     /// Every kind takes these, since how much room a thing takes is a question about the panel
@@ -978,8 +982,9 @@ public class PanelView : Decorator
     /// <remarks>
     /// The wording is the question: a knob with no parameter says so, and one naming a parameter
     /// the machine has not got says that instead, which is the difference between not finished
-    /// and wrong. It takes the room the real control would take, so a panel laid out around it
-    /// does not jump when the parameter is picked.
+    /// and wrong. One size whatever part is waiting, sixty by thirty four, which is room for the
+    /// wording rather than room for the control: a panel laid out around one moves when the
+    /// parameter is picked and the real control takes its own measurements.
     /// </remarks>
     private Control Waiting(PanelElement element)
     {
@@ -1031,8 +1036,8 @@ public class PanelView : Decorator
     /// The margin the description asks for, or none, which leaves the container to space it.
     /// </summary>
     /// <remarks>
-    /// On the outside of the skin, so that while designing the outline hugs the element and the
-    /// margin is the gap between one outline and the next. Inside it, the outline would be drawn
+    /// A margin rather than padding, so that while designing the outline hugs the element and the
+    /// margin is the gap between one outline and the next. As padding, the outline would be drawn
     /// round the empty space as well and two elements side by side would look joined.
     /// </remarks>
     private static Control Apart(PanelElement element, Control control)
@@ -1167,9 +1172,9 @@ public class PanelView : Decorator
     /// A run of cells, with each child standing on as many of them as it asks for.
     /// </summary>
     /// <remarks>
-    /// The span goes on whatever <see cref="Build"/> handed back rather than on the control
-    /// itself, because while designing that is the skin around it and the strip measures the
-    /// skin. The same reason the grid sets its column on what it is given.
+    /// The span goes on whatever <see cref="Build"/> handed back rather than on a control found
+    /// again afterwards, since that is the one the strip is measuring. The same reason the grid
+    /// sets its column on what it is given.
     ///
     /// A strip has a gap of its own on top of the cells, so its children are spaced by the strip
     /// rather than by a margin apiece. It defaults to the panel's own gap, so that a strip and a
@@ -1241,14 +1246,18 @@ public class PanelView : Decorator
     /// Only the alignment across the flow is decided here. Along it the container decides, and a
     /// child told where to sit along the flow would be a child pushed to one end of its own row.
     ///
-    /// Three answers, in order. A child's own word beats the row's, the way its own margin beats
-    /// the row's gap: one knob standing at the foot of a row of boxes is the case, where the row
-    /// wants everything at the top and that one thing does not. Then the row's word, if it gave
-    /// one. Then, only for a control that has not already said where it sits, the rule above:
-    /// sections stretch, plain controls keep their own. The name beside a field is why the last
-    /// test is there, since it is written to sit on the middle line so it lines up with the box
-    /// it names, and a row that pushed it to the top would leave it riding half a line above the
-    /// thing it is about.
+    /// Across a row there are three answers, in order. A child's own word beats the row's, the
+    /// way its own margin beats the row's gap: one knob standing at the foot of a row of boxes is
+    /// the case, where the row wants everything at the top and that one thing does not. Then the
+    /// row's word, if it gave one. Then, only for a control that has not already said where it
+    /// sits, the rule above: sections stretch, plain controls keep their own. The name beside a
+    /// field is why the last test is there, since it is written to sit on the middle line so it
+    /// lines up with the box it names, and a row that pushed it to the top would leave it riding
+    /// half a line above the thing it is about.
+    ///
+    /// Down a column the row's word decides for every child and a child's own is not consulted,
+    /// since down a column what is being set is which side of the column each control sits on and
+    /// that is the column's to say.
     /// </remarks>
     private T Fill<T>(
         T container,
@@ -1588,9 +1597,10 @@ public class PanelView : Decorator
     /// happened and not for how long. The handlers ask to hear about events already marked
     /// handled, since the button handles both of them itself.
     ///
-    /// The lamp, where the button has one, follows the press rather than being read back out
-    /// of the value, because nothing tells this panel that a value has moved since it was
-    /// drawn. It is the same thing either way while a person is doing the pressing.
+    /// The lamp, where the button has one, follows the press rather than being read back out of
+    /// the value, because the button does not register a reader: what a panel re-reads is what
+    /// asked to be read, and a momentary button's lamp is about the finger rather than about the
+    /// value. It is the same thing either way while a person is doing the pressing.
     ///
     /// There is a second kind of button, and it is not a cap at all. One naming an
     /// <c>action</c> asks for something to be done rather than setting anything, so it names no
@@ -1687,9 +1697,8 @@ public class PanelView : Decorator
     /// rather than falling back to the parameter's name the way a knob does. A lamp is a dot,
     /// and a dot with a sentence under it is as wide as the sentence.
     ///
-    /// Read only. Lit or unlit it reads once: the value is fetched as the panel is drawn and
-    /// nothing says when it has moved since, so a lamp that has to follow the sound is not this
-    /// element. Blinking is the exception and reads the setting like any other control, because
+    /// Read only, and read once: the value is fetched as the panel is drawn and this registers no
+    /// reader, so a lamp that has to follow the sound is not this element. Blinking is the exception and reads the setting like any other control, because
     /// there the setting is a rate and the lamp is what that rate looks like, in hertz, and the
     /// lamp does the timing itself.
     /// </remarks>
@@ -1806,12 +1815,12 @@ public class PanelView : Decorator
     /// The keyboard, showing the octave the parameter is set to.
     /// </summary>
     /// <remarks>
-    /// The octave is all of it that a machine can be wired to, and that is not a shortcoming
-    /// of the wiring. The keyboard's other two ends are which notes are sounding and what to
-    /// do when one is pressed, and neither is a setting: a note is an event with a beginning
-    /// and an end, and this panel knows about values and nothing else. So the keys draw, the
-    /// octave lamps follow the parameter, and pressing a key here sounds nothing until a
-    /// machine is handed something better than <c>Get</c> and <c>Set</c> to hear it through.
+    /// The octave is all of it a parameter can be wired to, and that is not a shortcoming of the
+    /// wiring. The keyboard's other two ends are which notes are sounding and what to do when one
+    /// is pressed, and neither is a value: a note is an event with a beginning and an end, and
+    /// values know nothing about either. So the octave lamps follow the parameter and the rest
+    /// comes off <see cref="IPanelKeys"/>, which is what lights the keys and what a press and a
+    /// release are handed to.
     ///
     /// The parameter is optional, unlike every other control here, because a keyboard with no
     /// octave to show is still a keyboard. Naming one the machine does not have is still
@@ -2124,9 +2133,10 @@ public class PanelView : Decorator
     /// nothing but which property they are: a start and a loop start are the same fraction of
     /// the same file read off the same drag.
     ///
-    /// The subscription goes on after the starting value is in, for the same reason it does
-    /// everywhere else here: putting a value into a control raises the same notification a hand
-    /// on it raises, and the panel must not write back what it has just read.
+    /// The subscription goes on after the starting value is in, because putting a value into a
+    /// control raises the same notification a hand on it raises and the panel must not write back
+    /// what it has just read. Where a control is subscribed to first instead, the quiet read in
+    /// <see cref="_reading"/> is what keeps the write out.
     /// </remarks>
     private void Handle(
         PanelElement element,
@@ -2330,7 +2340,7 @@ public class PanelView : Decorator
     }
 
     /// <summary>
-    /// The four corners, spelled out both ways.
+    /// The two corners a menu may go in, spelled as a face writes them.
     /// </summary>
     /// <remarks>
     /// Written as a map of literal words rather than worked out from the toolkit's own names, so
@@ -2847,10 +2857,10 @@ public class PanelView : Decorator
     /// The shape the machine is making, drawn from the machine's own engine.
     /// </summary>
     /// <remarks>
-    /// The one control here that is handed a setting it does not turn: how much of the wave is
-    /// shown is a knob somewhere else on the panel, and this has to be told which so the two
-    /// agree. It is read and never written, the way a picture of a recording reads the take it
-    /// is a picture of.
+    /// Handed a setting it does not turn: how much of the wave is shown is a knob somewhere else
+    /// on the panel, and this has to be told which so the two agree. It is read and never
+    /// written, the way a picture of a recording reads the take it is a picture of, and the same
+    /// is true of the meter, the lamp and the envelope curve.
     ///
     /// Started by a note, the same as the envelope curve beside it, and bound rather than set
     /// because the panel is built once and notes go on being played.
@@ -3267,8 +3277,9 @@ public class PanelView : Decorator
     /// The walk upwards is the point: a press lands on whatever is innermost, and the answer
     /// wanted is the nearest element containing it rather than the exact control.
     ///
-    /// Nothing at all when not designing, since there are no frames then and a panel being
-    /// played is not a panel anything is dropped on.
+    /// It answers on a played panel as readily as on one being laid out, since every element is
+    /// noted whichever mode the panel is in. What designing decides is whether a control listens
+    /// to the pointer at all, which is a different question.
     /// </remarks>
     public PanelElement? ElementAt(object? source)
     {

@@ -122,7 +122,7 @@ public sealed class MidiTransportRouter
     private const int MmcPause = 0x09;
 
     /// <summary>
-    /// Reads a transport press, in whichever of the three dialects the device chose.
+    /// Reads a transport press, in whichever of the four dialects the device chose.
     /// </summary>
     /// <remarks>
     /// A realtime byte and a machine control message are neither of them a button, so neither has
@@ -181,10 +181,10 @@ public sealed class MidiTransportRouter
     }
 
     /// <summary>
-    /// The fourth dialect: a controller whose file says which of its buttons the transport's are.
+    /// The fifth dialect: a controller whose file says which of its buttons the transport's are.
     /// </summary>
     /// <remarks>
-    /// Asked last, after the three protocols have all declined, so a device speaking one of them
+    /// Asked last, after the four protocols have all declined, so a device speaking one of them
     /// never reaches here and nothing that worked can change. It exists because the tick in
     /// SETTINGS meant two different things depending on the device. A MiniLab 3 and a KeyLab
     /// mkII speak Mackie Control, plain controllers or machine control, so ticking Transport

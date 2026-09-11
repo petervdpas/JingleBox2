@@ -47,7 +47,7 @@ public sealed class PanelParts : IPanelParts
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Each of these needs notes or a kit behind it, which is the one thing a box handed a
+    /// Each of these needs notes or a kit behind it, which is the one thing a device handed a
     /// track's audio has not got. A Take, a Wave, a Location, a Scope and a Preset are
     /// deliberately absent: a convolution reverb picks an impulse response off your shelf and
     /// draws it, a compressor traces its gain reduction, a delay on a track has a playhead, and

@@ -71,12 +71,16 @@ public sealed class AutomationLane
     /// One per time, because a point at a time that already has one is somebody moving that
     /// point: there is nowhere for a second to go and no way to draw them apart.
     ///
-    /// Kept private so those two facts cannot be broken from outside. <see cref="Put"/> is the
-    /// only way in.
+    /// Kept private so those two facts cannot be broken from outside. Two ways in keep them:
+    /// <see cref="Put"/>, which is a hand on the curve, and <see cref="TakePoints"/>, which is a
+    /// file being read and sorts and deduplicates as it goes.
     /// </remarks>
     private readonly List<AutomationPoint> _points = new();
 
-    /// <summary>The points, to be read. <see cref="Put"/> is the only way one goes in.</summary>
+    /// <summary>
+    /// The points, to be read. They go in through <see cref="Put"/> or <see cref="TakePoints"/>,
+    /// both of which keep them sorted and one to a time.
+    /// </summary>
     public IReadOnlyList<AutomationPoint> Points => _points;
 
     /// <summary>

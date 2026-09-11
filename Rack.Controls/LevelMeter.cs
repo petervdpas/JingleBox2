@@ -87,10 +87,6 @@ public class LevelMeter : ThemedControl
         AvaloniaProperty.Register<LevelMeter, double>(nameof(MinimumDecibels), MeterScale.DefaultMinimumDecibels);
 
     /// <summary>
-    /// Backs <see cref="ShowPeak"/>: a mark riding the loudest recent moment, so a transient is
-    /// readable after it has gone.
-    /// </summary>
-    /// <summary>
     /// Whether the meter carries a clip light: a small mark at the loud end, lit when what it
     /// was shown went past full scale.
     /// </summary>
@@ -145,7 +141,6 @@ public class LevelMeter : ThemedControl
             MinimumDecibelsProperty, ShowPeakProperty);
     }
 
-    /// <summary>How loud the left is, nought to one as amplitude rather than as decibels.</summary>
     /// <inheritdoc cref="ShowClipProperty"/>
     public bool ShowClip
     {
@@ -304,9 +299,10 @@ public class LevelMeter : ThemedControl
     /// Draws the clip mark at the loud end of the meter.
     /// </summary>
     /// <remarks>
-    /// At the end the bar fills towards, so it reads as the bar having run out of room rather
-    /// than as a lamp somebody put nearby. Over the bar rather than beside it, since the meter
-    /// is often the narrowest thing on a strip and there is no room beside it.
+    /// At the end the bar fills towards, which is where an eye following the level already is.
+    /// Over the bar rather than beside it, since the meter is often the narrowest thing on a
+    /// strip and there is no room beside it. It is a lamp and is drawn as one, so it reads as a
+    /// light rather than as the bar having run out of room: see <see cref="Lamp"/>.
     /// </remarks>
     /// <param name="context">Where it is drawn.</param>
     /// <param name="palette">The theme's colours.</param>
@@ -337,11 +333,9 @@ public class LevelMeter : ThemedControl
     /// gloss and the halo are drawn once for the whole application, and the dark state is that
     /// same lamp with its colour dimmed rather than a circle drawn another way.
     ///
-    /// **A lamp nobody can find while it is off is one nobody trusts when it is on.** The first
-    /// version was four pixels at a quarter opacity and could not be told from the meter's own
-    /// frame; the second was a cap across the bar, which reads as the bar running out of room
-    /// rather than as a lamp. The whole value of a clip light is knowing it was there and dark a
-    /// moment ago.
+    /// **A lamp nobody can find while it is off is one nobody trusts when it is on**, which is
+    /// why it is a round lamp with a halo rather than a few pixels at low opacity or a cap across
+    /// the bar. The whole value of a clip light is knowing it was there and dark a moment ago.
     /// </remarks>
     /// <param name="width">How wide the meter is.</param>
     /// <param name="height">And how tall.</param>

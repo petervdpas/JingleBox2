@@ -48,11 +48,11 @@ public interface ISoundEffectEngines
     /// application. An effect is made in the designer and named by whoever made it, so the
     /// manifest says which engine it wants and the id is the effect's own.
     ///
-    /// The three that shipped before that name no engine, and every chain on anybody's disc
-    /// writes their ids down, so those three ids are still understood. Nothing else is.
+    /// Every chain on anybody's disc writes an id down, so the three ids that shipped before the
+    /// field existed are still understood without it. Nothing else is.
     /// </remarks>
     /// <param name="id">The effect's own id, which a chain writes down.</param>
-    /// <param name="named">What its manifest says, which is usually nothing for the first three.</param>
+    /// <param name="named">What its manifest says, or nothing where it says nothing.</param>
     string? EngineOf(string? id, string? named);
 
     /// <summary>

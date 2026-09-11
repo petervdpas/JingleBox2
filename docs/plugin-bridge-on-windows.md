@@ -321,7 +321,7 @@ plugin that never connects cannot hold the caller for ever. That is right. **On 
 handed back by `Accept` carries a copy of the listening socket's options, timeout included; on
 Linux it does not.** The audio socket has its own patience written over it on the next line. The
 control socket did not, so a number meaning "how long to wait for a plugin to turn up" silently
-became "how long a running plugin may go without speaking" — and a control socket is quiet by
+became "how long a running plugin may go without speaking", and a control socket is quiet by
 design, since it carries knob moves and window resizes rather than audio.
 
 Measured rather than reasoned about, twice. A bare probe: a listener set to 12345 ms hands back an
@@ -367,7 +367,7 @@ that this exercise ruled the bridge out rather than explaining anything.
 it.** The ratio looks decisive, eleven blocks over budget against one, and it is not: eleven events
 in three minutes on a machine running at a third of its block is nearly nought against nearly
 nought, and the two mean ranges overlap almost completely. What would settle it is the case the
-switch exists for, which is a machine that is actually struggling — the Linux column, where the
+switch exists for, which is a machine that is actually struggling: the Linux column, where the
 serial half never came under 66% and the overlapped half never went over 68%. Turning a default
 over on the strength of a box with nothing wrong with it is the wrong way round.
 

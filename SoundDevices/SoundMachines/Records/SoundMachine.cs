@@ -7,18 +7,17 @@ using JingleBox2.Rack.SoundDevices.Interfaces;
 namespace JingleBox2.SoundDevices.SoundMachines.Records;
 
 /// <summary>
-/// One of the things that make sound. A machine is part of the application and there is a fixed
-/// set of them; what you make is an instrument on one.
+/// One soundmachine as the rack shows it: what it is called, what it is for, and what it is
+/// painted in.
 /// </summary>
 /// <remarks>
-/// The distinction is the one a rack makes. You do not build a new machine, you take one and
-/// program it, and the result is an instrument with a name of its own: "Kick" is an OddSkilla
-/// set a certain way, not a kind of thing in itself.
+/// The distinction is the one a rack makes. A machine is a face over an engine, shipped beside
+/// the program or made in the designer; what you make on a track is an instrument on one, with a
+/// name of its own, so "Kick" is an OddSkilla set a certain way rather than a kind of thing in
+/// itself.
 ///
-/// <see cref="TrackerInstrumentKind"/> is the field that says which machine an instrument is on,
-/// and its numbers are in every song and instrument file ever saved, so they do not move. This
-/// is the readable side of the same fact: what the machine is called, what it is for, and what
-/// it needs from the panel that shows it.
+/// <see cref="TrackerInstrumentKind"/> is the engine, and its numbers are in every song and
+/// instrument file ever saved, so they do not move. Any number of machines can name one engine.
 /// </remarks>
 /// <param name="Kind">Which engine is behind it, which is what a song's own file says.</param>
 /// <param name="Id">
@@ -49,13 +48,12 @@ public sealed record SoundMachine(
     /// The instrument id a machine's own slot in the rack uses.
     /// </summary>
     /// <remarks>
-    /// Every machine of ours is always on the shelf, once, under its own name. You do not add
-    /// one and you cannot rename or delete one, the way a rack has the boxes it has. So each
-    /// needs an id that is the same on every machine and every run, rather than the fresh guid
-    /// an instrument you made gets.
+    /// The machine's own id, which is the same string on every installation and every run rather
+    /// than the fresh guid an instrument you made gets: what sits on the rack is that machine and
+    /// not a second one, so taking it off and putting it back finds the settings that were on it.
     ///
-    /// Written out one by one rather than made from the name, so the strings that end up in
-    /// people's instrument files can be found by looking for them.
+    /// It comes off the manifest, which is what makes a machine somebody designed as good as one
+    /// that ships.
     /// </remarks>
     public string SlotId => Id;
 
@@ -108,16 +106,13 @@ public sealed record SoundMachine(
         new PanelTheme("#7B838C"));
 
     /// <summary>
-    /// The order machines stand in, which is the app's and not any machine's.
+    /// The five engines that shipped, in the order they were introduced.
     /// </summary>
     /// <remarks>
-    /// Reading order rather than alphabetical: the plainest first and the odd one last, which is
-    /// how they were introduced and how anybody learning them meets them. A machine that is not
-    /// installed simply is not there, so the rest close up.
-    ///
-    /// Also the list of engines this build has. An id that is not one of these is a machine
-    /// written against a later version, and it is left on the shelf rather than put on the rack
-    /// as a box with nothing behind it.
+    /// **Nothing reads it.** What the rack shows is <see cref="Installed"/>, which is sorted by
+    /// name, and which engines this build has is decided by <c>EngineNamed</c> and
+    /// <see cref="KindOf"/> as each manifest is registered. There is no curated order any more,
+    /// since a machine somebody makes and names themselves has no place in one.
     /// </remarks>
     private static readonly TrackerInstrumentKind[] Offered =
     {
@@ -223,13 +218,11 @@ public sealed record SoundMachine(
     /// Which engine one of the five original ids is for, or nothing for any other id.
     /// </summary>
     /// <remarks>
-    /// The machines that shipped before a machine could name its own engine, and the whole of
-    /// what this is for. Their manifests say nothing in <c>Engine</c>, and every song and rack
-    /// file on anybody's disc names them, so the mapping cannot go: it is what lets those five
-    /// keep working while every machine made from now on carries its engine in its own file.
-    ///
-    /// Nothing else consults it. A machine that names its engine is registered on the engine it
-    /// names, whatever it calls itself.
+    /// The five that shipped before a machine could name its own engine, and the whole of what
+    /// this is for: every song and rack file on anybody's disc writes those ids down, so the
+    /// mapping cannot go. It is consulted only where a manifest is silent about its engine, and
+    /// the five shipped manifests are not silent, so on shipped content it never fires. What it
+    /// answers for is a file somebody has that predates the field.
     /// </remarks>
     private static TrackerInstrumentKind? KindOf(string? id) => id switch
     {

@@ -22,8 +22,8 @@ public interface ISixteenBit
     /// <remarks>
     /// The channel count is left as it is: how many channels a take holds is the capture's
     /// business and the meter is already told. A block that is already sixteen bit integers is
-    /// handed straight back, since a copy there would be work done on the capture's own thread
-    /// for nothing.
+    /// still copied rather than handed back, and that is not an oversight: the capture goes on
+    /// using its own buffer for the next block, and everything above here keeps what it is given.
     ///
     /// A float past full scale is held rather than allowed to wrap, which is the one difference
     /// that matters: the wrap is a loud crack and the hold is what every converter does anyway.

@@ -27,9 +27,10 @@ public interface IRenderCost
     /// <remarks>
     /// Nothing back means there is nothing to say yet, which is almost every call.
     ///
-    /// A block with no frames, no time or no rate is not a block and is ignored rather than
-    /// counted as a free one: a rate of nought would divide by it, and a zero-length block
-    /// averaged in would report the mixing as cheaper than it is.
+    /// A block with no frames or no rate is not a block and is ignored, since a rate of nought
+    /// would divide by it. A block that took no time at all is counted, deliberately: it is a
+    /// real block that was cheap, and dropping the cheap ones would report the mixing as dearer
+    /// than it is. A time that is negative or not a number is ignored with the rest.
     /// </remarks>
     /// <param name="frames">How many frames were mixed.</param>
     /// <param name="milliseconds">How long that took.</param>

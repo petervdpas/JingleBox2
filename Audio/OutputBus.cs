@@ -318,11 +318,11 @@ public sealed class OutputBus : IOutputBus
     /// there, and it is the answer only there, because it wants a channel that is plugged into a
     /// mixer and refuses anything else.
     ///
-    /// The third way is the one that was left reading nought. **A bus a driver pulls is plugged
+    /// The third way is the one no call of BASS's answers. **A bus something pulls is plugged
     /// into nothing**: it is a decoding channel, so the ordinary call would eat the audio, and it
     /// is a source on no mixer, so the add-on's call answers that it is not available. That is an
-    /// ASIO driver holding the output, which exists on Windows and nowhere else, so the meters on
-    /// the desk and on the patchbay went dead there with the audio playing perfectly.
+    /// ASIO driver holding the output on Windows and the sound server holding it on Linux, and
+    /// the meters on the desk and on the patchbay are the ones that would read nought.
     ///
     /// A reader on the block has none of those cases in it. It runs where the audio is, whatever
     /// is pulling it, it takes nothing out of the mix, and it needs to know nothing about how the

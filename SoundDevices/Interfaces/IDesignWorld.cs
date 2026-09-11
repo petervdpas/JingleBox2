@@ -10,10 +10,9 @@ namespace JingleBox2.SoundDevices.Interfaces;
 /// effect, so there is one editor and one view, told which world it is in.
 ///
 /// What differs is at the edges and is all here: what a fresh one is, what its id begins with,
-/// what the manifest is called, what the word is in a sentence on the status line, whether the
-/// folder can be carried somewhere else, and whether it can be written out as a zip. An effect
-/// cannot be exported yet, and says so rather than offering a button that would write half a
-/// parcel.
+/// what the manifest is called, what the word is in a sentence on the status line, which parts
+/// may be dropped on the face, whether the folder can be carried somewhere else, and whether it
+/// can be written out as a zip. Both worlds export and both have a presets page.
 /// </remarks>
 public interface IDesignWorld
 {
@@ -92,11 +91,11 @@ public interface IDesignWorld
     /// Whether it ships presets that are edited here, on a page of their own.
     /// </summary>
     /// <remarks>
-    /// A machine's preset is an instrument file, a whole thing with a name on it, because that is
-    /// what a machine with settings is. An effect has no instrument and no name of its own on a
-    /// chain, so its preset is the smaller thing, an id and the values its knobs were left at,
-    /// and that file does not exist yet. Until it does, the page is not offered rather than
-    /// offered and empty.
+    /// True in both worlds, and what differs is the file. A machine's preset is an instrument
+    /// file, a whole thing with a name on it, because that is what a machine with settings is; an
+    /// effect has no instrument and no name of its own on a chain, so its preset is the smaller
+    /// thing, a name and where each control stands. That is also why the two pages differ: a
+    /// machine's shows the JSON, and an effect's is a form with a row per control.
     /// </remarks>
     bool HasPresets { get; }
 

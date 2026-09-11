@@ -17,7 +17,9 @@ What it is deliberately **not** called is a device. That is the industry word (R
 and Ableton all say device for a machine, an effect or a mixer strip) and it is the wrong word
 here for one reason: this is a page about MIDI, where device already means the box on the desk.
 The two ends of the wire may not share a name. So the hardware end is the **controller**
-throughout, and `ControlDeviceLinks` was renamed `ControllerLinks` to stop it saying otherwise.
+throughout, and `ControlDeviceLinks` was renamed `ControllerLinks` to stop it saying otherwise,
+and then `ControlTemplateLinks`, which is what it is called now: a card is a template, and the
+list is the templates rather than one controller's links.
 
 In the interface the umbrella is not shown at all. A card is headed with the thing itself and
 the sort of thing is a quiet word beside it: `OddSkilla  device`, `EchoBox  device`,

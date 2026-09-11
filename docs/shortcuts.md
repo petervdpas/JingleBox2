@@ -37,7 +37,7 @@ Two consequences worth knowing:
 does nothing, which is right. A page that wants it says so.
 
 **A control can answer for itself.** Saving a machine that has never had a folder must ask where
-to put it, and asking is a window's job, so `MachineEditorView` answers rather than its view
+to put it, and asking is a window's job, so `DesignerView` answers rather than its view
 model. A view model answers where that is simpler.
 
 ## What answers what today
@@ -183,7 +183,7 @@ hole, and `Dressed` was saying what it did to the two things showing the colour 
 else.
 
 **The door is a redraw rather than an edit.** Every edit in the designer ends at
-`MachineEditorViewModel.Redraw`, so that is where the history hears about it. It is told more
+`DesignerViewModel.Redraw`, so that is where the history hears about it. It is told more
 often than there are edits, which is safe: a redraw where nothing about the machine moved reads
 the same as before and leaves no step. Over-telling costs a comparison; under-telling would be an
 edit that cannot be undone.

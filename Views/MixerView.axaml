@@ -11,10 +11,11 @@
              x:DataType="vm:TrackerViewModel">
 
   <UserControl.Resources>
-    <!-- A strip over something that is not a track: a badge, a fader and a meter, and nothing
-         else. No pan, no mute, no solo and no ducking, because none of those mean anything for
-         the recording input, the pads as a whole, or a take being auditioned. One template for
-         all three, since what differs between them is only what the fader writes to. -->
+    <!-- A strip over something that is not a track: the recording input, the pads as a whole, a
+         take being auditioned, or the desk's own master. Each of them is over a bus, so each has
+         a pan, a mute and a solo like any other strip; what none of them has is ducking, which is
+         a track pushing another track down and belongs to the song. One template for all four,
+         since what differs between them is only what the fader writes to. -->
     <DataTemplate x:Key="SourceStrip" x:DataType="vm:SourceStripViewModel">
       <Border Classes="inset" Width="134">
         <!-- The same six rows every strip here uses, so a row of them lines up: badge, pan,
@@ -28,10 +29,10 @@
               <TextBlock Text="{Binding Label}" />
             </Border>
 
-            <!-- Only where there is a bus underneath. The recording input has neither: panning
-                 what is being recorded is not something the recorder does, and a mute there
-                 would be recording nothing without saying so. No solo on any of them, because
-                 solo here is the song's and these are not in the song. -->
+            <!-- The pan, the mute and the solo below are drawn where there is a bus underneath,
+                 which every strip built from this template has. They are the bus's own, so they
+                 decide what is heard and never what is recorded: a take is written from the
+                 capture and nothing on this strip reaches it. -->
           </StackPanel>
 
           <ui:Knob Grid.Row="1" Label="Pan" Format="0.00" DefaultValue="0"
@@ -111,37 +112,31 @@
               </ComboBox.ItemTemplate>
             </ComboBox>
 
-            <!-- Capturing a source and taking it off everything else are two different acts, so
-                 this is a switch of its own under the picker rather than something choosing a
-                 source implies. Off unless somebody says so: a browser that went silent
-                 everywhere the moment it was picked would read as this application having
-                 broken it. Grey where the machine cannot rather than gone, the rule every other
-                 switch on this page keeps. -->
             <!-- The desk's input channel: what is coming in goes through the recording chain and
-                 out of the master, which is what an insert on an input has always meant. Grey
-                 for what an output is playing, since hearing that through the output is a loop
-                 rather than a monitor.
+                 out of the master, which is what an insert on an input has always meant.
+                 Choosing a source above is what takes it off its own output, and this is what
+                 releases it into the mix.
+
+                 **Never greyed.** It says whether the recorder is heard at all, and what the
+                 recorder is carrying is a separate question: greying it for a source that cannot
+                 be heard took the whole recorder with it. A source that would feed back is
+                 answered by leaving the capture off the recorder's bus and saying so on the
+                 status line.
 
                  **As wide as the picker rather than as wide as its own words.** Centred on
-                 itself, a switch sits where the length of its label puts it, so two of them
-                 under one picker have their boxes on two different lines down the strip. Given
-                 the picker's width they all start on the picker's own left edge, which is the
-                 one edge this column has. -->
-            <!-- **Never greyed, because it is a property of the recorder.** It says whether the
-                 recorder is heard at all; what the recorder is carrying is a separate question.
-                 It was disabled whenever the chosen source was an output's own monitor, which
-                 really cannot be heard through the desk, and that took the whole recorder with
-                 it. The loop is answered where it happens now, by leaving the capture off the
-                 recorder's bus and saying so on the line. -->
+                 itself, a switch sits where the length of its label puts it, so two of them under
+                 one picker have their boxes on two different lines down the strip. Given the
+                 picker's width they start on the picker's own left edge, which is the one edge
+                 this column has. -->
             <CheckBox Content="Hear it"
                       Classes="strip"
                       IsChecked="{Binding Source.Hearing, Mode=TwoWay}"
-                      ToolTip.Tip="Hear what is coming in, through the Recording Effects chain, out of the master. It arrives a buffer or two late, and what an output is playing cannot be heard this way because that is a loop." />
+                      ToolTip.Tip="Hear what is coming in, through the Recording Effects chain, out of the master. It arrives a buffer or two late, and the output this application is playing through cannot be heard this way, since that is a loop." />
 
-            <!-- Only drawn where a source has to be sent somewhere rather than simply
-                 unplugged, which is a machine with no graph. A cable is the usual answer and a
-                 spare socket is as good; picking one here is what makes the switch under it
-                 something that can be pressed. -->
+            <!-- Only drawn where a source has to be sent somewhere rather than simply unplugged,
+                 which is a machine with no graph. A cable is the usual answer and a spare socket
+                 is as good; without one chosen there is nowhere for a source to go and choosing a
+                 source cannot take it off its own output. -->
             <StackPanel Spacing="2" IsVisible="{Binding Source.NeedsSilentOutput}">
               <TextBlock Classes="cardHint" HorizontalAlignment="Center" Text="Send it to" />
 
@@ -350,8 +345,9 @@
                                      ToolTip.Tip="The last thing between the mix and the card. Double click to go back to unity."
                                      Value="{Binding VolumeDecibels}" />
 
-                        <!-- What is leaving, which is the one meter on this page measuring the thing
-                             you actually hear. -->
+                        <!-- What the song is putting onto the desk, after every track and the
+                             song's own master chain. What leaves the machine is the desk's MASTER
+                             strip, which has its own meter. -->
                         <ui:LevelMeter Width="22"
                                           VerticalAlignment="Stretch"
                                           Margin="0,0,0,7"

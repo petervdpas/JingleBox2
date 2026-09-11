@@ -17,7 +17,9 @@ namespace JingleBox2.Files.Interfaces;
 /// complete. A move over an existing file is one operation as far as anybody watching is
 /// concerned: what is there is either all of the old file or all of the new one, never half of
 /// either. A crash before the move leaves the old file exactly as it was, and a stray temporary
-/// file that the next write cleans up.
+/// file beside it that nothing sweeps: the name carries the writing process and a counter, so it
+/// is unique per write and no later write has one to find. That is the price of two threads
+/// being able to write one file at once, and a file nobody ever reads is the cheaper fault.
 ///
 /// Both overloads fall back to copying the finished file over the old one where the move will
 /// not go through, since a file written the risky way is worth more than a file not written at
@@ -43,8 +45,8 @@ public interface ISafeFile
     /// </remarks>
     /// <param name="path">Where it should end up. Its folder is made if it is not there.</param>
     /// <param name="write">
-    /// Fills the stream. Called once, and possibly a second time on the fallback path, so it
-    /// must be able to write the same thing twice.
+    /// Fills the stream. Called exactly once, into the file beside the real one: the fallback
+    /// lands a file that is already whole, so this is never asked to write the same thing twice.
     /// </param>
     void Write(string path, Action<Stream> write);
 

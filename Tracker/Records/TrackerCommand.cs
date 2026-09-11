@@ -18,27 +18,30 @@ public readonly record struct TrackerCommand(char Command, int Parameter)
     public static readonly TrackerCommand None = new(NoCommand, 0);
 
     /// <summary>
-    /// <c>Vxx</c>: set the voice's volume, 00 to 40.
+    /// <c>Vxx</c>: set the voice's volume, 00 to 80, which is the volume column's own scale.
     /// </summary>
     /// <remarks>
-    /// One of the four commands the player understands. Anything else is kept in the cell and
-    /// written back out unchanged, and does nothing while the song plays.
+    /// One of the two commands the player acts on. Anything else is kept in the cell and written
+    /// back out unchanged, and does nothing while the song plays.
     /// </remarks>
     public const char SetVolume = 'V';
 
     /// <summary><c>Pxx</c>: pan the voice, 00 hard left, 40 centre, 80 hard right.</summary>
     public const char SetPan = 'P';
 
-    /// <summary><c>Rxx</c>: retrigger the voice every xx ticks.</summary>
+    /// <summary><c>Rxx</c>: retrigger the voice every xx ticks. Written down and not played.</summary>
     public const char Retrigger = 'R';
 
-    /// <summary><c>Axy</c>: cycle the note, the note plus x, and the note plus y.</summary>
+    /// <summary>
+    /// <c>Axy</c>: cycle the note, the note plus x, and the note plus y. Written down and not
+    /// played.
+    /// </summary>
     public const char Arpeggio = 'A';
 
     /// <summary>True when the column is blank.</summary>
     public bool IsNone => Command == NoCommand;
 
-    /// <summary>True for one of the four the player acts on, rather than one merely kept.</summary>
+    /// <summary>True for one of the four letters this names, whether or not the player acts on it.</summary>
     public bool IsKnown => Command is SetVolume or SetPan or Retrigger or Arpeggio;
 
     /// <summary>Three characters, as every column here is: "..." when blank, else "V40".</summary>

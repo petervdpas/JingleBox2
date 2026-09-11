@@ -51,8 +51,10 @@ public interface IRecordingNames
     /// </summary>
     /// <remarks>
     /// Numbers are not reused after a delete, so a name never points at two different takes
-    /// over a session. A name in the series carrying no number still occupies the place its
-    /// number would map to, so the search walks upwards until it finds one nothing answers to.
+    /// over a session. Only a numbered name counts towards the highest; a name in the series
+    /// carrying no number holds no place, since there is no number in it to hold one. The
+    /// composed name is then walked upwards until it finds one nothing on the shelf answers to,
+    /// compared without regard to case, so the answer is the same on both systems.
     /// </remarks>
     /// <param name="baseName">Any name in the series, numbered or not.</param>
     /// <param name="existingNames">The takes already on the shelf.</param>

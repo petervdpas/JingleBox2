@@ -67,7 +67,7 @@ Every seam is an interface, and the prose lives on the interface: what a thing i
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-848 of them, in about three seconds, with no window and no hardware. They run in CI on every branch and every pull request, on Linux **and** Windows, because two of them are genuinely platform specific: a path is written with a separator that is not the same character on the two systems, and those are exactly the tests that would pass on one machine for a year and fail on somebody else's. The release workflow runs them first and every job that makes an artefact waits on them, because a release is the one build nobody gets to take back.
+2421 of them, in about half a minute, with no window and no hardware. They run in CI on every branch and every pull request, on Linux **and** Windows, because two of them are genuinely platform specific: a path is written with a separator that is not the same character on the two systems, and those are exactly the tests that would pass on one machine for a year and fail on somebody else's. The release workflow runs them first and every job that makes an artefact waits on them, because a release is the one build nobody gets to take back.
 
 What is covered is the parts that can be got wrong quietly: the MIDI wire, controller profiles and codecs, shortcuts, the histories, patterns and their edits, a song written down and poured back, the mix, the filters and the drive curve, the sample window and its loop, a WAV read and written, and the bridge's message bodies. Several of those tests exist because that exact thing was wrong once.
 
@@ -106,7 +106,8 @@ recordings/      # your takes, 16-bit WAV
 deleted/         # takes you threw away this session, so undo can fetch them back
 songs/           # one .jibx per song: a zip holding song.json and each plugin's patch
                  # Pack writes one with the recordings inside it too, for handing over
-machines/        # the machines registered here, a folder each
+rack/machines/   # the soundmachines registered here, a folder each
+rack/effects/    # and the effects, the same way
 instruments/     # the instruments on your rack, and the plugins you have added
 controllers/     # a .json saying what a controller is, a .lua saying what it does
 crashes/         # what the app was doing when a run ended badly
@@ -152,7 +153,8 @@ JingleBox2/
 ├─ Help/               # What the app explains about itself
 ├─ Tests/              # xunit, no window and no hardware
 ├─ Diagnostics/        # The log and the crash report
-├─ machines/           # The machines that ship: a folder each, panel and presets inside
+├─ rack/               # What ships: machines/ and effects/, a folder each,
+│                     #   manifest, panel, presets and help inside
 ├─ native/             # BASS binaries per platform, and bassasio for win-x64
 ├─ installer/windows/  # Inno Setup script
 └─ packaging/fedora/   # RPM spec and desktop entry

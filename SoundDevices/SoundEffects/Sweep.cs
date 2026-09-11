@@ -22,8 +22,8 @@ namespace JingleBox2.SoundDevices.SoundEffects;
 ///
 /// The two stages are the sweeping filter twice, which is what the ladder in the synth already
 /// is: six decibels an octave apiece, so a pair is twelve and two pairs would be the twenty four
-/// an Emulator gave. The resonance goes on the first stage only, and the second is there to make
-/// the slope rather than to ring, or the two would ring against each other.
+/// an Emulator gave. Both stages take the same damping, so the resonance is the pair of them
+/// ringing together rather than one peak with a plain slope after it.
 ///
 /// **Both modes are one filter read differently.** The low pass is what the poles give and the
 /// high pass is what is left when it is taken from the input, which is how the sweeping filter

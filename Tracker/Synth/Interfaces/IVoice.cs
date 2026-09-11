@@ -62,7 +62,11 @@ public interface IVoice
     /// </remarks>
     float Pan { get; set; }
 
-    /// <summary>How loud this voice is right now, for metering. Zero once it has finished.</summary>
+    /// <summary>How loud this voice is right now, 0 to 1. Zero once it has finished.</summary>
+    /// <remarks>
+    /// What a voice thinks it is worth. No meter reads it: a track's meter is the peak off that
+    /// track's bus, which counts the insert chain and answers the same way for a plugin.
+    /// </remarks>
     float Level { get; }
 
     /// <summary>Silent and done, so the mixer can drop it after the block it finished in.</summary>

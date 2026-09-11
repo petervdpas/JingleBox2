@@ -18,7 +18,7 @@ namespace JingleBox2.Audio.Routing.Interfaces;
 /// input, and this writes nothing else: it is handed what happened and answers what to say.
 ///
 /// **Pure, and that is the whole of why it is separate.** No audio, no graph, no window and no
-/// clock, so every sentence the input channel can produce can be read in a test — including the
+/// clock, so every sentence the input channel can produce can be read in a test, including the
 /// ones that only happen when a machine refuses something, which is exactly the wording nobody
 /// ever sees while writing it.
 /// </remarks>

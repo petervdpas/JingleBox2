@@ -9,7 +9,7 @@ namespace JingleBox2.ViewModels.Interfaces;
 /// to hear it while you work.
 /// </summary>
 /// <remarks>
-/// The designer is one control shown in two places: on the INSTRUMENTS tab against whatever the
+/// The designer is one control shown in two places: inside TRACKER against whatever the
 /// rack has picked, and in a window of its own against the instrument a track plays. This is
 /// the small surface both of those have to offer, so neither has to be the other.
 ///

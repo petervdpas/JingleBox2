@@ -134,10 +134,11 @@
          the panel in the middle gets the room. Written out line by line because a width that
          changes has to be bound, and the short form cannot be. Both ways, so that a width the
          handle beside it set is the width the column comes back to. -->
-    <!-- Two jobs, two tabs. What the machine looks like and what it sounds like when somebody
-         first meets it have nothing to say to each other, and on one screen neither gets the
-         room. The Design switch belongs to the first: on the other there is no panel being laid
-         out for it to be about. -->
+    <!-- One tab per job, because none of them has anything to say to the others and on one
+         screen none of them would get the room: Screen is the face, Presets is what it starts
+         you from, Helptext is the page it carries about itself, and Utilities is the bench of
+         tools over its presets. The Design switch belongs to Screen alone: on the others there
+         is no panel being laid out for it to be about. -->
     <TabControl Classes="jobs" Margin="0,8,0,0" Padding="0"
                 IsVisible="{Binding HasProject}"
                 SelectedIndex="{Binding Page, Mode=TwoWay}">

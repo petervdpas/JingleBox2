@@ -2028,11 +2028,11 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// other. One reason at most from here, which is what <see cref="_standing"/> is: the two
     /// switches are one arrangement.
     ///
-    /// **The graph is deliberately not watched from here.** Reading it puts the chosen source back
-    /// on the capture and holds it off its own output, which are worth having, and it also writes
-    /// the picker's selection from a reading that lands a moment later. Tying that to a switch is
-    /// a second change with a fault of its own history, so it is left for its own turn: what this
-    /// does is hold the input open and nothing else.
+    /// **The graph is watched for as long as the arrangement stands**, and the settling clock
+    /// runs with it. Reading the graph is what puts the chosen source back on the capture and
+    /// holds it off its own output against a session manager that keeps rewiring it, and neither
+    /// is worth anything once nothing is chosen and nothing is being listened to. So the watch,
+    /// the clock and the input go up and come down together.
     /// </remarks>
     private void Standing()
     {
@@ -2201,31 +2201,28 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// in with ours: being wrong that way is a switch that does nothing, and being wrong the other
     /// way is a room full of feedback at whatever the master is set to.
     ///
-    /// It used to read the kind alone and refuse every monitor, which is right on a machine with
-    /// one output and silently wrong on a machine with two: the switch was on, the source was
-    /// chosen, the capture was left off the recorder's bus, and the line said it was a loop.
+    /// Reading the kind alone and refusing every monitor is right on a machine with one output
+    /// and silently wrong on a machine with two, where another card's monitor is a perfectly good
+    /// source.
     /// </remarks>
     public bool CanHear => _input.CanHear(SelectedRoute, PlayingOut);
 
     /// <summary>
-    /// Turns listening off where the source that has just been chosen cannot be listened to.
+    /// Says again whether the chosen source can be listened to, and leaves the capture off the
+    /// recorder's bus where it cannot.
     /// </summary>
     /// <remarks>
-    /// Picking what an output is playing while the input is being heard would make a loop out of
-    /// a switch that was already on, which is the one case the switch being grey cannot cover: it
-    /// is grey from the moment the source changes and by then the audio is already going round.
-    /// So the source decides, and the switch follows it.
+    /// The switch itself is not touched: it says whether the recorder is heard, and what the
+    /// recorder is carrying is a separate question. Picking the output this application plays
+    /// through while Hear it is already on would otherwise make a loop, so the capture is taken
+    /// off the bus instead and the status line says why.
     ///
     /// **Said for every way the source can move, including the ones nobody chose.** The graph is
     /// read on a clock and puts the picker back to whatever the machine says is current, and that
     /// path deliberately skips connecting, since it is answering a reading rather than making
-    /// one. It used to skip this with it, which is a different kind of thing: the picker landed
-    /// on what an output is playing, the screen said the recorder could not be heard, and the
-    /// capture was still on its bus going round. Nothing on the page says why, because as far as
-    /// the page is concerned nobody touched anything.
-    ///
-    /// It showed up first as a test that failed about one run in three and passed on its own,
-    /// which is what a poll landing inside somebody else's moment looks like from the outside.
+    /// one, and it must not skip this with it: the picker can land on the output this application
+    /// plays through without anybody having touched the page, and the capture has to come off the
+    /// bus just the same.
     /// </remarks>
     private void Listening()
     {
@@ -2309,22 +2306,19 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     private readonly Audio.Routing.Interfaces.IInputWords _words = new Audio.Routing.InputWords();
 
     /// <summary>
-    /// Puts a source that was taken aside back, and says so.
+    /// Makes the arrangement again against the output that has just been picked.
     /// </summary>
     /// <remarks>
-    /// **Where the sound comes out is half of what taking a source aside means.** The switch says
-    /// this is heard through JingleBox2 and nowhere else, and what "here" is, is the output in
-    /// SETTINGS: picked another one and the arrangement somebody set up is over a device they
-    /// were not listening to, with the source still unplugged from its own. Worse where the new
-    /// output is the one the source was taken off or the one it was sent to, which is a source
-    /// silenced into the very thing it is being played back through.
+    /// **Where the sound comes out is half of what taking a source aside means.** A source pointed
+    /// at the input is heard through this application and nowhere else, and what "here" is, is the
+    /// output in SETTINGS: picked another one and the arrangement is over a device nobody is
+    /// listening to, with the source still unplugged from its own. Worse where the new output is
+    /// the one the source was taken off or the one it was sent to, which is a source silenced into
+    /// the very thing it is being played back through.
     ///
-    /// **So the arrangement is made again against the new output rather than thrown away.** It
-    /// used to clear the source outright, which was defensible while taking one aside was a switch
-    /// somebody set: the promise had been made about an output nobody was listening to any more.
-    /// It is not now that choosing the source is the arrangement, and what it came to was the
-    /// input silently emptying itself every time the output picker was touched, with the source
-    /// handed back to its own speakers, which is heard as the sound coming back.
+    /// **So the arrangement is made again rather than thrown away.** Clearing the source outright
+    /// means the input silently emptying itself every time the output picker is touched, with the
+    /// source handed back to its own speakers, which is heard as the sound coming back.
     ///
     /// **The one case that really does end it is the new output being the source**, which is
     /// hearing an output through itself. The path answers that through <see cref="CanHear"/>, and

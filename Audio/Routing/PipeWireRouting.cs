@@ -204,12 +204,6 @@ public sealed class PipeWireRouting : IAudioRouting
     /// </remarks>
     private readonly List<PipeWireLink> _moved = new();
 
-    /// <inheritdoc/>
-    /// <remarks>
-    /// Every link out of that node that is not into our own capture, which is the whole of it:
-    /// the source keeps whatever brought it here and loses everything else. Its own links are
-    /// remembered first, so a run that breaks half of them can still put that half back.
-    /// </remarks>
     /// <summary>
     /// What is supposed to be aside, so what has crept back can be told from what was never
     /// taken off. Nothing while the arrangement is not standing.
@@ -476,20 +470,6 @@ public sealed class PipeWireRouting : IAudioRouting
     }
 
     /// <summary>
-    /// One dump of the graph, answering both of the questions asked of it. Both are wanted on
-    /// every call and the page asks every couple of seconds, so this is remembered for about
-    /// that long: a stream does not appear and disappear faster than that.
-    /// </summary>
-    /// <remarks>
-    /// A capture stream is the one whose media class says audio comes in to it; a playback
-    /// stream gives audio out and carries the same name, which is exactly the confusion
-    /// <see cref="CapturePorts"/> exists to avoid.
-    ///
-    /// A dump that cannot be read leaves what was remembered alone and says nothing. Nothing
-    /// readable means nothing to route into, which the callers already handle as an empty
-    /// answer, and throwing here would cost the page rather than the reading.
-    /// </remarks>
-    /// <summary>
     /// Throws away what was remembered of the graph, so the next question is asked of the machine.
     /// </summary>
     /// <remarks>
@@ -506,6 +486,20 @@ public sealed class PipeWireRouting : IAudioRouting
         _captureNodes = null;
     }
 
+    /// <summary>
+    /// One dump of the graph, answering both of the questions asked of it. Both are wanted on
+    /// every call and the page asks every couple of seconds, so this is remembered for about
+    /// that long: a stream does not appear and disappear faster than that.
+    /// </summary>
+    /// <remarks>
+    /// A capture stream is the one whose media class says audio comes in to it; a playback
+    /// stream gives audio out and carries the same name, which is exactly the confusion
+    /// <see cref="CapturePorts"/> exists to avoid.
+    ///
+    /// A dump that cannot be read leaves what was remembered alone and says nothing. Nothing
+    /// readable means nothing to route into, which the callers already handle as an empty
+    /// answer, and throwing here would cost the page rather than the reading.
+    /// </remarks>
     private void ReadGraph()
     {
         if (_captureNodes != null && _sinceSnapshot.IsRunning && _sinceSnapshot.Elapsed < SnapshotLifetime) return;

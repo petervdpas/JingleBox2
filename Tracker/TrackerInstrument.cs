@@ -9,9 +9,13 @@ namespace JingleBox2.Tracker;
 
 /// <summary>
 /// A playable voice: either a recording played back at a pitch, or a synth built from a patch.
-/// Instruments live in a library of their own and are used by any number of songs, so the
-/// identity below is what a song holds on to, not the position in a list.
 /// </summary>
+/// <remarks>
+/// A song owns its instruments, which are its own copies rather than the rack's, and it holds
+/// them in a list that cells point into **by index**: that is why taking one out renumbers every
+/// cell in the song. The id below is the instrument's own and travels with it, but it is not what
+/// a pattern writes down.
+/// </remarks>
 public sealed class TrackerInstrument
 {
     /// <summary>

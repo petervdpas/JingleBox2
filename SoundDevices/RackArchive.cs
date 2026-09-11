@@ -13,12 +13,13 @@ namespace JingleBox2.SoundDevices;
 
 /// <inheritdoc/>
 /// <remarks>
-/// What a subclass supplies is the two things that differ between one kind of box and another:
-/// what the file at the top of its folder is called, and how a folder is read into a manifest.
+/// What a subclass supplies is the two things that differ between one kind of sound device and
+/// another: what the file at the top of its folder is called, and how a folder is read into a
+/// manifest.
 /// Everything else here is zips, staging folders and the swap at the end, none of which knows
 /// what is in the folder it is carrying.
 /// </remarks>
-/// <typeparam name="T">The manifest a box of this kind is read into.</typeparam>
+/// <typeparam name="T">The manifest a sound device of this kind is read into.</typeparam>
 public abstract class RackArchive<T> : IRackArchive<T> where T : class, IRackProject
 {
     /// <summary>Who names the folder the installed ones live in.</summary>
@@ -51,7 +52,7 @@ public abstract class RackArchive<T> : IRackArchive<T> where T : class, IRackPro
     /// <summary>What the file at the top of one of these folders is called.</summary>
     protected abstract string ManifestName { get; }
 
-    /// <summary>Reads one folder into a manifest, or nothing when there is no box in it.</summary>
+    /// <summary>Reads a folder into a manifest, or nothing when it holds no device.</summary>
     /// <param name="folder">The folder to read.</param>
     protected abstract T? Open(string folder);
 

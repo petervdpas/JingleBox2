@@ -12,10 +12,12 @@ namespace JingleBox2.Rack.Controls.Interfaces;
 /// </remarks>
 internal interface IKnobMath
 {
-    /// <summary>A pot turns three quarters of a circle, from seven o'clock to five o'clock.</summary>
+    /// <summary>
+    /// A pot turns three quarters of a circle, from half past seven round to half past four.
+    /// </summary>
     double SweepDegrees { get; }
 
-    /// <summary>Where the sweep begins, which is seven o'clock, measured from twelve.</summary>
+    /// <summary>Where the sweep begins, which is half past seven, measured from twelve.</summary>
     double StartDegrees { get; }
 
     /// <summary>Pixels of vertical drag that cover the whole range.</summary>

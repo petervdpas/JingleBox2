@@ -15,8 +15,8 @@ namespace JingleBox2.Audio.Routing;
 /// <remarks>
 /// Windows has no graph to patch, so nothing is being rewired here. The list offers what the
 /// system can capture, and picking one points the recorder at it: a device through BASS as
-/// before, or an output through WASAPI loopback. One program on its own is not in reach this
-/// way; that needs per-process loopback, which is a different piece of work.
+/// before, an output through WASAPI loopback, or one program on its own through per-process
+/// loopback, which is what makes this page mean the same thing on both machines.
 ///
 /// Setting the recorder's loopback device reopens the capture, so a route picked here is heard
 /// straight away rather than the next time the input happens to be opened.
@@ -71,8 +71,8 @@ public sealed class WindowsRouting : IAudioRouting
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Windows, and the system really offering loopback. No loopback devices means the add-on
-    /// is missing or the system will not do it, and then this offers nothing the recorder's own
+    /// Windows, and the system really offering something this page can reach: a loopback output
+    /// or a program playing on its own. With neither, this offers nothing the recorder's own
     /// device picker does not already, so it stands down rather than showing the same devices
     /// twice.
     /// </remarks>

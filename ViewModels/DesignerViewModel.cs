@@ -20,15 +20,20 @@ using JingleBox2.SoundDevices.Interfaces;
 namespace JingleBox2.ViewModels;
 
 /// <summary>
-/// The machine editor: one project open at a time, and what can be done with it.
+/// The designer: one project open at a time, and what can be done with it.
 /// </summary>
 /// <remarks>
-/// The other half of the rack. The rack holds machines that are registered and ready for a song
-/// to take an instrument off; this is where one is made in the first place. New, open, save, and
-/// export it as a zip for somebody else to import.
+/// The other half of the rack. The rack holds what is registered and ready to be used; this is
+/// where one is made in the first place. New, open, save, and export it as a zip for somebody
+/// else to import.
 ///
-/// Nothing about a song here, and nothing about instruments: a machine is a box, and it becomes
-/// an instrument only when a song takes it.
+/// One class used twice, once per world, told which it is in by <c>IDesignWorld</c>: the Machines
+/// instance writes <c>machine.json</c> and the Effects instance <c>effect.json</c>, and nothing
+/// else here knows which of the two it is serving. Two instances rather than a mode, so each
+/// holds its own project, its own undo and its own unsaved changes.
+///
+/// Nothing about a song here, and nothing about instruments: a soundmachine becomes an
+/// instrument only when a song takes it.
 /// </remarks>
 public sealed partial class DesignerViewModel : ObservableObject
 {
@@ -268,7 +273,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     public bool OnUtilities => Page == 2;
 
     /// <summary>
-    /// True while the tools have anything to work on, which is a machine with a preset in it.
+    /// True while the tools have anything to work on, which is a machine saved to a folder.
     /// </summary>
     /// <remarks>
     /// Renaming a preset is nearly always something somebody wants, so this is nearly always
@@ -401,7 +406,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     public PanelTheme Theme => Project?.Theme ?? new PanelTheme(Bare);
 
     /// <summary>
-    /// A machine nobody has saved yet, with an id of its own from the start.
+    /// A device nobody has saved yet, with an id of its own from the start.
     /// </summary>
     /// <remarks>
     /// The id is made once and never changes, because it is what every song that uses this

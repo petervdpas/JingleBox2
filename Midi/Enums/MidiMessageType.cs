@@ -40,15 +40,19 @@ public enum MidiMessageType
     PitchBend = 2,
 
     /// <summary>
-    /// Start, continue and stop, which are one byte each and belong to no channel.
+    /// The transport and the clock, which belong to no channel.
     /// </summary>
     /// <remarks>
     /// The transport as the specification has had it since 1983, and the one dialect of it that
     /// every sequencer ever built can speak. A byte with no channel, no data and no note off:
-    /// 0xFA start, 0xFB continue, 0xFC stop. Its siblings 0xF8 clock and 0xFE active sensing
-    /// arrive dozens of times a second and are dropped at the wire.
+    /// 0xFA start, 0xFB continue, 0xFC stop. 0xF8 clock is here too, twenty four to the beat,
+    /// because a clock that is followed has to reach the dispatcher; 0xFE active sensing is
+    /// not, and is dropped at the wire. Which of the five a message is, is <c>Value</c>.
     ///
-    /// <c>Value</c> carries the status byte itself, since there is nothing else to carry.
+    /// 0xF2 song position is the odd one and is here as well, although it is three bytes and
+    /// the rest are one: it is what a master sends to say where to carry on from, so it arrives
+    /// with a continue and means nothing apart from one. <c>Data</c> carries its pointer, in
+    /// sixteenth notes, 0 to 16383; every other status leaves <c>Data</c> at nought.
     /// </remarks>
     Realtime = 3,
 

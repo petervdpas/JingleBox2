@@ -11,14 +11,15 @@ namespace JingleBox2.SoundDevices.SoundMachines.Interfaces;
 /// so an instrument saved off the rack can be dropped straight in as one: a preset file is
 /// an instrument file, the same shape, read by the same reader.
 ///
-/// The folder is named after the machine, beside the program. The number a filename starts with
-/// is only there to hold the order they are offered in; the name on the panel is the one inside
-/// the file.
+/// The folder is <c>presets</c> inside the machine's own folder, found by the machine's id, which
+/// is what makes a preset travel with the machine in a zip. The number a filename starts with is
+/// only there to hold the order they are offered in; the name on the panel is the one inside the
+/// file.
 ///
 /// Called a library rather than the machine's presets because
-/// <c>JingleBox2.Rack.SoundDevices.Faces.IPanelPresets</c> is already that name, and it is a
-/// different thing: that one is the picker a panel puts in front of you, this one is where the
-/// files are read from.
+/// <c>JingleBox2.Rack.SoundDevices.Faces.Interfaces.IPanelPresets</c> is already that name, and
+/// it is a different thing: that one is the picker a panel puts in front of you, this one is
+/// where the files are read from.
 ///
 /// What has been read is remembered, and it is remembered per library rather than per program.
 /// A folder that a running application never changes is worth walking once, but as a static

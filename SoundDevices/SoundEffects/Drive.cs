@@ -20,14 +20,16 @@ namespace JingleBox2.SoundDevices.SoundEffects;
 /// **After it is the level it cost.** A curve that flattens the peaks makes everything quieter,
 /// so a drive without a makeup is a drive nobody can compare with the sound before it, and
 /// deciding whether you like an effect while it is also six decibels down is not a comparison at
-/// all. The makeup is worked out from the curve rather than measured, so it is exact and free:
-/// what a tanh does to full scale is known.
+/// all. There are two makeups and **Drive keeps** is which. Off, it is worked out from the curve
+/// rather than measured, so it is exact and free: what a tanh does to full scale is known, and
+/// what is held is the height of the wave. On, it is measured off what actually went past, two
+/// running mean squares either side of the curve, and what is held is the loudness.
 ///
 /// The fade at the bottom is a trap this codebase has already paid for once, recorded in the
 /// synth's own drive. The makeup levels the curve at full scale and nowhere else, so leaving the
 /// minimum it steps by 1.6 decibels the moment the knob comes off its stop, which reads as the
 /// effect switching on rather than as a knob being turned. It is faded in over the first unit of
-/// the range, so a drive of two and above is exactly what it always was.
+/// the range, so a drive of two and above is the curve at full strength.
 ///
 /// **The bias is what makes it a character rather than a curve.** A symmetrical curve adds odd
 /// harmonics only, which is the sound of a transistor; leaning the signal off centre before it

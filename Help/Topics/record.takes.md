@@ -51,9 +51,11 @@ the capture as it arrived, worked on afterwards.
 
 Two things to know before you use it. What you hear is a capture buffer and an output
 buffer late, which is what monitoring through a computer costs and is why the sizes in
-SETTINGS matter. And what an output is playing cannot be heard this way at all, which
-is why the switch is grey for it: that source is the output's own monitor, so hearing
-it through the output would feed it back into itself.
+SETTINGS matter. And what an output is playing cannot be heard this way at all, since
+that source is the output's own monitor and hearing it through the output would feed it
+back into itself. The switch stays live: it says whether the recorder is heard, and what
+the recorder is carrying is a separate question. The capture is left off the recorder's
+bus instead, and the status line says so.
 
 ## Trimming
 

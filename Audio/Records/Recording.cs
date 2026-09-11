@@ -16,10 +16,12 @@ namespace JingleBox2.Audio.Records;
 /// </remarks>
 public sealed partial class Recording : ObservableObject
 {
-    /// <summary>What this take is called in a config file or a song, rather than by its path.</summary>
+    /// <summary>A fresh identifier, minted whenever a row is made.</summary>
     /// <remarks>
-    /// Its own identity rather than the file name, so a take can be renamed without everything
-    /// that plays it having to be found and corrected.
+    /// **Nothing is stored under it and nothing looks a take up by it.** A config file and a
+    /// song both name a take by its path, and <c>RecordViewModel.RenameAsync</c> moves the file
+    /// and repoints every instrument that pointed at the old one. So this is a fresh value on
+    /// every read of the shelf, and two readings of the same file answer differently.
     /// </remarks>
     public required string Id { get; set; }
 
@@ -30,13 +32,21 @@ public sealed partial class Recording : ObservableObject
     /// </remarks>
     public required string FilePath { get; set; }
 
-    /// <summary>When it was recorded, which is what the shelf is sorted by.</summary>
+    /// <summary>When it was recorded, which RECORD prints beside it.</summary>
+    /// <remarks>
+    /// Not what the shelf is ordered by: the list is in the order the folder was read in, which
+    /// is the disc's.
+    /// </remarks>
     public DateTime CreatedAt { get; set; }
 
-    /// <summary>Whatever somebody wrote about it, and empty for almost all of them.</summary>
+    /// <summary>Whatever somebody wrote about it, which is nothing: nothing writes or shows it.</summary>
     public string Description { get; set; } = "";
 
-    /// <summary>What it is called, which is a person's word and not the file's.</summary>
+    /// <summary>What it is called, which is the file's name without the extension.</summary>
+    /// <remarks>
+    /// The same word either way round: renaming a take here renames the file to match, so there
+    /// is never a person's name for a take sitting over a different file name.
+    /// </remarks>
     [ObservableProperty] private string name = "";
 
     /// <summary>How long it is, in milliseconds. Changes under the list when a take is trimmed.</summary>

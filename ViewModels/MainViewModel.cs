@@ -44,7 +44,6 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAudioFlowing, IShortcutContext
 {
-    /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
     /// <summary>
     /// What is known about the controllers plugged in, for the whole application.
     /// </summary>
@@ -316,16 +315,6 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     private readonly Midi.Interfaces.IMidiClockFollow _clockFollow = new Midi.MidiClockFollow();
 
     /// <summary>
-    /// Hands the deck whichever outputs are ticked, opening each one.
-    /// </summary>
-    /// <remarks>
-    /// Called once at startup and again whenever the setting moves, which is what makes ticking a
-    /// box take effect without a restart. **The opening happens here and never on the clock**:
-    /// opening a MIDI output was measured at eighty milliseconds on a real port, and a tick at
-    /// 120 to the minute lasts twenty. An open on the first tick of a pass is four ticks missed,
-    /// on the thread that also starts notes, at the moment somebody pressed play.
-    /// </remarks>
-    /// <summary>
     /// Makes the master's start, continue and stop move this transport.
     /// </summary>
     /// <remarks>
@@ -354,6 +343,16 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         _clockFollow.Ended += () => Avalonia.Threading.Dispatcher.UIThread.Post(Tracker.StopTransport);
     }
 
+    /// <summary>
+    /// Hands the deck whichever outputs are ticked, opening each one.
+    /// </summary>
+    /// <remarks>
+    /// Called once at startup and again whenever the setting moves, which is what makes ticking a
+    /// box take effect without a restart. **The opening happens here and never on the clock**:
+    /// opening a MIDI output was measured at eighty milliseconds on a real port, and a tick at
+    /// 120 to the minute lasts twenty. An open on the first tick of a pass is four ticks missed,
+    /// on the thread that also starts notes, at the moment somebody pressed play.
+    /// </remarks>
     private void DriveTheClock()
     {
         var midi = _cfg.Midi;
@@ -2576,8 +2575,9 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// <remarks>
     /// The order is the point. What is on the pads now is stored into the open profile first,
     /// or it would be thrown away with the pads it is on; then the settings, since everything
-    /// below reads the count from them; then the engine, which stops anything on a pad that is
-    /// going away and leaves the rest playing; then the pads themselves and the MIDI router.
+    /// below reads the count from them; then the engine, which stops everything and empties every
+    /// pad it has; then the pads themselves and the MIDI router, which is what puts back on them
+    /// whatever the profile just kept.
     ///
     /// The pages that show pads are told about the count and the columns by hand, because both
     /// are worked out from the settings rather than held, so nothing else would ever say they

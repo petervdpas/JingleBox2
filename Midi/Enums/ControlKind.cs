@@ -8,7 +8,7 @@ public enum ControlKind
     /// sound effect.
     /// </summary>
     /// <remarks>
-    /// One kind for both, because to a hardware knob they are one thing: a box on the rack with
+    /// One kind for both, because to a hardware knob they are one thing: a device on the rack with
     /// a face, named by the id its manifest carries and the key the control turns. Which of the
     /// two it is decides where it is looked for, a soundmachine on the track you are on or a
     /// sound effect on that track's chain, and nothing else about a link.

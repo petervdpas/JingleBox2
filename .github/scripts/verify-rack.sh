@@ -11,11 +11,11 @@
 # which the guard below reads as the check itself being broken and says so. That guard is the
 # only reason the rename did not ship a release with an empty rack in it.
 #
-# Usage: verify-machines.sh <publish-output-dir>
+# Usage: verify-rack.sh <publish-output-dir>
 
 set -euo pipefail
 
-OUT="${1:?usage: verify-machines.sh <publish-output-dir>}"
+OUT="${1:?usage: verify-rack.sh <publish-output-dir>}"
 
 # Where the rack lives in the source tree, and under the same name in the output, since the
 # csproj copies the folder rather than naming its contents.

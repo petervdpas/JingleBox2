@@ -22,9 +22,9 @@ namespace JingleBox2.SoundDevices.SoundMachines;
 /// written in the same two halves: the filter once, and every zone in its own block.
 ///
 /// The zone's window is among the settings even though no knob turns it. It is set by dragging a
-/// boundary on the picture, and it has to travel with the preset: both presets this machine
-/// ships are one recording cut into pieces, and a preset that forgot where the cuts were would
-/// be eleven zones all playing the whole file.
+/// boundary on the picture, and it has to travel with the preset: all three presets this machine
+/// ships are one recording cut into pieces, and a preset that forgot where the cuts were would be
+/// every zone playing the whole file.
 ///
 /// A key it does not know reads as zero and swallows the write, for the reason the others do: a
 /// machine.json written by a later version has to open on an older app rather than take it down.
@@ -341,8 +341,9 @@ public sealed class SamplerValues(
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Only the take and the name are yours to set. The other three are what the panel reads out
-    /// about the zone, and there is nothing to write them into.
+    /// Only the take and the name are yours to set. The rest are read out rather than written:
+    /// which file the zone holds, which keys it covers and what its root is, all of which are the
+    /// zone's, and the filter's cutoff in words, which is the instrument's.
     ///
     /// A take goes on through the zone's own way of taking one, which names the zone after the
     /// file unless the zone has a name somebody chose. A zone still called after the recording it

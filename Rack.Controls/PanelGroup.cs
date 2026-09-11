@@ -47,10 +47,10 @@ public class PanelGroup : Decorator
     /// taller than its contents.
     /// </summary>
     /// <remarks>
-    /// A section in a row is as tall as the tallest section beside it, so a short one has room
-    /// to spare and something has to decide where the spare room goes. That is the machine's
-    /// choice and not ours: knobs centred in their frame is the usual look on a rack, but a
-    /// section whose contents belong under its caption wants them at the top.
+    /// A section in a row is as tall as the tallest section beside it, so a short one has room to
+    /// spare and something has to decide where the spare room goes. Centred, which is the usual
+    /// look on a rack. It is a styled property so that a host drawing its own panel can set it;
+    /// nothing a face writes reaches it, since the description has no word for it.
     /// </remarks>
     public static readonly StyledProperty<VerticalAlignment> ContentAlignmentProperty =
         AvaloniaProperty.Register<PanelGroup, VerticalAlignment>(

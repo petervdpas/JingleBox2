@@ -14,7 +14,7 @@ namespace JingleBox2.SoundDevices;
 /// <inheritdoc/>
 public sealed class PanelImages : IPanelImages
 {
-    /// <summary>Where the pictures on a face go, inside the box's own folder.</summary>
+    /// <summary>Where the pictures on a face go, inside the device's own folder.</summary>
     /// <remarks>
     /// Written out rather than built, so the one folder name a face's pictures depend on can be
     /// found by looking for it, here and in every manifest that names one.

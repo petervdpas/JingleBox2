@@ -103,7 +103,10 @@ public interface IMidiClockGrid
     /// <remarks>
     /// The other half of <see cref="PointerFor"/>, for a master that starts us somewhere other
     /// than the top. It cannot always be exact: a sixteenth is six ticks and a line at five to
-    /// the beat is 4.8, so a pointer can land between two lines and the nearer one is meant.
+    /// the beat is 4.8, so a pointer can land between two lines. The line it lands in is the
+    /// answer, which is the earlier of the two rather than the nearer, and deliberately: this
+    /// places a playhead, and a playhead put past where the master actually is has skipped a
+    /// line of music that was about to play.
     /// </remarks>
     /// <param name="pointer">Sixteenth notes from the top of the song.</param>
     /// <param name="linesPerBeat">How many lines the song puts in a beat.</param>

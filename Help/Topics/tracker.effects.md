@@ -15,7 +15,7 @@ effects this application ships come first, since that list is short and known an
 plugin list runs to hundreds; ours load in this process with nothing to find on disc.
 After them are the CLAP and VST3 effects this machine has.
 
-Three ship at the moment, each with presets to start from:
+Six ship at the moment, each with presets to start from:
 
 - **EchoBox** is a delay. The repeats darken as they go, and the time glides rather
   than jumping, so moving it sounds like a tape slowing rather than like a click.
@@ -26,6 +26,13 @@ Three ship at the moment, each with presets to start from:
   down for an amplifier; the bias leans the signal off centre, which is the half of a
   valve people actually like; and what the curve costs in level is given back, so you
   are comparing the sound and not the loudness.
+- **Shifter** moves the pitch without moving the speed: two taps read through a delay
+  line at the wrong rate and crossfaded, in whole steps and in cents, with a window
+  that trades the warble against the smearing.
+- **Ringer** multiplies the signal by a tone, which is the sound of a machine talking.
+  A sine or a square carrier, a spread between the two channels, and a crush on top.
+- **Widener** puts a mono source across the room instead of in the middle of your head:
+  a width, a slow drift under it, and a Haas delay on whichever side you choose.
 
 A block opens that effect's controls in a window of its own, and its power button
 switches it off without taking it out, so it can be heard in and out. Each block
@@ -40,7 +47,7 @@ it made, so first is the only place it has. Right click still has Move earlier a
 Move later, a step at a time, and Remove.
 
 An effect of ours carries a page about itself the way a machine does: the hamburger in the
-corner of its face has **Help** on it where its author wrote one, and the three that ship all
+corner of its face has **Help** on it where its author wrote one, and all six that ship
 have one.
 
 The mixer's master has a chain of its own, and so does a pad. The same effect on two

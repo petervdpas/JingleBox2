@@ -22,9 +22,11 @@ which port does what. Where there is one, a control is called `Encoder 3` rather
 
 ## Pointing a knob at something
 
-There is no table of controller numbers to fill in. Rest the pointer on the control
-you want driven, hold `Ctrl+Shift+M`, and touch the knob or button on the desk: the
-link is made from what you were pointing at. It works on a machine's face, on an
+There is no table of controller numbers to fill in. Press `Ctrl+Shift+M`, rest the
+pointer on the control you want driven, and touch the knob or button on the desk: the
+link is made from what you were pointing at. The key turns the mode over rather than
+being held down, so press it again when you are done, or the next thing you touch is
+learned rather than played. It works on a machine's face, on an
 effect's, on a mixer strip, on the transport, and on a pad on FIRE.
 
 A link says which machine and which control, never which track or which song, so one

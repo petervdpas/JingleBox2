@@ -24,9 +24,10 @@ public interface ITakeTap
 {
     /// <summary>Which bus to keep, which is the recorder's own.</summary>
     /// <remarks>
-    /// Told rather than found, and told again whenever the bus is made again: an output device
-    /// that changes takes every bus with it, and a hook on a handle that has gone is a hook on
-    /// whatever is given that number next.
+    /// Told rather than found, once, at startup. The bus itself is one object that is reopened
+    /// where it stands when the output moves, so what is kept here stays the right object and the
+    /// handle is read off it again as each take begins: a hook on a handle that has gone would be
+    /// a hook on whatever is given that number next.
     /// </remarks>
     /// <param name="bus">The recorder's bus.</param>
     void Follow(IOutputBus bus);

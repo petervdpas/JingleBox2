@@ -24,8 +24,9 @@ namespace JingleBox2.Audio.Interfaces;
 /// findable.
 ///
 /// **A real-time thread that never sleeps holds a core against everything else**, so only a
-/// thread that waits belongs here. Both of the ones that ask do: the mixer sleeps on a full
-/// queue and the clock sleeps until its line is nearly due.
+/// thread that waits belongs here. Both of the ones that ask do: the thread mixing ahead sleeps
+/// on a full queue, and a plugin's own audio thread sleeps on the socket until the parent hands
+/// it a block.
 /// </remarks>
 public interface IRealtimeThread
 {

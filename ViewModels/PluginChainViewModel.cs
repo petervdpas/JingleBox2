@@ -449,8 +449,9 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// Reads the chain back out of whatever it is attached to.
     /// </summary>
     /// <remarks>
-    /// Only the plugin effects are shown. A chain can hold any insert, and one built elsewhere
-    /// would need rows of its own, which nothing does yet.
+    /// Both kinds of slot get a row: a plugin, and one of our own effects, which is drawn as a
+    /// <c>SoundEffectViewModel</c> over the engine on the chain. An insert that is neither is not
+    /// shown, since there would be nothing to say about it.
     ///
     /// Every existing row is told it is closing on the way past, or a window left open over a
     /// device belonging to the track you have just left goes on drawing something that is no

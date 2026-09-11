@@ -21,10 +21,9 @@ namespace JingleBox2.SoundDevices.SoundEffects;
 ///
 /// It is not a machine and this is not
 /// <see cref="JingleBox2.SoundDevices.SoundMachines.SoundMachineProject"/> with a flag on it. What a
-/// machine carries that an effect has no use for is most of it: which engine it borrows, where
-/// its picker gets its list, and a folder of sounds, all of which are about a thing that is
-/// sent notes and plays them back. What is left is what any device on the rack is, which is
-/// <see cref="IRackProject"/>, plus the face.
+/// machine carries that an effect has no use for is what belongs to a thing that is sent notes:
+/// where its picker gets its list, and a folder of sounds. Both name an engine, both carry a
+/// face, and both are what any device on the rack is, which is <see cref="IRackProject"/>.
 ///
 /// An effect in use is a slot on a track's chain, and it takes no name of its own: two of the
 /// same effect on one track read as that effect twice, which is what two of the same plugin
@@ -145,8 +144,8 @@ public sealed class SoundEffectProject : IRackProject, IDesignProject, ISoundDev
     /// <remarks>
     /// The same <see cref="Panel"/> a machine's face is described with, because a face is a face:
     /// the same knobs, the same faders, the same Menu, laid out by whoever built the thing and
-    /// drawn by the same library. What an effect adds is the footswitch, which is bypass and is
-    /// a fact about the slot rather than a parameter.
+    /// drawn by the same library. Bypass is not on it and is not a parameter: it is a fact about
+    /// the slot the effect is standing in, so the block on the chain carries it.
     /// </remarks>
     public Panel Panel { get; set; } = new();
 

@@ -120,7 +120,7 @@ public partial class SplashWindow : Window, IStartupLines
     /// machine hesitating rather than as two kinds of line.
     ///
     /// It costs less than it looks, since the splash is already held for a shortest stay
-    /// whatever happens, which is <c>App.SplashLeast</c> and is two and a half seconds: what
+    /// whatever happens, which is <c>App.SplashLeast</c> and is two and two fifths seconds: what
     /// this really does is spend that wait on something to look at. Past that it is paid by the
     /// line, and there is deliberately no ceiling on the whole run: a rack of thirty devices is
     /// thirty names, and racing them past to fit a budget would be showing them to nobody.

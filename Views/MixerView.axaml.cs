@@ -73,14 +73,14 @@ public partial class MixerView : UserControl
     }
 
     /// <summary>
-    /// What reads the three strips that are not the song's.
+    /// What reads the whole signal table, which is every strip on this page and the cables.
     /// </summary>
     /// <remarks>
     /// The page's own rather than the tracker's, because the tracker polls while the mix is
-    /// sounding and these three are not the mix: a pad is fired and a take is auditioned with the
-    /// transport stopped, and an input meter shows what is arriving whether anything is playing at
-    /// all. It runs only while this page is on screen, which is what the two visual-tree events
-    /// are for, so a mixer nobody is looking at costs nothing.
+    /// sounding and the strips that are not the song's are not the mix: a pad is fired and a take
+    /// is auditioned with the transport stopped, and an input meter shows what is arriving whether
+    /// anything is playing at all. It runs only while this page is on screen, which is what the
+    /// two visual-tree events are for, so a mixer nobody is looking at costs nothing.
     /// </remarks>
     private readonly Avalonia.Threading.DispatcherTimer _meters;
 

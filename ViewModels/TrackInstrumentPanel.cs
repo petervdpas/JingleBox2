@@ -15,7 +15,7 @@ namespace JingleBox2.ViewModels;
 /// The instrument designer, pointed at the instrument one track is playing.
 /// </summary>
 /// <remarks>
-/// The same panel the INSTRUMENTS tab shows, over a different instrument: the song's own copy
+/// The same panel the rack shows, over a different instrument: the song's own copy
 /// rather than the rack's. That is the whole point of it. A machine standing in this song's
 /// rack is edited here, and what is edited is this song's, so two songs can use the same kick
 /// sounding differently.

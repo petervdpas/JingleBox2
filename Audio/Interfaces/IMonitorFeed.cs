@@ -93,14 +93,15 @@ public interface IMonitorFeed
     /// **Acoustic feedback, which is the one loop nothing about the wiring can see**: the signal
     /// leaves through a speaker and comes back through a microphone, and the only evidence is in
     /// the audio. Watched here rather than anywhere else because this is the only path in the
-    /// application where that can happen — a delay at the top of its feedback knob is somebody's
+    /// application where that can happen: a delay at the top of its feedback knob is somebody's
     /// sound and must never be caught by this.
     ///
     /// Raised on the thread the capture arrives on, so whoever answers it is expected to get
     /// itself somewhere else before touching anything that draws.
     ///
-    /// Said once and then latched. Setting <see cref="Heard"/> true again is what arms it, which
-    /// is the deliberate act of asking to listen after having been told why it stopped.
+    /// Said once and then latched. Setting <see cref="Heard"/> or <see cref="HearsTheRoom"/> true
+    /// is what arms it again, both of them being the deliberate act of asking to listen after
+    /// having been told why it stopped.
     /// </remarks>
     event System.Action? Rang;
 

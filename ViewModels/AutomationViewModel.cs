@@ -20,9 +20,9 @@ namespace JingleBox2.ViewModels;
 /// instrument and then its effects; here it is the parameter and then its lane. A person who
 /// has used one already knows where to look on the other.
 ///
-/// Under the mixer rather than anywhere else because that is where a track's settings are, and
-/// automation is a track's settings moving. It is opened per track, from the strip's own AUTO
-/// button, so which track it is about is never a question the panel has to ask.
+/// Under the pattern rather than anywhere else, because a lane is written against the pattern's
+/// lines: it folds open from a strip of its own beside the chain, and it follows the cursor's
+/// track, so which track it is about is never a question the panel has to ask.
 /// </remarks>
 public sealed partial class AutomationViewModel : ObservableObject
 {

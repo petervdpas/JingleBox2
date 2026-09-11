@@ -26,11 +26,16 @@ public sealed class MidiMessage
     /// <summary>1 to 16. For a bend this is the whole of its address.</summary>
     public int Channel { get; init; }
 
-    /// <summary>Note or CC number. Nought for a bend, which has none.</summary>
+    /// <summary>
+    /// Note or CC number. Nought for a bend, which has none, and the status byte itself for a
+    /// realtime message, which is what says which of the five it is.
+    /// </summary>
     public int Value { get; init; }
 
     /// <summary>
-    /// Velocity, or a CC value, 0 to 127. For a bend, 0 to 16383 with 8192 in the middle.
+    /// Velocity, or a CC value, 0 to 127. For a bend, 0 to 16383 with 8192 in the middle. For a
+    /// song position, which is the one realtime message with anything to carry, where the master
+    /// says to be, in sixteenth notes, 0 to 16383; nought for every other realtime status.
     /// </summary>
     public int Data { get; init; }
 

@@ -17,8 +17,9 @@ public interface IWaveformService
 {
     /// <summary>The picture of a recording: its peaks, its rate, its channels and its length.</summary>
     /// <remarks>
-    /// A fixed number of columns whatever the recording's length, so a picture can be drawn at any
-    /// width without reading the file again.
+    /// Read into a fixed number of columns, so a picture can be drawn at any width without reading
+    /// the file again. A recording with fewer frames than that comes back with a peak a frame
+    /// instead, since more columns than there are frames is detail that is not in the file.
     /// </remarks>
     /// <param name="filePath">The recording.</param>
     /// <exception cref="FileNotFoundException">There is no such file.</exception>

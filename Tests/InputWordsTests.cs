@@ -10,8 +10,8 @@ namespace JingleBox2.Tests;
 /// </summary>
 /// <remarks>
 /// **These could not be written before, and that is the argument for the module.** The wording
-/// lived in five places around the page — <c>Listening</c>, <c>ApplyRoute</c> twice, <c>Agree</c>
-/// and the switch's own setter — each writing the status line, last one winning by whenever a
+/// lived in five places around the page (<c>Listening</c>, <c>ApplyRoute</c> twice, <c>Agree</c>
+/// and the switch's own setter), each writing the status line, last one winning by whenever a
 /// thread came back. Two of those sentences were provably never seen by anybody: the loop was
 /// overwritten a millisecond after it was written, and a machine refusing to move a source was
 /// discarded on the following line.

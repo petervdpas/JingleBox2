@@ -26,7 +26,7 @@ public interface ILevelMeterService
     /// The loudest sample in a block of interleaved 16 bit audio, whatever its channel count.
     /// </summary>
     /// <param name="data">The block, little endian, or null.</param>
-    /// <returns>0 to 1, and 0 for a block too short to hold a sample.</returns>
+    /// <returns>0 to 1, and 0 for a block shorter than a stereo frame.</returns>
     float GetLevelFromBytes(byte[]? data);
 
     /// <summary>Both sides of a block of interleaved 16 bit audio.</summary>
@@ -37,6 +37,8 @@ public interface ILevelMeterService
     /// </remarks>
     /// <param name="data">The block, little endian, or null.</param>
     /// <param name="channels">How many channels one frame holds.</param>
-    /// <returns>Both sides, and <see cref="StereoLevel.Silent"/> for a block too short.</returns>
+    /// <returns>
+    /// Both sides, and <see cref="StereoLevel.Silent"/> for a block shorter than a stereo frame.
+    /// </returns>
     StereoLevel GetStereoFromBytes(byte[]? data, int channels);
 }

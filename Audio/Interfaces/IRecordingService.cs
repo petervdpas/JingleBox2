@@ -60,9 +60,13 @@ public interface IRecordingService
     bool IsMonitoring { get; }
 
     /// <summary>
-    /// Set when StartRecording could not use the selected device and fell back to the
-    /// system default. Null when the selected device was used as-is.
+    /// Set when the input could not be opened on the selected device and the system default was
+    /// used instead. Null where the selected device was used as it stands.
     /// </summary>
+    /// <remarks>
+    /// Written wherever the input is opened, which is watching the level and reopening as well as
+    /// starting a take: the fallback is the same one whichever of them asked.
+    /// </remarks>
     string? LastStartWarning { get; }
 
     /// <summary>Gain applied to incoming audio, in dB. 0 is unity.</summary>
@@ -99,6 +103,10 @@ public interface IRecordingService
     /// sound somebody set a chain up to record; the capture as it arrived is written beside it
     /// under the other name, since an effect cannot be taken off a take afterwards.
     ///
+    /// **One file, and no chain, where the take comes off the recorder's bus**, which is
+    /// <see cref="ITakeTap.Mixed"/>: what is on the bus has already been through the chain on its
+    /// way there, so running it again would be hearing it twice.
+    ///
     /// The chain is run here rather than while the audio was arriving, and
     /// <see cref="ITakeEffects"/> is where the reason for that is written down.
     /// </remarks>
@@ -123,9 +131,11 @@ public interface IRecordingService
 
     /// <summary>The rate the capture is running at, which a chain has to be built for.</summary>
     /// <remarks>
-    /// The device's own rate on the ordinary path and the output's where a loopback is being
-    /// captured, so it is only true once the input has been opened. Before that it is what the
-    /// next take will be opened at.
+    /// 44100 on the ordinary path, which is what the capture is opened at rather than what the
+    /// device would have chosen: BASS is asked for that rate and resamples if it has to, so the
+    /// device is never put the question. Where a loopback is being captured it is the output's
+    /// own rate, read back after opening, since there the rate is not ours to choose. Only true
+    /// once the input has been opened; before that it is what the next take will be opened at.
     /// </remarks>
     int SampleRate { get; }
 
@@ -202,7 +212,9 @@ public interface IRecordingService
     /// picture that draws two things arriving and a file that holds one.
     ///
     /// Told rather than found, because the recorder deals in captures and knows nothing about
-    /// busses, and told again whenever the output moves, since that makes every bus again.
+    /// busses. Told once, at startup: the bus is one instance that is reopened where it stands, so
+    /// an output change leaves this holding the same object and the handle is read again as each
+    /// take starts.
     /// </remarks>
     /// <param name="bus">The recorder's own bus.</param>
     void TakeFrom(IOutputBus bus);

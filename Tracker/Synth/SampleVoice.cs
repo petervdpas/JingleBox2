@@ -36,7 +36,7 @@ public sealed class SampleVoice : IVoice
     /// </remarks>
     private static readonly IPitchMotion Motion = new PitchMotion();
 
-    /// <summary>The drive, applied last on the way out.</summary>
+    /// <summary>The drive, run into the filter.</summary>
     /// <remarks>
     /// Shared rather than one per voice: it holds nothing, and a voice is made every time a
     /// key goes down, which is not somewhere to be allocating.

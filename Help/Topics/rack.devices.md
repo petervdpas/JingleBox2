@@ -44,8 +44,9 @@ host's:
   lays that template down again.
 - **Learn a control**, which turns over the same mode `Ctrl+Shift+M` does.
 
-Pointing works here as it does everywhere: rest the pointer on a knob, hold `Ctrl+Shift+M`, and
-touch the control on your desk. A link names the device and the control and never the track, so a
+Pointing works here as it does everywhere: press `Ctrl+Shift+M`, rest the pointer on a knob, and
+touch the control on your desk. The key turns the mode over rather than being held, so press it
+again when you are done. A link names the device and the control and never the track, so a
 knob pointed at a soundmachine here is pointed at it in every song.
 
 ## Taking one off and putting it back

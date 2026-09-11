@@ -39,7 +39,12 @@ public interface IInputSource
     /// </remarks>
     AudioRoute? SelectedRoute { get; set; }
 
-    /// <summary>False on a machine with no graph to patch, where the picker has nothing to offer.</summary>
+    /// <summary>False where there is nothing behind the picker, which leaves it empty and dead.</summary>
+    /// <remarks>
+    /// Whether a routing is available at all, which is not the same question as whether the
+    /// machine has a graph: Windows has no graph and answers true whenever there is an output or
+    /// a program it can capture. <see cref="NeedsSilentOutput"/> is the graph question.
+    /// </remarks>
     bool IsRoutingAvailable { get; }
 
     /// <summary>Reads the graph again, for a program that has started playing since.</summary>
@@ -75,15 +80,19 @@ public interface IInputSource
     /// Whether the chosen source is one this can be done with at all.
     /// </summary>
     /// <remarks>
-    /// **No for what an output is playing, which is a loop and nothing else.** That source is the
-    /// output's own monitor, so hearing it through the output feeds it back into itself, and the
+    /// **No for the monitor of the output this application is playing through, which is a loop
+    /// and nothing else.** Hearing that through the same output feeds it back into itself and the
     /// first thing anybody would know about it is the noise. It is the ordinary source here,
-    /// since it is what the picker defaults to, so this is a case that would be met on the first
-    /// press rather than an awkward one.
+    /// since it is what the picker defaults to.
     ///
-    /// A microphone and a program are both fine: a program that is still playing out of its own
-    /// output is merely heard twice, which is a doubling somebody can hear and undo, and one
-    /// that has been taken aside is heard here alone.
+    /// **Another output's monitor is fine**, and asking which output a monitor belongs to is the
+    /// routing's job rather than a guess from the kind: on a machine with two cards, refusing
+    /// every monitor would refuse a working arrangement, and on a machine with one, allowing them
+    /// all would make the loop. Where the routing cannot tell, the cautious answer is no.
+    ///
+    /// A microphone and a program are both fine: a program still playing out of its own output is
+    /// merely heard twice, which is a doubling somebody can hear and undo, and one that has been
+    /// taken aside is heard here alone.
     /// </remarks>
     bool CanHear { get; }
 
@@ -100,9 +109,9 @@ public interface IInputSource
 
     /// <summary>Which of them is chosen, or nothing while none is.</summary>
     /// <remarks>
-    /// A cable is the usual answer and a spare socket is as good. Nothing chosen leaves the
-    /// switch grey rather than failing when it is pressed, which is the rule every other switch
-    /// on that strip keeps.
+    /// A cable is the usual answer and a spare socket is as good. With nothing chosen there is
+    /// nowhere to send a source, so choosing one cannot take it off its own output and the
+    /// routing says so rather than half doing it.
     /// </remarks>
     Audio.Records.AudioEndpoint? SilentOutput { get; set; }
 }

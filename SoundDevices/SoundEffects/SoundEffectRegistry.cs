@@ -13,9 +13,9 @@ namespace JingleBox2.SoundDevices.SoundEffects;
 /// shipped effect is taken by the archive, which is the same staging folder and the same swap a
 /// machine arrives through.
 ///
-/// The engine gate is why the Effects tab is empty today rather than showing five boxes that
-/// cannot sound. Every folder in the effects folder is read; each is offered to
-/// <see cref="ISoundEffectEngines"/>, and one it has no engine for is passed over without a word.
+/// The engine gate is what keeps a device that cannot sound off the Effects tab, and what makes
+/// an effects folder from a later version harmless. Every folder in it is read, each is offered
+/// to <see cref="ISoundEffectEngines"/>, and one it has no engine for is passed over in silence.
 /// </remarks>
 public sealed class SoundEffectRegistry : RackRegistry<SoundEffectProject>
 {
@@ -33,8 +33,8 @@ public sealed class SoundEffectRegistry : RackRegistry<SoundEffectProject>
     /// folder has on disc can be found by looking for it.
     /// </remarks>
     /// <param name="engines">
-    /// Which effects this build has. Left out, the real list, which is empty until the first
-    /// engine is written; given, whatever a test wants to hold it to.
+    /// Which engines this build has. Left out, the real list; given, whatever a test wants to
+    /// hold it to.
     /// </param>
     /// <param name="paths">
     /// How this system decides two paths are the same. Left out, the rule this system really has.

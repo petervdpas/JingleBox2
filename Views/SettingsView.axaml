@@ -26,9 +26,9 @@
          in, and a setting somebody is looking for is easier to find under a heading than by
          scrolling past everything else. Vertical rather than across the top, because the
          headings are words and words read better in a column. -->
-    <!-- Across the top instead, for a window too narrow to give a hundred and fifty pixels to
-         a list of five words. The switch is made in the code behind, since a width is not
-         something a style can ask about. -->
+    <!-- Across the top instead, for a window too narrow to give a column to a list of six
+         words. The switch is made in the code behind, since a width is not something a style can
+         ask about. -->
     <Style Selector="TabControl.strip > TabItem">
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />

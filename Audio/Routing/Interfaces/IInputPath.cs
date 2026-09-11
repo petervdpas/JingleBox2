@@ -67,16 +67,23 @@ public interface IInputPath
     /// <remarks>
     /// Told both at once rather than one at a time, because they are one arrangement: a source
     /// set without the tick and a tick set without the source are two half-answers that can
-    /// disagree, which is what four scattered readings of them already did.
+    /// disagree.
     ///
-    /// Whatever was taken aside is put back first, whichever way either fact went, since a source
-    /// that is no longer the input has no business staying unplugged from its own output.
+    /// **The same question twice moves nothing.** The page reads the graph on a clock and ends
+    /// every reading here, so all but the first of those are the arrangement that is already
+    /// standing; acted on, each one would give the source back and take it off again, which is
+    /// the source out of the desk and back for a fraction of a second, once a second. The
+    /// question is the source and what this application plays out of, and a repeat is answered
+    /// from what the first one came to. Hear it is not in it, since where a source plays is
+    /// settled by choosing it and the tick has nothing to say about that; keeping the
+    /// arrangement standing against a session manager that rewires it is
+    /// <see cref="Hold"/>'s job.
     ///
-    /// **It answered in prose and now answers what happened**, because the prose was the fault.
-    /// Five things wrote the status line during one gesture and the last one won by accident, so
-    /// the sentence this used to return was written and thrown away a millisecond later on both
-    /// paths anybody uses. The words are <see cref="IInputWords"/>'s alone now, and this says only
-    /// what it did.
+    /// Whatever was taken aside is put back before anything new is taken, since a source that is
+    /// no longer the input has no business staying unplugged from its own output.
+    ///
+    /// What it answers is what happened rather than a sentence to show: the words are
+    /// <see cref="IInputWords"/>'s.
     /// </remarks>
     /// <param name="source">What the input is now pointed at, or nothing.</param>
     /// <param name="heard">Whether Hear it is on.</param>

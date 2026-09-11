@@ -89,9 +89,7 @@ a card's own driver or something like ASIO4ALL puts one there.
 
 **A driver is handed one stream and only one.** It owns the card, so everything this
 application plays is summed before it leaves: the tracker, the pads and a take being
-auditioned all go out of the driver together. That used to be a switch, and it is not
-one any more, since a driver picked with it off left the pads and RECORD silent with
-nothing to explain it.
+auditioned all go out of the driver together. There is nothing to switch on for it.
 
 **If the sound goes strange after changing one, restart the app.** Reopening the
 output while everything else is still running is not the same as starting clean:

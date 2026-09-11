@@ -17,14 +17,16 @@ namespace JingleBox2.Tracker.Interfaces;
 /// with a moment of nothing before the first hit, and that silence has to belong to no slice
 /// rather than to the first one.
 ///
-/// It knows nothing about what takes the pieces. A kit has sixteen pads and a map thirty-two
-/// zones, and both clamp again on the way in.
+/// It knows nothing about what takes the pieces. A kit has as many pads as its machine declares,
+/// sixteen where it declares nothing, and a map thirty-two zones; both clamp again on the way in
+/// to whatever room they really have.
 /// </remarks>
 public interface ISampleSlicer
 {
     /// <summary>
-    /// The most pieces this will ever cut a recording into. Whoever takes the pieces holds
-    /// fewer than this and clamps again: a kit has sixteen pads, a map thirty-two zones.
+    /// The most pieces this will ever cut a recording into. Whoever takes them clamps again to
+    /// the room it really has: a map has thirty-two zones, and a kit has whatever its machine
+    /// declares, which is sixteen unless it says otherwise.
     /// </summary>
     int MaxSlices { get; }
 

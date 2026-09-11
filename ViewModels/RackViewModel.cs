@@ -23,8 +23,9 @@ using JingleBox2.SoundDevices.SoundMachines;
 namespace JingleBox2.ViewModels;
 
 /// <summary>
-/// The instrument rack: the voices you own, kept outside any song. A preset is where a new
-/// one starts; after that the instrument is its own thing and every song can use it.
+/// The rack page, in two tabs: the soundmachines this installation has registered, and the
+/// effects. A machine on it is where a song's instrument starts; an effect on it is a face to
+/// look at and a place to point a knob at, since an effect in use is a slot on a chain.
 /// </summary>
 /// <remarks>
 /// Edits save themselves. There is no Save button here on purpose: an instrument is a small

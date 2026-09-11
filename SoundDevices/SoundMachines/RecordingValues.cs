@@ -277,10 +277,10 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
 
     /// <inheritdoc/>
     /// <remarks>
-    /// The settings that are not numbers: which recording this plays, and what is written
-    /// beside the base note.
+    /// The settings that are not numbers: which recording this plays, what the file itself says
+    /// about it, the filter's cutoff in words, and the base note said as a note.
     ///
-    /// Three of them, and all but the take are read only. How long the take is and what rate it
+    /// Four of them, and all but the take are read only. How long the take is and what rate it
     /// was recorded at is read off the file rather than held anywhere, so there is nothing to
     /// write back, and it is answered only when this was given a shelf to ask: an instrument on
     /// its own knows the path and nothing about what is in the file.

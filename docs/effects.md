@@ -1,9 +1,9 @@
 # Effects of our own
 
-Decided on 2026-09-02, and built since. Five effects of ours ship: **EchoBox** the delay,
-**Sweeper** the filter, **Roaster** the drive, **Shifter** the pitch shifter and **Ringer** the
-ring modulator, with six presets apiece, and each is on the rack's Effects tab, on a track's
-chain, on the master and on a pad. They are registered, imported and thrown out by the same rules
+Decided on 2026-09-02, and built since. Six effects of ours ship: **EchoBox** the delay,
+**Sweeper** the filter, **Roaster** the drive, **Shifter** the pitch shifter, **Ringer** the
+ring modulator and **Widener** the stereo widener, with six presets apiece and seven on Widener,
+and each is on the rack's Effects tab, on a track's chain, on the master and on a pad. They are registered, imported and thrown out by the same rules
 a machine is, laid out in the same designer, and pointed at by the same links. The rest of this
 file is the design that got there, and the list at the foot says what is still unwritten.
 
@@ -124,7 +124,8 @@ Kept as they are, because only the instrument world has them: `IMachine`, `IPane
 `IPanelNotes`, `PanelNotes`, `IPanelPads`, `IPanelZones`, `IPanelSlices`,
 `IPanelTakes`, `IPanelLocation`, `IPanelPatch`, `IInstrumentName`. Everything in the
 application's own assemblies that is genuinely about machines keeps its name too:
-`SoundMachineProject`, `SoundMachineRegistry`, `SoundMachineRack`, `MachineEditorViewModel` and the rest.
+`SoundMachineProject`, `SoundMachineRegistry`, `SoundMachineRack` and the rest. The designer is
+not among them: it lays out both worlds, so it is `DesignerViewModel` and `DesignerView`.
 
 Two of those rows are the awkward ones and are worth saying out loud. `MachineMenuOptions` is
 the words a menu can carry and `MenuOptions` is already taken by the rule that reads them, which
@@ -245,10 +246,13 @@ bottom of the knob is for.
 ## The order of work
 
 1. **The rename. Done**, and with it the namespaces and the assemblies. The types first, then
-   `JingleBox2.Machines` became `JingleBox2.Rack.SoundDevices` with `JingleBox2.Rack.SoundMachines` beside it
-   for what only an instrument has and `JingleBox2.Rack.SoundEffects` waiting for what only an effect
-   will have. The two assemblies are `JingleBox2.Rack.SoundDevices` and `JingleBox2.Rack.Controls`,
-   which is what `LICENSE.EXCEPTION` names. No warnings and the suite green at 1186. `Panel` collides with `Avalonia.Controls.Panel` and the collision is
+   `JingleBox2.Machines` became `JingleBox2.Rack.SoundDevices`. A `JingleBox2.Rack.SoundMachines`
+   beside it for what only an instrument has, with a `JingleBox2.Rack.SoundEffects` waiting for
+   what only an effect will have, was the plan here and is not what was built: asked one at a
+   time, most of those contracts turned out not to be about being played, so the shared level is
+   the whole of the published one and neither namespace exists. The two assemblies are
+   `JingleBox2.Rack.SoundDevices` and `JingleBox2.Rack.Controls`, and it is the first of those
+   alone that `LICENSE.EXCEPTION` names. No warnings and the suite green at 1186. `Panel` collides with `Avalonia.Controls.Panel` and the collision is
    written up in `CLAUDE.md`: ours wins silently inside `JingleBox2.Rack.Controls`, since the
    enclosing namespace beats a using, and is an ambiguity anywhere else. Nothing on disc moved,
    which `Tests/SoundMachinePartsTests.cs` says by reading the shipped manifests and passing
@@ -303,12 +307,17 @@ bottom of the knob is for.
    decides nothing, that a square carrier through a steady signal reads back as the square, and
    that nothing either can be set to makes it hand back something that is not a number.
 
-7. **The other three engines.** Reverb, EQ and the compressor.
+7. **One more that was not on the list. Done.** Widener, the stereo widener, which is the same
+   shape again: an engine, a face, an id a chain writes down, and nothing anywhere had to be
+   widened to take it.
+
+8. **The other three engines.** Reverb, EQ and the compressor.
 
 ## Still open
 
 - **What they are called.** A machine is not called Sampler, it is called Zampler, and a pedal
-  wants the same treatment. Five are named: EchoBox, Sweeper, Roaster, Shifter and Ringer. The names are the
+  wants the same treatment. Six are named: EchoBox, Sweeper, Roaster, Shifter, Ringer and
+  Widener. The names are the
   manifest's business and are somebody's to edit; the ids under them are not, since a chain
   writes those down.
 - Nothing about where the designer lives: both worlds are tabs inside DESIGNER, which is the one
@@ -317,7 +326,12 @@ bottom of the knob is for.
   answers only while the track plays that machine, which is what stops knob one meaning six
   things. The equivalent for an effect is the track's chain holding it, and whether the slot has
   to match as well as the id is a question for when there are two of one pedal on a track.
-- **An effect ships presets, and what a preset of one actually is has to be settled.** The
+- **An effect ships presets, and what a preset of one is, is settled: it is `SoundEffectPreset`,
+  a name and where each control stands, keyed by the parameter's own key, and `SoundEffectPresets`
+  is the shelf it comes off, in `presets/` inside the effect's own folder so it travels in the
+  zip. The picker is `ElementKinds.Preset` dropped on the face like any other part, and the page
+  that fills one is a form with a row per control rather than the machine's JSON.** What follows
+  is the reasoning that got there. The
   question of whether was never really open: `IPanelPresets` is a face's contract rather than a
   machine's, `PanelStarts` already says where a picker's list comes from, and an effect's folder
   has `presets/` beside `images/` the same as a machine's. What differs is the file. A machine's

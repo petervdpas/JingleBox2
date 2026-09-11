@@ -214,7 +214,14 @@ public class ZoneMapView : ThemedControl
     /// </remarks>
     private const double Wanted = 480;
 
-    /// <summary>The narrowest it is worth drawing at, below which the octave marks run together.</summary>
+    /// <summary>
+    /// The narrowest it is worth drawing at, below which the octave marks run together.
+    /// </summary>
+    /// <remarks>
+    /// A floor under <see cref="Wanted"/> rather than a width anything is measured against, so
+    /// while that stays the larger of the two this never decides anything: it is here so that a
+    /// smaller <see cref="Wanted"/> cannot quietly take the map below what can be read.
+    /// </remarks>
     private const double Least = 240;
 
     /// <summary>

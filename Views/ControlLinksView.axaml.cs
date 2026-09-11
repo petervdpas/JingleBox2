@@ -12,8 +12,8 @@ namespace JingleBox2.Views;
 /// </summary>
 /// <remarks>
 /// Bound to a <see cref="ControlLinksViewModel"/> itself rather than to something holding one,
-/// so both places that want the list point one of these at it and nothing here has to know
-/// where it is being drawn.
+/// so whatever wants the list points one of these at it and nothing here has to know where it is
+/// being drawn.
 ///
 /// The two buttons are here rather than commands on the view model because both of them are a
 /// file picker, which is the window's and not the list's. Everything either one does once a

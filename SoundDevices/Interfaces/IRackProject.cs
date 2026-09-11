@@ -4,19 +4,19 @@ using JingleBox2.Rack.SoundDevices.Interfaces;
 namespace JingleBox2.SoundDevices.Interfaces;
 
 /// <summary>
-/// A device as its folder holds it: what it is, plus where it is kept and who made it.
+/// A sound device as its folder holds it: what it is, plus where it is kept and who made it.
 /// </summary>
 /// <remarks>
-/// <see cref="ISoundDevice"/> is what a device is; this is that same device as a folder on somebody's
-/// disc, which adds only the two things a folder knows and a device does not: who wrote it and
-/// which version this is, and where it was read from. Nothing about notes or audio is here, which
-/// is the test of whether something belongs: a question this cannot answer is a question about
-/// one world rather than about the rack.
+/// <see cref="ISoundDevice"/> is what a sound device is; this is that same thing as a folder on
+/// somebody's disc, which adds only the two things a folder knows and it does not: who wrote it
+/// and which version this is, and where it was read from. Nothing about notes or audio is here,
+/// which is the test of whether something belongs: a question this cannot answer is a question
+/// about one world rather than about the rack.
 ///
-/// It exists so the rules for a folder of boxes can be written once. Which folders ship, which
-/// are this installation's, what has been offered, and what is brought up to date against what
-/// are facts about a rack rather than about a machine, and they were written for machines first
-/// because machines came first.
+/// It exists so the rules for a folder of sound devices can be written once. Which folders ship,
+/// which are this installation's, what has been offered, and what is brought up to date against
+/// what are facts about a rack rather than about a machine, and they were written for machines
+/// first because machines came first.
 /// </remarks>
 public interface IRackProject : ISoundDevice
 {

@@ -164,24 +164,22 @@ public sealed class WaveformService : IWaveformService
         }
     }
 
-    /// <summary>The loudest sample under each column of the picture.</summary>
-    /// <remarks>
-    /// Each column's stretch is worked out from the column rather than by stepping a fixed number
-    /// of frames, so the columns cover the whole recording and the last one really is the end of
-    /// it. A fixed step throws away whatever the division left over, which puts every position
-    /// read off the picture out by that much, worst at the end where the error has had the whole
-    /// file to build up. A recording shorter than the picture is wide still gets a frame per
-    /// column, so a short take is drawn across the width instead of squeezed into the left. Each
-    /// sample is widened to an int before Abs, since Abs(short.MinValue) throws.
-    /// </remarks>
     /// <summary>
     /// Reads the recording into that many peaks, or into one a frame where it is shorter than
     /// that.
     /// </summary>
     /// <remarks>
-    /// The clamp is what stops a short take being read into more peaks than it has frames,
-    /// which is buckets of one sample repeated and a picture claiming detail that is not there.
-    /// A one second take is 44100 peaks and that is all there is to have.
+    /// Each column's stretch is worked out from the column rather than by stepping a fixed number
+    /// of frames, so the columns cover the whole recording and the last one really is the end of
+    /// it. A fixed step throws away whatever the division left over, which puts every position
+    /// read off the picture out by that much, worst at the end where the error has had the whole
+    /// file to build up.
+    ///
+    /// The clamp is what stops a short take being read into more peaks than it has frames, which
+    /// is buckets of one sample repeated and a picture claiming detail that is not there. A one
+    /// second take is 44100 peaks and that is all there is to have.
+    ///
+    /// Each sample is widened to an int before Abs, since Abs(short.MinValue) throws.
     /// </remarks>
     /// <param name="samples">The audio, channels interleaved.</param>
     /// <param name="channels">How many of those there are.</param>

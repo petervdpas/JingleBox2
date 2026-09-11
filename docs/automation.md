@@ -155,12 +155,14 @@ ControlTargets.Find     (machine, key) or (plugin, parameter), resolved against 
 The clock writing into a target at line 32 and a knob writing into it from CC 74 are the same
 act against the same interface. A lane is that resolution plus a list of points.
 
-What is not in place, and was missed in the first draft: nothing here can list the targets on a
-track. `IControlTargets` has only `Find(mapping)`, deliberately asked per message because what a
-mapping names moves underneath it. Renoise's Automation List is every parameter of every device
-on the active track, searchable, with an "automated only" filter, and it is how a parameter gets
-a lane in the first place. The parts exist a layer down, `SoundMachineProject.Parameters` and a
-plugin's own parameter list, so this is a new door on that interface rather than new knowledge.
+What was missed in the first draft, and is in place now: nothing here could list the targets on
+a track. `IControlTargets` had only `Find(mapping)`, deliberately asked per message because what
+a mapping names moves underneath it, and `On(track)` is the door that was wanted: every parameter
+the track's machine has in panel order, then each insert's, then the strip, each one a
+`ControlChoice` carrying the mapping and the name beside it. Renoise's Automation List is the
+same idea, searchable, with an "automated only" filter, and that filter is what is still not
+drawn. The parts were a layer down all along, `SoundMachineProject.Parameters` and a plugin's own
+parameter list, so it was a new door on that interface rather than new knowledge.
 
 ## The pieces
 

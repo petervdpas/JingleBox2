@@ -33,8 +33,9 @@ namespace JingleBox2.Rack.Controls;
 ///
 /// The containers have no face of their own, since what a row looks like is whatever is put in
 /// it. Those get a diagram instead: blank boxes laid out the way that container lays things
-/// out, drawn in the theme's own border colour so the diagram is as much part of the theme as
-/// the controls beside it.
+/// out, outlined in the theme's muted text colour and filled with its surface, so the diagram is
+/// as much part of the theme as the controls beside it and still reads as a container rather than
+/// as an empty chip.
 /// </remarks>
 public sealed class PartSample : Decorator
 {

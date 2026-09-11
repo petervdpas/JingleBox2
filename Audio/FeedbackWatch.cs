@@ -115,7 +115,7 @@ public sealed class FeedbackWatch : IFeedbackWatch
     ///
     /// **Eight hundred and not three, and the three was measured being wrong.** At three hundred
     /// this landed on bin 3 of a 48 kHz stream, which is 281 Hz, and the next-peak test skips the
-    /// bins within <see cref="Beside"/> of the candidate — so bins 0 to 6, everything under 656
+    /// bins within <see cref="Beside"/> of the candidate, so bins 0 to 6, everything under 656
     /// Hz, was hidden from the one test that is supposed to notice music. A low swell then read as
     /// a lone tone 58 times over a next peak that had been excluded from being itself:
     /// <c>ringing at bin 3, 67 over the mean, 33 over the bins beside it, 58 over the next peak,

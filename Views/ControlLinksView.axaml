@@ -6,13 +6,13 @@
              x:DataType="vm:ControlLinksViewModel">
 
   <!-- The templates, as a card for each controller against each thing it is pointed at. Bound
-       to the list itself rather than to whoever holds one, which is what lets the same drawing
-       serve both places it is wanted: the tracker's MIDI CC page and SETTINGS. It was written
-       out twice before and the two had already drifted: one had a column the other did not. -->
-  <!-- One card is one controller and one target, which is exactly what a file is written from.
-       It was a card per target with the controllers nested inside, and that put the templates
-       one level down and made the card a thing no file could be written from: a card holding
-       two controllers would land on somebody who has one of them. -->
+       to the list itself rather than to whoever holds one, so wherever it is drawn it needs to
+       know nothing about who is drawing it. It is one drawing and not two: written out twice,
+       the two had already drifted by a column.
+
+       One card is one controller and one target, which is exactly what a file is written from: a
+       card holding two controllers would export a file that lands on somebody who has one of
+       them. -->
   <StackPanel Spacing="8">
     <StackPanel Orientation="Horizontal" Spacing="8">
       <TextBlock Classes="cardTitle" Text="{Binding Title}" />

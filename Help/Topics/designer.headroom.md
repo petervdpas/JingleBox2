@@ -59,10 +59,11 @@ scale.
 Together they take the patch that started all this from peaking at 1.06 to peaking at 0.45,
 with the drive knob moving the loudness by less than a decibel across its whole range.
 
-**Roaster** and **Sweeper** carry the same switches. An effect cannot be handed the wave it is
-about to work on, so its Loudness setting measures what actually went past instead: two running
-averages either side of the curve, about fifty milliseconds each. On a steady tone that is
-exact.
+**Sweeper** carries both switches and **Roaster** carries the first: there is nothing to
+reorder on a drive with no filter in it, so Roaster has Drive keeps and no Order. An effect
+cannot be handed the wave it is about to work on, so Drive keeps measures what actually went
+past instead: two running averages either side of the curve, about fifty milliseconds each. On
+a steady tone that is exact.
 
 ## It is said, not enforced
 

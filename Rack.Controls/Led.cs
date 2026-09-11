@@ -296,8 +296,9 @@ public class Led : ThemedControl
     /// A colour taken towards white or towards black, for the dome's gradient and its ring.
     /// </summary>
     /// <remarks>
-    /// Its own copy rather than <see cref="ThemePalette.Shade"/> because this file is reached
-    /// from <see cref="LedRow"/> while a row is being drawn and has no palette in hand there.
+    /// The same arithmetic <see cref="ThemePalette.Shade"/> does, kept here so that a lamp drawn
+    /// from a static context, which is every caller of <see cref="DrawLamp"/>, needs nothing but
+    /// the colour it was handed.
     /// </remarks>
     private static Color Lighten(Color colour, double amount)
     {

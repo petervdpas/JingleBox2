@@ -120,7 +120,7 @@ public sealed class SoundingNotes
     /// <param name="note">Which key to light, and an unplayable one for an OFF row, which puts a key out.</param>
     /// <param name="seconds">
     /// How long it will sound, so the key goes out on its own. Zero where nobody knows, which
-    /// leaves it lit until something else puts it out.
+    /// lights it for one tick, which is the least there is.
     /// </param>
     /// <param name="alone">
     /// True for a note from a track, which has one voice: it puts out whatever that track was

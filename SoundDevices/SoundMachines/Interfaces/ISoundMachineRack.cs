@@ -14,11 +14,12 @@ namespace JingleBox2.SoundDevices.SoundMachines.Interfaces;
 /// kick sounding differently, which is what anybody who has built a kick for one track and not
 /// for another expects.
 ///
-/// A machine is a fixture on it, one apiece under its own name, always there. It cannot be
-/// renamed, deleted or duplicated, the way a rack has the boxes it has; a plugin can be deleted
-/// but takes its name from the VST3 or CLAP. Nothing else belongs here at all, and anything that
-/// is neither is moved aside on the next open through <see cref="Retire"/>, because there is no
-/// longer any way to make one.
+/// A machine is on the rack while it is registered, one apiece under its own name. It cannot be
+/// renamed there, since that would be renaming the machine, and it can be taken off through
+/// <see cref="Shelve"/>, which is not losing it: the registry still has it and the picker offers
+/// it back. It can be duplicated, which is a variant of the machine set up differently. Nothing
+/// but a registered machine belongs here, and anything else is moved aside on the next open
+/// through <see cref="Retire"/>.
 ///
 /// What a new instrument starts from is its machine's presets, which belong to the machine and
 /// are never written here: see <see cref="Records.SoundMachinePreset"/>. A preset seeded onto the shelf would

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-JingleBox2 is a cross-platform audio pad launcher built with .NET 9 and Avalonia UI for radio, streaming, and live audio workflows. It features a FIRE tab for performance (triggering audio pads) and a PADS tab for setup, with MIDI controller support.
+JingleBox2 is a cross-platform audio pad launcher built with .NET 10 and Avalonia UI for radio, streaming, and live audio workflows. It features a FIRE tab for performance (triggering audio pads) and a PADS tab for setup, with MIDI controller support.
 
 ## Build Commands
 
@@ -76,8 +76,10 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   Machines and Effects. It was MACHINES. The page is where a machine's face
   is laid out, which is a job rather than a list of things: MACHINES read as the place your
   machines are kept, and the place they are kept is the rack in the tracker and the registry in
-  SETTINGS. The types keep their names, since `MachineEditorViewModel` is what the thing is
-- `Themes/` - XAML resource dictionaries (Dark, Light, Neon, Industrial)
+  SETTINGS. The types say it too: `DesignerViewModel` and `DesignerView` are the page, since
+  laying a face out is what the thing is
+- `Themes/` - XAML resource dictionaries: `Base`, which the rest are written over, and six
+  pairs of a dark and a light (the plain pair, Citrus, Ember, Industrial, Neon, Orchid)
 - `native/` - BASS audio library binaries for win-x64, linux-x64, linux-arm64
 
 ### Data Flow
@@ -85,13 +87,13 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - **Playback**: PadViewModel → BassAudioEngine → BASS library → PadPlaybackChanged event → UI update
 - **Config**: PadViewModel property change → MainViewModel → ConfigStore.Save() → JSON file
 - **MIDI**: MidiService.MessageReceived → MidiDispatcher → (MidiControlRouter.Pads → ControlTargets → PadTriggerAdapter → PadViewModel.TogglePlayCommand) or (MidiNoteRouter → TrackerNoteAdapter → TrackerViewModel)
-- **Tracker**: TrackerPlayer clock → TrackerSequencer events → sample channels (TrackerSampleBank) or voices and plugins (TrackMixer → SynthOutput → one BASS stream)
+- **Tracker**: TrackerPlayer clock → TrackerSequencer events → sample channels (SampleStore) or voices and plugins (TrackMixer → TrackerOutput → one BASS stream)
 
 ### Key Classes
 
 - `BassAudioEngine` (Audio/): Manages pad audio playback, device selection, file/stream sources, dynamic resize
-- `Log` (Diagnostics/): What the app writes down about itself, switched on in SETTINGS or with `JB_LOG=1`. Off costs one comparison and does not even build the message. Areas (App, Audio, Plugins, Tracker, Midi) so a log can be read without reading all of it
-- `AppFolder` (Config/): Where everything the app keeps lives. Knows nothing, so a plugin's own process can find the same folder without loading the settings
+- `Log` (Diagnostics/): What the app writes down about itself, switched on in SETTINGS or with `JB_LOG=1`. Off costs one comparison and does not even build the message. Areas (App, Audio, Plugins, Tracker, Midi, Machines) so a log can be read without reading all of it
+- `AppFolder` (Files/): Where everything the app keeps lives. Knows nothing, so a plugin's own process can find the same folder without loading the settings
 - `PluginHost` (Audio/Plugins/): The one place that knows both plugin standards. Everything above it deals in `PluginInfo` and `IPluginEffect`
 - `BridgedPlugin` / `PluginProcess` (Audio/Plugins/Bridge/): A plugin running in another process, wearing the same face as one that is not. Socket for messages, shared memory for audio
 - `PluginHostProcess` (Audio/Plugins/Bridge/): This same executable started again with `--plugin-host`, being one plugin and nothing else
@@ -262,14 +264,16 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   there is no design there to decide anything and the keyboard is part of the panel rather than
   an addition to one. Nothing was added to any machine on the way past: a machine that wants a
   keyboard gets a Keys part dropped on it in the designer, by hand, like every other part
-- The instrument window hears the same two halves through `MidiKeyDown` and `MidiKeyUp` on the
-  tracker, which are beside `NotePlayed` rather than folded into it because they answer different
-  questions: what is sounding is what a kit's pads show and what a playhead runs on, and where a
-  hand is is what a keyboard shows. A note goes on sounding long after its key came up. Only the
-  hardware raises them, deliberately: the drawn keyboard hears its own presses, and a letter
-  typed into the pattern has no key coming up at all, so a light lit from one would stay lit for
-  the rest of the session. The up carries no track, since the cursor can move between the press
-  and the release and a light filtered by where the release landed would never go out
+- The instrument window hears the same two halves through the monitor, which is
+  `TrackerViewModel.MidiKeys` and `RackViewModel.MidiKeys`, both of them the one `IMidiMonitor`
+  the application makes. It is beside `NotePlayed` rather than folded into it because the two
+  answer different questions: what is sounding is what a kit's pads show and what a playhead runs
+  on, and where a hand is is what a keyboard shows. A note goes on sounding long after its key
+  came up. It was a pair of events on the tracker, `MidiKeyDown` and `MidiKeyUp`, raised by the
+  hardware alone and carrying no track on the up, and every one of those decisions is the
+  monitor's now: the drawn keyboard says its own presses through `Pressed` and `Released`, a
+  letter typed into the pattern has no key coming up at all, and nothing is filtered by where a
+  release landed, since a light filtered that way would never go out
 - The peak mark on a meter would not come down. The fall is in `MeterScale.DecayPeak` and always
   was, held for a moment and then twenty decibels a second, but it is worked out while the meter
   draws and a meter draws when a value changes. So the bar emptied when the last level arrived
@@ -295,8 +299,9 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `TrackMixer` (Tracker/Synth/): The song's tracks, summed. A bus, a level, a pan, an insert
   chain, a ducker and an instrument apiece, and room made on a track for each new note the way
   that track's instrument asks for it: cut, which is what a tracker has always done, release or
-  sustain. Auditions carry no track at all and pile up, which is why a
-  panel's keyboard cannot be heard on a strip or turned down by one. It was called `SynthMixer`,
+  sustain. An audition carries the track it was played on where there is one, and piles up
+  either way; one that names none goes onto a loose bus of its own, which is why the rack's
+  keyboard cannot be heard on a strip or turned down by one. It was called `SynthMixer`,
   which was true when it summed synth voices and nothing else; it grew all of the above and went
   on wearing the old name, which said the wrong thing about the one class the whole mix goes
   through. `Tests/MixerIsolationTests.cs` plays a note on one track and asks what every other
@@ -346,11 +351,11 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   soundmachine is played, so it becomes an instrument on a track; an effect is not, so it becomes
   a slot on a track's chain. Everything before that is one act done twice, and fixing the
   identity in one world and not the other was the same fault this file names everywhere else
-- **The three ids that shipped are grandfathered and nothing else is.** `KindOf` and
-  `SoundEffectEngines.Was` map the eight original ids to their engines and are consulted only
+- **The eight ids that shipped first are grandfathered and nothing else is.** `KindOf` maps the
+  five soundmachines and `SoundEffectEngines.Was` the three effects, and both are consulted only
   where a manifest is silent, since every song, rack file and chain on anybody's disc names them.
-  Compared without regard to case, like every other id here. The eight shipped manifests name
-  their engines out loud now, and `Tests/ShippedEngineTests.cs` holds them to it, including that
+  Compared without regard to case, like every other id here. Every shipped manifest names its
+  engine out loud now, all eleven of them, and `Tests/ShippedEngineTests.cs` holds them to it, including that
   the engine each names is the one its id used to imply: a shipped device that quietly moved
   engines would open every song that plays it and sound like something else
 - **An effect's engine is resolved from the id the chain wrote down**, since a chain writes an
@@ -427,7 +432,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   `machine.json` written into an empty folder somewhere else is a machine that draws nothing and
   has no presets. `SoundMachineProject.Save` writes the manifest and only that, rightly, since it is
   called on every ordinary save and copying the whole folder onto itself each time would be
-  absurd; `IMachineArchive.CopyInto` is the other half, for the one case where the folder
+  absurd; `IRackArchive<T>.CopyInto` is the other half, for the one case where the folder
   changes. The files first and the manifest after them, because the one on disc is behind
   whatever is on screen and copying a stale one would only be overwriting it a moment later.
 
@@ -445,7 +450,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 
   Everything asks it. What the rack shows, what a panel is drawn from, what a song can sound,
   and which machines a song is missing are all one question with one answer, and there is one
-  list that gives it: `IMachineRegistry` reads the folders and `ISoundMachineProjects` holds what it
+  list that gives it: `IRackRegistry<T>` reads the folders and `ISoundMachineProjects` holds what it
   found for the run. A machine whose id this build has no engine for is read and passed over, so
   a machines folder from a later version is harmless, and that gate is what has to move before a
   machine written by somebody else can be registered at all.
@@ -473,7 +478,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   was written before the registry existed and had been quietly untrue ever since: the registry is
   what this installation has and is the only thing that answers that. `TrackerInstrument`
   is the data type for both a machine and an instrument, but the rack's types say machine
-  (`SoundMachineRack`, `MachineRackViewModel`, `RackSoundMachine`, `MachinesView`) and the tracker's say
+  (`SoundMachineRack`, `RackSoundMachine`) and the tracker's say
   instrument (`Song.Instruments`, `InstrumentSlot`, `AddInstrumentCommand`)
 - **The rack is what this installation has registered, in two tabs: Machines and Effects.** A
   plugin is on neither and never should have been on the rack at all: a CLAP or a VST3 is
@@ -1277,8 +1282,9 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   holds what was found for the run, and the rack's Effects tab is that list. `ISoundEffectEngines`
   is the gate, and its table was empty for exactly as long as there were no engines: an effect
   that could be had and makes no sound is the device this codebase refuses to put on a rack, so the
-  first entry arrived with the engine that does the work rather than before it. EchoBox, Sweeper
-  and Roaster are in it now, keyed by the **engine** rather than by the effect's id, which is what
+  first entry arrived with the engine that does the work rather than before it. Six are in it now,
+  the delay, the filter, the drive, the pitch shifter, the ring modulator and the widener, keyed
+  by the **engine** rather than by the effect's id, which is what
   lets any number of effects name one. There is deliberately no enum of effect engines with
   numbers in it, unlike `TrackerInstrumentKind`: a song says which engine an instrument is on, and
   a chain writes down an effect's id and never its engine, so nothing here is ever written to a
@@ -1371,9 +1377,9 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   passed over. What the two share is the drawing, which is why the panel types stopped being
   named for machines. An effect in use is a slot on a track's chain and takes no name of its own,
   the way two of the same plugin on one track already read. `docs/effects.md` is the design, the
-  rename, the engines and the order they are built in. Five are written: the delay is EchoBox,
-  the filter is Sweeper, the drive is Roaster, the pitch shifter is Shifter and the ring
-  modulator is Ringer. Reverb, EQ and the compressor are not. **The list of six that document
+  rename, the engines and the order they are built in. Six are written: the delay is EchoBox,
+  the filter is Sweeper, the drive is Roaster, the pitch shifter is Shifter, the ring
+  modulator is Ringer and the stereo widener is Widener. Reverb, EQ and the compressor are not. **The list of six that document
   opens with was a plan and not a bound**, which the last two say out loud: they were asked for,
   they are an engine and a face like the other three, and nothing anywhere had to be widened to
   take them
@@ -1395,7 +1401,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   The effects tab has no picker at all, since an effect cannot be shelved: what is registered is
   what is there
 - **A song picks its instrument from one list: the rack's machines and the instrument plugins on
-  this computer.** `MachineRackViewModel.Offered`, drawn as a coloured dot and a name, since to a
+  this computer.** `RackViewModel.Offered`, drawn as a coloured dot and a name, since to a
   track those are one question with one answer: what plays this part. Instruments only, because
   an effect goes on a track's chain under the pattern, which is where it belongs and where it
   already worked. A plugin says its format only where the same name is installed twice, which
@@ -1433,15 +1439,22 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 
 ## How this code is written down
 
-Every seam is an interface, and the prose lives on the interface. What a thing is for, why it
-works the way it does and what was got wrong on the way there is a fact about the contract, not
-about one implementation of it, and a reader who has the interface in front of them should not
-have to go looking for the class to find out what they are holding.
+Every seam is an interface, and the prose lives on the interface. What a thing is for and why it
+works the way it does is a fact about the contract, not about one implementation of it, and a
+reader who has the interface in front of them should not have to go looking for the class to find
+out what they are holding.
 
 So: the interface carries the full XML documentation. The implementation carries `<inheritdoc/>`
 and, under it, only what is true of that implementation and untrue of the contract, which is
 usually how it does the thing rather than what the thing is. A remark that would still be true of
 a second implementation belongs upstairs.
+
+**And every word of it is about what is, never about what was.** No "it used to be", no "that
+changed when", no paragraph explaining the design that this one replaced. A reader holding a
+contract wants the contract, and a correction attached to it reads as a second contract
+disagreeing with the first: that is how a stale sentence outlives the code it described. Where
+a reason still governs the shape of the thing it stays, because a reason is a fact about now.
+Where it only explains how the shape came about, it goes.
 
 **A class is named for what it is, never for what it is to somebody else.** No `Helper`, no
 `Util`, no `Manager`, no `Common`: those name a relationship rather than a thing, so they attract
@@ -1522,11 +1535,12 @@ song does with the device, and that is application code: `SoundDevices/SoundMach
 effect on a chain takes no name of its own. `IPluginEffect` and `ClapEffect` keep theirs as well,
 because a plugin that works on audio really is a plugin effect and both already say plugin.
 
-Still open, and it is the fault this uncovered: `DesignerViewModel.Library` is one unfiltered
-list bound straight into the page, and `IDesignWorld` says nothing about parts, so the Effects
-tab offers `Keys`, `Pads`, `Pad`, `PadPicker`, `Zones`, `ZonePicker`, `Slices`, `Take`,
-`Location` and `InstrumentName` on an effect's face. `Scope` and `Preset` are deliberately not on
-that list: they belong on an effect and are only unwired.
+The fault this uncovered is closed. `DesignerViewModel.Library` was one unfiltered list bound
+straight into the page, and `IDesignWorld` said nothing about parts, so the Effects tab offered
+`Keys`, `Pads`, `Pad`, `PadPicker`, `Zones`, `ZonePicker`, `Slices`, `Take`, `Location` and
+`InstrumentName` on an effect's face. `IDesignWorld.Parts` is that question now and `Library`
+reads it, and the list itself is `IPanelParts`, asked whether the world is played, so the two
+worlds cannot drift apart by being written out twice.
 
 **The panel a face stands in is not a designer, and was called one in three places.**
 `ISoundDevicePanel` is what a face needs behind it: the editor, the octave to test at, the note
@@ -1632,11 +1646,13 @@ you get.
 
 **The namespaces say which world a contract belongs to, and the assemblies are named for the
 rack rather than for machines.** `JingleBox2.Rack.SoundDevices` is what both worlds draw themselves out
-of, `JingleBox2.Rack.SoundMachines` is what only an instrument has (a keyboard, zones, pads, slices,
-takes, a patch, a place in the pattern, the name badge), `JingleBox2.Rack.SoundEffects` is what only
-an effect will have, and `JingleBox2.Rack.Controls` is the controls. The folders say the same thing:
-`Rack.SoundDevices/Faces/`, with its own `Interfaces` and `Records` under it. The assemblies are `JingleBox2.Rack.SoundDevices` and `JingleBox2.Rack.Controls`,
-which is what `LICENSE.EXCEPTION` names.
+of, and `JingleBox2.Rack.Controls` is the controls. The folders say the same thing:
+`Rack.SoundDevices/Faces/`, with its own `Interfaces` and `Records` under it. There is no
+`Rack.SoundMachines` or `Rack.SoundEffects` namespace, and the paragraph above says why: asked
+one at a time, most of the contracts that looked like an instrument's turned out not to be, so
+the shared level is the whole of the published one and the two worlds are real in application
+code instead. The assemblies are `JingleBox2.Rack.SoundDevices` and `JingleBox2.Rack.Controls`,
+and it is the first of those alone that `LICENSE.EXCEPTION` names.
 
 **The shared level being a namespace of its own is what makes the `Panel` collision loud.**
 `Panel` is also `Avalonia.Controls.Panel`, and a namespace that encloses another is searched
@@ -1715,7 +1731,7 @@ folder is the classes: the things that do something.
 **A record referred to by a view has to be told about twice.** XAML names a type through a
 `clr-namespace`, so moving one breaks an `x:DataType` in a way only the Avalonia compiler catches,
 and only on a build that is not incremental. Four views needed a second `xmlns` for this:
-`HelpWindow`, `MachineEditorView`, `PluginStrip` and `SongDialog`. Nothing in XAML names an enum
+`HelpWindow`, `DesignerView`, `PluginStrip` and `SongDialog`. Nothing in XAML names an enum
 or an interface but `SoundDevicePanel`, which is bound to `ISoundDevicePanel`.
 
 ### There are no line comments
@@ -1770,7 +1786,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-1872 of them, in about twenty five seconds, with no window and no hardware. They run in CI on every push
+2421 of them, in about half a minute, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -1899,6 +1915,10 @@ whole exercise and is worth writing down rather than summarising:
     `PadMatrix.Usual` against `PadMatrix.Most` and is a switch of its own because a grid of 32 is
     a different instrument from a grid of 8
   - Default: 4 rows x 2 columns = 8 pads (backward compatible)
+- **PipeWire is what a Linux machine plays through, and the output picker says so by offering
+  what really opens.** `IOutputProbe`, `ISoundServerOutput`, `IOutputChoice` and `IPipeWireOutput`
+  are the four rules under that, and none of them shortens anybody's list: see the routing notes
+  further down for what each is for and what it cost to find out.
 - Two source types per pad: a recording off the shelf (picked from RECORD's takes, so the
   app owns every file a pad depends on) or an HTTP stream. A pad still plays a path
   underneath; what changed is where the path can come from
@@ -2950,7 +2970,7 @@ whole exercise and is worth writing down rather than summarising:
   megabytes. Put back **in place** rather than as a new instance, since panels and the rack hold
   the project they were opened on. The fields are found rather than listed, by walking the
   project's serialisable properties, so a field added later comes back without anybody naming it.
-  The door is `MachineEditorViewModel.Redraw`, which every edit ends at: told more often than
+  The door is `DesignerViewModel.Redraw`, which every edit ends at: told more often than
   there are edits, and a redraw where nothing moved leaves no step
 - An instrument's knobs have undo too, and that one had to turn a stream back into a gesture: a
   knob dragged across its range is one thing a person did and forty messages, and a controller
@@ -3274,7 +3294,7 @@ whole exercise and is worth writing down rather than summarising:
 - `Views/SoundDeviceHelpWindow.axaml` is the window, and it is deliberately not
   `HelpWindow`: no topic list, no search, the device's name and its one line at the top, and the
   page on a plate in the device's own colours. One window per device, so a page can be left open
-  beside the device while somebody works it. All eight devices that ship carry one, and
+  beside the device while somebody works it. All eleven devices that ship carry one, and
   `Tests/ShippedHelpTests.cs` walks both rack folders and says so, including that a page starts
   with its own device's name, which is how a copied file that was never edited fails.
   `verify-rack.sh` refuses a release payload that lost one, since `help.md` is neither json nor
@@ -3427,7 +3447,7 @@ whole exercise and is worth writing down rather than summarising:
   said plugin everywhere, after our own effects went on chains beside them
 - **Nine topics were missing altogether**, and the pages with the most explaining to do had the
   least: the pads, RECORD, the pattern, songs and packing, automation, the registry, the
-  templates page, and the output device. `Help/Topics/` is twenty one files now, and every one is
+  templates page, and the output device. `Help/Topics/` is twenty four files now, and every one is
   reachable from the page it explains: `Tests/HelpTopicTests.cs` reads every `HelpBadge` in every
   layout and says the topic it names exists, which is the only thing that would ever catch a
   badge pointing at a renamed topic, since XAML cannot reach a const
@@ -3640,7 +3660,7 @@ whole exercise and is worth writing down rather than summarising:
   edits and must hand it over, or the panel and the values would be looking at two copies of one
   patch, and anything only reading wants a throwaway. Which three controls is `PanelOrder`, so
   they are the first three your eye lands on when you open the machine
-- `ViewModels/ControlReading.cs` is one control and its reading, and one row template draws it for
+- `ViewModels/Records/ControlReading.cs` is one control and its reading, and one row template draws it for
   both kinds of block, because to a track a machine and a plugin are the same thing. A plugin's
   wording goes through `PluginParameterViewModel` and is then thrown away: how a value is worded
   is real work, since a VST3 parameter is nought to one whatever it means and the many that hand
@@ -3810,7 +3830,7 @@ whole exercise and is worth writing down rather than summarising:
   pointing a button at it by hand. Nobody could have worked that rule out from the outside, and
   it was reported in exactly those words: that is not how the transport works for the minilab3
   or the mk2
-- So there is a fourth dialect and it is the file. `ControllerControl.Transport` is the legend
+- So there is a fifth dialect and it is the file. `ControllerControl.Transport` is the legend
   printed on the button, `IControllerProfiles.TransportOn` the question, and
   `MidiTransportRouter` asks it only after its three protocols have all declined, so a device
   speaking one of them is untouched. It adds no capability the hardware lacks: the device really
@@ -3879,7 +3899,7 @@ whole exercise and is worth writing down rather than summarising:
   since a pad sends a note and `ControllerControl` is about controllers. Sixteen on channel 10,
   gated: User 1 runs 36 to 51 straight up and User 2 to 10 have the rows the other way about,
   48 to 51 along the top and 36 to 39 along the bottom. It is in the file's note instead
-- The transport is read in three dialects now, and a device speaks whichever its program or its
+- The transport is read in four dialects now, and a device speaks whichever its program or its
   menu chose. Mackie Control notes and the plain controllers a MiniLab sends were already there.
   Added: the realtime bytes 0xFA start, 0xFB continue and 0xFC stop, which are in the
   specification and understood by every sequencer ever built; and MIDI Machine Control,
@@ -3977,7 +3997,7 @@ whole exercise and is worth writing down rather than summarising:
   a script may reach rather than using a preset, so there is no io, no os and no loading more
   code, and a script that throws or takes more than 20ms is switched off rather than called
   again. It is Lua 5.2, which means `bit32.rshift` and not `>>`. The first thing built on it is
-  `Scripting/ControllerCodecs.cs`: one `.lua` per controller, matched on the port name, sitting
+  `Controllers/ControllerCodecs.cs`: one `.lua` per controller, matched on the port name, sitting
   between the wire and the routing. A codec can only say that these bytes mean those bytes, so
   it cannot add a feature or remove one, and a device with no codec is passed through untouched.
   Codecs live in `controllers/` beside the program and are copied to the app folder on first
@@ -4031,8 +4051,9 @@ whole exercise and is worth writing down rather than summarising:
 - Two places things are stored, on purpose: instruments (the shelf of sounds you own, where a
   new one starts) and songs (patterns plus their own copies of the instruments they use). There
   was a third, a preset bank, and it went when the library stopped reaching into songs: a sound
-  you start from and a sound you own turned out to be the same object. A fresh library seeds
-  itself with six starters, and from then on they are ordinary instruments
+  you start from and a sound you own turned out to be the same object. A fresh rack gets what is
+  registered, which on a fresh installation is the five soundmachines that ship, and from then on
+  they are ordinary entries with your own settings on them
 - A note played by hand on the tracker's keyboard is that track playing. It goes on the track
   the cursor is in, through its inserts, and moves that track's meter and the master's, which is
   the whole point of auditioning: it tells you what the part will sound like. Through its fader,
@@ -4100,7 +4121,7 @@ whole exercise and is worth writing down rather than summarising:
   through
 - There are two threads for one moment. The sound card's own thread renders in step, or a thread
   of its own renders ahead into a queue, never both, except while one is being swapped for the
-  other: `SynthOutput.StopMixingAhead` waits two tenths of a second for the ahead thread and
+  other: `TrackerOutput.StopMixingAhead` waits two tenths of a second for the ahead thread and
   then carries on regardless, which is right, since a plugin holding it up must not hang the
   application, and it leaves that thread still inside the mixer while the sound card's thread
   starts. Changing the output device or the render-ahead setting is exactly that moment, which
@@ -4135,7 +4156,7 @@ whole exercise and is worth writing down rather than summarising:
   and cannot tell the host what its own window did. `TrackMixer` therefore does not rest while
   any track has an insert, and does not skip a silent track that has one
 - Changing the output device calls `Bass.Free()`, which takes the tracker's stream with it.
-  `SynthOutput.EnsureStarted` checks the stream is really still running rather than trusting its
+  `TrackerOutput.EnsureStarted` checks the stream is really still running rather than trusting its
   handle, and `TrackerViewModel.ReopenAudio` is called after a device change
 - A knob turned in a plugin's own window reaches the host differently per standard: VST3 reports
   it at once through `IComponentHandler::performEdit`, CLAP only hands it back at the end of a
@@ -4530,6 +4551,155 @@ whole exercise and is worth writing down rather than summarising:
   somebody says so. Said on the status line and in the log, since a switch that turns itself off
   with nothing saying why reads as one that does not stay put, and it does nothing whatever where
   nothing was aside, which is every ordinary run
+- **That paragraph described a switch that is gone, and the whole of the IN strip is one module
+  now.** Only here was its own tick beside Hear it, and between the two of them the recorder's two
+  facts were read in four places in the page, each asking a slightly different question. What came
+  out of that is a browser chosen as the input that went on playing out of the speakers, and a
+  tick that wrote a level and nothing else: with it on you heard the same audio twice a buffer
+  apart, and with it off you heard the browser exactly as before. Reported, over and over, as Hear
+  it not working
+- **`IInputPath` is the two facts and the one arrangement they come to.** What source the input is
+  pointed at and whether it is released into the mix, told together rather than one at a time,
+  because a source set without the tick and a tick set without the source are two half-answers
+  that can disagree. `RecordViewModel.Agree` is the one place the page hands them over and puts
+  the sentence that comes back on the status line; it was `Aside` and it was the act itself, which
+  is what leaves it two lines
+- **Choosing a source is what takes it off its own output, and Hear it is what brings it back
+  through the desk.** Pointing the input at a browser and hearing that browser out of the speakers
+  anyway is the input being copied rather than taken, which is what every recorder does and is not
+  what the IN strip means: the source is the desk's from that moment and the desk is the only way
+  back to a speaker. So the silence arrives with the choice. It was the other way round on the
+  reasoning that unplugging somebody's program is a thing to ask for rather than a thing to do,
+  which is true of any program on the machine and false of the one somebody has just pointed the
+  recorder at. Only here went with it: choosing always takes a source aside, so that tick was
+  permanently on and doing nothing, and a tick that does nothing is worse than none
+- **What the act is differs per machine and not one word of it is above the module.** Links moved
+  on a graph, a program pointed at another output where there is none: `PipeWireRouting` and
+  `WindowsRouting` behind `IAudioRouting.TakeAside`, which is the only place the two systems part
+  company. On Windows `WindowsProgramOutput` throws `MarshalDirectiveException` on .NET 10 and has
+  never worked, so the rule is real on Linux and answers `Refused` there until that is fixed
+- **The same question is answered once, and that cost a hardware device.** The graph is read on a
+  clock and every reading ends by saying what the input is pointed at, which is almost always what
+  it was pointed at a second ago. Acted on, that gives the source back and takes it off again on
+  every reading: the log showed `put 4 link(s) back` and `took Firefox off 4 link(s)` once a
+  second for as long as the page was up, which is the source out of the desk and back for a
+  fraction of a second each time, and a pair of tool runs against somebody's graph at that rate.
+  The interface being rewired that often is what answered `Bass.Init failed: Busy` when it was
+  picked as the output. `Set` remembers the question and `Hold` keeps the arrangement, which is
+  what `HoldAside` was written for in the first place: a second, blunter mechanism beside it doing
+  the same job worse is the fault this file keeps naming
+- **Hear it is not part of that question**, deliberately. Where a source plays is settled by
+  choosing it, so counted in, every press of the tick let the source out of the desk and back
+- **And holding is not the same question as taking.** A source that could not be heard was never
+  moved, and the route's own hold takes one aside outright where it is holding nothing: asked
+  about a source this had deliberately left alone, it would unplug it on the next reading. The
+  module remembers what it really moved
+- **Hear it was dead after any output change, and it was two faults wearing one symptom.**
+  Opening another output frees everything the old device had, and two of those things are held
+  elsewhere: the tracker's stream, which was already asked for again, and the path the input is
+  heard through, which was not. `IRecordingService.ReopenMonitor` is that, said where the tracker
+  is already asked. The second is the level: the bus a new output brings is opened silent on
+  purpose, so the one `Heard` last wrote went with the old bus, and nothing wrote it again.
+  `MonitorFeed.Attach` writes it where the stream is put back, which is exactly the moment the bus
+  is known to be a new one. Turning the tick off and on did not help, since that writes a level
+  rather than making a stream, and from a chair the whole thing reads as a switch that stopped
+  working
+- **An output's number is a place in a list and the list moves.** The sound library enumerates
+  what the machine has when it is asked, so an interface plugged in or taken away shifts every row
+  after it. Read out of one evening's log: at 19:47 the twelfth row was `PipeWire Sound Server`
+  and the thirteenth was `PulseAudio Sound Server`, and an hour later the twelfth row was
+  PulseAudio. The setting had said twelve all along and nothing anywhere said so, because from
+  inside, opening device twelve is exactly what it was told to do. `IOutputChoice` asks the name
+  first and the number second, which is the rule `PluginSlotConfig` already keeps about a plugin
+  and for the same reason: what travels between one run and the next is what a thing is called.
+  The number is still stored and still tried, since every settings file written before this has
+  one
+- **A device is opened before it is offered.** The library's list says what the machine has, which
+  is not what is free: where a sound server is playing through a card it holds that card and
+  nothing else may open it, so the row is there, reads as a choice, and refuses the moment it is
+  picked. What that looked like was `Bass.Init failed: Busy` drawn as a stack trace across the
+  settings page over a choice the page had just offered. `IOutputProbe` opens each one and lets it
+  go, putting the calling thread's device back afterwards since the library keeps that per thread.
+  The one already held is never probed, and a probe that throws costs one device rather than the
+  page
+- **What is offered is written down as well as what is refused**, and that half was missing for a
+  while. A list that only says what it turned away cannot be read against what somebody is looking
+  at, and on a machine with a sound server the interesting rows are the ones nobody expects: the
+  server's own, the card it is playing through, and the system's default, all named plausibly and
+  behaving completely differently
+- **The list is not shortened to one, and it was for an hour.** Every entry is a real thing
+  somebody might mean, and a machine is entitled to its card, its plugins and its default. What
+  the choice decides is which path the mix takes out, not whether a row exists
+- **`ISoundServerOutput` answers which row means the sound server**, by its own description and
+  matched whole: `PulseAudio Sound Server` sits in the same list and is a compatibility layer over
+  the same server, one hop further from the graph. The system's default counts as well, and the
+  operating system is what says so rather than this working it out: where the server is running it
+  owns what everything else on the machine calls the default output, so the two rows are two ways
+  of reaching one thing
+- **`IPipeWireOutput` is this application as a node on the server's own graph, and it is the ASIO
+  arrangement said again with a different puller.** A driver owns the card and pulls, so the
+  library is opened on its own silent device and the mix is made a decoding stream for it to take;
+  the server is that same shape. `PipeWireOutput` is written to match `AsioDevices` line for line,
+  because a second way of delivering the mix is a second thing to keep in step. Through
+  `PipeWireSharp`, which is managed and wraps the server's own library, so nothing native is
+  shipped for it
+- Every call into that wrapper is behind a method the compiler will not inline and marked for the
+  one platform it belongs to. **A type's assembly is loaded the first time a method mentioning it
+  is prepared**, so a check and a use in one method loads the library on the way to deciding
+  whether to load it: on Windows, where the answer is always no, that would be a library reached
+  for on every start for nothing. The analyser said so in seven warnings until the platform was
+  declared
+- **What filled the buffer answers silence to everything that goes wrong**, since it runs on the
+  server's own thread and what it fills goes straight out of somebody's speakers: a block nobody
+  could fill is a moment of nothing, where anything thrown is this application taking part of the
+  machine's audio down with it. Not asked to run under the server's real time flag either, because
+  what fills it is the mixer, which is where the plugins are, and late on that thread is somebody
+  else's whole graph stuttering rather than this application's own audio
+- **The picture this application draws of itself was nothing like the machine's own, and that is
+  what took an evening.** Opened through the server's compatibility layer we appear as two
+  unrelated ALSA clients that happen to share a name, a capture and a playback with nothing in the
+  graph joining them, each wearing whatever shape the card's profile has. On an interface set to
+  surround that is four ports going out with two of them silent and six coming in. **Reading our
+  own patchbay instead of the machine's is what kept the fault hidden**, and the whole of the
+  answer was in `pw-link -l` and Helvum the first time either was looked at
+- **The library opens a device as wide as the card claims speakers**, so it can place a sound on
+  one of them, and nothing here ever does: every bus and the whole mix is stereo. The width is
+  ours to choose and the card's profile is not a constraint on it, which was measured rather than
+  assumed: `aplay -D default --dump-hw-params` answers `CHANNELS: [1 64]`. `BASS_DEVICE_STEREO`
+  does not touch it, which a run proved by opening the server's own entry with the flag on and
+  still coming out four ports wide
+- **The server's own lever is the plain one and it is an environment variable.** Its ALSA layer
+  reads `PIPEWIRE_ALSA` and applies `alsa.channels` to the hardware parameters the device reports,
+  so told two, the device offers two and the library has nothing else to choose. Measured on the
+  machine rather than read and hoped for: `aplay -D pipewire --dump-hw-params` answers
+  `CHANNELS: [1 64]` on its own and `CHANNELS: 2` with it set. `SoundServerWidth` says it at
+  startup, before anything opens, and leaves alone a machine that has already been told something
+- **And the first time it was said it landed nowhere, for a reason nothing anywhere mentions.**
+  The runtime keeps its own table of the environment on this platform and writes into that; what a
+  library loaded into this process reads is the real one, which is untouched. So the variable was
+  set, could be read back by the runtime, and simply was not there as far as the sound layer was
+  concerned. Measured rather than reasoned about: set through the runtime and read through
+  `getenv`, the answer is nothing at all. It is a real `setenv` now
+- **Our capture was being fed by the machine's own microphone under whatever was chosen.**
+  `CapturePorts` filtered to the stereo pair, so `Connect`'s "take everything off first" pass only
+  ever cleared `input_FL` and `input_FR`; the other four ports of a six-wide node were left for
+  the session manager to fill, and it filled them with the default source. Two cables go on and
+  however many are there come off, which is not the same list: `EveryCapturePort` is the clearing
+  one and the pair is still the linking one
+- **The terminal is held quiet while the devices are being opened.** Every refusal in that pass is
+  expected and the libraries underneath announce each one on a stream nothing here owns, so
+  starting from a terminal was met by half a dozen lines of alarm about a mixing plugin, a server
+  that is not running and a device file that does not exist, every one of them working exactly as
+  intended. `ITerminalHush` points the stream at nothing for the length of the pass and puts it
+  back however the pass ends. The whole stream rather than a filter on the words, since the words
+  belong to three libraries and are not ours to keep up with, and narrow on purpose: what this
+  application has to say about the same pass is in its own log, which is not the terminal
+- **Two of this session's hours went on things that were not the fault at all, and both are worth
+  keeping.** A `pgrep` for the application matched the shell command doing the grepping, so the
+  app was reported as running when it was not and every conclusion drawn from the graph in that
+  state was worthless. And the application's own patchbay was read as evidence about the machine's
+  wiring, which it is not: it is this program's picture of what it believes, and the entire point
+  of the evening was that the two had come apart
 - **The way that went stale is the one this file keeps warning about.** The note was written when
   it was true, the bus was built afterwards, and nothing made the two meet: a paragraph describing
   work still to do outlives the work. It cost a reading of this codebase that recommended building
@@ -4554,8 +4724,8 @@ whole exercise and is worth writing down rather than summarising:
   so that only the branch under test could catch them
 
 - **Whether the libraries are current is asked once a month by CI, and asked by hash.**
-  `.github/scripts/check-natives.sh` downloads what un4seen ships, pulls out the eight files this
-  program carries, and compares them; `.github/workflows/natives.yml` runs it on the first of the
+  `.github/scripts/check-natives.sh` downloads what un4seen ships, pulls out the eleven files
+  this program carries, and compares them; `.github/workflows/natives.yml` runs it on the first of the
   month and by hand. Not on a push, since the answer cannot change because of anything in a
   commit, and monthly because these see a release once or twice a year each and `basswasapi` has
   gone three years without one

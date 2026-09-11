@@ -7,8 +7,8 @@ every instrument it uses, plus each plugin's own patch as that plugin handed it 
 
 The patches are kept beside the document rather than in it because they are almost
 all of it, and because a document is all or nothing: one song here is 348 KB of which
-the music is 781 bytes and one synth's patch is 331 KB, and a patch that came back
-damaged used to cost the whole song.
+the music is 781 bytes and one synth's patch is 331 KB, so a patch that comes back
+damaged costs that patch and never the song.
 
 ## Saving
 

@@ -10,9 +10,10 @@ namespace JingleBox2.Audio;
 /// <inheritdoc/>
 /// <remarks>
 /// Through WASAPI, which offers a loopback capture per output device. That is a Windows idea, so
-/// this needs basswasapi beside the program and reports itself unsupported without it or off
-/// Windows, and the recorder then keeps to capture devices. Linux answers the same question from
-/// the other side, with a monitor source that appears among the capture devices already.
+/// <see cref="IsSupported"/> asks the platform and nothing else; basswasapi being beside the
+/// program is found out by asking for the devices, which answers an empty list where the library
+/// is missing. Either way the recorder keeps to capture devices. Linux answers the same question
+/// from the other side, with a monitor source that appears among the capture devices already.
 /// </remarks>
 public sealed class WasapiLoopback : ILoopbackCapture
 {
@@ -41,7 +42,11 @@ public sealed class WasapiLoopback : ILoopbackCapture
     /// <summary>The block as WASAPI wrote it, kept so a capture does not allocate per block.</summary>
     private float[] _floats = Array.Empty<float>();
 
-    /// <summary>The same block turned into sixteen bit samples, kept for the same reason.</summary>
+    /// <summary>The same block turned into sixteen bit samples, kept so the conversion allocates nothing.</summary>
+    /// <remarks>
+    /// What goes out to the caller is a copy of the used part of this, since this one is written
+    /// over by the next block and everything above keeps what it is given.
+    /// </remarks>
     private byte[] _pcm = Array.Empty<byte>();
 
     /// <summary>Which output is being listened to, or -1 for none.</summary>

@@ -167,7 +167,8 @@ public class WaveformView : ThemedControl
     /// somebody chose to be, and losing it every time the page is rebuilt is the same nuisance
     /// as losing a scroll position.
     ///
-    /// Held between one and ten by <see cref="WaveformViewport"/>, which owns the arithmetic;
+    /// Held between one and four hundred by <see cref="WaveformViewport"/>, which owns the
+    /// arithmetic;
     /// what is written here is clamped rather than refused, since a caller doubling the zoom at
     /// the far end means "as far as it goes".
     ///
@@ -342,13 +343,12 @@ public class WaveformView : ThemedControl
     private bool Slicing => SlicePoints is { Count: >= 2 };
 
     /// <summary>
-    /// A point moved, arrived or went. The list is the property, so a change to it is a change
-    /// to the picture and has to be repainted like any other.
+    /// A property moved: the peaks, the zoom, the scroll, or a new list of slice points arriving.
     /// </summary>
     /// <remarks>
-    /// A new set of peaks also puts the view back to showing the whole file. A different
-    /// recording is a different picture, and being dropped into it eight times magnified at
-    /// somebody else's scroll position tells you nothing about it.
+    /// A new set of peaks puts the view back to showing the whole file. A different recording is
+    /// a different picture, and being dropped into it eight times magnified at somebody else's
+    /// scroll position tells you nothing about it.
     ///
     /// Only one list is watched at a time, and the old one is let go of first: a control handed
     /// two lists in a row would otherwise go on repainting for the first one for as long as
@@ -661,9 +661,10 @@ public class WaveformView : ThemedControl
     /// edge. Pinned, it looks like something to take hold of, and taking hold of it would point
     /// at the wrong sample.
     ///
-    /// The grip is at the foot for a loop and at the head for a boundary, because on a looping
-    /// piece the two lines can lie on the same pixel and something has to say which of them a
-    /// click meant.
+    /// Where the grip sits is the caller's, through <c>atFoot</c>, and it is at the foot only on
+    /// a sliced picture: there a loop handle and a slice boundary can lie on the same pixel and
+    /// something has to say which of them a click meant. On an unsliced picture there is no such
+    /// pair, so every handle keeps its grip at the head.
     /// </remarks>
     private static void DrawHandle(
         DrawingContext context, Color colour, double x, Rect area, bool dashed, bool atFoot = false)

@@ -25,8 +25,8 @@
           <!-- Said rather than chosen. The source is picked at the foot of the IN strip on the
                mixer, because that is the strip it is about, and one choice offered in two
                pickers is two ways of doing one thing that would eventually answer differently.
-               Only on a system with a graph to patch; elsewhere the input is whatever the device
-               picker in SETTINGS chose. -->
+               Only where there is a routing behind the picker at all; without one the input is
+               whatever the device picker in SETTINGS chose. -->
           <StackPanel Spacing="4" IsVisible="{Binding IsRoutingAvailable}">
             <TextBlock Text="Capture from" Opacity="0.8" />
             <TextBlock Text="{Binding CaptureFrom}"

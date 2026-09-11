@@ -132,7 +132,8 @@ public sealed class TrackerSequencer : ITrackerSequencer
     /// <remarks>
     /// By the order entry rather than by the pattern, since the same pattern can be in a song
     /// twice and what follows it is a different answer each time. An order entry pointing at no
-    /// pattern ends the pass rather than being skipped, which is what an empty song does.
+    /// pattern is not skipped: it goes back to the top while looping and ends the pass otherwise,
+    /// which is what an empty song does.
     ///
     /// A loop range over the order is answered before the end of the order is, and it loops
     /// whatever the <paramref name="loop"/> flag says. Marking a range is somebody saying "go

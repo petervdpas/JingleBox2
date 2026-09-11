@@ -72,18 +72,18 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
     /// <summary>How hard the wave is pushed into the saturation at the end of it.</summary>
     private const string DriveKey = "drive";
 
+    /// <summary>What a new note does to the one the track is still sounding.</summary>
+    /// <remarks>
+    /// The instrument's rather than the patch's, like the level below it: it is not part of
+    /// the sound this machine makes, it is what the tracker does with the note before.
+    /// </remarks>
+    private const string NewNoteKey = "new_note";
+
     /// <summary>How loud the instrument plays, in decibels.</summary>
     /// <remarks>
     /// The instrument's, not the patch's: it sits on top of whatever the wave comes out at, and
     /// it is the same setting on every machine here, which is why they all read it the same way.
     /// </remarks>
-    /// <summary>What a new note does to the one the track is still sounding.</summary>
-    /// <remarks>
-    /// The instrument's rather than the patch's, like the level above it: it is not part of
-    /// the sound this machine makes, it is what the tracker does with the note before.
-    /// </remarks>
-    private const string NewNoteKey = "new_note";
-
     private const string LevelKey = "level";
 
     /// <summary>The filter: where it opens to.</summary>

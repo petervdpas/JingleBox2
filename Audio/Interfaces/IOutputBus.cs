@@ -6,24 +6,21 @@ namespace JingleBox2.Audio.Interfaces;
 /// Everything this application plays, summed into one stream.
 /// </summary>
 /// <remarks>
-/// There are three things that make sound here and they used to reach the card separately: the
-/// tracker's mix, the pads, and the take being auditioned on RECORD. The library summed them at
-/// the device, which works for as long as there is a device to sum them at.
+/// Four things make sound here: the tracker's mix, the pads, the take being auditioned on
+/// RECORD, and the recording input while somebody is listening to it. The summing is done here
+/// rather than at the device, because not every output is a device that can sum. An ASIO driver
+/// owns the card and is handed exactly one stream, and a sound server pulling the output is the
+/// same shape; either way the library is opened on its own silent device and whatever is being
+/// pulled is the only thing anybody hears.
 ///
-/// An ASIO driver is not one. The driver owns the card, so BASS is opened on its own silent
-/// device and whatever the driver is pulling is the only thing anybody hears: the tracker, since
-/// that is the one source that was ever handed over. Picking a driver silenced the pads and the
-/// take preview, and said nothing, because from BASS's side every call still succeeded.
-///
-/// So the summing moves up here, where this application can see it. What is played, or handed to
-/// a driver, is this one stream, and the three sources are decoding channels plugged into it.
-/// That is the same arrangement whichever kind of output is picked, which is the point: there is
-/// no second path left for a source to be missing from.
+/// So what is played, or handed to a driver or a server, is this one stream, and the four sources
+/// are decoding channels plugged into it. That is the same arrangement whichever kind of output
+/// is picked, which is the point: there is no second path for a source to be missing from.
 ///
 /// **It is not the song's master.** The tracks, the busses, the master strip and its effect chain
 /// are <c>TrackMixer</c>'s and stay there. A pad is not on a track and never has been, so running
 /// one through a song's master chain would change what a song sounds like when somebody hits
-/// FIRE. This sums three things that were already finished, and has no settings of its own.
+/// FIRE. This sums what is already finished, and has no settings of its own.
 ///
 /// Two rules come from the add-on and are worth knowing before writing against this. A source has
 /// to be a decoding channel, since the bus pulls it rather than being pushed to, and a channel
@@ -90,9 +87,10 @@ public interface IOutputBus : IDisposable
     /// and on every platform.** A bus here is driven in one of three ways: it plays itself, it is
     /// a source on another bus, or a driver pulls it. Every call BASS has for a level is right
     /// for one of those and wrong for the other two, and the third is what made this worth
-    /// writing down: a bus a driver pulls is plugged into no mixer and is not playing itself
+    /// writing down: a bus something pulls is plugged into no mixer and is not playing itself
     /// either, so both calls decline and the meter reads nought while the audio is perfectly
-    /// audible. That is an ASIO driver holding the output, which exists on Windows alone.
+    /// audible. That is an ASIO driver holding the output on Windows, and the sound server
+    /// holding it on Linux, which are one case here.
     ///
     /// What it reads is what is on the bus before the bus's own fader and mute, which is what
     /// every call it replaces read as well.

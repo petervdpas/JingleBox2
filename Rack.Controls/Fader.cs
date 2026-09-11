@@ -205,8 +205,10 @@ public class Fader : ThemedControl
     /// is the whole of it, and the meter beside it is squeezed out of existence, clip lamp and
     /// all. That was tried and it is what happened.
     ///
-    /// The reading is left out of the measuring as well as the drawing, or the fader would go on
-    /// reserving room for a number it no longer shows.
+    /// The width is measured against the longest reading only while the reading is shown, so a
+    /// fader without one is no wider than its cap and its name. The height keeps the reading's
+    /// line either way, which is what stops a row of faders sitting at two different heights
+    /// because one of them has the number switched off.
     /// </remarks>
     public static readonly StyledProperty<bool> ShowValueProperty =
         AvaloniaProperty.Register<Fader, bool>(nameof(ShowValue), true);

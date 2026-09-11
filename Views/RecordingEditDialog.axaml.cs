@@ -239,17 +239,6 @@ public partial class RecordingEditDialog : Window
     }
 
     /// <summary>
-    /// Cuts the file down to what is selected, and rewrites it.
-    /// </summary>
-    /// <remarks>
-    /// Afterwards every stored position points at audio that no longer exists, so the trim, the
-    /// play cursor, the playhead and the zoom are all put back to the whole file: what survived
-    /// the cut is the whole file from here on.
-    ///
-    /// Both destructive buttons are switched off while it runs, and the preview is stopped
-    /// first, since a file that is open is one that will not be rewritten on Windows.
-    /// </remarks>
-    /// <summary>
     /// Empties the region, leaving the take its length.
     /// </summary>
     /// <remarks>
@@ -278,6 +267,17 @@ public partial class RecordingEditDialog : Window
         }
     }
 
+    /// <summary>
+    /// Cuts the file down to what is selected, and rewrites it.
+    /// </summary>
+    /// <remarks>
+    /// Afterwards every stored position points at audio that no longer exists, so the trim, the
+    /// play cursor, the playhead and the zoom are all put back to the whole file: what survived
+    /// the cut is the whole file from here on.
+    ///
+    /// Both destructive buttons are switched off while it runs, and the preview is stopped
+    /// first, since a file that is open is one that will not be rewritten on Windows.
+    /// </remarks>
     private async void ApplyTrim_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (_vm == null || _applying) return;

@@ -13,7 +13,7 @@ namespace JingleBox2.Tests;
 /// to somebody's afternoon, and the awkward cases can be built on purpose rather than waited for.
 ///
 /// The one that earns it is <see cref="A_steady_tone_is_not_a_ring"/>. Everything that makes
-/// feedback recognisable — narrow, tonal, persistent, no harmonics — is equally true of a sine
+/// feedback recognisable, narrow, tonal, persistent and without harmonics, is equally true of a sine
 /// played into a microphone deliberately, and the only thing that separates them is that one of
 /// them climbs. A version without that test passes every other test in this file and mutes
 /// somebody's monitoring the first time they check a tone.
@@ -277,7 +277,7 @@ public class FeedbackWatchTests
     /// <c>ringing at bin 3, 67 over the mean, 33 over the bins beside it, 58 over the next peak,
     /// crest 1.66, grown 1.50</c>. Bin 3 of a 48 kHz stream is 281 Hz, which was the lowest bin
     /// the candidate was allowed, and the bins beside a candidate are skipped when the next peak
-    /// is looked for — so the whole of the bass this signal is made of was hidden from the test
+    /// is looked for, so the whole of the bass this signal is made of was hidden from the test
     /// that was supposed to see it.
     ///
     /// At 48 kHz deliberately, since the fault only appears where the floor and the bin width put

@@ -12,9 +12,11 @@ what is in force.
 
 ## Making one
 
-Rest the pointer on the control you want driven, hold `Ctrl+Shift+M`, and touch the
-knob or button on the desk. It works on a machine's face, on an effect's, on a mixer
-strip, on the transport, and on a pad on FIRE.
+Press `Ctrl+Shift+M`, rest the pointer on the control you want driven, and touch the
+knob or button on the desk. `Ctrl+Shift+M` turns the mode over rather than being held
+down, so press it again when you are done: left on, the next thing you touch on the
+desk is learned rather than played. It works on a machine's face, on an effect's, on a
+mixer strip, on the transport, and on a pad on FIRE.
 
 A link names the machine and the control, never the track or the song, so one knob is
 OddSkilla's filter on every track and in every song. A mixer link names the strip,

@@ -12,9 +12,11 @@ namespace JingleBox2.Tracker.Synth.Interfaces;
 /// Room is made in one note column for each new note before it starts, and what that means is
 /// the instrument's to say: cut, which is what a tracker has always done and is still the
 /// default, release, or nothing at all. A track is as many voices as it has note columns, and
-/// each of them is made room for on its own. Auditions sit outside it, carry no track and simply pile up,
-/// which is why a panel's keyboard cannot be heard on a strip or turned down by one. A kit
-/// answers the same question with its choke groups, since a crash has to go on ringing under
+/// each of them is made room for on its own. An audition sits outside that and piles up, and it
+/// carries a track where it was played on one: the tracker's keyboard sounds on the track the
+/// cursor is in, through its fader and its meter, and only a panel on the rack names no track and
+/// so cannot be heard on a strip or turned down by one. A kit answers the same question with its
+/// choke groups, since a crash has to go on ringing under
 /// the snare that follows it, so it is the one thing here that makes no room at all.
 ///
 /// It was called SynthMixer, which was true when it summed synth voices and nothing else. It
@@ -42,9 +44,9 @@ namespace JingleBox2.Tracker.Synth.Interfaces;
 /// <see cref="Render"/> is entered by the sound card's own thread, or by the thread that mixes
 /// ahead into a queue, and **one at a time whoever asks**: a second caller is handed a cleared
 /// buffer and returns at once rather than waiting. That is not defensiveness. The block size is
-/// not a value the two callers share, it is the size of the arrays the mixing works in, all of
-/// which are built again whenever the frame count changes; two threads rendering at once with
-/// different counts is one of them shortening the arrays the other is halfway through, and it
+/// not a value the two callers share, it is the size of the arrays the mixing works in, and those
+/// are grown whenever a block arrives longer than any before it; two threads rendering at once
+/// with different counts is one of them replacing the arrays the other is halfway through, and it
 /// has taken the application down on the audio thread after an afternoon's work. Refused rather
 /// than waited on, because one quiet block is a click and a blocked callback is every stream on
 /// the device stuttering.
@@ -113,8 +115,8 @@ public interface ITrackMixer
     /// The loudest thing that came off a track's bus in the last block, 0 to 1.
     /// </summary>
     /// <remarks>
-    /// Measured after the insert, so it is what the track actually put into the mix. It is not
-    /// what the track's meter shows: see <see cref="LevelFor"/> for that.
+    /// Measured after the insert, so it is what the track actually put into the mix. The same
+    /// reading <see cref="LevelFor"/> answers, without the master's own gain over it.
     /// </remarks>
     float GetTrackLevel(int track);
 
@@ -487,7 +489,9 @@ public interface ITrackMixer
     /// A second caller gets a cleared buffer and returns, which is silence for that block and
     /// never a wait.
     ///
-    /// In order: every sounding track onto its own bus, each bus through its insert, each bus
+    /// A pipeline per track rather than phases across all of them: each track in turn has its
+    /// instrument begun, its voices played onto its own bus and that bus put through its insert,
+    /// so one track's insert can run while another track's plugin is still out. Then each bus
     /// into the mix through its side chain, the loose bus of auditions on top, and then the
     /// master. Nothing here allocates, takes a lock for longer than a few list operations, or
     /// waits on another process.
@@ -537,13 +541,18 @@ public interface ITrackMixer
     (float Left, float Right) MasterLevel { get; }
 
     /// <summary>
-    /// How loud a track is sounding, for a meter. Taken from the voices rather than from the
-    /// mixed buffer: the voices are already summed together by the time that exists.
+    /// How loud a track is sounding, for a meter, read off the peak of that track's own bus.
     /// </summary>
     /// <remarks>
-    /// Falls on its own once the voices stop, which is why it needs none of the ageing
-    /// <see cref="MasterLevel"/> does. A track played by a plugin has no voices to ask, so its
-    /// bus peak stands in.
+    /// The bus is what the track really sent, so it counts the track's instrument whether that is
+    /// voices or a plugin, and it counts the track's insert chain. Measured where the render
+    /// already walks the buffer, so asking costs a read of a float and never the mixer's lock.
+    ///
+    /// The two sides read the same, since the measurement is of the bus rather than of a voice's
+    /// pan: a meter here is a loudness rather than a picture of the stereo field.
+    ///
+    /// It is a peak off the last block, so it says nothing once no block is being asked for.
+    /// Whatever is polling it is what stops, which is <c>Sounding</c>.
     /// </remarks>
     (float Left, float Right) LevelFor(int track);
 }

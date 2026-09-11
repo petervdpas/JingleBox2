@@ -48,9 +48,9 @@ namespace JingleBox2.Audio;
 /// does nothing is worse than one that fails, and guessing at it on somebody&apos;s machine is
 /// calling an unknown function on an undocumented object.
 ///
-/// Until then there is a route that needs none of this and works today, and it is in the help on
-/// the RECORD page: a virtual audio cable as the output the source is sent to, with Windows&apos;
-/// own Volume mixer doing the moving.
+/// Until then there is a route that needs none of this and works today, and it is in the help
+/// under SETTINGS, Recording input: a spare output or a virtual audio cable as where the source
+/// is sent, with Windows&apos; own Volume mixer doing the moving.
 /// </remarks>
 [SupportedOSPlatform("windows")]
 public sealed class WindowsProgramOutput : IProgramOutput

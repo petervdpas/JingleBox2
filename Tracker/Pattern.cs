@@ -119,7 +119,11 @@ public sealed class Pattern
     /// </remarks>
     private readonly List<AutomationLane> _lanes = new();
 
-    /// <summary>The lanes, to be read. <see cref="Lane"/> is the only way one is added.</summary>
+    /// <summary>
+    /// The lanes, to be read. <see cref="Lane"/> is how one is added by hand, and it is the one
+    /// that refuses a second lane on a parameter; <see cref="Restore"/> and <see cref="Clone"/>
+    /// put whole sets in, from a file or from a pattern that already kept the rule.
+    /// </summary>
     public IReadOnlyList<AutomationLane> Lanes => _lanes;
 
     /// <summary>What the order list calls it, which is two digits unless somebody renames it.</summary>

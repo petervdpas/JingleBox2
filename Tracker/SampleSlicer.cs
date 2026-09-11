@@ -10,7 +10,8 @@ public sealed class SampleSlicer : ISampleSlicer
 {
     /// <summary>
     /// The most pieces this will ever cut a recording into. Whoever takes the pieces holds
-    /// fewer than this and clamps again: a kit has sixteen pads, a map thirty-two zones.
+    /// clamps again to the room it really has: a map has thirty-two zones, and a kit has whatever
+    /// its machine declares.
     /// </summary>
     public const int MaxSlices = 32;
 

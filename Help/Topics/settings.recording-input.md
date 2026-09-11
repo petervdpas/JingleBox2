@@ -18,33 +18,33 @@ and the devices and outputs are.
 A program is offered while it is making a sound, so one that is paused is not there and
 turns up the moment it plays.
 
-## Only here
+## Choosing a source takes it off its own output
 
-Capturing a source leaves it playing wherever it was playing. That is what every program
-that records does and it is right for streaming; on air it is wrong, since what is going
-out must not also be coming out of the desk speakers a moment later.
+Capturing a source leaves it playing wherever it was playing, which is what every program
+that records does. Here it does not. On air that is wrong: what is going out must not also
+be coming out of the desk speakers a moment later. So a source pointed at the input belongs
+to the desk from that moment, and the desk is the only way back to a speaker.
 
-**Only here** is the switch under the source picker, and it is a second act rather than
-something choosing a source implies. Thrown, the source is taken off its own output and
-reaches JingleBox2 alone. It is off unless you ask for it, since it changes another
-program rather than this one, and it is put back when you pick another source or close
-the application.
+That means a browser goes quiet the moment you pick it. **Hear it**, under the picker, is
+what brings it back: thrown, what is coming in goes through the Recording Effects chain and
+out of the master. Off, the input is captured and nobody hears it.
 
-**On Windows it needs somewhere to send the source**, since there is no link to unplug:
-a program can only be pointed at another output. **Send it to** above the switch is where
-that is chosen. Until one is picked the switch stays grey, and resting the pointer on it
-says which of the two reasons it is grey for.
+Picking another source puts the last one back, and so does closing the application.
 
-**And on Windows the switch does not work at all at the moment.** It reaches per-program
-output through an interface of Windows own that this application can no longer call: the
-marshalling it needs was taken out of .NET, and the switch has therefore never worked on
-this platform. The log says so on every start. It is not your machine and it is not a
-setting: the interface is there and answers, and the fault is on this side.
+**On Windows a source needs somewhere to go**, since there is no link to unplug: a program
+can only be pointed at another output. **Send it to**, under Hear it, is where that is
+chosen, and it is only drawn on a machine that needs it.
+
+**And on Windows taking a source aside does not work.** It reaches per-program output
+through an interface of Windows own that this application cannot call: the marshalling it
+needs is not in .NET. The log says so on every start. It is not your machine and it is not
+a setting: the interface is there and answers, and the fault is on this side. The next
+section is how to do the same thing by hand.
 
 ## Doing it by hand on Windows
 
-The same thing, with no switch and nothing to install. It is two steps and it is what
-**Only here** was going to do for you.
+The same thing, with nothing to install. It is two steps, and it is what this application
+does for you on Linux and cannot yet do for you here.
 
 First, find an output nobody is listening to. Most machines already have one and it does
 not need anything plugged into it: a digital output with no cable in it, an HDMI socket

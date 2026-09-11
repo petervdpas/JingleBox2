@@ -33,7 +33,7 @@ public sealed class SynthVoice : IVoice
     /// </remarks>
     private static readonly IPitchMotion Motion = new PitchMotion();
 
-    /// <summary>The drive, applied last on the way out.</summary>
+    /// <summary>The drive, run before the filter or after it as the patch says.</summary>
     /// <remarks>
     /// Shared rather than one per voice: it holds nothing, and a voice is made every time a
     /// key goes down, which is not somewhere to be allocating.
@@ -115,7 +115,10 @@ public sealed class SynthVoice : IVoice
     /// <summary>
     /// Whether the level wobbles at all, which is the tremolo's own two settings asked once.
     /// </summary>
-    /// <remarks><inheritdoc cref="_bends" path="/remarks/para[last()]"/></remarks>
+    /// <remarks>
+    /// Asked of the patch once, because the tremolo cannot be switched on while a note sounds:
+    /// the voice owns its own copy of the patch.
+    /// </remarks>
     private readonly bool _wobbles;
 
     /// <summary>Whether the filter runs before the drive, off the patch.</summary>

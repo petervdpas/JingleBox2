@@ -15,8 +15,9 @@ namespace JingleBox2.Audio;
 /// <remarks>
 /// Through WASAPI's per-process loopback, which is <c>ActivateAudioInterfaceAsync</c> with the
 /// activation params saying which process tree to take. That is Windows 10 build 20348 and
-/// later, so this reports itself unavailable off Windows and on anything older, and the recorder
-/// then keeps to devices and outputs.
+/// later, and <see cref="AudioCapture"/> is what asks the machine: below that build, or off
+/// Windows, it hands back the empty one and the recorder keeps to devices and outputs. Nothing
+/// here asks, which is why <see cref="IsAvailable"/> is simply true.
 ///
 /// **NAudio does the activation and this does everything else.** What it gives back is a stream
 /// of whatever format was asked for, in blocks, on its own thread; what everything above meets

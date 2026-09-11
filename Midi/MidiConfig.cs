@@ -11,9 +11,9 @@ namespace JingleBox2.Midi;
 /// The desk rather than the music. Which controllers there are and what each was given to do,
 /// which button fires which pad, and every knob that has been pointed at something. None of it
 /// belongs to a song: the hardware is in the room and the song is in a file, so opening another
-/// song leaves all of this exactly as it was. The one exception is a link made against an
-/// instrument on a track, which is about that piece of music and is kept in the <c>.jibx</c>;
-/// see <see cref="ControlLink"/> for which of the two a link lands in and why.
+/// song leaves all of this exactly as it was. There is no exception, an instrument on a track
+/// included: every learned link lands here, and a link an older song is still holding is read
+/// and displaced rather than added to. See <see cref="ControlLink"/>.
 /// </remarks>
 public sealed class MidiConfig
 {

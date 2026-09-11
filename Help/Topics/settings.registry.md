@@ -69,5 +69,6 @@ That is the only reason a device is passed over. What it is called and what its 
 so a soundmachine you design under a new id reaches the registry, the rack and your songs like
 any other, as long as it names an engine that is here.
 
-The five that shipped before a device could name its own engine say nothing in that field, and
-are still understood, so every song and setting you already have keeps working.
+The eight ids that shipped before a device could name its own engine are understood without the
+field, so every song and setting you already have keeps working whatever the manifest says. All
+eleven devices that ship name their engine out loud now.

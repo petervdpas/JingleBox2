@@ -102,10 +102,10 @@ public sealed class SoundEffectEngines : ISoundEffectEngines
 
     /// <summary>Which engine each of the three original ids implied.</summary>
     /// <remarks>
-    /// The effects that shipped before an effect could name its own engine. Their manifests say
-    /// nothing, and every chain on anybody's disc names them, so the mapping cannot go. Nothing
-    /// is added to it: an effect that shipped after that names its engine in its own manifest,
-    /// which is the door this table exists to make unnecessary.
+    /// The three that shipped before an effect could name its own engine: every chain on
+    /// anybody's disc writes those ids down, so the mapping cannot go. It is consulted only where
+    /// a manifest is silent, and every shipped manifest names its engine, so on shipped content
+    /// it never fires. Nothing is added to it.
     ///
     /// Compared without regard to case, like every other id here, since a folder name is what it
     /// came from and a capital letter is not a different effect.

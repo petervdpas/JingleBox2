@@ -5,13 +5,14 @@ namespace JingleBox2.ViewModels;
 
 /// <summary>
 /// One strip on the mixer over something that is not a track: the recording input, the take
-/// being auditioned, or the pads.
+/// being auditioned, the pads, or the desk's own master.
 /// </summary>
 /// <remarks>
-/// A track's strip is <see cref="TrackStripViewModel"/> and has a pan, a mute, a solo, ducking
-/// and a place in the song. None of that is true here. What these three have is a level and a
-/// meter, so that is what this is, and the three differ only in what the level writes to, which
-/// is handed in.
+/// A track's strip is <see cref="TrackStripViewModel"/> and has ducking and a place in the song,
+/// neither of which means anything here: ducking is one track pushing another down, and these are
+/// not in the song at all. What each of these is over is a bus, so each has the bus's own pan,
+/// mute and solo beside its level and meter, and they differ only in which bus that is, which is
+/// handed in.
 ///
 /// Handed in rather than subclassed, because there is no behaviour to override: the recording
 /// input's level goes into the recorder's gain and never reaches the output bus at all, while
@@ -38,9 +39,9 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
 
     /// <summary>The bus this strip is over, or nothing where there is none.</summary>
     /// <remarks>
-    /// Only a strip over a bus has a pan and a mute. The recording input has neither: panning
-    /// what is being recorded is not something the recorder does, and a mute there would mean
-    /// quietly recording nothing, which is a way to lose a take rather than a control.
+    /// Only a strip over a bus has a pan, a mute and a solo, since all three are the bus's own.
+    /// Every strip built here is given one; the type allows none so that a strip over a plain
+    /// level can still be built, and it then draws the fader and the meter alone.
     /// </remarks>
     private readonly Audio.Interfaces.IOutputBus? _bus;
 
@@ -52,8 +53,8 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
     /// <param name="read">Where the level stands now.</param>
     /// <param name="write">Where to put it when the fader moves.</param>
     /// <param name="bus">
-    /// The bus underneath, which is what gives the strip a pan and a mute. Nothing for a strip
-    /// that is over something else, which is the recording input.
+    /// The bus underneath, which is what gives the strip a pan, a mute and a solo. Nothing for a
+    /// strip over a plain level, which then has the fader and the meter alone.
     /// </param>
     /// <param name="soloed">Told after the solo moves, so the whole row can be worked out again.</param>
     /// <param name="source">
@@ -102,8 +103,9 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Only where there is a bus underneath. The recording input has none: a mute there would
-    /// mean quietly recording nothing, which is a way to lose a take rather than a control.
+    /// Only where there is a bus underneath, since a mute is the bus's own. It decides what is
+    /// heard and never what is recorded: a take is written from the capture, which nothing on
+    /// this strip reaches.
     /// </remarks>
     public bool CanMute => OnABus;
 

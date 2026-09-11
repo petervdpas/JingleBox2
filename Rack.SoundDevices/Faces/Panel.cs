@@ -100,19 +100,18 @@ public static class ElementKinds
     public const string Grid = "Grid";
 
     /// <summary>
-    /// A framed group with a heading. Properties: caption, gap, equal, width, height.
+    /// A framed group with a heading. Properties: caption, inset, gap, equal, width, height.
     /// </summary>
     /// <remarks>
+    /// <c>caption</c> is the heading and <c>inset</c> the air between the frame and what is in
+    /// it. Where a section sits in a row, and whether it shares the row's height, is the row's
+    /// business. Room left over inside a section is shared above and below its contents, which is
+    /// what a rack looks like and is not worth a knob of its own.
+    ///
     /// A group given a size smaller than what it holds draws over whatever is under it, which is
     /// what the same group does written by hand. It is not clipped: a frame sits exactly on its
     /// own boundary, so clipping a group's contents shaves a pixel off every picture in it, and
     /// clipping the group takes the corners off its own frame.
-    /// </remarks>
-    /// <remarks>
-    /// Properties: caption and inset, the air between the frame and what is in it. Where a
-    /// section sits in a row, and whether it shares the row's height, is the row's business.
-    /// Room left over inside a section is shared above and below its contents, which is what a
-    /// rack looks like and is not worth a knob of its own.
     /// </remarks>
     public const string Group = "Group";
 
@@ -400,13 +399,12 @@ public static class ElementKinds
     public const string PadPicker = "PadPicker";
 
     /// <summary>
-    /// The pads of a kit: a grid of buttons. Properties: rows, columns, cap, capHeight, gap,
-    /// colour.
+    /// The pads of a kit: a grid of buttons. Properties: columns, cap, capHeight, gap, colour.
     /// </summary>
     /// <remarks>
-    /// Rows and columns say what shape it is, because that is what a grid is and it cannot be
-    /// worked out from the buttons: sixteen of them is four by four, two by eight or sixteen by
-    /// one. It holds one <see cref="Pad"/> for each button, so how many pads a sound device has,
+    /// <c>columns</c> is the whole of the shape: the rows follow from how many pads there are,
+    /// so sixteen pads in four columns is four rows and in eight columns is two. It holds one
+    /// <see cref="Pad"/> for each button, so how many pads a sound device has,
     /// and what each of them answers to, is a thing the sound device says rather than a number
     /// built into the program. That is what makes a pad reachable on its own: it has a name of its
     /// own, a key of its own, and a line of its own in every preset.
@@ -493,8 +491,11 @@ public static class ElementKinds
     /// <b>It goes in a corner and it may not go anywhere else.</b> This is the one place the
     /// program itself speaks on somebody's front panel, so it keeps out of the way of the things
     /// that are the sound device, and it never stretches to fill what is holding it however that is
-    /// laid out. <c>corner</c> is which one: topRight, which is the default and where every
-    /// program puts this button, or topLeft, bottomRight or bottomLeft.
+    /// laid out. <c>corner</c> is which one, and there are two: topRight, which is the default
+    /// and where every program puts this button, or topLeft for a sound device whose own artwork
+    /// wants that side. Both are at the top, since a panel taller than the window it is shown in
+    /// scrolls and a button below the fold is one nobody can find. Any other word is read as the
+    /// top right.
     ///
     /// <c>caption</c> is what is written on it, and says nothing by default, which draws the
     /// three bars every program uses for a menu. A sound device with room for a word may use one.

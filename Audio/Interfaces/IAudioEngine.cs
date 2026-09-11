@@ -184,12 +184,14 @@ public interface IAudioEngine : IDisposable
     void SetPadFadeOut(int padIndex, double seconds);
 
     /// <summary>
-    /// Changes how many pads there are, keeping what still fits.
+    /// Changes how many pads there are, starting them all again from nothing.
     /// </summary>
     /// <remarks>
     /// The matrix is a setting, so this happens while the application is running and while pads
-    /// are playing. Anything on a pad that is going away stops; everything else is left alone,
-    /// including what it is playing.
+    /// are playing. Everything sounding stops and every pad is emptied, whether or not its place
+    /// survives the new shape: the arrays are made again at the new size, so what a pad was
+    /// pointed at and what it was playing are both gone and whoever holds the settings has to
+    /// put them back. Nothing at all where the count has not really changed.
     /// </remarks>
     void Resize(int newPadCount);
 

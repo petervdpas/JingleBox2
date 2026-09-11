@@ -44,7 +44,12 @@ public interface IRackSoundDevices<T> where T : class, IRackProject
     /// <param name="id">The id a song, a chain or a link wrote down.</param>
     bool Has(string? id);
 
-    /// <summary>Every device of this kind the installation has, in the order they were read.</summary>
+    /// <summary>Every device of this kind the installation has, in alphabetical order.</summary>
+    /// <remarks>
+    /// By name, then by id, so two sharing a name sit still rather than swapping between runs.
+    /// Sorted where the list is kept rather than where it is drawn, so the rack, the pickers and
+    /// the shelf in SETTINGS cannot come out in three different orders.
+    /// </remarks>
     IReadOnlyList<T> All { get; }
 
     /// <summary>

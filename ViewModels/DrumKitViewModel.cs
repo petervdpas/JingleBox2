@@ -12,7 +12,7 @@ using JingleBox2.Tracker.Interfaces;
 namespace JingleBox2.ViewModels;
 
 /// <summary>
-/// The editable face of a <see cref="DrumKit"/>: sixteen pads and whichever one is in hand.
+/// The editable face of a <see cref="DrumKit"/>: its pads, and whichever one is in hand.
 /// </summary>
 /// <remarks>
 /// The kit stays plain data that serialises with the song; this is what the panel's pads and
@@ -30,7 +30,7 @@ public sealed partial class DrumKitViewModel : ObservableObject
     /// <summary>Sounds one pad, for the button on the pad's own face.</summary>
     private readonly Action<Note> _tap;
 
-    /// <summary>Builds the sixteen pads over one kit and picks the first of them.</summary>
+    /// <summary>Builds a row per pad the kit has and picks the first of them.</summary>
     public DrumKitViewModel(DrumKit kit, Action changed, Action<Note> tap)
     {
         _kit = kit;
@@ -43,7 +43,7 @@ public sealed partial class DrumKitViewModel : ObservableObject
     /// <summary>The kit itself, for what needs to ask it rather than the pads.</summary>
     public DrumKit Kit => _kit;
 
-    /// <summary>The pads, in the order they are laid out: four rows of four.</summary>
+    /// <summary>The pads, in the order the kit holds them.</summary>
     public ObservableCollection<DrumPadViewModel> Pads { get; } = new();
 
     /// <summary>Which pad the settings underneath are about. Never null once there are pads.</summary>
@@ -168,8 +168,8 @@ public sealed partial class DrumKitViewModel : ObservableObject
     /// Reads the kit again, for a preset that has just landed on it or a take that has been cut up.
     /// </summary>
     /// <remarks>
-    /// A kit is always sixteen pads, so there is never a list to rebuild: only what is on each of
-    /// them changes.
+    /// The pad count does not move while a kit is open, so there is never a list to rebuild here:
+    /// only what is on each of them changes.
     /// </remarks>
     public void Resliced()
     {

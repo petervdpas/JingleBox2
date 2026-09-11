@@ -10,7 +10,7 @@ namespace JingleBox2.Views;
 
 /// <summary>
 /// The SETTINGS page: the audio device, the pad matrix, the themes, the MIDI devices and their
-/// roles, the control surfaces, the desk's own controller links, the log, and the machine shelf.
+/// roles, the control surfaces, the keyboard shortcuts, the log, and the rack's own shelf.
 /// </summary>
 /// <remarks>
 /// Almost all of it is bindings onto <see cref="MainViewModel"/>. The two things answered here
@@ -24,8 +24,9 @@ public partial class SettingsView : UserControl
     /// How narrow the page has to get before the sections move from the side to the top.
     /// </summary>
     /// <remarks>
-    /// The rail costs a hundred and fifty pixels whatever the window is doing, and on a narrow
-    /// one that is a third of the page spent on five words. Across the top it costs a line.
+    /// The rail starts at three hundred pixels and can be dragged between ninety six and four
+    /// hundred and twenty, and on a narrow window even the least of that is page spent on six
+    /// words. Across the top it costs a line.
     /// </remarks>
     private const double RailNeeds = 620;
 

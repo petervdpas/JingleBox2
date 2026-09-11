@@ -250,9 +250,10 @@ public sealed class ConfigStore : IConfigStore
     /// since dropping half somebody's pads on the way in is not something a settings file should
     /// be able to do quietly. What the switch governs is what SETTINGS will let you ask for next.
     ///
-    /// The MIDI mappings are per pad and global rather than per profile, so switching layouts
-    /// does not move which key fires what. They are grown, trimmed and renumbered to match the
-    /// matrix here, which is the only place that count is enforced.
+    /// The pads themselves are grown and trimmed to the matrix here, which is the only place
+    /// that count is enforced. The per-pad MIDI table is not: it is carried onto the link layer
+    /// by <see cref="PadsBecomeLinks"/> and emptied, row for row, including a row for a pad the
+    /// matrix no longer has, since a link somebody made is theirs whatever the grid is set to.
     ///
     /// Two migrations live here and stay: pads written before profiles existed are moved into a
     /// "default" profile, and <see cref="Midi.Interfaces.IMidiPortBindings.Normalize"/> brings a file that

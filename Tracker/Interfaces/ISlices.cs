@@ -34,7 +34,7 @@ public interface ISlices
 
     /// <summary>How many pieces those points describe, never more than there is room for.</summary>
     /// <param name="points">The cuts, which is one more than the number of pieces.</param>
-    /// <param name="room">How many pieces the thing holding them has: sixteen pads, thirty-two zones.</param>
+    /// <param name="room">How many pieces the thing holding them has: a kit's pads, or a map's zones.</param>
     int CountFor(IReadOnlyList<double>? points, int room);
 
     /// <summary>

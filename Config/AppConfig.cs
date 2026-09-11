@@ -378,15 +378,16 @@ public sealed class AppConfig
     /// Zero mixes in step, and that is the default because it was measured and a cushion did
     /// not earn its cost. What made a cushion look necessary was timing the mixing against the
     /// length of a block, eleven and a half milliseconds, as though a block late by one were a
-    /// hole in the output. It is not: the stream is buffered sixty milliseconds ahead
-    /// (<c>TrackerOutput.BufferSeconds</c>) and BASS tops that up every ten, so a block that took
+    /// hole in the output. It is not: the stream is buffered as far ahead as
+    /// <c>AudioSizes.BufferFrames</c> comes to at the rate in force, which at the default of 2048 is
+    /// about forty five milliseconds, and BASS tops that up every ten, so a block that took
     /// longer than its own length is absorbed. Measured on the real output with a thread
     /// allocating hard enough to pause the process for a quarter of its wall time, thirty-two
     /// voices of synths, of recordings and of both: the sound card went without nothing, with
     /// the cushion and without it.
     ///
     /// So a cushion buys nothing here and costs the one thing this application cannot spare,
-    /// which is how long a key waits before it sounds, on top of the sixty already in the
+    /// which is how long a key waits before it sounds, on top of what is already in the
     /// stream. What it is still for is a plugin: every block one plays is a round trip to
     /// another process, and that is the case worth turning it on for, which is what the words
     /// in SETTINGS say.

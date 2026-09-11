@@ -121,8 +121,8 @@ public sealed class TakeLibrary : IPanelTakes
     /// without the extension, which is what it was called when it was dragged in.
     ///
     /// How long it is and what rate it was recorded at is a different question and a different
-    /// line on the panel, and it is <see cref="Details"/>. The format has nowhere to put that
-    /// line yet, so nothing asks for it.
+    /// line on the panel, and it is <see cref="Details"/>: a face asks for it by naming
+    /// <c>take_details</c>, which the Recording machine's own face does.
     /// </remarks>
     public string Describe(string take)
     {

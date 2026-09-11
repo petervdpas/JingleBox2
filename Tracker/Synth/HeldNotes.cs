@@ -16,8 +16,9 @@ public sealed class HeldNotes : IHeldNotes
     /// As many notes as one plugin is allowed to be holding at once.
     /// </summary>
     /// <remarks>
-    /// Ten fingers and a pedal. Past this a sustaining part is not a chord any more, it is a
-    /// leak, and the oldest note is the one nobody is listening to.
+    /// Sixteen: two hands and room to spare, since a part can be sustaining under them. Past this
+    /// it is not a chord any more, it is a leak, and the oldest note is the one nobody is
+    /// listening to.
     /// </remarks>
     public const int Most = 16;
 

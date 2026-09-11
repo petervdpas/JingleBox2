@@ -56,8 +56,12 @@ public interface IRecordingImport
     /// Brings files in, and answers with what is now on the shelf.
     /// </summary>
     /// <remarks>
-    /// A file already on the shelf byte for byte is skipped rather than copied again, which is
-    /// what makes opening a packed song twice add nothing. A file that will not read at all is
+    /// A file that is already in the recordings folder and needs no converting is taken where it
+    /// stands rather than copied over itself. Anything else is copied in, and a name that is
+    /// taken gets a number after it rather than overwriting: two kits can each have a kick.wav
+    /// and neither may silently become the other. What makes opening a packed song twice add
+    /// nothing is a byte-for-byte comparison one layer up, in <c>SongSamples</c>, which is where
+    /// the song's own copies are matched against the shelf. A file that will not read at all is
     /// passed over: one bad file in a folder somebody dragged in must not stop the other forty.
     /// </remarks>
     /// <param name="paths">The files, wherever they are.</param>

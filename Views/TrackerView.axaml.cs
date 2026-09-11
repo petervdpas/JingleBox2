@@ -875,32 +875,6 @@ public partial class TrackerView : UserControl
     }
 
     /// <summary>
-    /// Everything typed into the pattern: moving about, the block, and what goes in a cell.
-    /// </summary>
-    /// <remarks>
-    /// Only while the grid has the keyboard, so the same keys on the bar or in a box are that
-    /// control's. Shift with a movement key grows the block instead of moving away from it.
-    ///
-    /// What a key means depends on the column the cursor is in. In the note column the piano
-    /// layout applies and a letter is a note; everywhere else the digit row and A to F type hex
-    /// values, and in the effect column a letter that is not a hex digit is the command itself.
-    /// The rules are in <see cref="KeyboardNoteMap"/>, so this only decides which of them to
-    /// ask.
-    /// </remarks>
-    /// <summary>
-    /// A letter key coming up, which is what tells the view model a chord is over.
-    /// </summary>
-    /// <remarks>
-    /// The note path has no release of its own: a letter typed into the pattern sounds a note
-    /// that lets itself go after a moment, and nothing ever said the key had come up. That was
-    /// enough while a track held one note. It is not enough now, because a note pressed while
-    /// another is held is a chord and goes into the next note column, and without a release the
-    /// first chord anybody typed would go on filling columns for ever.
-    ///
-    /// It does not stop the sound. A note played by hand runs its own length here, which is the
-    /// rule everywhere in this application that a key can be clicked rather than held.
-    /// </remarks>
-    /// <summary>
     /// The keyboard has gone somewhere else, so every key it was holding is forgotten.
     /// </summary>
     /// <remarks>
@@ -915,6 +889,19 @@ public partial class TrackerView : UserControl
         ViewModel?.LetAllNotes();
     }
 
+    /// <summary>
+    /// A letter key coming up, which is what tells the view model a chord is over.
+    /// </summary>
+    /// <remarks>
+    /// The note path has no release of its own: a letter typed into the pattern sounds a note
+    /// that lets itself go after a moment, and nothing ever said the key had come up. That was
+    /// enough while a track held one note. It is not enough now, because a note pressed while
+    /// another is held is a chord and goes into the next note column, and without a release the
+    /// first chord anybody typed would go on filling columns for ever.
+    ///
+    /// It does not stop the sound. A note played by hand runs its own length here, which is the
+    /// rule everywhere in this application that a key can be clicked rather than held.
+    /// </remarks>
     private void OnGridKeyUp(object? sender, KeyEventArgs e)
     {
         if (!_typed.Remove(e.Key, out var note)) return;
@@ -970,6 +957,19 @@ public partial class TrackerView : UserControl
         }
     }
 
+    /// <summary>
+    /// Everything typed into the pattern: moving about, the block, and what goes in a cell.
+    /// </summary>
+    /// <remarks>
+    /// Only while the grid has the keyboard, so the same keys on the bar or in a box are that
+    /// control's. Shift with a movement key grows the block instead of moving away from it.
+    ///
+    /// What a key means depends on the column the cursor is in. In the note column the piano
+    /// layout applies and a letter is a note; everywhere else the digit row and A to F type hex
+    /// values, and in the effect column a letter that is not a hex digit is the command itself.
+    /// The rules are in <see cref="KeyboardNoteMap"/>, so this only decides which of them to
+    /// ask.
+    /// </remarks>
     private void OnGridKeyDown(object? sender, KeyEventArgs e)
     {
         var vm = ViewModel;

@@ -95,12 +95,12 @@ public class Knob : ThemedControl
         return Math.Clamp(value, low, high);
     }
 
-    /// <summary>Backs <see cref="Minimum"/>, the value at seven o'clock.</summary>
+    /// <summary>Backs <see cref="Minimum"/>, the value at half past seven.</summary>
     public static readonly StyledProperty<double> MinimumProperty =
         AvaloniaProperty.Register<Knob, double>(nameof(Minimum));
 
     /// <summary>
-    /// Backs <see cref="Maximum"/>, the value at five o'clock.
+    /// Backs <see cref="Maximum"/>, the value at half past four.
     /// </summary>
     /// <remarks>
     /// One rather than nought, so a knob nobody has given a range to turns over the nought to
@@ -241,14 +241,14 @@ public class Knob : ThemedControl
         set => SetValue(ValueProperty, value);
     }
 
-    /// <summary>The value at seven o'clock, where the sweep begins.</summary>
+    /// <summary>The value at half past seven, where the sweep begins.</summary>
     public double Minimum
     {
         get => GetValue(MinimumProperty);
         set => SetValue(MinimumProperty, value);
     }
 
-    /// <summary>The value at five o'clock, where the sweep ends.</summary>
+    /// <summary>The value at half past four, where the sweep ends.</summary>
     public double Maximum
     {
         get => GetValue(MaximumProperty);
@@ -473,8 +473,11 @@ public class Knob : ThemedControl
     /// the machine was sitting on its own tick marks.
     ///
     /// The link glow goes on last, over everything else, because while a controller is being
-    /// pointed at something the control being offered has to say so itself and nothing may
-    /// paint over that. See <see cref="LinkGlow"/>.
+    /// pointed at something the control being offered has to say so itself and nothing may paint
+    /// over that. See <see cref="LinkGlow"/>. It is painted on the name-below path, which is a
+    /// knob written in XAML and lit through <c>Pointable</c>; a knob on a described face sets
+    /// <see cref="LabelAbove"/> and the glow there is a layer the panel draws over the whole
+    /// element, so painting one here as well would be the same halo twice.
     /// </remarks>
     public override void Render(DrawingContext context)
     {

@@ -269,7 +269,7 @@ public sealed class SoundMachinePresetFile(ISoundMachinePaths? paths = null) : I
     /// <summary>How a preset is written, which is laid out for reading.</summary>
     /// <remarks>
     /// A preset is a file somebody opens to see what a machine is doing, and one machine here
-    /// ships two presets that are a whole chop apiece. Indented, both are still readable.
+    /// ships three presets that are a whole chop apiece. Indented, they stay readable.
     /// </remarks>
     private static readonly JsonSerializerOptions Layout = new() { WriteIndented = true };
 
@@ -361,7 +361,10 @@ public sealed class SoundMachinePresetFile(ISoundMachinePaths? paths = null) : I
     /// <param name="Numbers">The values one of the machine's things holds.</param>
     /// <param name="Words">And the words it holds.</param>
     /// <param name="Outside">The values the machine itself holds, which no thing on it owns.</param>
-    /// <param name="OutsideWords">And the words. Empty on every machine written so far.</param>
+    /// <param name="OutsideWords">
+    /// And the words. Empty on a machine whose face is built out of pads or zones, since there
+    /// every word belongs to one of them; the Recording machine has neither, so its take is here.
+    /// </param>
     private sealed record Settings(
         List<string> Numbers, List<string> Words,
         List<string> Outside, List<string> OutsideWords);

@@ -13,8 +13,8 @@ Always a lock guarding the wrong thing.
 | Thread | Started by | What it does |
 |---|---|---|
 | **drawing** | Avalonia | Every view and view model. The document: the song, its patterns, the machines, the settings |
-| **sound card** | BASS | `SynthOutput.Fill`, and one stream callback per pad in `BassAudioEngine`. Has a deadline of a few milliseconds and may never wait on anything |
-| **mixing ahead** | `SynthOutput.StartMixingAhead` | Renders blocks in advance into a ring, so a plugin's round trip eats the cushion rather than the output. Exists only while render-ahead is on |
+| **sound card** | BASS | `TrackerOutput.Fill`, and one stream callback per pad in `BassAudioEngine`. Has a deadline of a few milliseconds and may never wait on anything |
+| **mixing ahead** | `TrackerOutput.StartMixingAhead` | Renders blocks in advance into a ring, so a plugin's round trip eats the cushion rather than the output. Exists only while render-ahead is on |
 | **tracker clock** | `TrackerPlayer.StartClock` | Reads the song a line at a time and turns lines into notes. Above normal priority |
 | **MIDI** | the port | Every message off every open device, through `MidiService` into the dispatcher and the routers |
 | **log writer** | `Log` | Takes lines off a queue and writes them to the file, so nobody waits on a disc |
@@ -51,13 +51,14 @@ returns at once. Everything else may be called from any thread at any time, incl
 render.
 
 **Why it is guarded and not merely documented:** the block size is not a value the two callers
-share, it is the size of the arrays. `EnsureBusses` builds the bus, the loose bus and the
-scratch again whenever the frame count changes, so two threads rendering at once with different
-counts is one of them shortening the arrays the other is halfway through. It has taken the
+share, it is the size of the arrays. `EnsureBusses` grows the busses and the loose bus, and
+`PrepareBusses` the preview scratch, whenever a block arrives longer than any before it, so two
+threads rendering at once with different counts is one of them replacing the arrays the other is
+halfway through. It has taken the
 application down: an index outside the bounds of the array, on the audio thread, after an
 afternoon's work.
 
-**Why there are two callers at all**, when the design says there is one: `SynthOutput` swaps
+**Why there are two callers at all**, when the design says there is one: `TrackerOutput` swaps
 between rendering in step and rendering ahead, and `StopMixingAhead` waits two tenths of a
 second for the ahead thread and then carries on regardless. That is right, since a plugin
 holding it up must not hang the application, and it leaves that thread still inside the mixer
@@ -74,7 +75,7 @@ loose bus and the master each wrote past the end of a buffer smaller than the ca
 Half a fault guarded is worse than none: the guard that is there reads as the question having
 been asked.
 
-### `SynthOutput`
+### `TrackerOutput`
 
 **Entered by:** the sound card for `Fill`, the mixing-ahead thread for `MixAhead`, the drawing
 thread for everything else.

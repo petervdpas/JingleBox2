@@ -1288,8 +1288,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </summary>
     /// <remarks>
     /// Written out rather than a number to type, because repeating a part is a musical decision
-    /// with about four answers: again, a pair, a four bar phrase, eight. Anything else is a
-    /// second visit to the menu, which is cheaper than a dialog for the case nobody has.
+    /// with a handful of answers: once more, a pair, a four bar phrase, eight, sixteen. Anything
+    /// else is a second visit to the menu, which is cheaper than a dialog for the case nobody
+    /// has.
     /// </remarks>
     public int[] RepeatCounts { get; } = { 1, 2, 4, 8, 16 };
 
@@ -2354,17 +2355,16 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public double SamplePosition(int track) => _player.SamplePosition(track);
 
     /// <summary>
-    /// Which of the tracker's three pages is on show.
+    /// Which of the tracker's two pages is on show, the pattern or the rack.
     /// </summary>
     /// <remarks>
-    /// The instruments and the mixer are the tracker's, not the application's. The mixer mixes
-    /// its tracks and nothing else's; the rack exists so a song has something to play, and
-    /// the pads never touch either. As sibling tabs they looked like three separate parts of
-    /// the program rather than three ways of looking at one song.
+    /// The rack is the tracker's rather than the application's: it exists so a song has something
+    /// to play, and the pads never touch it. As sibling tabs along the top the two looked like
+    /// separate parts of the program rather than two ways of looking at one song.
     ///
-    /// Written out rather than an enum with a converter, because these three strings are what
-    /// the buttons pass and what the bindings ask about, and a name that only exists inside a
-    /// format string is a name nothing can find.
+    /// Written out rather than an enum with a converter, because these strings are what the
+    /// buttons pass and what the bindings ask about, and a name that only exists inside a format
+    /// string is a name nothing can find.
     /// </remarks>
     private const string PatternPage = "Pattern";
 

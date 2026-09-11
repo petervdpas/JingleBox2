@@ -59,10 +59,9 @@ public sealed class InputPath : IInputPath
     /// the same answer and not a claim that nothing happened.
     ///
     /// **Hear it is not part of the question, deliberately.** Where a source plays is settled by
-    /// choosing it and the tick has nothing to say about that: counted in, every press gave the
-    /// source back and took it off again, so ticking Hear it let the source out of the desk and
-    /// back for a moment on each press. It is still remembered, since <see cref="Heard"/> is
-    /// something a caller can ask about; it is just not a reason to rewire anything.
+    /// choosing it and the tick has nothing to say about that: counted in, every press would give
+    /// the source back and take it off again, letting it out of the desk and back for a moment on
+    /// each press.
     /// </remarks>
     private string _asked = "";
 

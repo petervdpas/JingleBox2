@@ -12,10 +12,10 @@ namespace JingleBox2.Rack.Controls.Interfaces;
 /// host offers can be put a question to without a window. This is the other half: the one place
 /// those lines become something on a screen.
 ///
-/// One place because there are two things that show them, a machine's own Menu part and the
-/// mixer's button, and the mixer is drawn by the program rather than described by anybody. Two
-/// spellings of "a line with children is a submenu, a line with no command is dead" would
-/// eventually disagree, and the way that fails is one of them quietly not offering something.
+/// One place because three things show them: a sound device's own Menu part, the mixer's button
+/// and FIRE's, and the last two are drawn by the program rather than described by anybody. Three
+/// spellings of "a line with no command is dead" would eventually disagree, and the way that
+/// fails is one of them quietly not offering something.
 /// </remarks>
 public interface IMenuLines
 {

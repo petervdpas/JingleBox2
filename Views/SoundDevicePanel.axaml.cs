@@ -24,7 +24,7 @@ namespace JingleBox2.Views;
 /// instrument it is.
 /// </summary>
 /// <remarks>
-/// Its own control rather than a column of the INSTRUMENTS tab, because the same designer is
+/// Its own control rather than a column of the rack page, because the same designer is
 /// wanted in two places: on that tab, against whatever the rack has picked, and in a window
 /// of its own, against the instrument a track is playing. A machine's front panel does not care
 /// which rack it is standing in.
@@ -280,7 +280,7 @@ public partial class SoundDevicePanel : UserControl
     /// through the controls between the root and whatever has focus, and after clicking a knob
     /// or a combo box that route does not have to come past here.
     ///
-    /// One window, one panel, so the INSTRUMENTS tab and an instrument's own window each get
+    /// One window, one panel, so the rack page and an instrument's own window each get
     /// their own and neither hears the other's keys.
     /// </remarks>
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)

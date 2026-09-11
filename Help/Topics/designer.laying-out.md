@@ -14,8 +14,9 @@ no name badge shows no name.
 leaves. **Helptext** is the page the device carries about itself: what it is, what its controls do,
 and anything somebody opening it for the first time would have to guess. It is written in
 markdown, saved as `help.md` beside the manifest, and it travels in the zip, so whoever you hand
-the device to gets the page with it. A device with nothing written there has no Help line on its
-Menu, which is the honest state rather than a line that opens an empty window.
+the device to gets the page with it. A device with nothing written there keeps the Help line on
+its Menu and loses the press: a line that is not there says this application cannot do it, where a
+grey one says this device has nothing to say.
 
 ## The two things a part needs
 

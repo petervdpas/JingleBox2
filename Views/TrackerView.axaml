@@ -341,11 +341,10 @@
                plays through, then what moves over the pattern. Both change when the cursor
                moves between tracks.
 
-               Rows rather than things docked at the foot, so the handle between them has two
-               sides to share out. Everything below the handle is one row, and inside it the
-               chain takes what it needs and the automation takes the rest: dragging the handle
-               therefore trades pattern for curve, which is the only trade on this page worth
-               offering. -->
+               Rows rather than things docked at the foot, and each strip is a row of its own
+               that asks for the height it wants. The pattern is measured in what is left, so a
+               grip on one strip moves that strip and takes its room off the music rather than
+               off the strip beside it. -->
           <Grid RowDefinitions="*,Auto,Auto">
 
             <ScrollViewer x:Name="GridScroll" Grid.Row="0"
