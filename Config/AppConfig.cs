@@ -76,6 +76,20 @@ public sealed class AppConfig
     /// <summary>The output card to play through, or -1 for the system's first.</summary>
     public int SelectedOutputDeviceId { get; set; } = -1;
 
+    /// <summary>
+    /// What that output was called, which is what survives the list moving.
+    /// </summary>
+    /// <remarks>
+    /// **The number beside this is a place in a list and the list moves.** The sound library
+    /// enumerates what the machine has when it is asked, so an interface plugged in or taken away
+    /// shifts every row after it: the number that was written down goes on naming a row and stops
+    /// naming the same device, quietly, since opening it is exactly what this was told to do.
+    ///
+    /// Empty in every settings file written before this, which reads back as nothing and leaves
+    /// the number to answer on its own, exactly as it did.
+    /// </remarks>
+    public string? SelectedOutputDeviceName { get; set; }
+
     /// <summary>Which of <see cref="Profiles"/> is on the pads now, by name.</summary>
     public string SelectedProfile { get; set; } = "default";
 

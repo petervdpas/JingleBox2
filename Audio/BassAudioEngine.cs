@@ -33,6 +33,17 @@ public sealed class BassAudioEngine : IAudioEngine
     /// <summary>What says whether an endpoint can be had, which is asked by having it.</summary>
     private readonly Interfaces.IOutputProbe _probe;
 
+    /// <summary>
+    /// Holds the terminal quiet while the devices are being opened one at a time.
+    /// </summary>
+    /// <remarks>
+    /// Every refusal in that pass is expected, and the libraries underneath say so at the top of
+    /// their voice on a stream nothing here owns: see
+    /// <see cref="Diagnostics.Interfaces.ITerminalHush"/>. What this application has to say about
+    /// the same pass is in its own log.
+    /// </remarks>
+    private readonly Diagnostics.Interfaces.ITerminalHush _hush = new Diagnostics.TerminalHush();
+
     /// <summary>Which of them are worth offering on a machine with a sound server.</summary>
     private readonly Interfaces.ISoundServerOutput _server = new SoundServerOutput();
 
@@ -287,6 +298,12 @@ public sealed class BassAudioEngine : IAudioEngine
     /// sound down to ask a question whose answer is yes. The ASIO drivers are not either, since a
     /// driver is not a device the library opens at all.
     ///
+    /// **The terminal is held quiet for the length of it.** Opening a device that cannot be had
+    /// is the point of the pass and the libraries underneath announce each one on their own
+    /// stream, so somebody starting this from a terminal was met by half a dozen lines of alarm
+    /// about a mixing plugin, a server that is not running and a device file that does not exist,
+    /// every one of them a thing working exactly as intended.
+    ///
     /// **What is offered is written down as well as what is not**, which is the half that was
     /// missing. A list that only says what it refused cannot be read against what somebody is
     /// looking at, and on a machine with a sound server the interesting entries are the ones
@@ -298,6 +315,8 @@ public sealed class BassAudioEngine : IAudioEngine
     public IReadOnlyList<AudioOutput> GetOutputDevices()
     {
         var list = new List<AudioOutput>();
+
+        using var quiet = _hush.Hushed();
 
         for (int i = 0; Bass.GetDeviceInfo(i, out var info); i++)
         {

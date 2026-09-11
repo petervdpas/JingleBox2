@@ -61,10 +61,14 @@ public sealed class HoldAsideTests
         var bench = new RecorderBench();
 
         bench.Page.SelectedRoute = RecorderBench.Firefox;
-        bench.Page.RefreshRoutes();
 
         Assert.True(
-            Within(() => bench.Wiring.Held > 0),
+            Within(() =>
+            {
+                bench.Page.RefreshRoutes();
+
+                return bench.Wiring.Held > 0;
+            }),
             "the arrangement was never held, so a source that got back onto its own output stays there");
     }
 

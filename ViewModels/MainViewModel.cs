@@ -115,6 +115,15 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     private readonly IAudioEngine _audio;
 
     /// <summary>
+    /// Which of the offered outputs is the one that was chosen last time.
+    /// </summary>
+    /// <remarks>
+    /// A rule of its own because a device's number is a place in a list and the list moves: see
+    /// <see cref="Audio.Interfaces.IOutputChoice"/>, which is why the name is stored beside it.
+    /// </remarks>
+    private readonly Audio.Interfaces.IOutputChoice _chosen = new Audio.OutputChoice();
+
+    /// <summary>
     /// The recorder, kept for the one thing above it that has to reach it: the output moving.
     /// </summary>
     /// <remarks>
@@ -2216,8 +2225,20 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             OutputDevices.Add(d);
 
         SelectedOutputDevice =
-            OutputDevices.FirstOrDefault(d => d.Id == _cfg.SelectedOutputDeviceId)
+            _chosen.Among(OutputDevices, _cfg.SelectedOutputDeviceName, _cfg.SelectedOutputDeviceId)
             ?? OutputDevices.FirstOrDefault();
+
+        if (SelectedOutputDevice != null
+            && !string.IsNullOrWhiteSpace(_cfg.SelectedOutputDeviceName)
+            && SelectedOutputDevice.Id != _cfg.SelectedOutputDeviceId)
+        {
+            var moved = SelectedOutputDevice;
+            int was = _cfg.SelectedOutputDeviceId;
+
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
+                "outputs: '" + moved.Name + "' is " + moved.Id + " now and was " + was
+                + ", so it was found by its name rather than by where it sat");
+        }
 
         if (SelectedOutputDevice != null)
         {
@@ -2873,6 +2894,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         EnsureProfilesInitialized(padCount: PadCount);
 
         _cfg.SelectedOutputDeviceId = SelectedOutputDevice?.Id ?? -1;
+        _cfg.SelectedOutputDeviceName = SelectedOutputDevice?.Name;
 
         SavePadsIntoProfile(_cfg.SelectedProfile);
 
