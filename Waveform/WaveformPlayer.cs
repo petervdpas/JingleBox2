@@ -1,56 +1,85 @@
 using Avalonia.Threading;
 using JingleBox2.Audio.Interfaces;
-using ManagedBass;
 using System;
 
 namespace JingleBox2.Waveform;
 
 /// <summary>
 /// Plays a region of a recording and reports where it has got to, as a fraction of the file.
-/// Owns the BASS channel and the progress timer so callers never have to.
+/// Owns the channel and the progress timer so callers never have to.
 /// </summary>
+/// <remarks>
+/// **What it does not own is how a recording is made to sound**, which is
+/// <see cref="IRecordingSource"/> and is the same one the pads go through. This opened its own
+/// channel and put it on a bus itself, which was a second spelling of an act this application
+/// already had, and the two had drifted all one way: the pads' opened the output first and asked
+/// for float and prescan, and this did neither.
+///
+/// **And there is one path out.** A take goes on the take bus the way a pad goes on the pad bus,
+/// and where there is no bus there is no sound rather than a second way of playing. The fork this
+/// had, playing the channel itself where the bus was not open, is the one the pads were rid of
+/// for the reason written on <see cref="IRecordingSource"/>: a channel played that way goes to
+/// whatever output the calling thread happens to hold, which behind a driver or a sound server is
+/// the device that plays nothing. The take runs, the cursor moves, and nobody hears it.
+///
+/// What is left here is the region and the clock, and neither is in bytes.
+/// </remarks>
 public sealed class WaveformPlayer : IDisposable
 {
-    /// <summary>
-    /// The bus the take goes onto, or nothing to play it the ordinary way.
-    /// </summary>
-    /// <remarks>
-    /// A take auditioned here is one of the three things this application makes a sound with, and
-    /// under an ASIO driver the ordinary way reaches the silent device BASS was opened on: the
-    /// take plays, the position runs, and nobody hears it. On the bus it is a decoding channel
-    /// like the pads and the tracker.
-    ///
-    /// Optional and defaulted to nothing, so an editor dialog built on its own still works, and so
-    /// this class can be put a question to without an audio engine.
-    /// </remarks>
+    /// <summary>How a recording is opened, moved about, asked where it is, and let go.</summary>
+    private readonly IRecordingSource? _source;
+
+    /// <summary>The bus the take goes onto.</summary>
     private readonly IOutputBus? _bus;
 
-    /// <summary>A player over a bus, or over none.</summary>
-    /// <param name="bus">Where the audio goes, or nothing to play it the way it always was.</param>
-    public WaveformPlayer(IOutputBus? bus = null) => _bus = bus;
+    /// <summary>A player over a source and the bus it lands on.</summary>
+    /// <remarks>
+    /// **Both are required, so a player that exists can play.** They were optional, which made
+    /// the two halves of a wiring mistake and a deliberate silence the same object: a caller that
+    /// forgot one got a player that opened nothing and said nothing, and the only way to find out
+    /// was that a take made no sound. A window with nothing to play on is a real thing all the
+    /// same, and it says so out loud through <see cref="Silent"/>.
+    /// </remarks>
+    /// <param name="source">How a recording is made to sound.</param>
+    /// <param name="bus">Where it goes.</param>
+    public WaveformPlayer(IRecordingSource source, IOutputBus bus)
+    {
+        _source = source;
+        _bus = bus;
+    }
 
-    /// <summary>Whether the take is going onto a bus rather than playing itself.</summary>
-    private bool OnBus => _bus is { IsOpen: true };
-    /// <summary>How wide one sample is, which is sixteen bits everywhere in this app.</summary>
-    private const int WavBytesPerSample = 2;
+    /// <summary>Builds one with nowhere to send a take.</summary>
+    private WaveformPlayer()
+    {
+    }
+
+    /// <summary>
+    /// A player with nowhere to send a take, which plays nothing whatever it is asked.
+    /// </summary>
+    /// <remarks>
+    /// For a window the toolkit builds for itself, which is handed no audio at all, and for a
+    /// page built with none. Named rather than defaulted, so it is a thing somebody asked for
+    /// rather than the shape an argument that was left out happens to take.
+    /// </remarks>
+    public static WaveformPlayer Silent() => new();
+
+    /// <summary>Whether there is anywhere for a take to go.</summary>
+    private bool Wired => _source != null && _bus is { IsOpen: true };
 
     /// <summary>How often the position is read. Ten a second, which a moving line does not need beating.</summary>
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
 
-    /// <summary>The BASS channel, or 0 when nothing is playing.</summary>
+    /// <summary>The channel, or 0 when nothing is playing.</summary>
     private int _channel;
 
     /// <summary>What reads the position, on the drawing thread. Null when nothing is playing.</summary>
     private DispatcherTimer? _timer;
 
-    /// <summary>Where the region ends, in bytes, or 0 when there is no region.</summary>
-    private long _endBytes;
+    /// <summary>Where the region ends, in seconds, or 0 when there is no region.</summary>
+    private double _endSeconds;
 
-    /// <summary>How wide one frame is, read off the file rather than assumed.</summary>
-    private long _bytesPerFrame = 4;
-
-    /// <summary>How long the file is in frames, which is what a fraction is a fraction of.</summary>
-    private long _totalFrames;
+    /// <summary>How long the recording is, which is what a fraction is a fraction of.</summary>
+    private double _seconds;
 
     /// <summary>Whether a region is playing.</summary>
     public bool IsPlaying { get; private set; }
@@ -66,6 +95,11 @@ public sealed class WaveformPlayer : IDisposable
     /// Whatever was playing is stopped first, so a channel or a timer is never left running behind
     /// this one.
     ///
+    /// **Every way of not starting leaves <see cref="IsPlaying"/> false**, the bus refusing the
+    /// channel included, since a caller lighting a row on the strength of having asked would be
+    /// saying something is playing when nothing is and leaving its stop button as the only way out
+    /// of a state nobody is in.
+    ///
     /// The position is read on a dispatcher timer rather than a pool one, so whoever is listening
     /// may touch controls directly. A pool thread raising these would throw inside Avalonia and
     /// the timer would swallow it.
@@ -73,31 +107,45 @@ public sealed class WaveformPlayer : IDisposable
     /// <param name="filePath">The recording.</param>
     /// <param name="startFraction">Where to start, 0 to 1.</param>
     /// <param name="endFraction">Where to stop, 0 to 1.</param>
-    /// <param name="totalFrames">How long the file is, which nought makes this do nothing.</param>
+    /// <param name="totalFrames">
+    /// How long the caller found the file to be, which nought makes this do nothing. It is the
+    /// caller's own reading of the file rather than a number this works in: a file that could not
+    /// be read is not worth opening twice.
+    /// </param>
     public void Play(string filePath, double startFraction, double endFraction, long totalFrames)
     {
         Stop();
 
-        if (totalFrames <= 0) return;
+        if (totalFrames <= 0 || !Wired) return;
 
-        _channel = Bass.CreateStream(filePath, 0, 0, OnBus ? BassFlags.Decode : BassFlags.Default);
+        _channel = _source!.Open(filePath);
         if (_channel == 0) return;
 
-        var info = Bass.ChannelGetInfo(_channel);
-        _bytesPerFrame = Math.Max(1, info.Channels * WavBytesPerSample);
-        _totalFrames = totalFrames;
+        _seconds = _source.Seconds(_channel);
 
-        long startFrame = (long)(Math.Clamp(startFraction, 0, 1) * totalFrames);
-        _endBytes = (long)(Math.Clamp(endFraction, 0, 1) * totalFrames) * _bytesPerFrame;
+        if (_seconds <= 0)
+        {
+            LetGo();
 
-        Bass.ChannelSetPosition(_channel, startFrame * _bytesPerFrame);
+            return;
+        }
 
-        if (OnBus) _bus!.Add(_channel);
-        else Bass.ChannelPlay(_channel);
+        double start = Math.Clamp(startFraction, 0, 1) * _seconds;
+
+        _endSeconds = Math.Clamp(endFraction, 0, 1) * _seconds;
+
+        _source.Seek(_channel, start);
+
+        if (!_bus!.Add(_channel))
+        {
+            LetGo();
+
+            return;
+        }
 
         IsPlaying = true;
 
-        PositionChanged?.Invoke((double)startFrame / _totalFrames);
+        PositionChanged?.Invoke(start / _seconds);
 
         _timer = new DispatcherTimer { Interval = PollInterval };
         _timer.Tick += (_, _) => Poll();
@@ -108,11 +156,13 @@ public sealed class WaveformPlayer : IDisposable
     /// <param name="fraction">Where to go, 0 to 1.</param>
     public void SeekTo(double fraction)
     {
-        if (!IsPlaying || _channel == 0 || _totalFrames <= 0) return;
+        if (!IsPlaying || _channel == 0 || _seconds <= 0) return;
 
-        long frame = (long)(Math.Clamp(fraction, 0, 1) * _totalFrames);
-        Bass.ChannelSetPosition(_channel, frame * _bytesPerFrame);
-        PositionChanged?.Invoke((double)frame / _totalFrames);
+        double at = Math.Clamp(fraction, 0, 1);
+
+        _source!.Seek(_channel, at * _seconds);
+
+        PositionChanged?.Invoke(at);
     }
 
     /// <summary>Stops, lets the channel go, and says so. Does nothing twice.</summary>
@@ -121,21 +171,30 @@ public sealed class WaveformPlayer : IDisposable
         _timer?.Stop();
         _timer = null;
 
-        if (_channel != 0)
-        {
-            _bus?.Remove(_channel);
+        LetGo();
 
-            Bass.ChannelStop(_channel);
-            Bass.StreamFree(_channel);
-            _channel = 0;
-        }
-
-        _endBytes = 0;
+        _endSeconds = 0;
+        _seconds = 0;
 
         if (!IsPlaying) return;
 
         IsPlaying = false;
         Stopped?.Invoke();
+    }
+
+    /// <summary>Takes the channel off the bus and lets it go, and does nothing twice.</summary>
+    /// <remarks>
+    /// Off the bus first. A source freed while a mixer still holds it is the add-on left pointing
+    /// at memory that has gone, and it is the one order here that cannot be got wrong quietly.
+    /// </remarks>
+    private void LetGo()
+    {
+        if (_channel == 0) return;
+
+        _bus?.Remove(_channel);
+        _source?.Close(_channel);
+
+        _channel = 0;
     }
 
     /// <summary>
@@ -156,43 +215,33 @@ public sealed class WaveformPlayer : IDisposable
     /// <param name="endFraction">Where the region now ends, 0 to 1.</param>
     public void PlayUntil(double endFraction)
     {
-        if (!IsPlaying || _channel == 0 || _totalFrames <= 0) return;
+        if (!IsPlaying || _channel == 0 || _seconds <= 0) return;
 
-        long frame = (long)(Math.Clamp(endFraction, 0, 1) * _totalFrames);
+        _endSeconds = Math.Clamp(endFraction, 0, 1) * _seconds;
 
-        _endBytes = frame * _bytesPerFrame;
-
-        if (Bass.ChannelGetPosition(_channel) >= _endBytes) Stop();
+        if (_source!.At(_channel) >= _endSeconds) Stop();
     }
 
     /// <summary>Reads where playback has got to, and stops it at the end of the region.</summary>
-    /// <remarks>
-    /// The state is compared against Stopped rather than tested for Playing, because
-    /// PlaybackState is not a flags enum: HasFlag does bitwise arithmetic on it and misreads
-    /// Paused and Stalled.
-    /// </remarks>
     private void Poll()
     {
-        if (_channel == 0)
+        if (_channel == 0 || _seconds <= 0)
         {
             Stop();
             return;
         }
 
-        long position = Bass.ChannelGetPosition(_channel);
+        double at = _source!.At(_channel);
 
-        bool reachedEnd = _endBytes > 0 && position >= _endBytes;
+        bool reachedEnd = _endSeconds > 0 && at >= _endSeconds;
 
-        bool ended = Bass.ChannelIsActive(_channel) == PlaybackState.Stopped;
-
-        if (reachedEnd || ended)
+        if (reachedEnd || _source.Ended(_channel))
         {
             Stop();
             return;
         }
 
-        if (_totalFrames > 0)
-            PositionChanged?.Invoke((double)(position / _bytesPerFrame) / _totalFrames);
+        PositionChanged?.Invoke(at / _seconds);
     }
 
     /// <summary>Stops whatever is playing.</summary>

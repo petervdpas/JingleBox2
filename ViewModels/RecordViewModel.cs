@@ -101,6 +101,9 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// <summary>The bus a take goes onto, kept so the editing dialog is given the same one.</summary>
     private readonly JingleBox2.Audio.Interfaces.IOutputBus? _takes;
 
+    /// <summary>How a recording is made to sound, kept so the editing dialog is given the same one.</summary>
+    private readonly JingleBox2.Audio.Interfaces.IRecordingSource? _recordings;
+
     /// <summary>The take the preview is on, so its row can be put back to idle when it stops.</summary>
     private Recording? _playing;
 
@@ -630,10 +633,11 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// The preview's row goes back to idle when it stops, whether it ran out on its own or
     /// somebody stopped it, since those are the same thing to whoever is looking at the list.
     /// </remarks>
-    public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, ConfigStore configStore, AppConfig cfg, IAudioRouting routing, JingleBox2.Audio.Interfaces.IOutputBus? takes = null)
+    public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, ConfigStore configStore, AppConfig cfg, IAudioRouting routing, JingleBox2.Audio.Interfaces.IOutputBus? takes = null, JingleBox2.Audio.Interfaces.IRecordingSource? recordings = null)
     {
         _takes = takes;
-        _preview = new Waveform.WaveformPlayer(takes);
+        _recordings = recordings;
+        _preview = Playing(recordings, takes);
 
         _routing = routing;
         _input = new Audio.Routing.InputPath(routing);
@@ -1160,10 +1164,9 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             CurrentWaveform = _waveformService.AnalyzeFile(recording.FilePath);
 
-            var dialog = new RecordingEditDialog(_takes)
-            {
-                DataContext = this
-            };
+            var dialog = Editor();
+
+            dialog.DataContext = this;
 
             if (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop && desktop.MainWindow is not null)
             {
@@ -1506,6 +1509,33 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         Status = $"Playing '{recording.Name}'";
     }
+
+    /// <summary>
+    /// What plays a take here, which is a real player or one that cannot sound anything.
+    /// </summary>
+    /// <remarks>
+    /// **A page built with no audio under it is a real thing**, which is what the bench that
+    /// measures this page is, so the answer is said out loud rather than left as the shape two
+    /// arguments happen to take when they are missing. A player is never half wired.
+    /// </remarks>
+    /// <param name="recordings">How a recording is made to sound, or nothing.</param>
+    /// <param name="takes">The bus a take goes onto, or nothing.</param>
+    private static Waveform.WaveformPlayer Playing(
+        JingleBox2.Audio.Interfaces.IRecordingSource? recordings,
+        JingleBox2.Audio.Interfaces.IOutputBus? takes) =>
+        recordings is { } source && takes is { } bus
+            ? new Waveform.WaveformPlayer(source, bus)
+            : Waveform.WaveformPlayer.Silent();
+
+    /// <summary>The editing window, over this page's own audio where there is any.</summary>
+    /// <remarks>
+    /// The same answer as <see cref="Playing"/> one layer up: the window is handed both halves or
+    /// neither, so it cannot be built holding one of them.
+    /// </remarks>
+    private RecordingEditDialog Editor() =>
+        _recordings is { } source && _takes is { } bus
+            ? new RecordingEditDialog(source, bus)
+            : new RecordingEditDialog();
 
     /// <summary>Silence, whichever recording it was. Safe to call when nothing is playing.</summary>
     public void StopPreview()

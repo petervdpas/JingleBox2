@@ -15,7 +15,7 @@ namespace JingleBox2.Audio;
 /// the arrays are swapped as a set by <see cref="Resize"/> and by nothing else, which is what
 /// lets the audio thread read them without the lock.
 /// </remarks>
-public sealed class BassAudioEngine : IAudioEngine
+public sealed class BassAudioEngine : IAudioEngine, Interfaces.IRecordingSource
 {
     /// <summary>The add-ons beside the program, loaded once for the process.</summary>
     private readonly IBassPlugins _plugins = new BassPlugins();
@@ -44,19 +44,27 @@ public sealed class BassAudioEngine : IAudioEngine
     /// </remarks>
     private readonly Diagnostics.Interfaces.ITerminalHush _hush = new Diagnostics.TerminalHush();
 
-    /// <summary>Which of them are worth offering on a machine with a sound server.</summary>
-    private readonly Interfaces.ISoundServerOutput _server = new SoundServerOutput();
-
     /// <summary>
-    /// This application as a node on the sound server's graph, where there is one.
+    /// Which of the three ways out the mix takes, for a given output.
     /// </summary>
     /// <remarks>
-    /// The second thing that can pull the mix, beside a driver, and it is arranged exactly as a
-    /// driver is: the library is opened on its own silent device, the mix is made a decoding
-    /// stream, and this takes blocks out of it. Absent everywhere but Linux, where everything
-    /// below simply goes the way it always did.
+    /// The graph node and the rule that recognises the server live in there rather than here, and
+    /// the drivers are handed over because this class reads them for other things: what is on the
+    /// machine, what is missing, and how long a block the open one is running. There is one of
+    /// those, so the outlet that opens it and the property that reports on it have to be looking
+    /// at the same object.
     /// </remarks>
-    private readonly Interfaces.IPipeWireOutput _pipe = new PipeWireOutput();
+    private readonly Interfaces.IMixOutlets _outlets;
+
+    /// <summary>
+    /// Where the mix is leaving now, which is the library playing it until an output is opened.
+    /// </summary>
+    /// <remarks>
+    /// One field rather than the two flags this used to carry about. A driver pulling and a sound
+    /// server pulling are the same fact, and written as two they were asked twice, in two methods,
+    /// with a third argument threaded between them for the one of the three that needs a number.
+    /// </remarks>
+    private Interfaces.IMixOutlet _outlet = new LibraryOutlet();
 
     /// <summary>
     /// Everything this application plays, summed, which is the only way anything leaves.
@@ -174,12 +182,19 @@ public sealed class BassAudioEngine : IAudioEngine
     /// What says whether an endpoint can be opened, or the real one. Handed in so the list can be
     /// asked for on a machine with no card, and so a test can offer a device that refuses.
     /// </param>
+    /// <param name="outlets">
+    /// Which of the three ways out the mix takes, or the machine's own. Handed in so the choice
+    /// can be put a question to without a driver, a graph or a card, which is where it was wrong.
+    /// </param>
     public BassAudioEngine(
         int padCount = 8,
         int deviceRate = 0,
         Interfaces.IOutputRate? rate = null,
-        Interfaces.IOutputProbe? probe = null)
+        Interfaces.IOutputProbe? probe = null,
+        Interfaces.IMixOutlets? outlets = null)
     {
+        _outlets = outlets ?? new MixOutlets(_asio);
+
         _deviceRate = (rate ?? new OutputRate()).Chosen(deviceRate);
         _probe = probe ?? new OutputProbe(_deviceRate);
 
@@ -434,8 +449,7 @@ public sealed class BassAudioEngine : IAudioEngine
 
         CloseBussesLocked();
 
-        _asio.Close();
-        _pipe.Close();
+        _outlet.Close();
 
         if (_opened) Bass.Free();
 
@@ -448,10 +462,9 @@ public sealed class BassAudioEngine : IAudioEngine
 
         string named = Bass.GetDeviceInfo(describes, out var about) ? about.Name : "";
 
-        bool driven = kind == Enums.AudioOutputKind.Asio;
-        bool served = !driven && _pipe.Present && _server.Is(named, about.IsDefault);
+        _outlet = _outlets.For(kind, index, named, about.IsDefault);
 
-        int opened = driven || served ? SilentDevice : index;
+        int opened = _outlet.Pulls ? SilentDevice : index;
 
         if (!Bass.Init(opened, _deviceRate, Stereo))
             throw new InvalidOperationException($"Bass.Init failed: {Bass.LastError}");
@@ -464,14 +477,13 @@ public sealed class BassAudioEngine : IAudioEngine
                 : Bass.GetDeviceInfo(opened, out var info) ? info.Name : "unnamed";
 
             return "outputs: opened " + opened + " '" + called + "' at " + _deviceRate + " Hz"
-                + (driven ? ", silently, since a driver is pulling" : "")
-                + (served ? ", silently, since the sound server is pulling" : "")
+                + (_outlet.Word.Length > 0 ? ", silently, since " + _outlet.Word + " is pulling" : "")
                 + (opened == SilentDevice ? "  (this device plays nothing)" : "");
         });
 
         LoadPlugins();
 
-        OpenBussesLocked(driven || served, index, served);
+        OpenBussesLocked();
     }
 
     /// <summary>
@@ -484,9 +496,11 @@ public sealed class BassAudioEngine : IAudioEngine
     /// on it: a stream that plays itself and is also pulled is the same audio leaving by two
     /// routes.
     ///
-    /// A driver that will not take the bus leaves everything open and silent rather than half
-    /// wired, and says so, and the sound server is the same in every respect: it is the second
-    /// thing that can pull, and where it does the library plays nothing itself.
+    /// **Who takes the mix out is one question with one answer**, which is the outlet, and the
+    /// three ways out differ nowhere in here: the bus is a decoding stream where the outlet pulls
+    /// and an ordinary playing one where it does not, and then it is handed over. An outlet that
+    /// will not take it leaves everything open and silent rather than half wired, and says which
+    /// one it was and what it had to say about it.
     ///
     /// **A bus that will not open throws rather than being worked around.** The one thing that
     /// can fail is BASSmix not being beside the program, and on that machine nothing can be
@@ -494,17 +508,11 @@ public sealed class BassAudioEngine : IAudioEngine
     /// which puts the message on that pad. Playing the pads a second way and losing solo, pan,
     /// mute and ASIO in silence is the alternative, and it is worse.
     /// </remarks>
-    /// <param name="pulled">Whether something pulls the output rather than BASS playing it.</param>
-    /// <param name="device">Which ASIO driver, where one is being used.</param>
-    /// <param name="served">
-    /// Whether the puller is the sound server rather than a driver. Asked first, since a machine
-    /// with a server has no driver and the two are never both true.
-    /// </param>
-    private void OpenBussesLocked(bool pulled, int device, bool served = false)
+    private void OpenBussesLocked()
     {
         _output.BufferMs = StartingBufferMs();
 
-        if (!_output.Open(_deviceRate, BusChannels, pulled))
+        if (!_output.Open(_deviceRate, BusChannels, _outlet.Pulls))
             throw new InvalidOperationException(
                 "The mixer stream could not be opened, so nothing can be played. " +
                 "This needs BASSmix beside the program.");
@@ -523,27 +531,16 @@ public sealed class BassAudioEngine : IAudioEngine
         _output.Add(_takeBus.Handle);
         _output.Add(_monitorBus.Handle);
 
-        if (served)
+        if (_outlet.Open(_output.Handle, _deviceRate)) return;
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
         {
-            if (!_pipe.Open(_output.Handle, _deviceRate))
-                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
-                    "bus: the sound server would not take the bus, so nothing will be heard");
+            string who = _outlet.Word.Length > 0 ? _outlet.Word : "the library";
+            string why = _outlet.Why;
 
-            return;
-        }
-
-        if (pulled)
-        {
-            if (!_asio.Open(device, _output.Handle, _deviceRate))
-                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
-                    "bus: the driver would not take the bus, so nothing will be heard");
-
-            return;
-        }
-
-        if (!Bass.ChannelPlay(_output.Handle))
-            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
-                () => "bus: the bus would not play: " + Bass.LastError);
+            return "bus: " + who + " would not take the bus, so nothing will be heard"
+                + (why.Length > 0 ? ": " + why : "");
+        });
     }
 
     /// <summary>Lets the bus and its sub-busses go, with the lock held.</summary>
@@ -736,10 +733,7 @@ public sealed class BassAudioEngine : IAudioEngine
 
             if (handle == 0)
             {
-                var flags = PadFlagsLocked(BassFlags.Prescan | BassFlags.Float
-                    | (_padLoops[padIndex] ? BassFlags.Loop : BassFlags.Default));
-
-                handle = Bass.CreateStream(filePath, Flags: flags);
+                handle = Open(filePath, _padLoops[padIndex]);
                 if (handle == 0)
                     throw new InvalidOperationException($"CreateStream(file) failed: {Bass.LastError}");
 
@@ -1103,6 +1097,101 @@ public sealed class BassAudioEngine : IAudioEngine
     /// </remarks>
     /// <param name="flags">What the pad wanted anyway.</param>
     private BassFlags PadFlagsLocked(BassFlags flags) => flags | BassFlags.Decode;
+
+    /// <inheritdoc/>
+    public Interfaces.IRecordingSource Recordings => this;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The flags are the whole of what one way of doing this buys, so they are written here once.
+    /// Float, so a plugin on a pad or on the desk meets the samples as they are rather than
+    /// through a conversion each way. Prescan, so a file whose length is not in its header still
+    /// reports one, which is what a cursor and a region run against. And decoding, since the only
+    /// place a recording goes here is a bus and a bus refuses anything else.
+    ///
+    /// The output is opened first: a pad pressed before anything else has asked already did that,
+    /// and a take auditioned first is the same case.
+    /// </remarks>
+    public int Open(string filePath, bool loops = false)
+    {
+        if (string.IsNullOrWhiteSpace(filePath)) return 0;
+
+        lock (_lock)
+        {
+            EnsureInitLocked();
+
+            return Bass.CreateStream(filePath, Flags: PadFlagsLocked(
+                BassFlags.Prescan | BassFlags.Float | (loops ? BassFlags.Loop : BassFlags.Default)));
+        }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Stopping a decoding channel does nothing to any sound by itself and is said all the same,
+    /// so a channel is let go of in the same state whichever path reached it.
+    /// </remarks>
+    public void Close(int channel)
+    {
+        if (channel == 0) return;
+
+        lock (_lock)
+        {
+            Bass.ChannelStop(channel);
+            Bass.StreamFree(channel);
+        }
+    }
+
+    /// <inheritdoc/>
+    public double Seconds(int channel)
+    {
+        if (channel == 0) return 0;
+
+        lock (_lock)
+        {
+            long length = Bass.ChannelGetLength(channel);
+
+            return length <= 0 ? 0 : Bass.ChannelBytes2Seconds(channel, length);
+        }
+    }
+
+    /// <inheritdoc/>
+    public double At(int channel)
+    {
+        if (channel == 0) return 0;
+
+        lock (_lock)
+        {
+            long position = Bass.ChannelGetPosition(channel);
+
+            return position <= 0 ? 0 : Bass.ChannelBytes2Seconds(channel, position);
+        }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Through the library's own conversion rather than an arithmetic of our own, which is what
+    /// keeps every caller clear of how wide a sample is: what it answers is already on a sample
+    /// boundary, and a position that is not is a channel moved into the middle of a frame.
+    /// </remarks>
+    public void Seek(int channel, double seconds)
+    {
+        if (channel == 0) return;
+
+        lock (_lock)
+            Bass.ChannelSetPosition(channel, Bass.ChannelSeconds2Bytes(channel, Math.Max(0, seconds)));
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Compared against stopped rather than tested for playing, because PlaybackState is not a
+    /// flags enum: HasFlag does bitwise arithmetic on it and misreads Paused and Stalled.
+    /// </remarks>
+    public bool Ended(int channel)
+    {
+        if (channel == 0) return true;
+
+        lock (_lock) return Bass.ChannelIsActive(channel) == PlaybackState.Stopped;
+    }
 
     /// <summary>Watches a pad for its end, whichever path its audio takes.</summary>
     /// <remarks>

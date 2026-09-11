@@ -67,6 +67,9 @@ public class CancelChangesTests
         public IOutputBus PadBus { get; } = new Nowhere();
         /// <inheritdoc/>
         public IOutputBus TakeBus { get; } = new Nowhere();
+
+        /// <inheritdoc/>
+        public JingleBox2.Audio.Interfaces.IRecordingSource Recordings { get; } = new NoRecordings();
         /// <inheritdoc/>
         public IOutputBus MonitorBus { get; } = new Nowhere();
         /// <inheritdoc/>

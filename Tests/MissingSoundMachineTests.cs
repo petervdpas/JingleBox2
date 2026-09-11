@@ -59,6 +59,9 @@ public class MissingSoundMachineTests
         public JingleBox2.Audio.Interfaces.IOutputBus PadBus => throw Asked();
         /// <inheritdoc/>
         public JingleBox2.Audio.Interfaces.IOutputBus TakeBus => throw Asked();
+
+        /// <inheritdoc/>
+        public JingleBox2.Audio.Interfaces.IRecordingSource Recordings => throw Asked();
         /// <inheritdoc/>
         public JingleBox2.Audio.Interfaces.IOutputBus MonitorBus => throw Asked();
         /// <inheritdoc/>

@@ -2111,7 +2111,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             store.Save(cfg);
         });
 
-        Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg, routing, _audio.TakeBus);
+        Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg, routing, _audio.TakeBus, _audio.Recordings);
 
         Record.UsePlugins(Plugins, _effects, _effectInFront);
 

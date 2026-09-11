@@ -152,6 +152,14 @@ public interface IAudioEngine : IDisposable
     /// </remarks>
     IMonitorFeed Monitor { get; }
 
+    /// <summary>The one way a recording is made into a source for a bus.</summary>
+    /// <remarks>
+    /// The pads go through it and so does a take auditioned on RECORD, which is what stops the
+    /// two drifting into two acts. Here rather than beside the recorder, because opening a
+    /// channel means opening the output behind it and this is what owns the output.
+    /// </remarks>
+    IRecordingSource Recordings { get; }
+
     /// <summary>Plays a file on that pad, from the beginning, at that level.</summary>
     void PlaySample(int padIndex, string filePath, float volume);
 

@@ -77,7 +77,7 @@ public partial class RecordingEditDialog : Window
     /// context announcement fires on every reassignment and would otherwise leave the window
     /// subscribed to every take it had ever shown.
     /// </remarks>
-    public RecordingEditDialog() : this(null)
+    public RecordingEditDialog() : this(WaveformPlayer.Silent())
     {
     }
 
@@ -88,13 +88,29 @@ public partial class RecordingEditDialog : Window
     /// only the defaulted version the page builds with a warning saying it cannot be reached that
     /// way, and this build is kept at nought warnings.
     /// </remarks>
-    /// <param name="takes">
-    /// The bus a take goes onto, or nothing to play it the way it always was. Handed in rather
-    /// than reached for, since this window is opened from RECORD and RECORD is what holds it.
+    /// <param name="recordings">
+    /// How a recording is made to sound, which is the one way everything here plays one. Handed
+    /// in rather than reached for, since this window is opened from RECORD and RECORD is what
+    /// holds it.
     /// </param>
-    public RecordingEditDialog(JingleBox2.Audio.Interfaces.IOutputBus? takes)
+    /// <param name="takes">The bus a take goes onto, on the same terms.</param>
+    public RecordingEditDialog(
+        JingleBox2.Audio.Interfaces.IRecordingSource recordings,
+        JingleBox2.Audio.Interfaces.IOutputBus takes)
+        : this(new WaveformPlayer(recordings, takes))
     {
-        _player = new WaveformPlayer(takes);
+    }
+
+    /// <summary>The window over whatever will be playing its preview.</summary>
+    /// <remarks>
+    /// Private, and the one place the window is really built: the two public ones differ only in
+    /// what they hand it, which is a player that can sound a take or one that cannot, and neither
+    /// is allowed to be half a player.
+    /// </remarks>
+    /// <param name="player">What plays the preview.</param>
+    private RecordingEditDialog(WaveformPlayer player)
+    {
+        _player = player;
 
         InitializeComponent();
 

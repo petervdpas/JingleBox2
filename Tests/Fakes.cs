@@ -256,6 +256,9 @@ internal sealed class SilentAudio : IAudioEngine
     public JingleBox2.Audio.Interfaces.IOutputBus TakeBus => null!;
 
     /// <inheritdoc/>
+    public JingleBox2.Audio.Interfaces.IRecordingSource Recordings { get; } = new NoRecordings();
+
+    /// <inheritdoc/>
     public JingleBox2.Audio.Interfaces.IOutputBus MonitorBus => null!;
 
     /// <inheritdoc/>
@@ -321,4 +324,34 @@ internal sealed class SilentAudio : IAudioEngine
     public void Dispose()
     {
     }
+}
+
+/// <summary>A source that opens nothing, for a test with no sound card under it.</summary>
+/// <remarks>
+/// Nought is the channel that is not open everywhere here, so answering it for every file is a
+/// recording that cannot be heard rather than one that fails.
+/// </remarks>
+public sealed class NoRecordings : JingleBox2.Audio.Interfaces.IRecordingSource
+{
+    /// <inheritdoc/>
+    public int Open(string filePath, bool loops = false) => 0;
+
+    /// <inheritdoc/>
+    public void Close(int channel)
+    {
+    }
+
+    /// <inheritdoc/>
+    public double Seconds(int channel) => 0;
+
+    /// <inheritdoc/>
+    public double At(int channel) => 0;
+
+    /// <inheritdoc/>
+    public void Seek(int channel, double seconds)
+    {
+    }
+
+    /// <inheritdoc/>
+    public bool Ended(int channel) => true;
 }
