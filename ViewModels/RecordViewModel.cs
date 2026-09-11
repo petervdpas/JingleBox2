@@ -14,6 +14,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using JingleBox2.Audio.Enums;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Tracker.Interfaces;
@@ -58,6 +59,18 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
     /// <summary>Reduces a finished take to peaks, for the picture under the list.</summary>
     private readonly IWaveformService _waveformService;
+
+    /// <summary>The copy of the take the editor works on, so the shelf's own file is untouched.</summary>
+    private readonly IWorkingCopy _copy;
+
+    /// <summary>What turns one written-down step into the edit it asks for.</summary>
+    private readonly ITakeSteps _steps;
+
+    /// <summary>What has been done to the take that is open, and where in it you are standing.</summary>
+    private readonly ITakeHistory _history = new TakeHistory();
+
+    /// <summary>What each step is called where somebody reads a list of them.</summary>
+    private readonly ITakeStepWords _stepWords = new TakeStepWords();
 
     /// <summary>Where the input device and the gain are written down, which is the settings file.</summary>
     private readonly ConfigStore _configStore;
@@ -633,8 +646,11 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// The preview's row goes back to idle when it stops, whether it ran out on its own or
     /// somebody stopped it, since those are the same thing to whoever is looking at the list.
     /// </remarks>
-    public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, ConfigStore configStore, AppConfig cfg, IAudioRouting routing, JingleBox2.Audio.Interfaces.IOutputBus? takes = null, JingleBox2.Audio.Interfaces.IRecordingSource? recordings = null)
+    public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, ConfigStore configStore, AppConfig cfg, IAudioRouting routing, JingleBox2.Audio.Interfaces.IOutputBus? takes = null, JingleBox2.Audio.Interfaces.IRecordingSource? recordings = null, IWorkingCopy? copy = null, ITakeSteps? steps = null)
     {
+        _copy = copy ?? new WorkingCopy();
+        _steps = steps ?? new TakeSteps(waveformService);
+
         _takes = takes;
         _recordings = recordings;
         _preview = Playing(recordings, takes);
@@ -1142,14 +1158,16 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     }
 
     /// <summary>
-    /// Opens the edit dialog on a take: its name, its picture, and the two things that rewrite it.
+    /// Opens the editor on a take: its name, its picture, and the tools that work on it.
     /// </summary>
     /// <remarks>
+    /// **A copy of the take is taken first and everything the editor does happens to the copy**,
+    /// so the file on the shelf is exactly as it was until somebody saves. The picture is read
+    /// off the copy for the same reason: what it has to show is the take with the unsaved work
+    /// on it.
+    ///
     /// The audition is stopped first, because the dialog has a player of its own and the page's
     /// would go on sounding underneath it.
-    ///
-    /// The picture is read again rather than the page's being handed over, since the dialog is
-    /// the one that rewrites the file and has to start from what is on disc now.
     /// </remarks>
     private void EditRecording(Recording? recording)
     {
@@ -1162,7 +1180,13 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             SelectedRecordingForEdit = recording;
             EditName = recording.Name;
 
-            CurrentWaveform = _waveformService.AnalyzeFile(recording.FilePath);
+            _history.Clear();
+
+            string path = _copy.Open(recording.FilePath) ?? recording.FilePath;
+
+            CurrentWaveform = _waveformService.AnalyzeFile(path);
+
+            Shown();
 
             var dialog = Editor();
 
@@ -1258,99 +1282,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         catch { return 0; }
     }
 
-    /// <summary>
-    /// Cuts the recording down to the selected region. Start and end are fractions of the
-    /// whole file, matching the trim handles in the editor.
-    /// </summary>
-    /// <remarks>
-    /// The file itself is rewritten, so anything built on it is holding audio that no longer
-    /// exists: <see cref="RecordingChanged"/> says the path, and whoever is playing it from
-    /// memory reads it again.
-    ///
-    /// The work is done off the drawing thread, since a long take takes a moment and a page that
-    /// stopped while it did would read as a program that had hung.
-    /// </remarks>
-    /// <returns>True when the file was rewritten, so callers can reset their view.</returns>
-    public async Task<bool> ApplyTrimAsync(double startFraction, double endFraction)
-    {
-        var recording = SelectedRecordingForEdit;
-        var waveform = CurrentWaveform;
-        if (recording == null || waveform == null) return false;
-
-        try
-        {
-            long totalFrames = waveform.TotalSamples;
-            long startFrame = (long)(Math.Clamp(startFraction, 0, 1) * totalFrames);
-            long endFrame = (long)(Math.Clamp(endFraction, 0, 1) * totalFrames);
-
-            Status = "Trimming...";
-            await Task.Run(() => _waveformService.TrimFile(recording.FilePath, startFrame, endFrame));
-
-            CurrentWaveform = await Task.Run(() => _waveformService.AnalyzeFile(recording.FilePath));
-            recording.DurationMs = ReadDurationMs(recording.FilePath);
-
-            RecordingChanged?.Invoke(this, recording.FilePath);
-
-            Status = $"Trimmed '{recording.Name}' to {TimeSpan.FromMilliseconds(recording.DurationMs):mm\\:ss\\.fff}";
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Status = $"Trim failed: {ex.Message}";
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Empties the region and leaves the rest of the take where it is.
-    /// </summary>
-    /// <remarks>
-    /// The same shape as <see cref="ApplyTrimAsync"/> and for the same reasons: the work is off
-    /// the drawing thread because a long take takes a moment, the file is rewritten so anything
-    /// playing it from memory has to read it again, and <see cref="RecordingChanged"/> carries
-    /// the path so it can.
-    ///
-    /// The length does not change, so unlike a trim the region, the playhead and the zoom are
-    /// still about the right part of the file afterwards and are left alone.
-    /// </remarks>
-    /// <param name="startFraction">Where the region starts, nought to one.</param>
-    /// <param name="endFraction">Where it ends.</param>
-    /// <returns>True when the file was rewritten.</returns>
-    public async Task<bool> SilenceAsync(double startFraction, double endFraction)
-    {
-        var recording = SelectedRecordingForEdit;
-        var waveform = CurrentWaveform;
-        if (recording == null || waveform == null) return false;
-
-        try
-        {
-            long totalFrames = waveform.TotalSamples;
-            long startFrame = (long)(Math.Clamp(startFraction, 0, 1) * totalFrames);
-            long endFrame = (long)(Math.Clamp(endFraction, 0, 1) * totalFrames);
-
-            if (endFrame <= startFrame)
-            {
-                Status = "Select a part of the take first.";
-                return false;
-            }
-
-            Status = "Silencing...";
-            await Task.Run(() => _waveformService.SilenceFile(recording.FilePath, startFrame, endFrame));
-
-            CurrentWaveform = await Task.Run(() => _waveformService.AnalyzeFile(recording.FilePath));
-
-            RecordingChanged?.Invoke(this, recording.FilePath);
-
-            Status = $"Silenced {TimeSpan.FromMilliseconds((endFrame - startFrame) * 1000.0 / Math.Max(1, waveform.SampleRate)):mm\\:ss\\.fff} of '{recording.Name}'";
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Status = $"Silence failed: {ex.Message}";
-            return false;
-        }
-    }
-
     /// <summary>Where a normalize puts the loudest moment, in dBFS.</summary>
     [ObservableProperty] private double normalizeTargetDb = Normalization.Target;
 
@@ -1361,49 +1292,357 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     public double MaxNormalizeDb => Normalization.Loudest;
 
     /// <summary>
-    /// Lifts the whole recording so its loudest moment sits on the target. The trim region is
-    /// not involved: this is about the level of the file, not about part of it.
+    /// The copy of the take the editor is working on, which is what it draws, plays and edits.
     /// </summary>
     /// <remarks>
-    /// A take already at the target is left alone and says so, rather than being rewritten to
-    /// the same audio: every rewrite is a file written and a picture redrawn, and doing that for
-    /// no change reads as work having happened when none did.
-    ///
-    /// The audio changes under anything built on this file, so <see cref="RecordingChanged"/>
-    /// carries the path.
+    /// **Nothing the editor does reaches the take on the shelf until Save.** So the picture, the
+    /// preview and every tool are pointed here, and the shelf's own file is what a replay comes
+    /// off and what Save writes to.
     /// </remarks>
-    /// <returns>True when the file was rewritten, so callers can redraw.</returns>
-    public async Task<bool> NormalizeAsync()
+    public string? EditingPath => _copy.Path;
+
+    /// <summary>True while a take is open in the editor.</summary>
+    public bool IsEditing => _copy.IsOpen;
+
+    /// <summary>True while something has been done that the take on the shelf has not got.</summary>
+    public bool HasEdits => _history.Done > 0;
+
+    /// <summary>True when there is a step to go back past.</summary>
+    public bool CanUndoEdit => _history.CanUndo;
+
+    /// <summary>And one in front to do again.</summary>
+    public bool CanRedoEdit => _history.CanRedo;
+
+    /// <summary>
+    /// The history as a list somebody can read and point at, the take itself at the top of it.
+    /// </summary>
+    /// <remarks>
+    /// The first line is the take as it was found, so standing on it is standing on the file the
+    /// shelf holds. Every line under it is one step, and the ones past where you are standing
+    /// are still there until something new is done.
+    ///
+    /// The rows outlive what happens to them, which is why they are told rather than made again:
+    /// see <see cref="TakeStepRow"/>.
+    /// </remarks>
+    public ObservableCollection<TakeStepRow> EditSteps { get; } = new();
+
+    /// <summary>
+    /// Which line of the history is the take you are looking at.
+    /// </summary>
+    /// <remarks>
+    /// Written to as well as read, since picking a line in the list is how somebody walks the
+    /// history with a pointer rather than a key. The walk is a file being rebuilt, so it is
+    /// started and not waited for, and the guard is what keeps the list agreeing with the
+    /// history rather than starting a second walk on the way back.
+    ///
+    /// Nothing picked at all is ignored rather than read as the top of the list. A list says
+    /// minus one whenever it is holding nothing, and walking the take back to how it was found
+    /// because a row went away for a moment is not what anybody meant.
+    /// </remarks>
+    public int EditAt
     {
-        var recording = SelectedRecordingForEdit;
-        if (recording == null) return false;
+        get => _history.Done;
+        set
+        {
+            if (!_walking && value >= 0 && value != _history.Done) _ = GoToStepAsync(value);
+        }
+    }
+
+    /// <summary>True while the history is being wound, so the list writing back is ignored.</summary>
+    private bool _walking;
+
+    /// <summary>
+    /// The working copy is about to be written over, so anything holding it open should let go.
+    /// </summary>
+    /// <remarks>
+    /// The editor plays its preview off the working copy, and a file that is being played is a
+    /// file that is open, which on Windows is a file that will not be rewritten. Every tool the
+    /// window presses already stops the preview on the way past; the ones that do not go through
+    /// a button are undo, redo and picking a line of the history, which are a keystroke and a
+    /// list, and this is what reaches them.
+    /// </remarks>
+    public event Action? TakeRewriting;
+
+    /// <summary>
+    /// Does one of the editor's tools to the working copy and writes it down as a step.
+    /// </summary>
+    /// <remarks>
+    /// The region arrives as fractions, which is what the picture deals in, and is written down
+    /// in frames against the take **as it is now**: a trim changes the length underneath, and a
+    /// step recorded as a fraction would mean somewhere else the moment one happened.
+    ///
+    /// The work is off the drawing thread, since a long take takes a moment and a page that
+    /// stopped while it did would read as a program that had hung. Nothing is announced to the
+    /// rest of the application: what changed is a copy, and the shelf's take is still what
+    /// everything else is playing until Save.
+    /// </remarks>
+    /// <param name="kind">Which edit.</param>
+    /// <param name="startFraction">Where the selection starts, nought to one.</param>
+    /// <param name="endFraction">Where it ends.</param>
+    /// <returns>True when the working copy changed, so the editor can redraw.</returns>
+    public async Task<bool> EditAsync(TakeEditKind kind, double startFraction, double endFraction)
+    {
+        if (_copy.Path is not { } path || CurrentWaveform is not { } waveform) return false;
+
+        long frames = waveform.TotalSamples;
+        long from = (long)(Math.Clamp(startFraction, 0, 1) * frames);
+        long to = (long)(Math.Clamp(endFraction, 0, 1) * frames);
+
+        string word = _stepWords.For(kind);
+
+        if (kind != TakeEditKind.Normalize && to <= from)
+        {
+            Status = "Select a part of the take first.";
+            return false;
+        }
+
+        if (kind == TakeEditKind.Trim && from == 0 && to >= frames)
+        {
+            Status = "The whole take is selected, so there is nothing to trim.";
+            return false;
+        }
+
+        var step = new TakeStep(kind, from, to, NormalizeTargetDb);
 
         try
         {
-            Status = "Normalizing...";
+            TakeRewriting?.Invoke();
 
-            double target = NormalizeTargetDb;
-            double moved = await Task.Run(() => _waveformService.NormalizeFile(recording.FilePath, target));
+            Status = word + "...";
 
-            if (Math.Abs(moved) < 0.001)
+            if (!await Task.Run(() => _steps.Run(step, path)))
             {
-                Status = $"'{recording.Name}' is already at {target:0.0} dB";
+                Status = $"Already at {NormalizeTargetDb:0.0} dB, so nothing was done";
                 return false;
             }
 
-            CurrentWaveform = await Task.Run(() => _waveformService.AnalyzeFile(recording.FilePath));
+            _history.Add(step);
 
-            RecordingChanged?.Invoke(this, recording.FilePath);
+            await Drawn();
 
-            Status = $"Normalized '{recording.Name}' by {moved:+0.0;-0.0} dB";
+            Status = $"{word}. {Outstanding()}";
             return true;
         }
         catch (Exception ex)
         {
-            Status = $"Normalize failed: {ex.Message}";
+            Status = $"{word} failed: {ex.Message}";
             return false;
         }
     }
+
+    /// <summary>Stands one step further back.</summary>
+    public Task UndoEditAsync() => GoToStepAsync(_history.Done - 1);
+
+    /// <summary>And one step further forward.</summary>
+    public Task RedoEditAsync() => GoToStepAsync(_history.Done + 1);
+
+    /// <summary>
+    /// Walks the history to a place in it, rebuilding the working copy to match.
+    /// </summary>
+    /// <remarks>
+    /// **Going back is a fresh copy of the take with the steps before that point done again.**
+    /// No edit here has an undo of its own and none needs one, which is the whole reason the
+    /// history is a list of what was asked for rather than a pile of copies of the audio: a take
+    /// is up to a hundred megabytes, so twenty steps kept as audio is two gigabytes.
+    ///
+    /// What it costs is the replay, which is a copy and a pass per step: on the takes anybody
+    /// records that is a fraction of a second, and on a very long one with a long history it is
+    /// not. Going forward by one is the exception and is the common case, since that is what
+    /// redo is: the step is simply done to what is already there.
+    /// </remarks>
+    /// <param name="done">How many steps should have been done.</param>
+    public async Task GoToStepAsync(int done)
+    {
+        if (_copy.Path is not { } path) return;
+
+        done = Math.Clamp(done, 0, _history.Steps.Count);
+
+        if (done == _history.Done) return;
+
+        var walk = _history.Toward(done);
+
+        if (walk.Idle && done == _history.Done) return;
+
+        try
+        {
+            TakeRewriting?.Invoke();
+
+            Status = walk.Fresh ? "Going back..." : "Doing it again...";
+
+            await Task.Run(() =>
+            {
+                if (walk.Fresh) _copy.Fresh();
+
+                foreach (var step in walk.Steps) _steps.Run(step, path);
+            });
+
+            _history.GoTo(done);
+
+            await Drawn();
+
+            Status = done == 0
+                ? $"'{Name(SelectedRecordingForEdit)}' as it was found"
+                : Outstanding();
+        }
+        catch (Exception ex)
+        {
+            Status = $"Could not go back: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Puts the working copy over the take on the shelf, which is the only thing here that does.
+    /// </summary>
+    /// <remarks>
+    /// The audio under everything that plays this file has changed, so
+    /// <see cref="RecordingChanged"/> carries the path and whoever is holding it in memory reads
+    /// it again. The history is emptied rather than kept: what is on the shelf is now what is on
+    /// the screen, so there is nothing outstanding to go back past, and a step that claimed to
+    /// undo a saved edit would be undoing it against the wrong original.
+    /// </remarks>
+    /// <returns>True when the take was replaced.</returns>
+    public async Task<bool> SaveEditAsync()
+    {
+        if (SelectedRecordingForEdit is not { } recording || !HasEdits) return false;
+
+        try
+        {
+            TakeRewriting?.Invoke();
+
+            Status = "Saving...";
+
+            if (!await Task.Run(() => _copy.Keep()))
+            {
+                Status = $"'{recording.Name}' could not be saved";
+                return false;
+            }
+
+            recording.DurationMs = ReadDurationMs(recording.FilePath);
+
+            RecordingChanged?.Invoke(this, recording.FilePath);
+
+            _history.Clear();
+            Shown();
+
+            Status = $"Saved '{recording.Name}'";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Status = $"Save failed: {ex.Message}";
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Throws every step away and puts the working copy back to what the shelf holds.
+    /// </summary>
+    /// <remarks>
+    /// The same act as walking the history to the top of it, and then the way forward goes as
+    /// well, which is the difference between this and an undo: this says the whole session was
+    /// not wanted.
+    /// </remarks>
+    public async Task RevertEditAsync()
+    {
+        if (_history.Steps.Count == 0) return;
+
+        await GoToStepAsync(0);
+
+        _history.Clear();
+        Shown();
+
+        Status = $"'{Name(SelectedRecordingForEdit)}' as it was found";
+    }
+
+    /// <summary>
+    /// Lets the working copy go, which is what closing the editor does.
+    /// </summary>
+    /// <remarks>
+    /// The copy is deleted rather than kept for next time. Keeping it would mean a take that
+    /// opens holding somebody's abandoned edits with nothing on the screen saying so, and the
+    /// file is the size of the take.
+    /// </remarks>
+    public void EndEdit()
+    {
+        _copy.Close();
+        _history.Clear();
+
+        EditSteps.Clear();
+        Moved();
+    }
+
+    /// <summary>How many steps are waiting to be saved, in words.</summary>
+    /// <returns>The sentence, which is never blank.</returns>
+    private string Outstanding() =>
+        _history.Done == 1 ? "1 change to save" : $"{_history.Done} changes to save";
+
+    /// <summary>The take's name, or a word for the one that is not there.</summary>
+    /// <param name="recording">The take, or nothing.</param>
+    /// <returns>What to call it in a sentence.</returns>
+    private static string Name(Recording? recording) => recording?.Name ?? "the take";
+
+    /// <summary>
+    /// Reads the working copy again and says everything about the history moved.
+    /// </summary>
+    /// <remarks>
+    /// The picture comes off the copy rather than off the shelf, which is the whole of what
+    /// makes an unsaved edit visible: the take itself has not changed and must not be read here
+    /// or the screen would show the edit undone the moment it was made.
+    /// </remarks>
+    private async Task Drawn()
+    {
+        if (_copy.Path is not { } path) return;
+
+        CurrentWaveform = await Task.Run(() => _waveformService.AnalyzeFile(path));
+
+        Shown();
+    }
+
+    /// <summary>Builds the history list again and says what moved with it.</summary>
+    private void Shown()
+    {
+        _walking = true;
+
+        while (EditSteps.Count > _history.Steps.Count + 1) EditSteps.RemoveAt(EditSteps.Count - 1);
+
+        if (EditSteps.Count == 0) EditSteps.Add(new TakeStepRow("Original", true));
+
+        for (int at = 0; at < _history.Steps.Count; at++)
+        {
+            string said = _stepWords.For(_history.Steps[at].Kind);
+            bool done = at < _history.Done;
+
+            if (at + 1 < EditSteps.Count) EditSteps[at + 1].Say(said, done);
+            else EditSteps.Add(new TakeStepRow(said, done));
+        }
+
+        _walking = false;
+
+        Moved();
+    }
+
+    /// <summary>Says that everything about the editor's state may have moved.</summary>
+    private void Moved()
+    {
+        OnPropertyChanged(nameof(IsEditing));
+        OnPropertyChanged(nameof(EditingPath));
+        OnPropertyChanged(nameof(HasEdits));
+        OnPropertyChanged(nameof(CanUndoEdit));
+        OnPropertyChanged(nameof(CanRedoEdit));
+        OnPropertyChanged(nameof(EditAt));
+    }
+
+    /// <summary>Goes back a step, for the button on the editor.</summary>
+    public IAsyncRelayCommand UndoEditCommand => new AsyncRelayCommand(UndoEditAsync);
+
+    /// <summary>And forward again.</summary>
+    public IAsyncRelayCommand RedoEditCommand => new AsyncRelayCommand(RedoEditAsync);
+
+    /// <summary>Puts the working copy over the take.</summary>
+    public IAsyncRelayCommand SaveEditCommand => new AsyncRelayCommand(async () => await SaveEditAsync());
+
+    /// <summary>Throws every step away.</summary>
+    public IAsyncRelayCommand RevertEditCommand => new AsyncRelayCommand(RevertEditAsync);
 
     /// <summary>
     /// The rack, set once it has been built. Recordings are its raw material,
@@ -1632,13 +1871,45 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// nothing.
     /// </remarks>
     bool Shortcuts.Interfaces.IShortcutContext.Can(Shortcuts.Enums.ShortcutAction action) =>
-        action == Shortcuts.Enums.ShortcutAction.Undo && CanUnbin;
+        action switch
+        {
+            Shortcuts.Enums.ShortcutAction.Undo => IsEditing ? CanUndoEdit : CanUnbin,
+            Shortcuts.Enums.ShortcutAction.Redo => IsEditing && CanRedoEdit,
+            Shortcuts.Enums.ShortcutAction.Save => IsEditing && HasEdits,
+            _ => false
+        };
 
     /// <inheritdoc/>
-    /// <remarks>Only undo is answered, and only while there is something in the bin.</remarks>
+    /// <remarks>
+    /// **Undo means the editor while the editor is open and the bin otherwise**, which is the
+    /// rule this whole mechanism exists for: the keystroke belongs to whatever you are looking
+    /// at. The editor's window answers with this page, since the window's own settings are what
+    /// the walk outwards from the keyboard reaches.
+    ///
+    /// Each one is started rather than waited for. Going back a step is a file being rebuilt,
+    /// and a keystroke that held the drawing thread while it happened would read as a program
+    /// that had hung.
+    /// </remarks>
     void Shortcuts.Interfaces.IShortcutContext.Do(Shortcuts.Enums.ShortcutAction action)
     {
-        if (action == Shortcuts.Enums.ShortcutAction.Undo) Unbin();
+        switch (action)
+        {
+            case Shortcuts.Enums.ShortcutAction.Undo when IsEditing:
+                _ = UndoEditAsync();
+                break;
+
+            case Shortcuts.Enums.ShortcutAction.Undo:
+                Unbin();
+                break;
+
+            case Shortcuts.Enums.ShortcutAction.Redo:
+                _ = RedoEditAsync();
+                break;
+
+            case Shortcuts.Enums.ShortcutAction.Save:
+                _ = SaveEditAsync();
+                break;
+        }
     }
 
     /// <summary>Where a deleted take waits, beside the recordings rather than inside them.</summary>

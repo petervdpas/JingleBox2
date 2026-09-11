@@ -15,6 +15,14 @@ public sealed class WaveformService : IWaveformService
     /// <summary>The peak normalisation rules. Holds nothing, so one serves the whole object.</summary>
     private readonly INormalization _levels = new Normalization();
 
+    /// <summary>What is done to a stretch of samples once the file has been read in.</summary>
+    /// <remarks>
+    /// The arithmetic is here and the file is this class's: a fade that is a frame out at one
+    /// end and a reversal that swaps the channels of a stereo take are both silent faults, and
+    /// neither is worth a temporary file to ask about.
+    /// </remarks>
+    private readonly IRecordingEdit _edit = new RecordingEdit();
+
     /// <summary>
     /// The most peaks a picture is read into, however long the recording is.
     /// </summary>
@@ -116,9 +124,67 @@ public sealed class WaveformService : IWaveformService
         if (frames <= 0)
             throw new InvalidOperationException("There is nothing selected to silence.");
 
-        Array.Clear(samples, (int)(startFrame * info.Channels), (int)(frames * info.Channels));
+        _edit.Silence(samples, info.Channels, startFrame, endFrame);
 
         Write(filePath, samples, info, ".silence.tmp");
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Read whole, turned round in place and written back through the same temporary file the
+    /// trim uses, so a failure part way leaves the take as it was.
+    /// </remarks>
+    public void ReverseFile(string filePath, long startFrame, long endFrame)
+    {
+        var (samples, info) = Reading(filePath, ref startFrame, ref endFrame, "There is nothing selected to reverse.");
+
+        _edit.Reverse(samples, info.Channels, startFrame, endFrame);
+
+        Write(filePath, samples, info, ".reverse.tmp");
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The same shape as the other two, and the ramp itself is <see cref="IRecordingEdit.Fade"/>,
+    /// which is where the two ends of it are pinned.
+    /// </remarks>
+    public void FadeFile(string filePath, long startFrame, long endFrame, bool rising)
+    {
+        var (samples, info) = Reading(filePath, ref startFrame, ref endFrame, "There is nothing selected to fade.");
+
+        _edit.Fade(samples, info.Channels, startFrame, endFrame, rising);
+
+        Write(filePath, samples, info, ".fade.tmp");
+    }
+
+    /// <summary>
+    /// Reads a take in and settles which of its frames an edit is about.
+    /// </summary>
+    /// <remarks>
+    /// The region is brought inside the file and an empty one is refused here rather than in the
+    /// arithmetic, and the two guards are not the same guard: the rule holds a region inside the
+    /// array so that nothing walks off the end of it, and this one exists to put a sentence in
+    /// front of somebody who marked nothing and pressed a button.
+    /// </remarks>
+    /// <param name="filePath">The take.</param>
+    /// <param name="startFrame">Where the region starts, held inside the file on the way out.</param>
+    /// <param name="endFrame">Where it ends, on the same terms.</param>
+    /// <param name="empty">What to say where the region holds no frames.</param>
+    /// <returns>The samples and what the file says about itself.</returns>
+    private (short[] Samples, WavInfo Info) Reading(
+        string filePath, ref long startFrame, ref long endFrame, string empty)
+    {
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException($"File not found: {filePath}");
+
+        var (samples, info) = _wav.Read(filePath);
+
+        startFrame = Math.Clamp(startFrame, 0, info.FrameCount);
+        endFrame = Math.Clamp(endFrame, startFrame, info.FrameCount);
+
+        if (endFrame <= startFrame) throw new InvalidOperationException(empty);
+
+        return (samples, info);
     }
 
     /// <inheritdoc/>

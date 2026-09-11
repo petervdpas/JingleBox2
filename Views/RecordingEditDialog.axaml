@@ -6,109 +6,390 @@
         x:Class="JingleBox2.Views.RecordingEditDialog"
         x:DataType="vm:RecordViewModel"
         Title="Edit Recording"
-        Width="900" Height="620"
-        MinWidth="620" MinHeight="440"
+        Width="1060" Height="680"
+        MinWidth="880" MinHeight="540"
         WindowStartupLocation="CenterOwner">
 
   <!--
-    A window somebody can pull out, because the picture is the work. A waveform three seconds
-    long in a fixed 760 pixels is one pixel to every four milliseconds, and finding the cough
-    you meant to silence means zooming rather than looking. It was sized to its content, which
-    makes a window that cannot be resized however hard you pull at the corner.
+    A workshop rather than a form. The take's picture has the room, the tools stand in a box of
+    square marks down the left, and whatever the tool in hand needs set is in the panel directly
+    under the box, which is where every graphics editor has put it since they had one.
 
-    A dock rather than a stack, so the picture takes whatever height is left after the name and
-    the buttons have had theirs: in a stack every child asks for what it wants and the extra
-    room goes at the bottom, which is how a window grows and the thing you are looking at does
-    not.
+    Picking a tool does nothing to the take. The box says what this window can do and the panel
+    under it holds the button that does it, so an edit that cannot be undone is never one stray
+    click on a button you were only reading.
+
+    A dock rather than a stack, so the picture takes whatever height is left after the header,
+    the transport and the foot have had theirs: in a stack every child asks for what it wants
+    and the extra room goes at the bottom, which is how a window grows and the thing you are
+    looking at does not.
   -->
-  <DockPanel Margin="16" LastChildFill="True">
-    <!-- A recording's name is its file name, so this box moves the file. Every instrument
-         playing it is repointed at the same moment, on the shelf and in the song that is
-         open, which is why it can be an ordinary box and not a warning. -->
-    <Grid DockPanel.Dock="Top" Margin="0,0,0,12"
-          ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
-      <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" />
 
-      <TextBox Grid.Row="0" Grid.Column="1" Name="NameBox" FontSize="14"
-               Text="{Binding EditName, Mode=TwoWay}"
-               ToolTip.Tip="What the recording is called, which is also what its file is called." />
+  <Window.Styles>
+    <!-- The tool box. A tab strip is exactly this shape already, one picked at a time with its
+         own panel under it, and using it means nothing here has to remember which tool is in
+         hand or which panel goes with it. Wrapped rather than in a row, so the marks lay out as
+         a block of squares the way a tool box does. -->
+    <Style Selector="TabControl.toolbox">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderMutedBrush}" />
+    </Style>
 
-      <Button Grid.Row="0" Grid.Column="2" Name="RenameButton" Content="Rename" Click="Rename_Click"
-              MinWidth="90" IsEnabled="{Binding CanRename}" />
+    <Style Selector="TabControl.toolbox > TabItem">
+      <Setter Property="Width" Value="42" />
+      <Setter Property="Height" Value="42" />
+      <Setter Property="MinHeight" Value="42" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0,0,4,4" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Background" Value="{DynamicResource BgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderMutedBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
 
-      <!-- Under the name, because this is the other thing about a take that is a word rather
-           than a waveform, and because this is where it was looked for. The same box as the
-           one on the page: what is typed in either shows up in the other. -->
-      <TextBlock Grid.Row="1" Grid.Column="0" Text="Category" FontWeight="Bold" FontSize="16"
-                 VerticalAlignment="Center" />
+    <!-- The tool in hand wears the accent, mark and frame together, which is the pair this
+         application already uses everywhere something is chosen: on a light theme the accent
+         alone is near enough the ordinary lettering that nothing reads as picked. -->
+    <Style Selector="TabControl.toolbox > TabItem:selected">
+      <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
 
-      <views:CategoryField Grid.Row="1" Grid.Column="1" FontSize="14"
-                           ItemsSource="{Binding Shelf.Categories}"
-                           Text="{Binding TakeCategory}"
-                           HorizontalAlignment="Stretch"
-                           ToolTip.Tip="Type a category to file this take under. Empty it to unfile it." />
-    </Grid>
+    <Style Selector="TabControl.toolbox > TabItem:selected views|ToolIcon">
+      <Setter Property="Tint" Value="{DynamicResource AccentBrush}" />
+    </Style>
 
-    <TextBlock DockPanel.Dock="Top" Margin="0,0,0,12"
-               Text="{Binding RenameError}" Foreground="{DynamicResource DangerBrush}"
-               FontSize="12" IsVisible="{Binding RenameError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    <!-- The panel under the box, which is the tool's own and nothing else's. The line above it
+         is what says the two are different things: without it the box reads as one card with a
+         paragraph under it rather than as a box of tools and the options of the one in hand. -->
+    <Style Selector="Border.toolOptions">
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderMutedBrush}" />
+      <Setter Property="BorderThickness" Value="0,1,0,0" />
+      <Setter Property="Margin" Value="0,8,4,0" />
+      <Setter Property="Padding" Value="0,12,0,0" />
+    </Style>
 
-    <!-- Controls -->
-    <Grid DockPanel.Dock="Bottom" Margin="0,12,0,0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-      <Button Grid.Column="0" Content="Cancel" Click="Cancel_Click" MinWidth="120" />
-      <TextBlock Grid.Column="1" Text="{Binding Status}" Opacity="0.75" FontSize="12"
-                 VerticalAlignment="Center" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
-      <Button Grid.Column="2" Name="ApplyTrimButton" Content="Apply Trim" Click="ApplyTrim_Click" MinWidth="120" />
-    </Grid>
+    <Style Selector="Border.toolOptions > StackPanel">
+      <Setter Property="Spacing" Value="8" />
+    </Style>
 
-    <!-- Waveform Editor -->
-    <Border Classes="card">
-      <DockPanel LastChildFill="True">
-        <Grid DockPanel.Dock="Top" Margin="0,0,0,8"
-              ColumnDefinitions="*,auto,auto,auto,auto,auto,auto,auto" ColumnSpacing="8">
-          <TextBlock Grid.Column="0" Text="Trim Region" FontWeight="SemiBold" VerticalAlignment="Center" />
+    <!-- The history sits at the foot of the rail with a line over it, the same line that
+         separates the tools from their options: three blocks down one rail, each saying what it
+         is by standing apart from the next. -->
+    <Style Selector="Border.historyCard">
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderMutedBrush}" />
+      <Setter Property="BorderThickness" Value="0,1,0,0" />
+      <Setter Property="Margin" Value="0,12,4,0" />
+      <Setter Property="Padding" Value="0,10,0,0" />
+    </Style>
 
-          <!-- Normalizing is about the level of the whole recording, so it sits apart from
-               the region controls rather than among them. -->
-          <TextBlock Grid.Column="1" Text="Peak" VerticalAlignment="Center" Opacity="0.8" FontSize="12" />
-          <ui:NumberField Grid.Column="2" Width="66" Format="0.0"
-                             Minimum="-24" Maximum="0" SmallStep="0.5" LargeStep="3"
-                             Value="{Binding NormalizeTargetDb}"
-                             ToolTip.Tip="Where the loudest moment ends up, in dBFS. Just under zero leaves room for a resampled note to overshoot." />
-          <Button Grid.Column="3" Name="NormalizeButton" Content="Normalize" Click="Normalize_Click"
-                  ToolTip.Tip="Lifts the whole recording so its loudest moment sits on the peak above. Changes the file." />
+    <!-- A button that does the thing the tool in hand is for: one to a panel, across the
+         width of the rail, so there is never a question about which press is the edit. -->
+    <Style Selector="Button.doIt">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
 
-          <!-- The other half of what a region is for: trimming keeps it and throws the rest
-               away, this keeps the rest and empties it. Beside the region controls rather than
-               beside Normalize, which is about the whole file. -->
-          <Button Grid.Column="4" Name="SilenceButton" Content="Silence" Click="Silence_Click"
-                  ToolTip.Tip="Empties the region and leaves the length alone, for a cough in the middle of a good take. Changes the file." />
+    <!-- The view buttons under the picture, square like the tools and marked the same way,
+         because they are the same kind of thing to press. They are not tools: nothing they do
+         reaches the file. -->
+    <Style Selector="Button.viewTool">
+      <Setter Property="Width" Value="32" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+  </Window.Styles>
 
-          <Button Grid.Column="5" Content="🔍-" Click="ZoomOut_Click" Width="40" />
-          <Button Grid.Column="6" Content="🔍+" Click="ZoomIn_Click" Width="40" />
-          <Button Grid.Column="7" Name="PlayButton" Content="▶ Play" Click="Play_Click" />
-        </Grid>
-        <TextBlock DockPanel.Dock="Bottom" Margin="0,8,0,0"
-                   Text="{Binding CurrentWaveform.TotalSamples, StringFormat='Samples: {0}'}"
-                   Opacity="0.7" FontSize="12" />
+  <DockPanel LastChildFill="True">
 
-        <!-- The one waveform control, the same one a machine's face and RECORD draw with. This
-             window drew its own for years: a canvas, a viewport, trim handles, a selection
-             tint, a playhead marker and the pointer handling for all of it, every piece of
-             which the control already had. What it did not have was a way to zoom from a
-             button, which is what kept the two apart. -->
-        <Border Background="{DynamicResource BgBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="1"
-                CornerRadius="4"
-                MinHeight="160">
-          <ui:WaveformView Name="Waveform"
-                           Peaks="{Binding CurrentWaveform.PeakData}"
-                           ShowMarkers="True"
-                           ShowLoop="False" />
+    <!-- The foot runs under the rail as well as under the picture, since what it says is about
+         the take rather than about either half, and the way out of a window belongs at its
+         corner. -->
+    <Border DockPanel.Dock="Bottom"
+            Background="{DynamicResource BgBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="0,1,0,0"
+            Padding="12,8">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+        <TextBlock Grid.Column="0" Text="{Binding Status}" Opacity="0.75" FontSize="12"
+                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+        <!-- The pair this application already uses for work that is on the screen and not on
+             the disc: green to keep it, warm to throw it away, and both lit by the same fact.
+             Save is the only thing in this window that touches the take on the shelf. -->
+        <Button Grid.Column="1" Classes="discard" Content="Revert"
+                Command="{Binding RevertEditCommand}" IsEnabled="{Binding HasEdits}" MinWidth="100"
+                ToolTip.Tip="Throws every change away and puts the take back to what is on the shelf." />
+        <Button Grid.Column="2" Classes="save" Content="Save"
+                Command="{Binding SaveEditCommand}" IsEnabled="{Binding HasEdits}" MinWidth="100"
+                ToolTip.Tip="Writes what you have done over the take. Ctrl+S." />
+        <Button Grid.Column="3" Content="Close" Click="Cancel_Click" MinWidth="100" />
+      </Grid>
+    </Border>
+
+    <!-- The rail: the box, then the panel for whatever is in hand. Scrolled, because a window
+         pulled down to its floor still has to reach the button at the bottom of a panel. -->
+    <Border DockPanel.Dock="Left" Width="212"
+            Background="{DynamicResource SurfaceBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="0,0,1,0">
+      <DockPanel LastChildFill="True" Margin="12">
+
+        <!-- What has been done, in the order it was done, the take itself at the top. Standing
+             on a line is standing on the take as it was at that point, which is what undo and
+             redo do a step at a time and what picking a line does outright. -->
+        <Border DockPanel.Dock="Bottom" Classes="historyCard">
+          <DockPanel LastChildFill="True">
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4"
+                  Margin="0,0,0,6">
+              <TextBlock Grid.Column="0" Classes="cardTitle" Text="History" VerticalAlignment="Center" />
+              <Button Grid.Column="1" Classes="viewTool" Command="{Binding UndoEditCommand}"
+                      IsEnabled="{Binding CanUndoEdit}" ToolTip.Tip="Back a step. Ctrl+Z.">
+                <views:ToolIcon Mark="Undo" MarkSize="16" />
+              </Button>
+              <Button Grid.Column="2" Classes="viewTool" Command="{Binding RedoEditCommand}"
+                      IsEnabled="{Binding CanRedoEdit}" ToolTip.Tip="Forward a step again. Ctrl+Y.">
+                <views:ToolIcon Mark="Redo" MarkSize="16" />
+              </Button>
+            </Grid>
+
+            <ListBox Height="150" Background="Transparent" Padding="0"
+                     ItemsSource="{Binding EditSteps}"
+                     SelectedIndex="{Binding EditAt, Mode=TwoWay}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:TakeStepRow">
+                  <TextBlock Text="{Binding Words}" FontSize="12"
+                             Opacity="{Binding Fade}" />
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </DockPanel>
         </Border>
+
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <TabControl Name="Tools" Classes="toolbox" SelectedIndex="0">
+
+          <TabControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel />
+            </ItemsPanelTemplate>
+          </TabControl.ItemsPanel>
+
+          <TabItem ToolTip.Tip="Select: what the two handles on the picture stand over.">
+            <TabItem.Header>
+              <views:ToolIcon Mark="Select" MarkSize="20" />
+            </TabItem.Header>
+            <Border Classes="toolOptions">
+              <StackPanel>
+              <TextBlock Classes="cardTitle" Text="Select" />
+              <TextBlock Classes="cardHint"
+                         Text="Drag across the picture to mark a stretch. Every tool under this one works on what is marked." />
+              <Button Classes="doIt" Content="Whole take" Click="SelectAll_Click"
+                      ToolTip.Tip="Puts both handles back on the two ends of the recording." />
+              </StackPanel>
+            </Border>
+          </TabItem>
+
+          <TabItem ToolTip.Tip="Trim: keep the selection, throw the rest away.">
+            <TabItem.Header>
+              <views:ToolIcon Mark="Trim" MarkSize="20" />
+            </TabItem.Header>
+            <Border Classes="toolOptions">
+              <StackPanel>
+              <TextBlock Classes="cardTitle" Text="Trim" />
+              <TextBlock Classes="cardHint"
+                         Text="Keeps what is selected and throws the rest of the take away. Everything after the cut moves, so the picture starts again from the top." />
+              <Button Name="ApplyTrimButton" Classes="doIt discard"
+                      Content="Trim to selection" Click="Trim_Click" />
+              </StackPanel>
+            </Border>
+          </TabItem>
+
+          <TabItem ToolTip.Tip="Silence: empty the selection and leave the length alone.">
+            <TabItem.Header>
+              <views:ToolIcon Mark="Silence" MarkSize="20" />
+            </TabItem.Header>
+            <Border Classes="toolOptions">
+              <StackPanel>
+              <TextBlock Classes="cardTitle" Text="Silence" />
+              <TextBlock Classes="cardHint"
+                         Text="Empties the selection and leaves the take its length, for a cough in the middle of a good one. Nothing that points into this file moves." />
+              <Button Name="SilenceButton" Classes="doIt discard"
+                      Content="Silence selection" Click="Silence_Click" />
+              </StackPanel>
+            </Border>
+          </TabItem>
+
+          <TabItem ToolTip.Tip="Reverse: turn the selection back to front.">
+            <TabItem.Header>
+              <views:ToolIcon Mark="Reverse" MarkSize="20" />
+            </TabItem.Header>
+            <Border Classes="toolOptions">
+              <StackPanel>
+              <TextBlock Classes="cardTitle" Text="Reverse" />
+              <TextBlock Classes="cardHint"
+                         Text="Turns the selection back to front. Select the whole take for a reversed cymbal, or a word for a word said backwards." />
+              <Button Name="ReverseButton" Classes="doIt discard"
+                      Content="Reverse selection" Click="Reverse_Click" />
+              </StackPanel>
+            </Border>
+          </TabItem>
+
+          <TabItem ToolTip.Tip="Fade in: bring the selection up from silence.">
+            <TabItem.Header>
+              <views:ToolIcon Mark="FadeIn" MarkSize="20" />
+            </TabItem.Header>
+            <Border Classes="toolOptions">
+              <StackPanel>
+              <TextBlock Classes="cardTitle" Text="Fade in" />
+              <TextBlock Classes="cardHint"
+                         Text="Comes up from silence at the head of the selection and reaches full at its end. Straight, which is what a hand can predict." />
+              <Button Name="FadeInButton" Classes="doIt discard"
+                      Content="Fade in over selection" Click="FadeIn_Click" />
+              </StackPanel>
+            </Border>
+          </TabItem>
+
+          <TabItem ToolTip.Tip="Fade out: take the selection down to silence.">
+            <TabItem.Header>
+              <views:ToolIcon Mark="FadeOut" MarkSize="20" />
+            </TabItem.Header>
+            <Border Classes="toolOptions">
+              <StackPanel>
+              <TextBlock Classes="cardTitle" Text="Fade out" />
+              <TextBlock Classes="cardHint"
+                         Text="Full at the head of the selection and silent at its end, which is what a take that stops on a click wants." />
+              <Button Name="FadeOutButton" Classes="doIt discard"
+                      Content="Fade out over selection" Click="FadeOut_Click" />
+              </StackPanel>
+            </Border>
+          </TabItem>
+
+          <TabItem ToolTip.Tip="Normalize: lift the whole take to a peak.">
+            <TabItem.Header>
+              <views:ToolIcon Mark="Normalize" MarkSize="20" />
+            </TabItem.Header>
+            <Border Classes="toolOptions">
+              <StackPanel>
+              <TextBlock Classes="cardTitle" Text="Normalize" />
+              <TextBlock Classes="cardHint"
+                         Text="The whole take rather than the selection: this is about the level of the file. A take already there is left alone and says so." />
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                <TextBlock Grid.Column="0" Classes="cardHint" Text="Peak" VerticalAlignment="Center" />
+                <ui:NumberField Grid.Column="1" Format="0.0"
+                                Minimum="-24" Maximum="0" SmallStep="0.5" LargeStep="3"
+                                Value="{Binding NormalizeTargetDb}"
+                                HorizontalAlignment="Left" Width="80"
+                                ToolTip.Tip="Where the loudest moment ends up, in dBFS. Just under zero leaves room for a resampled note to overshoot." />
+              </Grid>
+              <Button Name="NormalizeButton" Classes="doIt"
+                      Content="Normalize" Click="Normalize_Click" />
+              </StackPanel>
+            </Border>
+          </TabItem>
+
+          </TabControl>
+        </ScrollViewer>
       </DockPanel>
     </Border>
+
+    <!-- The picture and the two rows that say what is on it. -->
+    <DockPanel Margin="12" LastChildFill="True">
+
+      <!-- The take's name, which is the document this window is about, along the top of it
+           rather than in the tool box: what a take is called is not a tool. Renaming moves the
+           file, and every instrument playing it is repointed at the same moment, on the shelf
+           and in the song that is open, which is why it can be an ordinary box. -->
+      <Grid DockPanel.Dock="Top" Margin="0,0,0,10"
+            ColumnDefinitions="Auto,*,Auto,Auto,220" ColumnSpacing="8">
+        <TextBlock Grid.Column="0" Text="Name" FontWeight="SemiBold" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Name="NameBox" FontSize="14"
+                 Text="{Binding EditName, Mode=TwoWay}"
+                 ToolTip.Tip="What the recording is called, which is also what its file is called." />
+        <Button Grid.Column="2" Name="RenameButton" Content="Rename" Click="Rename_Click"
+                MinWidth="88" IsEnabled="{Binding CanRename}" />
+
+        <TextBlock Grid.Column="3" Text="Category" FontWeight="SemiBold" VerticalAlignment="Center"
+                   Margin="8,0,0,0" />
+        <views:CategoryField Grid.Column="4" FontSize="14"
+                             ItemsSource="{Binding Shelf.Categories}"
+                             Text="{Binding TakeCategory}"
+                             HorizontalAlignment="Stretch"
+                             ToolTip.Tip="Type a category to file this take under. Empty it to unfile it." />
+      </Grid>
+
+      <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8"
+                 Text="{Binding RenameError}" Classes="danger" FontSize="12"
+                 IsVisible="{Binding RenameError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+      <!-- What is on the picture, said in times. The picture deals in fractions of itself and
+           nobody works in those: a cough is at nine seconds, not at 0.174 of the way along. -->
+      <Grid DockPanel.Dock="Bottom" Margin="0,6,0,0"
+            ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="6">
+        <TextBlock Grid.Column="0" Classes="cardHint" Text="Selection" VerticalAlignment="Center" />
+        <views:TimeReadout Grid.Column="1" Name="RegionStartTime" ReadingSize="12" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="2" Classes="cardHint" Text="to" VerticalAlignment="Center" />
+        <views:TimeReadout Grid.Column="3" Name="RegionEndTime" ReadingSize="12" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="4" Classes="cardHint" Text="lasting" VerticalAlignment="Center" />
+        <views:TimeReadout Grid.Column="5" Name="RegionLengthTime" ReadingSize="12" VerticalAlignment="Center" />
+
+        <!-- What the file is, which is the thing an editor says about the thing it is editing. -->
+        <StackPanel Grid.Column="7" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <TextBlock Classes="cardHint" Text="{Binding CurrentWaveform.SampleRate, StringFormat='{}{0} Hz'}" />
+          <TextBlock Classes="cardHint" Text="{Binding CurrentWaveform.Channels, StringFormat='{}{0} ch'}" />
+          <TextBlock Classes="cardHint" Text="{Binding CurrentWaveform.TotalSamples, StringFormat='{}{0} samples'}" />
+        </StackPanel>
+      </Grid>
+
+      <!-- The transport and the view, under the picture where the thing they are about is.
+           What is playing is the selection, and the clock beside it reads against the take, so
+           the number under the cursor is where in the recording you are. -->
+      <Grid DockPanel.Dock="Bottom" Margin="0,8,0,0"
+            ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="6">
+        <Button Grid.Column="0" Name="PlayButton" Click="Play_Click" MinWidth="96"
+                HorizontalContentAlignment="Center"
+                ToolTip.Tip="Plays what is selected, from the play cursor.">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <views:ToolIcon Name="PlayMark" Mark="Play" MarkSize="13" VerticalAlignment="Center" />
+            <TextBlock Name="PlayWord" Text="Play" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+
+        <views:TimeReadout Grid.Column="1" Name="PlayheadTime" ReadingSize="16" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="2" Text="/" Opacity="0.5" VerticalAlignment="Center" />
+        <views:TimeReadout Grid.Column="3" Name="TotalTime" ReadingSize="16" VerticalAlignment="Center" />
+
+        <Button Grid.Column="5" Classes="viewTool" Click="ZoomOut_Click" ToolTip.Tip="Further out.">
+          <views:ToolIcon Mark="ZoomOut" MarkSize="17" />
+        </Button>
+        <Button Grid.Column="6" Classes="viewTool" Click="Fit_Click"
+                ToolTip.Tip="The whole recording on the screen at once. The selection is left where it is.">
+          <views:ToolIcon Mark="Fit" MarkSize="17" />
+        </Button>
+        <Button Grid.Column="7" Classes="viewTool" Click="ZoomIn_Click"
+                ToolTip.Tip="Closer, about the middle of what is on screen. The wheel zooms about the pointer.">
+          <views:ToolIcon Mark="ZoomIn" MarkSize="17" />
+        </Button>
+      </Grid>
+
+      <!-- The one waveform control, the same one a machine's face and RECORD draw with. This
+           window drew its own for years: a canvas, a viewport, trim handles, a selection tint,
+           a playhead marker and the pointer handling for all of it, every piece of which the
+           control already had. -->
+      <Border Classes="inset" Padding="1">
+        <ui:WaveformView Name="Waveform"
+                         Peaks="{Binding CurrentWaveform.PeakData}"
+                         ShowMarkers="True"
+                         ShowLoop="False" />
+      </Border>
+
+    </DockPanel>
 
   </DockPanel>
 

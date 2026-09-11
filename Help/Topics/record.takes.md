@@ -57,30 +57,70 @@ back into itself. The switch stays live: it says whether the recorder is heard, 
 the recorder is carrying is a separate question. The capture is left off the recorder's
 bus instead, and the status line says so.
 
-## Trimming
+## Editing a take
 
-Edit opens the take on its own picture. Drag across it to mark the part you want,
-either way round, and the two lines that appear are the ends of it: take hold of
-either to move it. What falls outside is dimmed, so what you are looking at is what
-would survive.
+Edit opens the take on its own picture, with a box of tools down the left. Picking a
+tool shows what it does and the button that does it, in the panel under the box: that
+panel is the only place an edit happens from, so nothing is one stray click.
 
-Nothing is destroyed until **Apply Trim** is pressed, and what it keeps is what is
-marked. **Silence** is the other half of the same idea: it empties the marked part
-and leaves the length alone, for a cough in the middle of a good take.
+**A copy of the take is taken when the window opens and every tool works on the copy.**
+The take on the shelf is not touched at all until **Save**, which is the green button at
+the foot. Close asks first if there is anything unsaved, and answering no leaves the
+window exactly as it was.
 
-The magnifying glasses take you closer and further out, about the middle of what is
-on screen; the wheel does the same, about the pointer. To move a zoomed picture
+Drag across the picture to mark the part you want, either way round, and the two lines
+that appear are the ends of it: take hold of either to move it. What falls outside is
+dimmed, so what you are looking at is what would survive. **Select whole take** puts
+both ends back on the two ends of the recording.
+
+The tools, in the order they stand in the box:
+
+- **Trim** keeps what is marked and throws the rest away.
+- **Silence** empties what is marked and leaves the take its length, for a cough in the
+  middle of a good one. Nothing that points into this file moves.
+- **Reverse** turns what is marked back to front. Mark the whole take for a reversed
+  cymbal, or one word for a word said backwards.
+- **Fade in** comes up from silence at the head of the marked part and is at full by its
+  end. **Fade out** is the same the other way about. Both are straight.
+- **Normalize** lifts the **whole take** so its loudest moment sits on the peak beside
+  the button. A take already there is left alone and says so.
+
+## Going back
+
+Everything you do is a line in the **History** at the foot of the rail, with the take as
+it was found at the top of it. The two arrows beside the heading go back a step and
+forward again, and `Ctrl+Z` and `Ctrl+Y` do the same; picking a line goes there outright.
+Lines in front of where you are standing are drawn faintly and are still offered, since
+that is what going forward would do again. Doing something new from where you are
+standing drops them, which is what every editor does: they were done to audio that is
+no longer there.
+
+**Revert** throws the lot away and puts the copy back to what is on the shelf.
+
+Going back is the take copied again with the steps before that point done again, so
+what it costs is a moment on a long take rather than nothing. What it buys is that no
+edit here needs an undo of its own, which is where this sort of thing usually goes
+wrong.
+
+## Looking at it
+
+The magnifying glasses take you closer and further out, about the middle of what is on
+screen; the wheel does the same, about the pointer, and **Fit** puts the whole
+recording back on the screen without touching what is marked. To move a zoomed picture
 sideways rather than mark a new region, drag with `Ctrl` or `Shift` held, or drag with
 the middle button.
 
 It goes in a long way: at the far end a sixteen second take shows about forty
-milliseconds across the window, which is close enough to find a click and mark it
-out.
+milliseconds across the window, which is close enough to find a click and mark it out.
 
 **Play plays what is marked**, from its beginning to its end, and the cursor runs
 across it. Moving an end while it is playing moves what is playing with it, so
 dragging the end back to where you are listening stops it: what is playing is the
-region, so the region is what decides.
+region, so the region is what decides. What you hear is the copy with your unsaved work
+on it.
+
+Under the picture, the selection is written out as times, and beside them what the file
+is: its rate, how many channels it has and how many samples.
 
 It is the same picture everywhere. The one on the RECORD page, the one here, and the
 one on a machine's face are one control, so a take looks the same and behaves the

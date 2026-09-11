@@ -63,6 +63,37 @@ public interface IWaveformService
     /// <param name="endFrame">Where it ends, exclusive.</param>
     void SilenceFile(string filePath, long startFrame, long endFrame);
 
+    /// <summary>
+    /// Turns part of a recording back to front, leaving everything else and its length alone.
+    /// </summary>
+    /// <remarks>
+    /// The region the handles stand over rather than the whole take, since the whole take is the
+    /// region when both handles are on the ends: one rule covers reversing a word somebody said
+    /// backwards and reversing a cymbal to swell into a beat.
+    /// </remarks>
+    /// <param name="filePath">The take.</param>
+    /// <param name="startFrame">Where the reversal starts.</param>
+    /// <param name="endFrame">Where it ends, exclusive.</param>
+    /// <exception cref="FileNotFoundException">There is no such file.</exception>
+    /// <exception cref="InvalidOperationException">The region holds no frames.</exception>
+    void ReverseFile(string filePath, long startFrame, long endFrame);
+
+    /// <summary>
+    /// Ramps part of a recording up from silence or down to it, leaving its length alone.
+    /// </summary>
+    /// <remarks>
+    /// What a take off a microphone almost always wants before it is used for anything: a head
+    /// that starts on a click and a tail that stops on one are the two faults every raw
+    /// recording has, and both are a fade a fraction of a second long.
+    /// </remarks>
+    /// <param name="filePath">The take.</param>
+    /// <param name="startFrame">Where the fade starts.</param>
+    /// <param name="endFrame">Where it ends, exclusive.</param>
+    /// <param name="rising">True to come up from silence, false to go down to it.</param>
+    /// <exception cref="FileNotFoundException">There is no such file.</exception>
+    /// <exception cref="InvalidOperationException">The region holds no frames.</exception>
+    void FadeFile(string filePath, long startFrame, long endFrame, bool rising);
+
 
     /// <summary>
     /// Lifts the whole file so its loudest moment sits on the target, in dBFS. Destructive,

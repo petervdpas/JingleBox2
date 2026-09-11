@@ -1,35 +1,47 @@
+using System;
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
+using JingleBox2.Audio.Enums;
 using JingleBox2.ViewModels;
 using JingleBox2.Waveform;
+using JingleBox2.Waveform.Interfaces;
+using JingleBox2.Views.Enums;
 using JingleBox2.Rack.Controls;
 
 namespace JingleBox2.Views;
 
 /// <summary>
-/// One take, its picture, and the two things that can be done to it: trimmed to what is
-/// selected, and lifted to full level.
+/// One take, its picture, and the tools that work on it.
 /// </summary>
 /// <remarks>
-/// Buttons in, a file rewritten out. The picture is <c>WaveformView</c>, the same control a
-/// machine's face and RECORD draw with, so what a region is, how far its ends may travel, what
-/// a drag across the picture marks out, how the wheel zooms and where the play cursor goes are
-/// all its business rather than this window's.
+/// A workshop rather than a dialog. The picture has the room, the tools stand in a box of square
+/// marks down the left, and what the tool in hand needs set is in the panel under the box.
+/// Picking a tool does nothing to the take: the panel holds the button that does it, so an edit
+/// that cannot be undone is never one stray click on a button somebody was only reading.
 ///
-/// This window drew its own for years: a canvas, a viewport, two trim handles, a selection
-/// tint, a playhead marker and the pointer handling for all of it, some six hundred lines. Two
-/// things kept them apart and both were small. The control could not be zoomed from a button,
-/// which is what the two magnifying glasses do, and it had no way to drag a region out from
-/// nothing, which is the gesture this window was written to have. Both are the control's now,
-/// and a machine's face gets them as well.
+/// Nothing here is pending: every edit rewrites the file the moment its button is pressed, so
+/// the window stays open afterwards and the picture is drawn again from what is now on the disc.
 ///
-/// Both edits rewrite the file where it lies rather than making a new take, so the window
-/// stays open afterwards and the picture is drawn again from what is now on the disc.
+/// Which tool is in hand is the tool box's own answer rather than something kept here, which is
+/// the whole reason it is a tab strip: one picked at a time with its own panel under it is what
+/// a tab control already is, and the alternative is a flag in this file and a list of panels to
+/// be shown and hidden by hand.
+///
+/// The picture is <c>WaveformView</c>, the same control a machine's face and RECORD draw with,
+/// so what a region is, how far its ends may travel, what a drag across the picture marks out,
+/// how the wheel zooms and where the play cursor goes are all its business rather than this
+/// window's. What this window adds is the readings: the picture deals in fractions of itself,
+/// which is not a unit anybody works in, so <see cref="IRegionTimes"/> turns each handle into a
+/// time and <see cref="TimeReadout"/> says it in the same words the transport does.
 /// </remarks>
 public partial class RecordingEditDialog : Window
 {
     /// <summary>What plays the preview, and what reports where it has got to.</summary>
     private readonly WaveformPlayer _player;
+
+    /// <summary>What turns a place on the picture into a time.</summary>
+    private readonly IRegionTimes _times = new RegionTimes();
 
     /// <summary>
     /// The picture, which is the one waveform control this application has.
@@ -41,8 +53,26 @@ public partial class RecordingEditDialog : Window
     /// </remarks>
     private WaveformView? _waveform;
 
-    /// <summary>Kept because its wording is written to: it says Play or Stop as the preview runs.</summary>
-    private Button? _playButton;
+    /// <summary>The mark on the play button, which is a triangle or a square as the preview runs.</summary>
+    private ToolIcon? _playMark;
+
+    /// <summary>And the word beside it, which says what pressing it now would do.</summary>
+    private TextBlock? _playWord;
+
+    /// <summary>Where the region begins, in the take's own time.</summary>
+    private TimeReadout? _startTime;
+
+    /// <summary>Where it ends.</summary>
+    private TimeReadout? _endTime;
+
+    /// <summary>And how long it lasts, which is the reading somebody is usually after.</summary>
+    private TimeReadout? _lengthTime;
+
+    /// <summary>How far the preview has got, against the take rather than against the region.</summary>
+    private TimeReadout? _playheadTime;
+
+    /// <summary>How long the whole take is.</summary>
+    private TimeReadout? _totalTime;
 
     /// <summary>
     /// The RECORD page's view model, which owns the take being edited. Kept so its changes can
@@ -52,6 +82,9 @@ public partial class RecordingEditDialog : Window
 
     /// <summary>Guards against a second Apply landing while the file is being rewritten.</summary>
     private bool _applying;
+
+    /// <summary>True once the question about unsaved work has been answered and closing is on.</summary>
+    private bool _leaving;
 
     /// <summary>The same, for a rename: the file is moving and cannot move twice.</summary>
     private bool _renaming;
@@ -65,13 +98,19 @@ public partial class RecordingEditDialog : Window
     /// <summary>And where it ends.</summary>
     private double RegionEnd => _waveform?.End ?? 1;
 
+    /// <summary>How many sample frames the take holds, or none before one has been read.</summary>
+    private long Frames => _vm?.CurrentWaveform?.TotalSamples ?? 0;
+
+    /// <summary>How many of them go past in a second.</summary>
+    private int Rate => _vm?.CurrentWaveform?.SampleRate ?? 0;
+
     /// <summary>
     /// Builds the window and wires the picture up: the player's reports in, the pointer
     /// gestures out.
     /// </summary>
     /// <remarks>
-    /// The canvas and the play button are found when the window loads rather than here, since
-    /// neither exists until the template has been applied.
+    /// The canvas, the play button and the five readings are found when the window loads rather
+    /// than here, since none of them exists until the template has been applied.
     ///
     /// The view model's changes are let go of before being taken again, because the data
     /// context announcement fires on every reassignment and would otherwise leave the window
@@ -117,40 +156,77 @@ public partial class RecordingEditDialog : Window
         _player.PositionChanged += position =>
         {
             if (_waveform != null) _waveform.Playhead = position;
+
+            Say(_playheadTime, _times.At(position, Frames, Rate));
         };
 
         _player.Stopped += () =>
         {
             if (_waveform != null) _waveform.Playhead = -1;
 
-            SetPlayButtonContent("▶ Play");
+            Say(_playheadTime, TimeSpan.Zero);
+            SaysPlay(true);
         };
 
         Loaded += (_, _) =>
         {
-            _playButton = this.FindControl<Button>("PlayButton");
+            _playMark = this.FindControl<ToolIcon>("PlayMark");
+            _playWord = this.FindControl<TextBlock>("PlayWord");
+            _startTime = this.FindControl<TimeReadout>("RegionStartTime");
+            _endTime = this.FindControl<TimeReadout>("RegionEndTime");
+            _lengthTime = this.FindControl<TimeReadout>("RegionLengthTime");
+            _playheadTime = this.FindControl<TimeReadout>("PlayheadTime");
+            _totalTime = this.FindControl<TimeReadout>("TotalTime");
             _waveform = this.FindControl<WaveformView>("Waveform");
 
-            if (_waveform == null) return;
+            if (_waveform != null) _waveform.PropertyChanged += RegionMoved;
 
-            _waveform.PropertyChanged += RegionMoved;
+            Readings();
         };
 
         DataContextChanged += (_, _) =>
         {
+            if (_vm != null)
+            {
+                _vm.PropertyChanged -= TakeChanged;
+                _vm.TakeRewriting -= Stop;
+            }
+
             _vm = DataContext as RecordViewModel;
+
+            if (_vm != null)
+            {
+                _vm.PropertyChanged += TakeChanged;
+                _vm.TakeRewriting += Stop;
+            }
+
+            Readings();
         };
 
-        Closing += (_, _) =>
-        {
-            _player.Dispose();
+        Closing += (_, e) => Leaving(e);
 
-            if (_waveform != null) _waveform.PropertyChanged -= RegionMoved;
-        };
+        Shortcuts.ShortcutKeys.Listen(this);
     }
 
     /// <summary>
-    /// The region moved on the picture, so what is playing has to move with it.
+    /// The take under the window changed, so every reading about it is stale.
+    /// </summary>
+    /// <remarks>
+    /// The shape is read again after each of the three edits as well as when another take is
+    /// opened, so this is what carries a trim through to the clock: the picture is redrawn by
+    /// its own binding and the readings beside it would otherwise still be about the file as it
+    /// was before the cut.
+    /// </remarks>
+    /// <param name="sender">The view model. Not read: there is one.</param>
+    /// <param name="e">Which of its properties moved.</param>
+    private void TakeChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is null or nameof(RecordViewModel.CurrentWaveform)) Readings();
+    }
+
+    /// <summary>
+    /// The region moved on the picture, so what is playing and what is written down have to
+    /// move with it.
     /// </summary>
     /// <remarks>
     /// The end was told to the player when Play was pressed and stayed where it was told, so
@@ -162,7 +238,75 @@ public partial class RecordingEditDialog : Window
     /// <param name="e">Which of its properties moved.</param>
     private void RegionMoved(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
+        if (e.Property != WaveformView.StartProperty && e.Property != WaveformView.EndProperty) return;
+
         if (e.Property == WaveformView.EndProperty) _player.PlayUntil(RegionEnd);
+
+        Readings();
+    }
+
+    /// <summary>
+    /// Writes the four readings that are about where things are rather than about what is
+    /// playing: the two handles, the stretch between them, and the length of the take.
+    /// </summary>
+    /// <remarks>
+    /// Written rather than bound, because what the handles stand over is the picture's and the
+    /// rate that turns it into a time is the take's, and nothing owns both. Safe before the
+    /// window has been laid out and safe with no take open: a reading nobody has found yet is
+    /// left alone, and a take that says nothing about itself reads nought.
+    /// </remarks>
+    private void Readings()
+    {
+        long frames = Frames;
+        int rate = Rate;
+
+        Say(_startTime, _times.At(RegionStart, frames, rate));
+        Say(_endTime, _times.At(RegionEnd, frames, rate));
+        Say(_lengthTime, _times.Between(RegionStart, RegionEnd, frames, rate));
+        Say(_totalTime, _times.At(1, frames, rate));
+    }
+
+    /// <summary>Puts a time on one of the readings, where that reading is on the window yet.</summary>
+    /// <param name="reading">The clock to write, or nothing before the window has been laid out.</param>
+    /// <param name="time">What it should say.</param>
+    private static void Say(TimeReadout? reading, TimeSpan time)
+    {
+        if (reading != null) reading.Time = time;
+    }
+
+    /// <summary>
+    /// Puts both handles back on the two ends of the recording.
+    /// </summary>
+    /// <remarks>
+    /// The way back from a region marked out by mistake, and the way to normalise after a trim
+    /// without hunting the last handle back into the corner of the picture.
+    /// </remarks>
+    /// <param name="sender">The button. Not read.</param>
+    /// <param name="e">Ignored.</param>
+    private void SelectAll_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_waveform is not { } picture) return;
+
+        picture.Start = 0;
+        picture.End = 1;
+    }
+
+    /// <summary>
+    /// Puts the whole recording back on the screen at once.
+    /// </summary>
+    /// <remarks>
+    /// The region is left exactly where it is: this is about what can be seen and not about what
+    /// is marked, and a button that quietly threw a selection away on the way to showing it all
+    /// would be the worst kind of help.
+    /// </remarks>
+    /// <param name="sender">The button. Not read.</param>
+    /// <param name="e">Ignored.</param>
+    private void Fit_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_waveform is not { } picture) return;
+
+        picture.Zoom = WaveformViewport.MinZoom;
+        picture.Scroll = 0;
     }
 
     /// <summary>
@@ -204,29 +348,94 @@ public partial class RecordingEditDialog : Window
             return;
         }
 
-        if (_vm?.SelectedRecordingForEdit == null || _vm.CurrentWaveform == null) return;
+        if (_vm?.EditingPath is not { } path || _vm.CurrentWaveform == null) return;
 
         _player.Play(
-            _vm.SelectedRecordingForEdit.FilePath,
+            path,
             RegionStart,
             RegionEnd,
             _vm.CurrentWaveform.TotalSamples);
 
-        if (_player.IsPlaying)
-            SetPlayButtonContent("⏹ Stop");
-    }
-
-    /// <summary>Writes the wording on the play button, which says what pressing it now would do.</summary>
-    private void SetPlayButtonContent(string text)
-    {
-        if (_playButton != null) _playButton.Content = text;
+        if (_player.IsPlaying) SaysPlay(false);
     }
 
     /// <summary>
-    /// Closes the window. Nothing is undone by it: trimming and normalising rewrite the file
-    /// when they are pressed, so there is nothing pending for this to abandon.
+    /// Lets the working copy go, because it is about to be written over.
     /// </summary>
+    /// <remarks>
+    /// A method rather than a lambda so it can be taken off again: an event handler this window
+    /// could not unsubscribe would keep a closed editor listening to the page for the rest of
+    /// the session.
+    /// </remarks>
+    private void Stop() => _player.Stop();
+
+    /// <summary>
+    /// Puts the play button into one of its two states.
+    /// </summary>
+    /// <remarks>
+    /// Written rather than bound, because the player is not a view model and its stopping is an
+    /// event: it also ends on its own at the end of the selection. The mark is drawn rather than
+    /// written for the reason <see cref="ToolMark"/> gives, which is that the two characters
+    /// meaning these things are not in every font a machine might fall back to.
+    /// </remarks>
+    /// <param name="idle">True for the triangle, false for the square.</param>
+    private void SaysPlay(bool idle)
+    {
+        if (_playMark != null) _playMark.Mark = idle ? ToolMark.Play : ToolMark.Stop;
+        if (_playWord != null) _playWord.Text = idle ? "Play" : "Stop";
+    }
+
+    /// <summary>Closes the window, having asked about anything unsaved on the way out.</summary>
     private void Cancel_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
+
+    /// <summary>
+    /// The window is going, unless there is unsaved work and somebody would rather it did not.
+    /// </summary>
+    /// <remarks>
+    /// **Asked rather than saved**, because saving is the explicit act this whole window is
+    /// arranged around: a close that quietly wrote over somebody's take would be the worst
+    /// possible reading of a button that says Close. Answering no leaves the window exactly as
+    /// it was, with the work still in the history, which is why the question is the safe way
+    /// round: the dangerous answer is the one somebody has to choose.
+    ///
+    /// The working copy is let go of only where the window really goes, so a cancelled close
+    /// does not leave an editor standing over a copy that has been deleted.
+    /// </remarks>
+    /// <param name="e">The closing itself, which is what is cancelled while the question stands.</param>
+    private async void Leaving(WindowClosingEventArgs e)
+    {
+        _player.Stop();
+
+        if (!_leaving && _vm is { HasEdits: true } page)
+        {
+            e.Cancel = true;
+
+            string many = page.EditSteps.Count > 2 ? "changes" : "change";
+
+            if (!await ConfirmDialog.AskAsync(
+                    "Close without saving",
+                    $"'{page.EditName}' has {page.EditAt} {many} that are not saved. "
+                    + "Closing now throws them away and leaves the take as it was.",
+                    "Throw them away"))
+                return;
+
+            _leaving = true;
+
+            Close();
+            return;
+        }
+
+        _player.Dispose();
+
+        if (_waveform != null) _waveform.PropertyChanged -= RegionMoved;
+
+        if (_vm != null)
+        {
+            _vm.PropertyChanged -= TakeChanged;
+            _vm.TakeRewriting -= Stop;
+            _vm.EndEdit();
+        }
+    }
 
     /// <summary>
     /// Gives the recording another name. The dialog stays open: renaming is not finishing, and
@@ -254,49 +463,55 @@ public partial class RecordingEditDialog : Window
         }
     }
 
-    /// <summary>
-    /// Empties the region, leaving the take its length.
-    /// </summary>
-    /// <remarks>
-    /// The region, the playhead and the zoom are left where they are, unlike a trim: nothing has
-    /// moved, so every stored position is still about the part of the file it was about. The
-    /// preview is stopped first, since a file that is open is one that will not be rewritten on
-    /// Windows, and both destructive buttons are switched off while it runs.
-    /// </remarks>
-    private async void Silence_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    /// <summary>Keeps what is selected and throws the rest away.</summary>
+    private async void Trim_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (_vm == null || _applying) return;
+        if (!await Edit(TakeEditKind.Trim)) return;
 
-        _player.Stop();
+        if (_waveform is not { } picture) return;
 
-        _applying = true;
-        SetApplyEnabled(false);
-
-        try
-        {
-            await _vm.SilenceAsync(RegionStart, RegionEnd);
-        }
-        finally
-        {
-            _applying = false;
-            SetApplyEnabled(true);
-        }
+        picture.Start = 0;
+        picture.End = 1;
+        picture.Playhead = -1;
+        picture.Zoom = WaveformViewport.MinZoom;
     }
 
+    /// <summary>Empties the selection.</summary>
+    private async void Silence_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        await Edit(TakeEditKind.Silence);
+
+    /// <summary>Turns it back to front.</summary>
+    private async void Reverse_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        await Edit(TakeEditKind.Reverse);
+
+    /// <summary>Brings it up from silence.</summary>
+    private async void FadeIn_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        await Edit(TakeEditKind.FadeIn);
+
+    /// <summary>And takes it down to silence.</summary>
+    private async void FadeOut_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        await Edit(TakeEditKind.FadeOut);
+
+    /// <summary>Lifts the whole take to the peak beside the button.</summary>
+    private async void Normalize_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        await Edit(TakeEditKind.Normalize);
+
     /// <summary>
-    /// Cuts the file down to what is selected, and rewrites it.
+    /// Does one of the tools to the working copy, with the guards every one of them needs.
     /// </summary>
     /// <remarks>
-    /// Afterwards every stored position points at audio that no longer exists, so the trim, the
-    /// play cursor, the playhead and the zoom are all put back to the whole file: what survived
-    /// the cut is the whole file from here on.
+    /// The preview is stopped first, since a file that is open is one that will not be rewritten
+    /// on Windows, and every edit is switched off while one runs: a second write landing over
+    /// the top of the first is the one way to lose work here.
     ///
-    /// Both destructive buttons are switched off while it runs, and the preview is stopped
-    /// first, since a file that is open is one that will not be rewritten on Windows.
+    /// Nothing is undone by any of it in this window: the edit goes into the history on the page
+    /// and the way back is the history rather than a memory of what this window did.
     /// </remarks>
-    private async void ApplyTrim_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    /// <param name="kind">Which edit.</param>
+    /// <returns>True where the working copy changed.</returns>
+    private async System.Threading.Tasks.Task<bool> Edit(TakeEditKind kind)
     {
-        if (_vm == null || _applying) return;
+        if (_vm == null || _applying) return false;
 
         _player.Stop();
 
@@ -305,14 +520,7 @@ public partial class RecordingEditDialog : Window
 
         try
         {
-            if (!await _vm.ApplyTrimAsync(RegionStart, RegionEnd)) return;
-
-            if (_waveform is not { } picture) return;
-
-            picture.Start = 0;
-            picture.End = 1;
-            picture.Playhead = -1;
-            picture.Zoom = WaveformViewport.MinZoom;
+            return await _vm.EditAsync(kind, RegionStart, RegionEnd);
         }
         finally
         {
@@ -322,42 +530,27 @@ public partial class RecordingEditDialog : Window
     }
 
     /// <summary>
-    /// Lifts the file's level. The audio changes under every stored position but the timeline
-    /// does not, so the trim region and the playhead stay where they are.
+    /// Every edit goes off together: while the file is being rewritten, none of them may start a
+    /// second write over the top of it.
     /// </summary>
-    private async void Normalize_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        if (_vm == null || _applying) return;
-
-        _player.Stop();
-
-        _applying = true;
-        SetApplyEnabled(false);
-
-        try
-        {
-            await _vm.NormalizeAsync();
-        }
-        finally
-        {
-            _applying = false;
-            SetApplyEnabled(true);
-        }
-    }
-
-    /// <summary>
-    /// Both destructive buttons go together: while the file is being rewritten, neither the
-    /// trim nor the normalize may start a second write over the top of it.
-    /// </summary>
+    /// <remarks>
+    /// By name rather than by walking the tool box, because a panel that has never been opened
+    /// has not been built: a tab control makes its content when the tab is first picked, so
+    /// anything found by walking it would be whichever tools somebody happened to have visited.
+    /// A button that is not there yet cannot be pressed either, so the two agree.
+    /// </remarks>
+    /// <param name="enabled">True to let the edits be pressed again.</param>
     private void SetApplyEnabled(bool enabled)
     {
-        var trim = this.FindControl<Button>("ApplyTrimButton");
-        if (trim != null) trim.IsEnabled = enabled;
+        foreach (string named in new[]
+                 {
+                     "ApplyTrimButton", "SilenceButton", "ReverseButton",
+                     "FadeInButton", "FadeOutButton", "NormalizeButton"
+                 })
+        {
+            var button = this.FindControl<Button>(named);
 
-        var normalize = this.FindControl<Button>("NormalizeButton");
-        if (normalize != null) normalize.IsEnabled = enabled;
-
-        var silence = this.FindControl<Button>("SilenceButton");
-        if (silence != null) silence.IsEnabled = enabled;
+            if (button != null) button.IsEnabled = enabled;
+        }
     }
 }

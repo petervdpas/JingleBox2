@@ -254,6 +254,12 @@ public sealed class RecorderBench
         public void SilenceFile(string filePath, long startFrame, long endFrame) { }
 
         /// <inheritdoc/>
+        public void ReverseFile(string filePath, long startFrame, long endFrame) { }
+
+        /// <inheritdoc/>
+        public void FadeFile(string filePath, long startFrame, long endFrame, bool rising) { }
+
+        /// <inheritdoc/>
         public double NormalizeFile(string filePath, double targetDecibels) => 0;
     }
 
