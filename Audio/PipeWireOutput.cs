@@ -22,7 +22,21 @@ namespace JingleBox2.Audio;
 /// </remarks>
 public sealed class PipeWireOutput : IPipeWireOutput
 {
-    /// <summary>Held while the node is made, started or let go.</summary>
+    /// <summary>
+    /// Held while the node is made or let go, and never while the server's own thread might
+    /// want something.
+    /// </summary>
+    /// <remarks>
+    /// **Letting the node go waits for the server's thread to stop calling us**, and that thread
+    /// is filling blocks out of the mix. So a teardown that held this while it waited would be
+    /// waiting for a thread that was itself waiting for this, which is the whole of what a
+    /// deadlock is: the application opened, went to put the output somebody had chosen in place
+    /// of the one it had started on, and stopped there for ever with the splash still up.
+    ///
+    /// What the two threads really share is one number, the mix being pulled, and a number wants
+    /// to be read rather than locked. Nothing on the filling side takes this at all now, which
+    /// is what makes it safe to hold anywhere else.
+    /// </remarks>
     private readonly object _lock = new();
 
     /// <summary>What was answered about the server being here, once it has been asked.</summary>
@@ -38,10 +52,20 @@ public sealed class PipeWireOutput : IPipeWireOutput
     private IDisposable? _stream;
 
     /// <summary>The mix being pulled, by its library handle, or nought.</summary>
-    private int _mix;
+    /// <remarks>
+    /// Read by the server's own thread on every block and written by whoever opens or closes the
+    /// node, so it is read as it stands rather than under the lock: nought is the answer for a
+    /// node that is being taken down, and silence is what nought means.
+    /// </remarks>
+    private volatile int _mix;
 
     /// <summary>Whether a block that could not be read has already been said.</summary>
-    private bool _saidQuiet;
+    /// <remarks>
+    /// Written on the server's thread, so it is read as it stands for the same reason the mix
+    /// is. Two threads arriving at once would say the line twice, which is a line in a log
+    /// against a lock on the audio path.
+    /// </remarks>
+    private volatile bool _saidQuiet;
 
     /// <inheritdoc/>
     public bool Present
@@ -119,26 +143,30 @@ public sealed class PipeWireOutput : IPipeWireOutput
 
         if (!OperatingSystem.IsLinux()) return false;
 
+        Close();
+
+        bool made;
+
         lock (_lock)
         {
-            CloseLocked();
-
             _mix = stream;
             _saidQuiet = false;
 
             try
             {
-                return Make(rate);
+                made = Make(rate);
             }
             catch (Exception bad)
             {
                 Log.Fault(LogArea.Audio, "the sound server would not take the mix", bad);
 
-                CloseLocked();
-
-                return false;
+                made = false;
             }
         }
+
+        if (!made) Close();
+
+        return made;
     }
 
     /// <summary>Stereo, which is what the whole application is and what the node is made as.</summary>
@@ -218,9 +246,7 @@ public sealed class PipeWireOutput : IPipeWireOutput
     /// <returns>How many bytes of it were filled.</returns>
     private int Fill(Span<byte> buffer)
     {
-        int mix;
-
-        lock (_lock) mix = _mix;
+        int mix = _mix;
 
         if (mix == 0 || buffer.Length == 0) return 0;
 
@@ -270,12 +296,9 @@ public sealed class PipeWireOutput : IPipeWireOutput
     /// <param name="answered">What the library answered, which is negative for an error.</param>
     private void Quiet(int answered)
     {
-        lock (_lock)
-        {
-            if (_saidQuiet) return;
+        if (_saidQuiet) return;
 
-            _saidQuiet = true;
-        }
+        _saidQuiet = true;
 
         var error = Bass.LastError;
 
@@ -285,27 +308,45 @@ public sealed class PipeWireOutput : IPipeWireOutput
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// **What is taken down is taken out of the fields first and let go of after the lock has
+    /// been given back.** Letting a node go waits for the server's own thread to stop calling
+    /// into this object, so anything still held while that happens is held against a thread that
+    /// cannot finish until it is given back.
+    ///
+    /// The mix is put to nought as the fields are swapped out, which is what the filling side
+    /// reads: a block asked for in the moment between is answered with silence rather than out
+    /// of a mix that is being taken away.
+    /// </remarks>
     public void Close()
     {
-        lock (_lock) CloseLocked();
+        IDisposable? stream;
+        IDisposable? context;
+
+        lock (_lock)
+        {
+            _mix = 0;
+
+            stream = _stream;
+            context = _context;
+
+            _stream = null;
+            _context = null;
+        }
+
+        LetGo(stream, context);
     }
 
-    /// <summary>Takes it down with the lock held.</summary>
+    /// <summary>Lets the node and the context go, in the order the two were made reversed.</summary>
     /// <remarks>
-    /// The node first and the context after it, which is the order they were made in reversed: a
-    /// context let go while a node is still on it is a node with nothing behind it, and what that
-    /// costs is inside somebody else's library.
+    /// A context let go while a node is still on it is a node with nothing behind it, and what
+    /// that costs is inside somebody else's library. Neither is allowed to throw on the way out:
+    /// this is called from the way out of the process as well as from a change of output.
     /// </remarks>
-    private void CloseLocked()
+    /// <param name="stream">The node, or nothing.</param>
+    /// <param name="context">What it was made on, or nothing.</param>
+    private static void LetGo(IDisposable? stream, IDisposable? context)
     {
-        _mix = 0;
-
-        var stream = _stream;
-        var context = _context;
-
-        _stream = null;
-        _context = null;
-
         try
         {
             stream?.Dispose();
