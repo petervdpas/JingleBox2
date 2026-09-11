@@ -147,7 +147,11 @@ internal sealed class PluginProcess : IDisposable
 
         _rate = sampleRate;
         _cost = new BridgeCost(name);
+        _name = name;
     }
+
+    /// <summary>What the plugin is called, for the lines this writes about it.</summary>
+    private readonly string _name;
 
     /// <summary>The rate the audio is made at, which is what turns a crossing's frames into time.</summary>
     private readonly int _rate;
@@ -338,6 +342,10 @@ internal sealed class PluginProcess : IDisposable
         var words = _body.ReadWords(hello.Value.Payload);
 
         HasOwnWindow = words.Length > 0 && words[0] == "window";
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
+            "editor: " + _name + " said hello as '" + string.Join(" ", words) + "', so it "
+            + (HasOwnWindow ? "draws a window of its own" : "leaves the drawing to the host's knobs"));
 
         var list = Call(BridgeCall.Parameters, null);
 

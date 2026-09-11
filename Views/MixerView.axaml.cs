@@ -70,7 +70,38 @@ public partial class MixerView : UserControl
             Sources?.LetRoutesGo();
             Input?.LetGo();
         };
+
+        StripScroll.PropertyChanged += (_, moved) =>
+        {
+            if (moved.Property == ScrollViewer.ExtentProperty ||
+                moved.Property == ScrollViewer.ViewportProperty) RoomForTheBar();
+        };
     }
+
+    /// <summary>
+    /// Leaves the strips room for the horizontal scrollbar, and only while there is one.
+    /// </summary>
+    /// <remarks>
+    /// **The bar is drawn over the content rather than beside it**, so a row of strips measured to
+    /// the viewport has the bar lying across its foot: the reading under a fader, and a track's
+    /// ducking knobs. Room for the bar alone clears them and then leaves it against the bottom of
+    /// the cards, which reads as the cards being cut off, so the gap every card here keeps from
+    /// what is beside it goes with it.
+    ///
+    /// **And it is given back when nothing is scrolling.** A window wide enough for every strip
+    /// has no bar, and a strip of empty page under the faders there is room the faders could have
+    /// had. Asked of the extent against the viewport rather than of the bar itself, since that is
+    /// the same question the bar asks and it can be asked before the bar exists.
+    /// </remarks>
+    private void RoomForTheBar()
+    {
+        bool scrolls = StripScroll.Extent.Width > StripScroll.Viewport.Width + 0.5;
+
+        Strips.Margin = new Thickness(0, 0, 0, scrolls ? BarRoom : 0);
+    }
+
+    /// <summary>The bar's own height and the gap a card keeps, which is what it is given.</summary>
+    private const double BarRoom = 22;
 
     /// <summary>
     /// What reads the whole signal table, which is every strip on this page and the cables.

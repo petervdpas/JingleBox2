@@ -12,28 +12,42 @@
         WindowStartupLocation="CenterOwner">
 
   <!-- Sized to what the plugin actually has: a two-knob effect gets a small window and a
-       thirty-knob one gets a wide one, rather than both getting the same half-empty box. -->
-  <DockPanel Margin="14">
-    <Border DockPanel.Dock="Top" Classes="inset" Padding="8,5" Margin="0,0,0,12">
+       thirty-knob one gets a wide one, rather than both getting the same half-empty box.
+
+       The room round it is set in the code behind, since the two things this window can hold want
+       different amounts: a plugin's own face is a picture at a size the plugin chose and goes edge
+       to edge, and the host's own knobs are a grid that needs air round it. See PluginWindow.Cap. -->
+  <DockPanel x:Name="Frame">
+    <!-- The way back to whichever half of the plugin is not on show, and the only thing this
+         window has of its own. It is drawn where there is one to offer, which is where the face
+         refused, and nowhere else: a plugin that drew itself is the whole of its window.
+
+         The name is not on it, since the title bar says that already, and switching the plugin
+         off is not on it either: the block in the chain carries the power button, and a second
+         one over the same flag is two controls to keep agreeing. -->
+    <Border DockPanel.Dock="Top" Classes="inset" Padding="8,5" Margin="0,0,0,12"
+            IsVisible="{Binding Panel.HasWayBack}">
       <StackPanel Orientation="Horizontal" Spacing="12">
-        <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding Name}" />
-
-        <ToggleButton Content="Bypass"
-                      MinWidth="0" Padding="10,2" FontSize="12"
-                      IsVisible="{Binding HasBypass}"
-                      IsChecked="{Binding IsBypassed}"
-                      ToolTip.Tip="Switch it off without taking it out of the chain" />
-
-        <!-- The plugin's face or the host's knobs. Only offered where the plugin has a face,
-             since without one the knobs are all there is. What the knobs are for is reading
-             every parameter at once and setting one exactly, which a face laid out for the ear
-             is not always the quickest way to do. Nothing here can be pointed a hardware knob
+        <!-- The way back to the knobs, offered only where they were what you were left with:
+             a plugin whose face opened when it was asked has nothing to choose between, and a
+             button beside a working face inviting somebody to swap it for two thousand dials
+             leaves the window shaped for the grid. Nothing here can be pointed a hardware knob
              at: a plugin brings its own MIDI learn. -->
         <ToggleButton Content="Knobs"
                       MinWidth="0" Padding="10,2" FontSize="12"
                       IsVisible="{Binding Panel.CanShowKnobs}"
                       IsChecked="{Binding Panel.ShowsKnobs}"
                       ToolTip.Tip="Show this plugin's controls as the host draws them, every parameter in one list." />
+
+        <!-- The way back, and the only one: a plugin that would not open its window is not a
+             plugin that has none, and without this the first refusal stands for the life of the
+             window. It takes the place the Knobs button has, since the two are never both there:
+             one is offered while there is a face and the other while there is not. -->
+        <Button Content="Face"
+                MinWidth="0" Padding="10,2" FontSize="12"
+                IsVisible="{Binding Panel.CanTryFace}"
+                Command="{Binding Panel.TryFaceCommand}"
+                ToolTip.Tip="Ask this plugin for its own interface again. It costs nothing if it still will not open, and the log says why." />
       </StackPanel>
     </Border>
 

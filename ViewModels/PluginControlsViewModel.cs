@@ -145,7 +145,14 @@ public sealed partial class PluginControlsViewModel : ObservableObject
     }
 
     /// <summary>True when the plugin's process has gone and it is not playing.</summary>
-    [ObservableProperty] private bool hasStopped;
+    /// <remarks>
+    /// It decides whether the Face button is offered as well as the Restart one, since asking a
+    /// process that is not there for a window can only ever answer no.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanTryFace))]
+    [NotifyPropertyChangedFor(nameof(HasWayBack))]
+    private bool hasStopped;
 
     /// <summary>What happened to it, in words fit to put on the page.</summary>
     [ObservableProperty] private string stoppedNote = "";
@@ -170,6 +177,10 @@ public sealed partial class PluginControlsViewModel : ObservableObject
 
         OnPropertyChanged(nameof(Editor));
         OnPropertyChanged(nameof(HasOwnWindow));
+        OnPropertyChanged(nameof(CanShowKnobs));
+        OnPropertyChanged(nameof(CanTryFace));
+        OnPropertyChanged(nameof(HasWayBack));
+        OnPropertyChanged(nameof(ShowsFace));
         OnPropertyChanged(nameof(HasKnobs));
     }
 
@@ -203,6 +214,7 @@ public sealed partial class PluginControlsViewModel : ObservableObject
 
         _prepared = false;
         _knobs = false;
+        _faceRefused = false;
         Prepare();
 
         _changed?.Invoke();
@@ -254,10 +266,41 @@ public sealed partial class PluginControlsViewModel : ObservableObject
 
     /// <summary>True when there is a choice to make, so the window can offer it.</summary>
     /// <remarks>
-    /// Only where the plugin draws itself. Without a face there is nothing to switch to and a
-    /// button offering to show the knobs that are already showing says nothing.
+    /// **Only where the face has actually refused at some point.** A plugin that drew itself the
+    /// moment it was asked has nothing to offer here: its face is what the window was opened for,
+    /// and a button beside it inviting somebody to swap it for two thousand dials is an
+    /// invitation to a worse window. The knobs are sized for a grid and the face is sized for
+    /// itself, so the swap leaves the window shaped for whichever was last shown.
+    ///
+    /// After <see cref="TryFaceCommand"/> has fetched a face that would not come the first time,
+    /// this is true: there the knobs really were what you were left with, and going back to them
+    /// is a choice worth having.
     /// </remarks>
-    public bool CanShowKnobs => Editor != null;
+    public bool CanShowKnobs => _faceRefused && Editor != null;
+
+    /// <summary>
+    /// Whether there is a way back to the half of this plugin that is not on show.
+    /// </summary>
+    /// <remarks>
+    /// **It is the only thing the window has of its own, and it is there only because something
+    /// went wrong.** A plugin that drew itself when it was asked is the whole of its window: the
+    /// title bar says what it is called, and switching it off or taking it out is done on its
+    /// block in the chain, where it sits. There is nothing left for a bar to carry.
+    ///
+    /// Where the face refused there is: the knobs are what you were left with, and
+    /// <see cref="CanTryFace"/> is the way back to the face. Once that has fetched one,
+    /// <see cref="CanShowKnobs"/> is the way back to the knobs. So the bar appears with the
+    /// trouble and goes with it.
+    /// </remarks>
+    public bool HasWayBack => CanShowKnobs || CanTryFace;
+
+    /// <summary>Whether asking for the plugin's own interface has ever come back empty.</summary>
+    /// <remarks>
+    /// What separates a plugin that has no face here from one that simply has a face. The first
+    /// is offered the way back to it and the way back to the knobs; the second is offered
+    /// neither, since neither is a question it has.
+    /// </remarks>
+    private bool _faceRefused;
 
     /// <summary>True when there is nothing but the host's knobs to show.</summary>
     public bool HasKnobs => ShowsKnobs && HasParameters;
@@ -311,34 +354,33 @@ public sealed partial class PluginControlsViewModel : ObservableObject
 
         IsBlocked = PluginCrashGuard.IsBlocked(Plugin.Info);
 
-        if (!IsBlocked && Plugin is IPluginWindowSource source)
-        {
-            PluginCrashGuard.Risky(Plugin.Info, PluginStage.Window);
+        if (IsBlocked)
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
+                "editor: " + Plugin.Info.Name + " is on the blocked list, so it is not asked for a window");
+        else if (Plugin is not IPluginWindowSource)
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
+                "editor: " + Plugin.Info.Name + " is not a thing that can be asked for a window");
 
-            try
-            {
-                Editor = source.OpenEditor();
-            }
-            catch (Exception)
-            {
-                Editor = null;
-            }
-
-            if (Editor == null) PluginCrashGuard.Survived(Plugin.Info);
-            else Watch();
-        }
-
-        if (Editor != null)
+        if (Ask())
         {
             OnPropertyChanged(nameof(Editor));
             OnPropertyChanged(nameof(HasOwnWindow));
             OnPropertyChanged(nameof(CanShowKnobs));
+            OnPropertyChanged(nameof(CanTryFace));
+            OnPropertyChanged(nameof(HasWayBack));
             OnPropertyChanged(nameof(ShowsFace));
             OnPropertyChanged(nameof(HasKnobs));
             return;
         }
 
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
+            "editor: " + Plugin.Info.Name + " has no window here, so the host's knobs are shown instead");
+
+        _faceRefused = true;
+
         OnPropertyChanged(nameof(BlockedNote));
+        OnPropertyChanged(nameof(CanTryFace));
+        OnPropertyChanged(nameof(HasWayBack));
 
         _showsKnobs = true;
 
@@ -347,6 +389,109 @@ public sealed partial class PluginControlsViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowsKnobs));
         OnPropertyChanged(nameof(ShowsFace));
         OnPropertyChanged(nameof(HasKnobs));
+    }
+
+    /// <summary>
+    /// Asks the plugin for its own interface, and says whether one came back.
+    /// </summary>
+    /// <remarks>
+    /// The attempt is written down before the plugin is touched, because if it goes down there is
+    /// no afterwards in which to write anything. Every way of giving up says which way it was, so
+    /// a plugin showing the host's knobs can be told from one that was never asked.
+    ///
+    /// A plugin already on the blocked list is not asked at all, and neither is anything that
+    /// cannot be asked. Both are the knobs, and both say so.
+    /// </remarks>
+    /// <returns>True when <see cref="Editor"/> now holds an interface.</returns>
+    private bool Ask()
+    {
+        if (IsBlocked || Plugin is not IPluginWindowSource source) return false;
+
+        PluginCrashGuard.Risky(Plugin.Info, PluginStage.Window);
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
+            "editor: asking " + Plugin.Info.Name + " for its own window");
+
+        try
+        {
+            Editor = source.OpenEditor();
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
+                "editor: " + Plugin.Info.Name + " threw on being asked: " + ex.Message);
+
+            Editor = null;
+        }
+
+        if (Editor == null)
+        {
+            PluginCrashGuard.Survived(Plugin.Info);
+
+            return false;
+        }
+
+        Watch();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Whether there is a face to go looking for, which is what the Face button offers.
+    /// </summary>
+    /// <remarks>
+    /// **A plugin that would not open its window is not a plugin that has none.** Opening one is
+    /// a round trip to another process and everything that can be slow about it is somebody
+    /// else's: a plugin still loading its own wavetables when it was asked, a machine busy enough
+    /// that the answer came back late, an interface that was not ready the first time and is now.
+    /// Without a way back, the first refusal is the last word for the life of the window, and the
+    /// knobs are what you are left with whether or not anything is still wrong.
+    ///
+    /// Offered only where there is nothing to show but the knobs, so it never sits beside a face
+    /// that is already drawn, and never on a plugin this application will not ask. A plugin whose
+    /// process has gone is offered the Restart button instead, which is the thing to press first:
+    /// there is no window to ask a process that is not there for.
+    /// </remarks>
+    public bool CanTryFace => Editor == null && !IsBlocked && !HasStopped && Plugin is IPluginWindowSource;
+
+    /// <summary>Asks again for the plugin's own interface, and shows it where one comes back.</summary>
+    /// <remarks>
+    /// Always enabled; the button is only shown while there is no face. A refusal leaves
+    /// everything exactly as it was and says so in the log, so pressing it again is free.
+    /// </remarks>
+    public IRelayCommand TryFaceCommand => new RelayCommand(TryFace);
+
+    /// <summary>
+    /// One more go at the plugin's own interface.
+    /// </summary>
+    /// <remarks>
+    /// The knobs are left built, since they cost a pause to make and switching back to them is
+    /// what the Knobs button is for the moment a face arrives.
+    /// </remarks>
+    private void TryFace()
+    {
+        if (!CanTryFace) return;
+
+        if (!Ask())
+        {
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
+                "editor: " + Plugin.Info.Name + " was asked again and still has no window here");
+
+            return;
+        }
+
+        _showsKnobs = false;
+
+        OnPropertyChanged(nameof(Editor));
+        OnPropertyChanged(nameof(HasOwnWindow));
+        OnPropertyChanged(nameof(CanShowKnobs));
+        OnPropertyChanged(nameof(CanTryFace));
+        OnPropertyChanged(nameof(HasWayBack));
+        OnPropertyChanged(nameof(ShowsKnobs));
+        OnPropertyChanged(nameof(ShowsFace));
+        OnPropertyChanged(nameof(HasKnobs));
+
+        _changed?.Invoke();
     }
 
     /// <summary>

@@ -32,12 +32,13 @@ public sealed class TrackerOutput(IRenderCost? cost = null) : ITrackerOutput
     public const int Channels = 2;
 
     /// <summary>
-    /// How far ahead this stream is buffered. Short, because a note typed on a keyboard has to
-    /// sound now; BASS is told to update more often to keep a buffer this small fed.
+    /// Milliseconds between BASS buffer updates.
     /// </summary>
-    public const float BufferSeconds = 0.06f;
-
-    /// <summary>Milliseconds between BASS buffer updates. The default is far too slow for the above.</summary>
+    /// <remarks>
+    /// The library's own default is far too slow to keep a buffer this short fed, and a buffer
+    /// this short is what a note typed on a keyboard needs to sound now. How long the buffer
+    /// itself is comes off the settings, through <see cref="UseSizes"/>.
+    /// </remarks>
     public const int UpdatePeriodMs = 10;
 
     /// <summary>

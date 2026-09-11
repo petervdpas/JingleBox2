@@ -665,15 +665,44 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         lock (_gate)
         {
             var process = _process;
-            if (process?.Alive != true || !process.HasOwnWindow) return null;
+
+            if (process?.Alive != true)
+            {
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
+                    "editor: " + Info.Name + " has no process running, so there is no window to ask for");
+
+                return null;
+            }
+
+            if (!process.HasOwnWindow)
+            {
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
+                    "editor: " + Info.Name + " said it draws no window of its own, so the host's knobs are it");
+
+                return null;
+            }
 
             var answer = process.Call(BridgeCall.OpenEditor, null, PluginBridge.WindowTimeoutMilliseconds);
-            if (answer.Call != BridgeCall.Ok) return null;
+
+            if (answer.Call != BridgeCall.Ok)
+            {
+                var said = answer.Call == BridgeCall.Fail ? _body.ReadWords(answer.Payload) : System.Array.Empty<string>();
+
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
+                    "editor: " + Info.Name + " would not open its window: answered " + answer.Call
+                    + (said.Length > 0 ? ", " + string.Join(" ", said) : ""));
+
+                return null;
+            }
 
             var size = _body.ReadThree(answer.Payload);
 
             _editor?.Orphan();
             _editor = new BridgedEditor(this, process, size.First, size.Second) { CanResize = size.Third != 0 };
+
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
+                "editor: " + Info.Name + " opened its window at " + size.First + " by " + size.Second
+                + (size.Third != 0 ? ", resizable" : ", fixed"));
 
             return _editor;
         }

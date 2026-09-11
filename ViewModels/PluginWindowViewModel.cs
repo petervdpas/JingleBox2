@@ -3,25 +3,16 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace JingleBox2.ViewModels;
 
 /// <summary>
-/// One plugin in a window of its own: what is inside it, what it is called, and the one
-/// control that is the host's rather than the plugin's.
+/// One plugin in a window of its own: what is inside it and what it is called.
 /// </summary>
 /// <remarks>
-/// A plugin in a chain can be switched off without being taken out, and that button belongs to
-/// the host because the chain does. A plugin being an instrument has no chain and no bypass, so
-/// the window it opens in has a title and nothing else.
+/// The frame and nothing else. Everything the host has to say about a plugin is said where the
+/// plugin sits rather than here: switching it off is the power button on its block in the chain,
+/// and taking it out is the cross beside that. A second control over either of those would be two
+/// things over one flag with nothing but a binding keeping them in step.
 /// </remarks>
 public sealed class PluginWindowViewModel : ObservableObject
 {
-    /// <summary>
-    /// The box in the chain this window is over, or null when the plugin is an instrument.
-    /// </summary>
-    /// <remarks>
-    /// The only reason to hold it is the bypass, which is why null is an ordinary state here
-    /// rather than something to guard against.
-    /// </remarks>
-    private readonly PluginSlotViewModel? _device;
-
     /// <summary>
     /// Makes the window's contents around a panel that is already built.
     /// </summary>
@@ -31,12 +22,10 @@ public sealed class PluginWindowViewModel : ObservableObject
     /// instrument is named by the person who put it there and the plugin's own name is only
     /// part of that.
     /// </param>
-    /// <param name="device">The chain box, when there is one, which is what carries the bypass.</param>
-    public PluginWindowViewModel(PluginControlsViewModel panel, string name, PluginSlotViewModel? device = null)
+    public PluginWindowViewModel(PluginControlsViewModel panel, string name)
     {
         Panel = panel;
         Name = name;
-        _device = device;
     }
 
     /// <summary>The plugin's controls: its own interface if it has one, our knobs if not.</summary>
@@ -44,26 +33,4 @@ public sealed class PluginWindowViewModel : ObservableObject
 
     /// <summary>What the title bar says.</summary>
     public string Name { get; }
-
-    /// <summary>Only a plugin in a chain has one, because only a chain has somewhere to be off.</summary>
-    public bool HasBypass => _device != null;
-
-    /// <summary>
-    /// Switched off but still loaded, the same flag the block in the strip shows.
-    /// </summary>
-    /// <remarks>
-    /// Read and written through the chain box so that the window and the strip cannot disagree.
-    /// An instrument's window has nowhere to put this and reads false for ever.
-    /// </remarks>
-    public bool IsBypassed
-    {
-        get => _device?.IsBypassed ?? false;
-        set
-        {
-            if (_device == null) return;
-
-            _device.IsBypassed = value;
-            OnPropertyChanged();
-        }
-    }
 }

@@ -164,24 +164,6 @@ public class PanelView : Decorator
         AvaloniaProperty.Register<PanelView, IPanelMenu?>(nameof(Menu));
 
     /// <summary>
-    /// Asks for the panel to be built again, and decides nothing else.
-    /// </summary>
-    /// <remarks>
-    /// **The folder a face's pictures are named against is the face's own**, which is
-    /// <c>Face.Folder</c>, and that is what the picture parts are resolved against. A sound
-    /// device travels as a folder, so a picture on its face is a file in that folder and the
-    /// description says no more than the name of it; where the folder is is the host's to know,
-    /// since the same device sits somewhere different on every disc it is copied to. A face with
-    /// no folder draws a picture's frame and says so rather than going looking relative to
-    /// wherever the program happens to have been started.
-    ///
-    /// This property is in the rebuild list, so writing it redraws the panel. Nothing reads its
-    /// value.
-    /// </remarks>
-    public static readonly StyledProperty<string?> AssetsProperty =
-        AvaloniaProperty.Register<PanelView, string?>(nameof(Assets));
-
-    /// <summary>
     /// The element the designer is working on, outlined on the panel.
     /// </summary>
     /// <remarks>
@@ -422,7 +404,17 @@ public class PanelView : Decorator
     /// <summary>What its controls stand for.</summary>
     private IReadOnlyList<Parameter>? Parameters => Face?.Parameters;
 
-    /// <summary>Where it is kept, which is what its pictures are named against.</summary>
+    /// <summary>Where the face is kept, which is what its pictures are named against.</summary>
+    /// <remarks>
+    /// The face's own folder and never a property of this control's: a sound device travels as a
+    /// folder, so a picture on its face is a file in that folder and the description says no more
+    /// than the name of it. Where the folder is is whoever handed over the face's to know, since
+    /// the same device sits somewhere different on every disc it is copied to.
+    ///
+    /// Nothing at all means no pictures, which is the state a panel is in when whatever put it on
+    /// screen has no folder to offer. A picture then draws its frame and says so rather than
+    /// going looking relative to wherever the program happens to have been started.
+    /// </remarks>
     private string? Assets => Face?.Folder;
 
     /// <inheritdoc cref="ValuesProperty"/>
@@ -649,7 +641,6 @@ public class PanelView : Decorator
             change.Property == ValuesProperty ||
             change.Property == TakesProperty ||
             change.Property == PresetsProperty ||
-            change.Property == AssetsProperty ||
             change.Property == DesigningProperty ||
             change.Property == LinkingProperty ||
             change.Property == PadsProperty ||
@@ -982,9 +973,8 @@ public class PanelView : Decorator
     /// <remarks>
     /// The wording is the question: a knob with no parameter says so, and one naming a parameter
     /// the machine has not got says that instead, which is the difference between not finished
-    /// and wrong. One size whatever part is waiting, sixty by thirty four, which is room for the
-    /// wording rather than room for the control: a panel laid out around one moves when the
-    /// parameter is picked and the real control takes its own measurements.
+    /// and wrong. It takes the room the real control would take, through <see cref="Room"/>, so a
+    /// panel laid out around it does not jump when the parameter is picked.
     /// </remarks>
     private Control Waiting(PanelElement element)
     {
@@ -994,6 +984,8 @@ public class PanelView : Decorator
             ? element.Element + ": no " + element.Parameter
             : element.Element + ": pick a parameter";
 
+        var room = Room(element.Element);
+
         return new Border
         {
             BorderBrush = new SolidColorBrush(palette.Muted, 0.7),
@@ -1001,8 +993,8 @@ public class PanelView : Decorator
             CornerRadius = new CornerRadius(3),
             Background = new SolidColorBrush(palette.Muted, 0.10),
             Padding = new Thickness(8, 6),
-            MinWidth = 60,
-            MinHeight = 34,
+            MinWidth = Math.Max(LeastWaiting.Width, room.Width),
+            MinHeight = Math.Max(LeastWaiting.Height, room.Height),
             Child = new TextBlock
             {
                 Text = said,
@@ -1012,6 +1004,44 @@ public class PanelView : Decorator
                 HorizontalAlignment = HorizontalAlignment.Center,
             },
         };
+    }
+
+    /// <summary>The least a stand-in is drawn at, which is room for the wording on it.</summary>
+    private static readonly Size LeastWaiting = new(60, 34);
+
+    /// <summary>
+    /// How much room the real control for that kind asks for with nothing set on it.
+    /// </summary>
+    /// <remarks>
+    /// **Measured off a bare one rather than written down as a table**, because a table of sizes
+    /// beside the controls that decide them is two answers to one question and the way that fails
+    /// is a panel that jumps the moment a parameter is picked. A knob measures its dial plus the
+    /// reach of its tick ring plus two lines of lettering; a fader measures its throw. Neither is
+    /// a number this file should be keeping.
+    ///
+    /// Only while laying out, since that is the only time a stand-in is built, so the cost of
+    /// making a control to throw away is paid where a hand is moving parts about.
+    ///
+    /// Nothing for a kind whose control needs something to be about before it has a size, which
+    /// is every kind not named here: those fall back to <see cref="LeastWaiting"/>.
+    /// </remarks>
+    /// <param name="kind">The element's kind, as its face spells it.</param>
+    private static Size Room(string kind)
+    {
+        Control? bare = kind switch
+        {
+            ElementKinds.Knob => new Knob { LabelAbove = true },
+            ElementKinds.Fader => new Fader(),
+            ElementKinds.Switch => new Switch(),
+            ElementKinds.Number => new NumberField(),
+            _ => null,
+        };
+
+        if (bare is null) return default;
+
+        bare.Measure(Size.Infinity);
+
+        return bare.DesiredSize;
     }
 
     /// <summary>

@@ -205,10 +205,9 @@ public class Fader : ThemedControl
     /// is the whole of it, and the meter beside it is squeezed out of existence, clip lamp and
     /// all. That was tried and it is what happened.
     ///
-    /// The width is measured against the longest reading only while the reading is shown, so a
-    /// fader without one is no wider than its cap and its name. The height keeps the reading's
-    /// line either way, which is what stops a row of faders sitting at two different heights
-    /// because one of them has the number switched off.
+    /// The reading is left out of the measuring as well as the drawing, both ways: a fader
+    /// without one is no wider than its cap and its name, and no taller than the room its throw
+    /// really needs. See <see cref="ReadingRoom"/>.
     /// </remarks>
     public static readonly StyledProperty<bool> ShowValueProperty =
         AvaloniaProperty.Register<Fader, bool>(nameof(ShowValue), true);
@@ -427,7 +426,6 @@ public class Fader : ThemedControl
     protected override Size MeasureOverride(Size availableSize)
     {
         var label = BuildText(Label, LabelFontSize, FontFamily.Default, Brushes.Black);
-        var value = BuildText(ValueText, ValueFontSize, PatternFont.Family, Brushes.Black);
 
         double throwLength = TrackLength > 0 ? TrackLength : MinimumTrackLength;
 
@@ -436,7 +434,7 @@ public class Fader : ThemedControl
             ValueFontSize, PatternFont.Family, Brushes.Black);
 
         double width = Math.Max(CapWidth, Math.Max(label.Width, widest.Width)) + ScaleWidth();
-        double height = label.Height + TextGap + throwLength + CapHeight + TextGap + value.Height;
+        double height = label.Height + TextGap + throwLength + CapHeight + ReadingRoom();
 
         return new Size(width, height);
     }
@@ -638,16 +636,27 @@ public class Fader : ThemedControl
     private (double Top, double Length) Track()
     {
         var label = BuildText(Label, LabelFontSize, FontFamily.Default, Brushes.Black);
-        var value = BuildText(ValueText, ValueFontSize, PatternFont.Family, Brushes.Black);
 
         double top = label.Height + TextGap + CapHeight / 2;
 
         double length = TrackLength > 0
             ? TrackLength
-            : Math.Max(MinimumTrackLength, Bounds.Height - top - CapHeight / 2 - TextGap - value.Height);
+            : Math.Max(MinimumTrackLength, Bounds.Height - top - CapHeight / 2 - ReadingRoom());
 
         return (top, length);
     }
+
+    /// <summary>How much height under the cap the reading takes, and nought where it is not shown.</summary>
+    /// <remarks>
+    /// Asked in both places that divide the height up, the measuring and the throw, so a fader
+    /// told to leave the number out really gets that room back rather than reserving a line for
+    /// something it does not draw. Measured off the reading as it stands rather than off the
+    /// longest one, since every reading is one line of the same face and only the width moves.
+    /// </remarks>
+    private double ReadingRoom() =>
+        ShowValue
+            ? TextGap + BuildText(ValueText, ValueFontSize, PatternFont.Family, Brushes.Black).Height
+            : 0;
 
     /// <summary>A piece of text laid out for measuring or for drawing, with no width limit.</summary>
     private FormattedText BuildText(string? text, double size, FontFamily family, IBrush brush) =>

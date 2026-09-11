@@ -106,24 +106,6 @@ public sealed record SoundMachine(
         new PanelTheme("#7B838C"));
 
     /// <summary>
-    /// The five engines that shipped, in the order they were introduced.
-    /// </summary>
-    /// <remarks>
-    /// **Nothing reads it.** What the rack shows is <see cref="Installed"/>, which is sorted by
-    /// name, and which engines this build has is decided by <c>EngineNamed</c> and
-    /// <see cref="KindOf"/> as each manifest is registered. There is no curated order any more,
-    /// since a machine somebody makes and names themselves has no place in one.
-    /// </remarks>
-    private static readonly TrackerInstrumentKind[] Offered =
-    {
-        TrackerInstrumentKind.Synth,
-        TrackerInstrumentKind.MonoSynth,
-        TrackerInstrumentKind.Sampler,
-        TrackerInstrumentKind.Kit,
-        TrackerInstrumentKind.Sample,
-    };
-
-    /// <summary>
     /// What a machine of that kind is called before anything has been read off disc.
     /// </summary>
     /// <remarks>

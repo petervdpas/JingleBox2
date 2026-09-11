@@ -29,43 +29,10 @@
       <Setter Property="Margin" Value="0,0,16,6" />
     </Style>
 
-    <!-- The instrument's name, in the corner rather than on a line of its own. Everything else
-         on this panel belongs to the machine; the name is the one thing that belongs to the
-         song, and it earns a badge rather than a row. Quiet until the pointer is on it, so a
-         panel at rest is all machine. -->
-    <!-- The chip the rest of the app uses for a track or a category, with a box in it instead
-         of a line, because this one is typed into. The Border does the badge; the box inside it
-         is made to disappear so what shows is the chip and the word.
-
-         Painted in the panel's own lettering rather than its accent, which is what the badge
-         everywhere else uses. A machine panel is already wearing the machine's colour, and the
-         accent chip on it came out dark red on dark red. The ink is the one colour on a machine
-         that is chosen to be readable against its face, whatever face that is. -->
-    <Style Selector="Border.badge.instrument">
-      <Setter Property="Background">
-        <SolidColorBrush Color="{DynamicResource Color.TextPrimary}" Opacity="0.10" />
-      </Setter>
-      <Setter Property="BorderBrush">
-        <SolidColorBrush Color="{DynamicResource Color.TextPrimary}" Opacity="0.30" />
-      </Setter>
-      <Setter Property="VerticalAlignment" Value="Top" />
-    </Style>
-
-    <Style Selector="TextBox.name">
-      <Setter Property="FontSize" Value="10" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="FontFamily" Value="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace" />
-      <Setter Property="TextAlignment" Value="Center" />
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="MinWidth" Value="0" />
-      <Setter Property="MinHeight" Value="0" />
-      <Setter Property="Background" Value="Transparent" />
-    </Style>
-
-    <Style Selector="TextBox.name /template/ Border#PART_BorderElement">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-    </Style>
+    <!-- The instrument's name is a part on the face like any other, dropped on in the designer
+         and drawn by the library: see ElementKinds.InstrumentName. Nothing about it is styled
+         here, which is the rule this panel keeps everywhere else, that what a face does not draw
+         nobody draws. -->
 
     <!-- One block of the voice: a heading with its knobs or faders under it. -->
     <Style Selector="StackPanel.group">

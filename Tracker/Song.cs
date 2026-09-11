@@ -864,7 +864,7 @@ public sealed class Song
         TrackCount = Math.Clamp(TrackCount, MinTrackCount, MaxTrackCount);
 
         if (Patterns.Count == 0)
-            Patterns.Add(new Pattern(Pattern.DefaultLines, TrackCount) { Name = "01" });
+            Patterns.Add(new Pattern(Pattern.DefaultLines, TrackCount) { Name = Named(0) });
 
         EnsureNoteColumns();
 

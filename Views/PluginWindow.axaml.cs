@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -167,39 +168,33 @@ public partial class PluginWindow : Window
 
         device.IsOpen = true;
 
-        Show(device, device.Panel, device.Name, owner, device, () => device.IsOpen = false);
+        Show(device, device.Panel, device.Name, owner, () => device.IsOpen = false);
     }
 
     /// <summary>
-    /// Opens a plugin that is not in a chain, an instrument for instance, in the same kind of
-    /// window. The key is whatever owns it, so asking twice brings the same window forward.
-    /// </summary>
-    public static void Show(object key, PluginControlsViewModel panel, string title, Window owner, Action? closed = null)
-    {
-        Show(key, panel, title, owner, null, closed);
-    }
-
-    /// <summary>
-    /// The one that actually opens a window, which both public overloads reach.
+    /// Opens a plugin in a window of its own, or brings the one it already has to the front.
     /// </summary>
     /// <remarks>
-    /// The plugin's interface is opened before the window is built, so the window can size
-    /// itself to whatever the plugin turns out to be. A plugin drawing its own interface is a
-    /// picture at a size it chose, so it is let out of the caps that keep a wall of host-drawn
-    /// knobs from filling the screen.
+    /// The key is whatever owns it, so asking twice brings the same window forward: a chain slot
+    /// hands itself in as its own key, and <see cref="CloseFor"/> is given the same thing.
     ///
-    /// The plugin is taken out of its window on the way out rather than after: letting the
-    /// window go first leaves the plugin drawing into something that is not there, which is a
-    /// crash on closing rather than on opening. Only the picture is put away; the plugin itself
-    /// carries on playing.
+    /// The plugin's interface is opened before the window is built, so the window can size itself
+    /// to whatever the plugin turns out to be. A plugin drawing its own interface is a picture at
+    /// a size it chose, so it is let out of the caps that keep a wall of host-drawn knobs from
+    /// filling the screen: see <see cref="Cap"/>.
+    ///
+    /// The plugin is taken out of its window on the way out rather than after: letting the window
+    /// go first leaves the plugin drawing into something that is not there, which is a crash on
+    /// closing rather than on opening. Only the picture is put away; the plugin itself carries on
+    /// playing.
     /// </remarks>
-    private static void Show(
-        object key,
-        PluginControlsViewModel panel,
-        string title,
-        Window owner,
-        PluginSlotViewModel? device,
-        Action? closed)
+    /// <param name="key">What owns the window, which is what finds it again.</param>
+    /// <param name="panel">The plugin's controls, already built.</param>
+    /// <param name="title">What the title bar and the header say.</param>
+    /// <param name="owner">The main window, which this one is centred on and capped against.</param>
+    /// <param name="closed">Told once the window has gone, or nothing.</param>
+    public static void Show(
+        object key, PluginControlsViewModel panel, string title, Window owner, Action? closed = null)
     {
         if (key == null || panel == null) return;
 
@@ -213,19 +208,20 @@ public partial class PluginWindow : Window
 
         var window = new PluginWindow
         {
-            DataContext = new PluginWindowViewModel(panel, title, device),
+            DataContext = new PluginWindowViewModel(panel, title),
             Title = title
         };
 
-        if (panel.HasOwnWindow)
+        Cap(window, panel, owner);
+
+        panel.PropertyChanged += (_, changed) =>
         {
-            window.MaxWidth = double.PositiveInfinity;
-            window.MaxHeight = double.PositiveInfinity;
-        }
-        else
-        {
-            window.MaxWidth = Math.Min(900, owner.Bounds.Width > 0 ? owner.Bounds.Width : 900);
-        }
+            if (changed.PropertyName != nameof(panel.ShowsKnobs)) return;
+
+            Cap(window, panel, owner);
+
+            window.SizeToContent = SizeToContent.WidthAndHeight;
+        };
 
         Open[key] = window;
 
@@ -242,6 +238,41 @@ public partial class PluginWindow : Window
 
         Free.Show(window, owner);
     }
+
+    /// <summary>
+    /// Shapes the window around what is being shown in it, which is not the same for the two.
+    /// </summary>
+    /// <remarks>
+    /// **A face is as big as the plugin says and a grid of knobs is as big as it likes.** Serum
+    /// answers with 2621 parameters, so the grid asks for whatever width it is given and takes the
+    /// whole screen; a face asked for eight hundred pixels then arrives in a window sized for the
+    /// grid and is stretched across it. So the cap follows what is on show rather than being
+    /// decided once when the window opens, and the window is told to take its size from its
+    /// contents again on the way past, which is what shrinks it back down to the face.
+    ///
+    /// The room round it goes the same way. A plugin's own face is a finished picture and wants
+    /// none: a border of ours round it is this application framing somebody else's artwork, and
+    /// it is the one thing on the window that is neither the plugin nor a way back to it. The
+    /// host's own knobs are ours and want the air every other card here has.
+    /// </remarks>
+    /// <param name="window">The window being shaped.</param>
+    /// <param name="panel">What is in it.</param>
+    /// <param name="owner">The main window, which is as wide as a grid is allowed to be.</param>
+    private static void Cap(PluginWindow window, PluginControlsViewModel panel, Window owner)
+    {
+        bool face = panel.ShowsFace;
+
+        window.Frame.Margin = new Thickness(face ? 0 : FrameRoom);
+
+        window.MaxHeight = double.PositiveInfinity;
+        window.MaxWidth = face
+            ? double.PositiveInfinity
+            : Math.Min(900, owner.Bounds.Width > 0 ? owner.Bounds.Width : 900);
+    }
+
+    /// <summary>How much air the host's own knobs are given round them.</summary>
+    /// <remarks>The card spacing the rest of the application uses, so the grid sits like a card.</remarks>
+    private const double FrameRoom = 14;
 
     /// <summary>
     /// Closes a window, for whatever owned it going away. Named apart from Window.Close so

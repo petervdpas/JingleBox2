@@ -1186,7 +1186,21 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// </remarks>
     public IPluginEditor? OpenEditor()
     {
-        if (_disposed || _controller == null) return null;
+        if (_disposed)
+        {
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins,
+                "editor: the plugin has already been let go of, so there is no view to ask for");
+
+            return null;
+        }
+
+        if (_controller == null)
+        {
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins,
+                "editor: this plugin has no settings half, which is the half that knows what it looks like");
+
+            return null;
+        }
 
         return Vst3Editor.Open(_controller);
     }

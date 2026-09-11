@@ -374,8 +374,15 @@
                  them are the application's and one is the song's, and that difference decides what a
                  fader does: pulling a track down changes the song, pulling PADS down changes this
                  installation. -->
-            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-              <StackPanel Orientation="Horizontal" Spacing="18">
+            <!-- The room under the strips is the scrollbar's, and it is left only while there is a
+                 bar to leave it for: see MixerView.RoomForTheBar. The bar is drawn over the
+                 content rather than beside it, so without the room it lies across the foot of
+                 whichever strips are tallest, which is the reading under a fader and a track's
+                 ducking knobs. Left on the content rather than on the scroller, since padding on
+                 the scroller moves the bar down with it and puts it off the bottom of the card. -->
+            <ScrollViewer x:Name="StripScroll"
+                          HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+              <StackPanel x:Name="Strips" Orientation="Horizontal" Spacing="18">
 
                 <!-- Each group is a DockPanel rather than a stack, so its title takes the line it
                      needs and the strips under it take everything left. Stacked, every group was as

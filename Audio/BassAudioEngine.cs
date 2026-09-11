@@ -93,8 +93,20 @@ public sealed class BassAudioEngine : IAudioEngine
     /// <summary>Held for anything that touches a pad's state or calls into BASS.</summary>
     private readonly object _lock = new();
 
-    /// <summary>Which output BASS was opened on, or -1 before it has been opened at all.</summary>
+    /// <summary>Which output BASS was opened on, or -1 for the system's own default.</summary>
     private int _currentDeviceId = -1;
+
+    /// <summary>
+    /// Whether BASS is up at all, which is not the same question as which output it is on.
+    /// </summary>
+    /// <remarks>
+    /// **Minus one is a real answer here and not an absence.** It is what
+    /// <see cref="Interfaces.IAudioOutputs.Which"/> reads as the system's own default, which is
+    /// what a settings file that has never had an output picked holds and what this engine opens
+    /// when a pad is pressed before anything else has asked. So whether anything is open has to
+    /// be its own fact, or the first pad press would reopen the device on every press after it.
+    /// </remarks>
+    private bool _opened;
 
     /// <summary>The BASS channel each pad is playing on, or 0 for one that is not open.</summary>
     private int[] _padStreams;
@@ -270,7 +282,7 @@ public sealed class BassAudioEngine : IAudioEngine
     {
         lock (_lock)
         {
-            if (!InRange(padIndex)) return _padVolumes[padIndex];
+            if (!InRange(padIndex)) return 0f;
             var handle = _padStreams[padIndex];
             if (handle == 0) return _padVolumes[padIndex];
             if (Bass.ChannelGetAttribute(handle, ChannelAttribute.Volume, out float vol))
@@ -388,7 +400,7 @@ public sealed class BassAudioEngine : IAudioEngine
     {
         lock (_lock)
         {
-            if (_currentDeviceId == deviceId) return;
+            if (_opened && _currentDeviceId == deviceId) return;
 
             OpenLocked(deviceId);
         }
@@ -425,9 +437,9 @@ public sealed class BassAudioEngine : IAudioEngine
         _asio.Close();
         _pipe.Close();
 
-        if (_currentDeviceId >= 0)
-            Bass.Free();
+        if (_opened) Bass.Free();
 
+        _opened = false;
         _currentDeviceId = deviceId;
 
         var (kind, index) = _outputs.Which(deviceId);
@@ -441,6 +453,8 @@ public sealed class BassAudioEngine : IAudioEngine
 
         if (!Bass.Init(opened, _deviceRate, Stereo))
             throw new InvalidOperationException($"Bass.Init failed: {Bass.LastError}");
+
+        _opened = true;
 
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
         {
@@ -965,23 +979,30 @@ public sealed class BassAudioEngine : IAudioEngine
 
     /// <summary>Opens BASS if nothing has, so that a pad pressed first still has somewhere to go.</summary>
     /// <remarks>
-    /// On device <see cref="SilentDevice"/>, which is the one that plays nothing. Nothing else is
-    /// known here: which output somebody chose is the settings' answer and reaches this class
-    /// through <c>SetOutputDevice</c>, which is what every ordinary start does before a pad can
-    /// be pressed. This is the path where that has not happened.
+    /// On <see cref="DefaultOutput"/>, since which output somebody chose is the settings' answer
+    /// and reaches this class through <c>SetOutputDevice</c>, which is what every ordinary start
+    /// does before a pad can be pressed. This is the path where that has not happened, and the
+    /// honest answer there is whatever the machine plays through.
+    ///
+    /// Through <see cref="OpenLocked"/> rather than a second spelling of it, so the busses, the
+    /// plugins and the log line are the ones every other open gets.
     /// </remarks>
     private void EnsureInitLocked()
     {
-        if (_currentDeviceId >= 0) return;
+        if (_opened) return;
 
-        if (!Bass.Init(0, _deviceRate))
-            throw new InvalidOperationException($"Bass.Init failed: {Bass.LastError}");
-        _currentDeviceId = 0;
-
-        LoadPlugins();
-
-        OpenBussesLocked(false, 0);
+        OpenLocked(DefaultOutput);
     }
+
+    /// <summary>
+    /// The system's own default output, which is what a number below nought means.
+    /// </summary>
+    /// <remarks>
+    /// The library's own word for it, and the same number
+    /// <see cref="Interfaces.IAudioOutputs.Which"/> already reads as the system's default. Not
+    /// <see cref="SilentDevice"/>, which is nought and plays nothing at all.
+    /// </remarks>
+    private const int DefaultOutput = -1;
 
 
     /// <summary>
@@ -1303,6 +1324,9 @@ public sealed class BassAudioEngine : IAudioEngine
         lock (_lock)
         {
             StopAllAndFreeStreamsLocked();
+
+            _opened = false;
+
             Bass.Free();
         }
     }

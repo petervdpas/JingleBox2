@@ -334,6 +334,8 @@ public static class PluginHostProcess
 
         bool hasWindow = _plugin is IPluginWindowSource;
 
+        Say(hasWindow ? "this plugin can draw a window of its own" : "this plugin draws no window of its own");
+
         _control.Send(BridgeCall.Hello, _body.Words(hasWindow ? "window" : "plain"));
 
         var reader = new Thread(() => Listen(_control)) { IsBackground = true, Name = "bridge control" };
@@ -656,6 +658,8 @@ public static class PluginHostProcess
 
             if (editor == null)
             {
+                Say("the plugin gave back no view, so the host's knobs are it");
+
                 control.Send(BridgeCall.Fail, _body.Words("this plugin has no window of its own"));
                 return;
             }

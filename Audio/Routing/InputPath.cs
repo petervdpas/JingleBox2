@@ -61,7 +61,9 @@ public sealed class InputPath : IInputPath
     /// **Hear it is not part of the question, deliberately.** Where a source plays is settled by
     /// choosing it and the tick has nothing to say about that: counted in, every press would give
     /// the source back and take it off again, letting it out of the desk and back for a moment on
-    /// each press.
+    /// each press. It is written down all the same, above the question, since
+    /// <see cref="Heard"/> is something a caller can ask about and an answer from the first press
+    /// of the session would be no answer at all.
     /// </remarks>
     private string _asked = "";
 
@@ -74,6 +76,8 @@ public sealed class InputPath : IInputPath
     /// <inheritdoc/>
     public InputAside Set(AudioRoute? source, bool heard, string? playingOut)
     {
+        Heard = heard;
+
         string asking = (source?.Node ?? "") + "\n" + (playingOut ?? "");
 
         if (_everAsked && asking == _asked) return _answered;
@@ -82,7 +86,6 @@ public sealed class InputPath : IInputPath
         _asked = asking;
 
         Source = source;
-        Heard = heard;
         _moved = false;
 
         _routing.GiveBack();
