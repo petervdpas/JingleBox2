@@ -199,11 +199,13 @@ public sealed class MidiControlRouter
 
         bool answered = false;
 
+        string desk = _profiles.Called(message.Device);
+
         foreach (var mapping in mappings)
         {
             if (mapping.Kind == ControlKind.Pad) continue;
 
-            if (!mapping.Answers(message)) continue;
+            if (!mapping.Answers(message, desk)) continue;
 
             answered = true;
 
@@ -250,11 +252,13 @@ public sealed class MidiControlRouter
         var mappings = _mappings();
         if (mappings is null) return;
 
+        string desk = _profiles.Called(message.Device);
+
         foreach (var mapping in mappings)
         {
             if (mapping.Kind != ControlKind.Pad) continue;
 
-            if (!mapping.Answers(message)) continue;
+            if (!mapping.Answers(message, desk)) continue;
 
             if (message.Type == MidiMessageType.ControlChange && message.Data < Still) continue;
 

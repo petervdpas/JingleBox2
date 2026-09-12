@@ -113,6 +113,34 @@ public sealed class ControlLink
     /// </remarks>
     public Func<IEnumerable<string>>? Ports { get; set; }
 
+    /// <summary>
+    /// What a profile calls the device a port belongs to, or nothing where nobody knows.
+    /// </summary>
+    /// <remarks>
+    /// Set once as the window is built, beside <see cref="Ports"/>. It is what tells this layer
+    /// that two ports are one box, which nothing in a port name says and which decides whether
+    /// learning a knob on one of them takes the link off the other.
+    ///
+    /// Nothing is claimed where it is not set: a device with no profile is compared by its port
+    /// name exactly as it always was.
+    /// </remarks>
+    public Func<string, string>? Called { get; set; }
+
+    /// <summary>
+    /// What a controller is called, which is what a link stores.
+    /// </summary>
+    /// <remarks>
+    /// **The contract has always said the device is the controller by name**, and what was
+    /// written into it was the port a message arrived on. A box shows up as several ports, a
+    /// MiniLab 3 as four of them, so one knob learned while a second port was delivering made a
+    /// second link that nothing displaced: one control doing one job twice.
+    ///
+    /// The port name is kept where nobody knows any better, which is a device with no profile,
+    /// and that is exactly what a port name is for there: it is the only name the thing has.
+    /// </remarks>
+    /// <param name="port">The port a message arrived on.</param>
+    private string Named(string port) => Called is { } called ? called(port) : port;
+
     /// <summary>Told when the song's own layout changed, so the song reads as unsaved.</summary>
     public Action? SongChanged { get; set; }
 
@@ -281,7 +309,7 @@ public sealed class ControlLink
 
         if (_offered is not { } wanted) return null;
 
-        wanted.Device = message.Device ?? "";
+        wanted.Device = Named(message.Device ?? "");
         wanted.Channel = message.Channel;
         wanted.Cc = message.Value;
         wanted.Sends = message.Type;
@@ -512,23 +540,57 @@ public sealed class ControlLink
     /// the surfaces line on a machine's face lists is what survived, so the repair somebody
     /// reaches for was itself made out of the damage.
     /// </remarks>
-    private static void Displace(List<ControlMapping>? from, ControlMapping wanted) =>
+    private void Displace(List<ControlMapping>? from, ControlMapping wanted) =>
         from?.RemoveAll(one => SameDesk(one, wanted)
                                && (one.SameTarget(wanted)
-                                   || (one.SameControl(wanted) && !Apart(one, wanted))));
+                                   || (SameKnob(one, wanted) && !Apart(one, wanted))));
+
+    /// <summary>
+    /// True when those two are the same control, the box having already been settled.
+    /// </summary>
+    /// <remarks>
+    /// **Deliberately narrower than <see cref="ControlMapping.SameControl"/>**, which also
+    /// compares the port a link was learned on. Here <see cref="SameDesk"/> has already answered
+    /// which box this is, and a box is not its port: with the port compared again, a knob learned
+    /// while the MiniLab's screen port was delivering was a different control from the same knob
+    /// on its main port, so pointing it somewhere else left the first link firing.
+    /// </remarks>
+    /// <param name="one">A link already on the desk.</param>
+    /// <param name="wanted">The link arriving.</param>
+    private static bool SameKnob(ControlMapping one, ControlMapping wanted) =>
+        one.Sends == wanted.Sends && one.Channel == wanted.Channel && one.Cc == wanted.Cc;
 
     /// <summary>True when those two links could ever answer the same controller.</summary>
     /// <remarks>
     /// A link naming no controller is the wildcard a link made before controllers were recorded
     /// reads as: <see cref="ControlMapping.Answers"/> lets it answer every device, so it really
     /// would fire beside an arriving link and it is displaced by any of them.
+    ///
+    /// **A box on two ports is one desk**, which the port names do not say: a MiniLab 3 is
+    /// <c>Minilab3 MIDI</c> and <c>Minilab3 ALV</c> to this machine and is one thing under the
+    /// hand, and the same knob arrives down both. Compared by port alone, learning that knob
+    /// displaced nothing, so one control did one job twice: two links, two rows under one card,
+    /// and both of them firing. What a profile calls the device is the only thing here that knows
+    /// the two ports are one box, which is why <see cref="Called"/> is asked as well.
+    ///
+    /// By port first, since that answers with no profile at all, and a device nobody has written
+    /// a file for is the case this whole layer is built to work in.
     /// </remarks>
     /// <param name="one">A link already on the desk.</param>
     /// <param name="wanted">The link arriving.</param>
-    private static bool SameDesk(ControlMapping one, ControlMapping wanted) =>
-        one.Device.Length == 0
-        || wanted.Device.Length == 0
-        || MidiService.SameName(one.Device, wanted.Device);
+    private bool SameDesk(ControlMapping one, ControlMapping wanted)
+    {
+        if (one.Device.Length == 0 || wanted.Device.Length == 0) return true;
+
+        if (MidiService.SameName(one.Device, wanted.Device)) return true;
+
+        if (Called is not { } called) return false;
+
+        string mine = called(one.Device);
+        string theirs = called(wanted.Device);
+
+        return mine.Length > 0 && theirs.Length > 0 && MidiService.SameName(mine, theirs);
+    }
 
     /// <summary>
     /// True when two links share a control but can never answer the same message.
@@ -545,12 +607,23 @@ public sealed class ControlLink
     /// protecting: that really would be two jobs on one knob and both would fire.
     ///
     /// A link naming no machine answers for all of them, so it is never apart from anything, and
-    /// neither is a mixer link: a strip has no machine to tell two of them apart, so both would
-    /// answer the same message.
+    /// neither is a second mixer link: a strip has no machine to tell two of them apart, so both
+    /// would answer the same message.
+    ///
+    /// **And two links of different kinds are apart, whatever they are on**, which is the shape
+    /// the whole layer is arranged in: one controller against the mixer, the pads, or one
+    /// machine, is one template apiece. A desk pointed at the mixer and then at a machine keeps
+    /// both, and a knob that drives a fader and a filter is a knob doing one job in each of two
+    /// places a person thinks of separately.
+    ///
+    /// It was the other way round, and the two ports of a MiniLab hid it: mixer links learned
+    /// while one port was delivering and machine links on the other were two desks, so neither
+    /// displaced the other. One box, one desk, and the mixer's template went the moment a machine
+    /// was learned on the same knob.
     /// </remarks>
     private static bool Apart(ControlMapping one, ControlMapping wanted)
     {
-        if (one.Kind != wanted.Kind) return false;
+        if (one.Kind != wanted.Kind) return true;
 
         return one.Kind switch
         {
@@ -596,6 +669,29 @@ public sealed class ControlLink
 
         return keys;
     }
+
+    /// <summary>
+    /// Whether anything on the desk is already pointed at what this names.
+    /// </summary>
+    /// <remarks>
+    /// **The other half of the hook, and the one that was only ever built for a drawn panel.** A
+    /// face of a machine is handed <see cref="KeysOn"/> and rings the parameters somebody has
+    /// already wired, so turning the mode on is how you see what your controller does. The mixer
+    /// and the pads are ordinary controls rather than a drawn face, so nothing asked this of them
+    /// and nothing marked them: a template applied there was invisible until a knob was turned.
+    ///
+    /// Asked with the same object the control offers, since that is what a control already
+    /// carries and is the only thing on the page that knows what it is pointed at. So it is one
+    /// question whatever kind of thing is asking, which is what keeps the mixer, the pads and a
+    /// device's face from each having a rule of their own that could drift.
+    ///
+    /// By the target and never by the controller: the mark says this fader has something on it,
+    /// not which desk. Two controllers pointed at one fader is two links and one ring, which is
+    /// right, since what the ring is warning about is that pointing here replaces something.
+    /// </remarks>
+    /// <param name="wanted">What the control offers, which names the target and nothing else.</param>
+    public bool Holds(ControlMapping? wanted) =>
+        wanted is not null && Mappings.Any(one => one.SameTarget(wanted));
 
     /// <summary>
     /// Takes off whatever is pointed at that parameter or that button of that machine.

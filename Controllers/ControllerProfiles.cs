@@ -121,6 +121,13 @@ public sealed class ControllerProfiles : IControllerProfiles
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// **By port pattern first and by the profile's own name second.** A link names the
+    /// controller rather than the port it arrived on, which is what
+    /// <see cref="Midi.ControlMapping.Device"/> has always said it holds, so what is asked about
+    /// here is as often "MiniLab 3" as "Minilab3 MIDI". A profile knows its own name, and a
+    /// device that answers to it is the same device.
+    /// </remarks>
     public ControllerProfile? For(string? device)
     {
         if (string.IsNullOrWhiteSpace(device)) return null;
@@ -131,7 +138,9 @@ public sealed class ControllerProfiles : IControllerProfiles
         {
             if (Decided.TryGetValue(device, out var known)) return known;
 
-            var found = Held.FirstOrDefault(one => one.Matches.Any(like => _folder.Like(like, device)));
+            var found = Held.FirstOrDefault(one => one.Matches.Any(like => _folder.Like(like, device)))
+                        ?? Held.FirstOrDefault(one =>
+                               string.Equals(one.Name, device, StringComparison.OrdinalIgnoreCase));
             Decided[device] = found;
 
             if (found is not null)

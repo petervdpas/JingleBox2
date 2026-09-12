@@ -5,7 +5,8 @@
              xmlns:views="clr-namespace:JingleBox2.Views"
              xmlns:ui="clr-namespace:JingleBox2.Rack.Controls;assembly=JingleBox2.Rack.Controls"
              x:Class="JingleBox2.Views.UseView"
-             x:DataType="vm:MainViewModel">
+             x:DataType="vm:MainViewModel"
+             views:Pointable.Hook="{Binding PadsHook}">
 
   <UserControl.Styles>
     <Style Selector="ToggleButton.pad">

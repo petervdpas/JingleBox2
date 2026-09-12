@@ -138,6 +138,53 @@ public sealed class ControlTemplateCutTests
         Assert.Contains(cut, one => one.Controller.Length == 0);
     }
 
+    /// <summary>
+    /// **A device on two ports is one desk, and so one template.**
+    /// </summary>
+    /// <remarks>
+    /// The case this was got wrong on, and it is the ordinary case rather than a corner: a
+    /// MiniLab arrives as <c>Minilab3 MIDI</c> and <c>Minilab3 ALV</c> on one machine, and both
+    /// are the same box under the hand. Cut by the port it is two templates under one name, each
+    /// covering the other's links as well as its own, which draws as two identical cards.
+    /// </remarks>
+    [Fact]
+    public void A_device_on_two_ports_is_one_template()
+    {
+        var cut = new ControlTemplates().Cut(
+            new[]
+            {
+                Knob("Minilab3 MIDI", "machine.oddskilla", 16),
+                Knob("Minilab3 ALV", "machine.oddskilla", 17),
+            },
+            port => "MiniLab 3");
+
+        var one = Assert.Single(cut);
+
+        Assert.Equal("MiniLab 3", one.Controller);
+        Assert.Equal(2, one.Controls.Count);
+    }
+
+    /// <summary>And what it covers is both of those ports' links, once each.</summary>
+    /// <remarks>
+    /// The other half of the same fault: the cut and <see cref="ControlTemplates.Covers"/> have
+    /// to agree, or a card is headed by a template that does not carry the rows under it.
+    /// </remarks>
+    [Fact]
+    public void And_it_covers_both_ports()
+    {
+        var links = new[]
+        {
+            Knob("Minilab3 MIDI", "machine.oddskilla", 16),
+            Knob("Minilab3 ALV", "machine.oddskilla", 17),
+        };
+
+        var store = new ControlTemplates();
+
+        var one = Assert.Single(store.Cut(links, port => "MiniLab 3"));
+
+        Assert.Equal(2, links.Count(link => store.Covers(one, link, port => "MiniLab 3")));
+    }
+
     /// <summary>The order does not move under the same links arriving in another order.</summary>
     /// <remarks>
     /// What that is worth is a writer that compares what it would write with what it wrote: a

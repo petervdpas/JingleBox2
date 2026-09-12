@@ -13,7 +13,7 @@ namespace JingleBox2.Midi.Records;
 /// </remarks>
 /// <param name="Links">Everything that could be read, ready to be laid down.</param>
 /// <param name="Skipped">How many lines described something this build has no word for.</param>
-/// <param name="Controller">The port these were pointed at, or the name the file carried.</param>
+/// <param name="Controller">The controller these name, as a profile calls it.</param>
 /// <param name="Found">Whether that controller is one this computer can actually see.</param>
 public sealed record ControlTemplateReading(
     IReadOnlyList<ControlMapping> Links,

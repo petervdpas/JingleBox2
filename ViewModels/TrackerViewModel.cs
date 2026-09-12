@@ -2582,8 +2582,20 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Made here and never rebuilt, since it holds nothing and reads the links every time it is
     /// worked.
     /// </remarks>
-    public Rack.SoundDevices.Faces.Interfaces.IPanelMenu MixerMenu { get; } =
-        new Midi.ControlMenu(() => "", () => "the mixer", kind: Midi.LinkTargets.Mixer);
+    public Rack.SoundDevices.Faces.Interfaces.IPanelMenu MixerMenu => _mixerMenu;
+
+    /// <summary>The mixer's own hook, which is the same one its Menu is a face over.</summary>
+    /// <remarks>
+    /// Hung on the page so every fader, knob and strip button on it can be marked when the mode
+    /// goes on. Beside the menu rather than reached through it, because the two are different
+    /// halves of the same thing: the menu is where a template is chosen and this is what the page
+    /// asks about each of its own controls.
+    /// </remarks>
+    public Midi.Interfaces.IControlExchange MixerHook => _mixerMenu.Hook;
+
+    /// <summary>The one behind both, held as itself so both halves can be given out.</summary>
+    private readonly Midi.ControlMenu _mixerMenu =
+        new(() => "", () => "the mixer", kind: Midi.LinkTargets.Mixer);
 
     /// <summary>
     /// Shows a page, or goes back to the pattern when the page asked for is already up.

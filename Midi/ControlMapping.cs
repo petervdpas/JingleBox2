@@ -207,13 +207,15 @@ public sealed class ControlMapping
     /// on the desk both have a CC 22, and a mapping made on one has nothing to say about the
     /// other.
     /// </remarks>
-    public bool Answers(MidiMessage message) =>
+    public bool Answers(MidiMessage message, string? desk = null) =>
         message != null
         && message.Type == Sends
         && (Sends != MidiMessageType.Note || message.IsOn)
         && message.Channel == Channel
         && message.Value == Cc
-        && (Device.Length == 0 || MidiService.SameName(Device, message.Device));
+        && (Device.Length == 0
+            || MidiService.SameName(Device, message.Device)
+            || (desk is { Length: > 0 } && MidiService.SameName(Device, desk)));
 
     /// <summary>
     /// True when both point at the same thing in the program, whatever they were learned on.

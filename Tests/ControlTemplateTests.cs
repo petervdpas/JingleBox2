@@ -101,12 +101,17 @@ public class ControlTemplateTests
     }
 
     /// <summary>
-    /// The port is worked out from what a profile calls it, which is the one thing that cannot
-    /// travel.
+    /// **A link names the controller and never the port it happens to arrive on here.**
     /// </summary>
     /// <remarks>
     /// The same device is <c>nanoKONTROL2 _ CTRL</c> to the ALSA sequencer and
-    /// <c>nanoKONTROL2 _ SLIDER/KNOB</c> to rawmidi, and Windows spells it a third way.
+    /// <c>nanoKONTROL2 _ SLIDER/KNOB</c> to rawmidi, and Windows spells it a third way, so the
+    /// port is the one thing about a controller that cannot travel and is also the one thing that
+    /// cannot identify it here: a box on two ports delivers on whichever its running program uses,
+    /// and a link holding the other answers nothing at all.
+    ///
+    /// The ports are still walked, for the one question they can answer, which is whether the
+    /// controller is here. That decides the wording and never the links.
     /// </remarks>
     [Fact]
     public void The_controller_is_found_by_its_profiles_name_and_not_by_the_port()
@@ -117,7 +122,7 @@ public class ControlTemplateTests
             port => port.Contains("nanoKONTROL2") ? "nanoKONTROL2" : port);
 
         Assert.True(reading.Found);
-        Assert.Equal("nanoKONTROL2 _ SLIDER/KNOB", reading.Links[0].Device);
+        Assert.Equal("nanoKONTROL2", reading.Links[0].Device);
     }
 
     /// <summary>
@@ -316,11 +321,20 @@ public class ControlTemplateTests
         Templates.Take(template, new[] { "nanoKONTROL2 _ CTRL" }, _ => "nanoKONTROL2").Links;
 
     /// <summary>And pointing the same knob somewhere else replaces, as it always did.</summary>
+    /// <remarks>
+    /// The desk is told what a profile calls a port, which is what the application does and what
+    /// this needs: the link already on it was learned before links were kept by name, so it holds
+    /// a port, and only the profile knows that the port and the name are one box.
+    /// </remarks>
     [Fact]
     public void A_template_displaces_what_held_the_same_knob()
     {
         var desk = new List<ControlMapping> { OnMachine("release", 0) };
-        var link = new ControlLink(desk, () => { });
+
+        var link = new ControlLink(desk, () => { })
+        {
+            Called = port => port.Contains("nanoKONTROL2") ? "nanoKONTROL2" : port
+        };
 
         link.Take(Templates.Take(
             Templates.Describe("nanoKONTROL2", new[] { OnMachine("attack", 0) })!,

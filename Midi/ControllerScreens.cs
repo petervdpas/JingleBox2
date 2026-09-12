@@ -66,7 +66,8 @@ public sealed class ControllerScreens : IControllerScreen
     ///
     /// The port it came from is tried first, since for a MiniLab 3 that is the answer and costs
     /// one comparison. Otherwise the ports of the same controller are looked through for one that
-    /// has a screen.
+    /// has a screen, which is also how a controller named rather than ported is found: a name
+    /// belongs to every port of the box and to no other, so the same walk answers both.
     ///
     /// Two of the same controller on one desk is the case that decides how: the ports are asked
     /// how much of their name they share with the one the control was turned on, and the closest
@@ -75,7 +76,12 @@ public sealed class ControllerScreens : IControllerScreen
     /// and it is the only thing available: an operating system does not say which ports are one
     /// controller, and the identity a device answers with is the same for both of them.
     /// </remarks>
-    /// <param name="device">The port something happened on.</param>
+    /// <param name="device">
+    /// The port something happened on, or the controller by the name its profile gives it. Both
+    /// really arrive here: a message off the wire knows its port, and a link knows the box, since
+    /// the name is the one spelling every port of a box shares. A name understood as a port alone
+    /// is a screen that says nothing while a knob is being turned.
+    /// </param>
     private string? Where(string? device)
     {
         if (string.IsNullOrWhiteSpace(device)) return null;
@@ -84,8 +90,7 @@ public sealed class ControllerScreens : IControllerScreen
 
         string mine = _profiles.Called(device);
 
-        if (mine.Length == 0 || string.Equals(mine, device, StringComparison.OrdinalIgnoreCase))
-            return null;
+        if (mine.Length == 0) return null;
 
         string? best = null;
         int shared = -1;

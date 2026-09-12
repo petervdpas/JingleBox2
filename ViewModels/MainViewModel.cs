@@ -218,9 +218,18 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// Made here and never rebuilt, since it holds nothing and reads the links every time it is
     /// worked.
     /// </remarks>
-    public Rack.SoundDevices.Faces.Interfaces.IPanelMenu PadsMenu { get; } =
-        new JingleBox2.Midi.ControlMenu(
-            () => "", () => "the pads", kind: JingleBox2.Midi.LinkTargets.Pads);
+    public Rack.SoundDevices.Faces.Interfaces.IPanelMenu PadsMenu => _padsMenu;
+
+    /// <summary>The pads' own hook, which is the same one their Menu is a face over.</summary>
+    /// <remarks>
+    /// Hung on FIRE so every pad can be marked when the mode goes on, which is the other half of
+    /// the exchange: a template is chosen on the menu and what it wired is seen on the pads.
+    /// </remarks>
+    public JingleBox2.Midi.Interfaces.IControlExchange PadsHook => _padsMenu.Hook;
+
+    /// <summary>The one behind both, held as itself so both halves can be given out.</summary>
+    private readonly JingleBox2.Midi.ControlMenu _padsMenu =
+        new(() => "", () => "the pads", kind: JingleBox2.Midi.LinkTargets.Pads);
 
     /// <summary>
     /// Which MIDI ports this computer has, asked rather than held.
@@ -233,6 +242,78 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// put on the desk.
     /// </remarks>
     private IEnumerable<string> Ports() => Midi.Devices.Select(one => one.Name).ToList();
+
+    /// <summary>
+    /// Every link named by its controller rather than by the port it arrived on, and one link
+    /// where there were two.
+    /// </summary>
+    /// <remarks>
+    /// **What a link stores is the controller, which is what its own contract has always said**,
+    /// and what was written into it for a long time was the port. A box arrives as several ports,
+    /// a MiniLab 3 as four, so a knob learned while a second of them was delivering made a second
+    /// link that nothing displaced: two rows under one card, and both firing.
+    ///
+    /// Carried on the way in rather than left to be displaced a knob at a time, since a file half
+    /// in one vocabulary and half in the other is two shapes in one file. The twins collapse as
+    /// they are read, keeping the first of each, which is the same answer pointing the control at
+    /// something again would have given.
+    ///
+    /// A device with no profile keeps its port name, which there is the only name it has.
+    /// </remarks>
+    /// <param name="links">What was read.</param>
+    /// <param name="profiles">What is known about the controllers plugged in.</param>
+    /// <returns>The links to work over.</returns>
+    private static List<ControlMapping> Named(
+        IReadOnlyList<ControlMapping> links,
+        IControllerProfiles profiles)
+    {
+        var named = new List<ControlMapping>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        int twins = 0;
+
+        foreach (var one in links)
+        {
+            one.Device = profiles.Called(one.Device);
+
+            string what = one.Device + "|" + one.Sends + "|" + one.Channel + "|" + one.Cc
+                          + "|" + one.Kind + "|" + one.Machine + "|" + one.Key + "|" + one.Plugin
+                          + "|" + one.Parameter + "|" + one.Mix + "|" + one.Transport
+                          + "|" + one.Pad + "|" + one.Track;
+
+            if (!seen.Add(what))
+            {
+                twins++;
+                continue;
+            }
+
+            named.Add(one);
+        }
+
+        if (twins > 0)
+            Diagnostics.Log.Write(
+                Diagnostics.Enums.LogArea.Midi,
+                () => "links: " + twins + " were the same control on another port of one box, and are one now");
+
+        return named;
+    }
+
+
+    /// <summary>Names every link in the block, and says so where anything moved.</summary>
+    /// <param name="block">The links block, read from the file a moment ago.</param>
+    private void Name(Midi.Interfaces.IControlLinkBlock block)
+    {
+        var named = Named(block.Links, _profiles);
+
+        if (named.Count == block.Links.Count
+            && !named.Where((one, at) => !ReferenceEquals(one, block.Links[at])).Any())
+            return;
+
+        block.Links.Clear();
+        block.Links.AddRange(named);
+
+        block.Moved();
+    }
 
 
     /// <summary>RECORD: taking a recording, and the shelf everything else fetches takes off.</summary>
@@ -2352,6 +2433,12 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
 
         var noteRouter = new MidiNoteRouter(Keys);
 
+        // What a link stores is the controller by name, which is what its own contract has always
+        // said; a file written before that holds the port a message arrived on. Named here rather
+        // than where the file is read, because this is the one IControllerProfiles the
+        // application has. See Named below.
+        Name(blocks.Links);
+
         ControlLink = new ControlLink(blocks.Links.Links, () => blocks.Links.Moved());
 
         // The write path: a hand points a control at something, that comes to a link, and the
@@ -2392,6 +2479,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         // than being threaded through every place a face can be drawn.
         ControlLink.Templates = blocks.Templates;
         ControlLink.Ports = Ports;
+        ControlLink.Called = port => _profiles.Called(port);
 
         Links = new ControlLinksViewModel(ControlLink, profiles: _profiles, ports: Ports);
 

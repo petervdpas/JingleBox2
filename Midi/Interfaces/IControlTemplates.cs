@@ -64,6 +64,13 @@ public interface IControlTemplates
     /// so the two can never compete and are two things somebody keeps, hands on or lays down
     /// apart.
     ///
+    /// **The controller is what a profile calls the device and never the port it arrived on.** A
+    /// MiniLab is <c>Minilab3 MIDI</c> and <c>Minilab3 ALV</c> to this machine and is one desk to
+    /// the hand on it, so cutting by the port makes two templates of one, both under the same
+    /// name, each covering every one of the other's links: two identical cards on the page and
+    /// two identical lines on a machine's face. It is the name a person reads and the name a file
+    /// carries, so it is the name the cut is by.
+    ///
     /// One rule, said here, because the page cuts its cards by it and the file is written by it
     /// and now the block is filled by it: three spellings would eventually disagree, and the way
     /// that fails is a template that means one thing to whoever exported it and another to
@@ -115,18 +122,23 @@ public interface IControlTemplates
     /// The links a template describes, ready to be laid down.
     /// </summary>
     /// <remarks>
-    /// The port is settled here, since this is the one part of a template that is about the
-    /// machine it arrives on: the controller is named as its profile calls it and the ports are
-    /// whatever this computer happens to spell them. A controller that is not plugged in keeps
-    /// the name the file carried, so the links are there when it comes back rather than being
-    /// refused for a cable.
+    /// **A link names the controller and never a port**, so nothing written here is a port. It
+    /// has to be the name, because a box arrives on more than one of them: a MiniLab is
+    /// <c>Minilab3 MIDI</c> and <c>Minilab3 ALV</c>, the knobs come in on whichever one the
+    /// program the device is running delivers on, and a link holding the other answers nothing at
+    /// all. The template applies, says how many controls it carried, and moves nothing. The name
+    /// is the one spelling every port of a box shares, and it is what a link made by hand holds.
+    ///
+    /// The ports are looked through for one answer only, which is whether this computer can see
+    /// the controller at all, and that decides the wording rather than the links: a controller in
+    /// the other room lays its links down exactly as one on the desk does, and they wait for it.
     ///
     /// What cannot be read is left out and counted rather than failing the lot: a template from
     /// a newer version is mostly this version's, and the useful answer is the part that works
     /// plus a line saying how much did not.
     /// </remarks>
     /// <param name="template">What was opened.</param>
-    /// <param name="ports">The MIDI ports this computer has, for working out which is the controller.</param>
+    /// <param name="ports">The MIDI ports this computer has, for saying whether the controller is here.</param>
     /// <param name="called">What a port's profile calls it, or the port itself where none does.</param>
     ControlTemplateReading Take(ControlTemplate? template, IEnumerable<string>? ports = null, Func<string, string>? called = null);
 

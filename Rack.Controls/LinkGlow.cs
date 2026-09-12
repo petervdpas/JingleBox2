@@ -45,6 +45,53 @@ public sealed class LinkGlow : Control
     public static void SetLit(Control control, bool value) => control.SetValue(LitProperty, value);
 
     /// <summary>
+    /// True on a control something is already pointed at, so it can ring itself quietly.
+    /// </summary>
+    /// <remarks>
+    /// The standing mark, where <see cref="LitProperty"/> is the one under the pointer. Turning
+    /// the mode on is how you see what your controller is wired to, and without this that was
+    /// true of a drawn face and of nothing else: the mixer and the pads are ordinary controls, so
+    /// a template applied to either marked nothing whatever and read exactly like a template that
+    /// had not been applied.
+    ///
+    /// A flag on the control rather than a layer over the page, for the reason
+    /// <see cref="LitProperty"/> gives: a control knows where it is and lights itself, where a
+    /// layer would have to be told where everything stands and kept in step as the page moved.
+    /// </remarks>
+    public static readonly AttachedProperty<bool> TakenProperty =
+        AvaloniaProperty.RegisterAttached<LinkGlow, Control, bool>("Taken");
+
+    /// <inheritdoc cref="TakenProperty"/>
+    public static bool GetTaken(Control control) => control.GetValue(TakenProperty);
+
+    /// <inheritdoc cref="TakenProperty"/>
+    public static void SetTaken(Control control, bool value) => control.SetValue(TakenProperty, value);
+
+    /// <summary>
+    /// The quiet ring, on a control that already has something pointed at it.
+    /// </summary>
+    /// <remarks>
+    /// One ring and a wash rather than the spreading glow, which is the difference a drawn face
+    /// already makes between what is wired and what is being offered: the offer has to be found
+    /// at a glance and these have to be readable all at once without the page becoming a wall of
+    /// red. The same colour deliberately, since a mark in another one reads as another thing.
+    ///
+    /// Inward like <see cref="Paint"/>, since a control has no room outside itself to paint in.
+    /// </remarks>
+    /// <param name="context">What to draw into.</param>
+    /// <param name="area">The control's own rectangle.</param>
+    public static void Quiet(DrawingContext context, Rect area)
+    {
+        if (area.Width <= 0 || area.Height <= 0) return;
+
+        context.DrawRectangle(
+            new SolidColorBrush(Hot, 0.07),
+            new Pen(new SolidColorBrush(Hot, 0.45), 1),
+            area.Deflate(0.5),
+            4, 4);
+    }
+
+    /// <summary>
     /// The ring, on a control that is drawing itself.
     /// </summary>
     /// <remarks>

@@ -271,7 +271,7 @@ public class Fader : ThemedControl
     static Fader()
     {
 
-        AffectsRender<Fader>(LinkGlow.LitProperty);
+        AffectsRender<Fader>(LinkGlow.LitProperty, LinkGlow.TakenProperty);
 
         AffectsRender<Fader>(
             ValueProperty, MinimumProperty, MaximumProperty, LabelProperty, ShowValueProperty,
@@ -446,6 +446,7 @@ public class Fader : ThemedControl
             (Bounds.Width - value.Width) / 2,
             trackTop + trackLength + CapHeight / 2 + TextGap));
 
+        if (LinkGlow.GetTaken(this)) LinkGlow.Quiet(context, new Rect(Bounds.Size));
         if (LinkGlow.GetLit(this)) LinkGlow.Paint(context, new Rect(Bounds.Size));
     }
 

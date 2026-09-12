@@ -472,4 +472,70 @@ public class ControllerScreenTests
         Assert.Single(midi.Sent);
         Assert.Equal(secondDaw, midi.Sent[0].Device);
     }
+
+    /// <summary>
+    /// **A reading addressed by the controller's own name reaches its screen.**
+    /// </summary>
+    /// <remarks>
+    /// What a link carries is the controller as its profile calls it, since a box arrives on more
+    /// than one port and the name is the one spelling they share. So the two places a reading is
+    /// raised from hand the name over, and a screen that only understood ports answered nothing:
+    /// the knob was reaching for a parameter, the screen was the one thing that would have said
+    /// so, and it stayed on the standing text. From a hand on the desk that is a controller doing
+    /// nothing at all.
+    ///
+    /// A port is still a port. Both are accepted because both really arrive here: a message off
+    /// the wire knows the port it came in on, and a link knows the box.
+    /// </remarks>
+    [Fact]
+    public void A_reading_addressed_by_the_controllers_name_reaches_its_screen()
+    {
+        var midi = new NoMidi();
+
+        var screens = new ControllerScreens(
+            () => new[] { Lab, KeyDaw, KeyMidi, "MPD218 Port A" },
+            _profiles,
+            new ArturiaDisplay(midi, null, _profiles));
+
+        screens.Moved("MiniLab 3", ScreenKind.Knob, 0.5, "Pan on TR-01", "pick up 0.00");
+
+        Assert.NotEmpty(midi.Sent);
+        Assert.All(midi.Sent, one => Assert.Equal(Lab, one.Device));
+
+        Assert.Contains(midi.Sent, one =>
+            System.Text.Encoding.ASCII.GetString(one.Bytes).Contains("Pan on TR-01"));
+    }
+
+    /// <summary>And the same by name for a box whose screen is on its other port.</summary>
+    [Fact]
+    public void A_name_finds_the_port_the_screen_is_really_on()
+    {
+        var midi = new NoMidi();
+
+        var screens = new ControllerScreens(
+            () => new[] { Lab, KeyMidi, KeyDaw },
+            _profiles,
+            new ArturiaDisplay(midi, null, _profiles));
+
+        screens.Moved("KeyLab mkII", ScreenKind.Knob, 0.5, "Cutoff", "50%");
+
+        Assert.Single(midi.Sent);
+        Assert.Equal(KeyDaw, midi.Sent[0].Device);
+    }
+
+    /// <summary>A name nobody has a file for still writes to nothing.</summary>
+    [Fact]
+    public void A_name_with_no_screen_behind_it_goes_nowhere()
+    {
+        var midi = new NoMidi();
+
+        var screens = new ControllerScreens(
+            () => new[] { Lab, "MPD218 Port A" },
+            _profiles,
+            new ArturiaDisplay(midi, null, _profiles));
+
+        screens.Moved("MPD218", ScreenKind.Knob, 0.5, "Cutoff", "50%");
+
+        Assert.Empty(midi.Sent);
+    }
 }

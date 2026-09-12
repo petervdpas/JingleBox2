@@ -445,6 +445,25 @@
             <Setter Property="Background" Value="#33FF2D2D" />
         </Style>
 
+        <!-- A control something is already pointed at, while the mode is on. Quieter than the
+             offer above and deliberately the same red: turning the mode on is how you see what
+             your controller is wired to, so these have to be readable all at once without the
+             page becoming a wall of colour, and the one under the pointer has to stand out from
+             them. A knob and a fader paint their own, the way they paint the offer. -->
+        <Style Selector="ToggleButton.wired /template/ ContentPresenter">
+            <Setter Property="BorderBrush" Value="#73FF2D2D" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <Style Selector="Button.wired /template/ ContentPresenter">
+            <Setter Property="BorderBrush" Value="#73FF2D2D" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <Style Selector="ToggleButton.strip.wired /template/ ContentPresenter">
+            <Setter Property="Background" Value="#12FF2D2D" />
+        </Style>
+
         <!-- The strip the mixer is about, which is the track everything pointed at a strip
              follows. Its own edge rather than a fill, so the meters and the fader inside it
              read exactly as they do on every other strip. -->

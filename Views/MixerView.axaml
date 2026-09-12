@@ -8,7 +8,8 @@
              xmlns:rec="clr-namespace:JingleBox2.UI.Records"
              xmlns:arec="clr-namespace:JingleBox2.Audio.Records"
              x:Class="JingleBox2.Views.MixerView"
-             x:DataType="vm:TrackerViewModel">
+             x:DataType="vm:TrackerViewModel"
+             views:Pointable.Hook="{Binding MixerHook}">
 
   <UserControl.Resources>
     <!-- A strip over something that is not a track: the recording input, the pads as a whole, a

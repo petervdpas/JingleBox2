@@ -147,15 +147,13 @@ public sealed class ControlTemplates : IControlTemplates
                      .OrderBy(one => _targets.RankOf(one.First()))
                      .ThenBy(one => _targets.TitleOf(one), StringComparer.OrdinalIgnoreCase))
         foreach (var desk in target
-                     .GroupBy(one => one.Device, StringComparer.OrdinalIgnoreCase)
+                     .GroupBy(one => called?.Invoke(one.Device) ?? one.Device, StringComparer.OrdinalIgnoreCase)
                      .OrderBy(one => one.Key, StringComparer.OrdinalIgnoreCase))
         {
-            string port = desk.Key;
-
             var template = Describe(
-                called?.Invoke(port) ?? port,
+                desk.Key,
                 desk.ToList(),
-                (channel, cc) => named?.Invoke(port, channel, cc) ?? "");
+                (channel, cc) => named?.Invoke(desk.Key, channel, cc) ?? "");
 
             if (template is not null) made.Add(template);
         }
@@ -190,8 +188,7 @@ public sealed class ControlTemplates : IControlTemplates
             return new ControlTemplateReading(links, 0, template?.Controller ?? "", false);
 
         string wanted = template.Controller ?? "";
-        string port = Port(wanted, ports, called);
-        bool found = port.Length > 0;
+        bool found = Here(wanted, ports, called);
 
         int skipped = 0;
 
@@ -210,7 +207,7 @@ public sealed class ControlTemplates : IControlTemplates
                 continue;
             }
 
-            one.Device = found ? port : wanted;
+            one.Device = wanted;
             one.Channel = entry.Channel is >= 1 and <= 16 ? entry.Channel : 1;
             one.Cc = entry.Cc is >= 0 and <= 127 ? entry.Cc : 0;
 
@@ -229,7 +226,7 @@ public sealed class ControlTemplates : IControlTemplates
             links.Add(one);
         }
 
-        return new ControlTemplateReading(links, skipped, found ? port : wanted, found);
+        return new ControlTemplateReading(links, skipped, wanted, found);
     }
 
     /// <inheritdoc/>
@@ -296,29 +293,28 @@ public sealed class ControlTemplates : IControlTemplates
     private static bool Strips(ControlMapping one) => one.Kind == ControlKind.Mix;
 
     /// <summary>
-    /// Which port on this computer is the controller the file names, or nothing.
+    /// Whether this computer can see the controller a template names.
     /// </summary>
     /// <remarks>
-    /// By what the profile calls a port rather than by the port's own spelling, since that is
-    /// the whole reason the file names the controller and not the port. A controller with no
-    /// profile is called by its port, so this still finds it when the two computers spell it the
-    /// same way, which is what a file made and opened on one machine does.
+    /// The one thing the ports are asked, since nothing here writes a port down: it decides the
+    /// wording on the line and nothing else. A controller in the other room lays its links down
+    /// exactly as one on the desk does.
+    ///
+    /// By what a profile calls a port rather than by the port's own spelling, which is the whole
+    /// reason a template names the controller. A controller with no profile is called by its
+    /// port, so this still sees it where the two computers spell it the same way, which is what
+    /// a file made and opened on one machine does.
     /// </remarks>
     /// <param name="controller">What the file named.</param>
     /// <param name="ports">The MIDI ports this computer has.</param>
     /// <param name="called">What a port's profile calls it.</param>
-    private static string Port(string controller, IEnumerable<string>? ports, Func<string, string>? called)
+    private static bool Here(string controller, IEnumerable<string>? ports, Func<string, string>? called)
     {
-        if (controller.Length == 0 || ports is null) return "";
+        if (controller.Length == 0 || ports is null) return false;
 
-        foreach (string port in ports)
-        {
-            if (string.Equals(called?.Invoke(port) ?? port, controller, StringComparison.OrdinalIgnoreCase))
-                return port;
-        }
-
-        return ports.FirstOrDefault(port =>
-            string.Equals(port, controller, StringComparison.OrdinalIgnoreCase)) ?? "";
+        return ports.Any(port =>
+            string.Equals(called?.Invoke(port) ?? port, controller, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(port, controller, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>What is left of a name once everything a file system might object to is gone.</summary>

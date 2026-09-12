@@ -199,7 +199,7 @@ public class Knob : ThemedControl
 
         AffectsMeasure<Knob>(LabelAboveProperty, LabelLinesProperty, HeadRoomProperty, TicksProperty);
 
-        AffectsRender<Knob>(LinkGlow.LitProperty);
+        AffectsRender<Knob>(LinkGlow.LitProperty, LinkGlow.TakenProperty);
 
         AffectsRender<Knob>(
             LabelAboveProperty, LabelLinesProperty, HeadRoomProperty, TicksProperty,
@@ -491,6 +491,7 @@ public class Knob : ThemedControl
         DrawDial(context, palette, centerX, middle, radius);
         DrawText(context, palette, middle + radius + 1 + TickReach);
 
+        if (LinkGlow.GetTaken(this)) LinkGlow.Quiet(context, new Rect(Bounds.Size));
         if (LinkGlow.GetLit(this)) LinkGlow.Paint(context, new Rect(Bounds.Size));
     }
 

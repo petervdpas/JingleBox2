@@ -1,9 +1,12 @@
+using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using JingleBox2.Rack.Controls;
 using JingleBox2.Midi;
+using JingleBox2.Midi.Interfaces;
+using System.Collections.Generic;
 
 namespace JingleBox2.Views;
 
@@ -59,12 +62,41 @@ public static class Pointable
         control.RemoveHandler(InputElement.PointerMovedEvent, Rested);
         control.RemoveHandler(InputElement.PointerEnteredEvent, Rested);
 
-        if (e.NewValue is not ControlMapping) return;
+        if (e.NewValue is not ControlMapping)
+        {
+            LinkGlow.SetTaken(control, false);
+            control.Classes.Remove(Wired);
+
+            return;
+        }
 
         control.AddHandler(InputElement.PointerMovedEvent, Rested,
             RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
         control.AddHandler(InputElement.PointerEnteredEvent, Rested,
             RoutingStrategies.Direct | RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
+
+        Remember(control);
+
+        if (ControlLink.Current is { } desk) Watch(desk);
+
+        Mark(control);
+    }
+
+    /// <summary>Keeps one control on the list of things to mark, once.</summary>
+    /// <remarks>
+    /// A mapping is hung again whenever the binding under it moves, which on the mixer is every
+    /// time the song is rebuilt, so the same control really does arrive here more than once.
+    /// </remarks>
+    /// <param name="control">The control that offers something.</param>
+    private static void Remember(Control control)
+    {
+        for (int at = Offering.Count - 1; at >= 0; at--)
+        {
+            if (!Offering[at].TryGetTarget(out var known)) Offering.RemoveAt(at);
+            else if (ReferenceEquals(known, control)) return;
+        }
+
+        Offering.Add(new WeakReference<Control>(control));
     }
 
     /// <summary>
@@ -118,12 +150,120 @@ public static class Pointable
     /// <summary>The link said something; anything but a standing offer puts the glow out.</summary>
     private static void Looked()
     {
+        MarkEverything();
+
         if (_watching is { IsLinking: true, Offered: not null }) return;
 
         _last = null;
 
         Light(null);
     }
+
+    /// <summary>
+    /// The hook this part of the page belongs to, hung once on whatever holds the controls.
+    /// </summary>
+    /// <remarks>
+    /// **This is what lets a page mark what is already wired without knowing anything about
+    /// links.** A control offers a mapping and nothing more; whether something is pointed at it
+    /// is the desk's answer, and which desk is the page's business. Hung on the mixer's root, on
+    /// the pads' and on a device's face, and read by walking up from the control, so a control
+    /// inside three templates still finds it and nothing has to be passed down.
+    ///
+    /// A page with none marks nothing, which is the right answer rather than a fallback: marking
+    /// from the desk directly would be a second way of asking the one question the hook exists to
+    /// answer, and two ways of asking one question is the fault this codebase keeps paying for.
+    /// </remarks>
+    public static readonly AttachedProperty<IControlExchange?> HookProperty =
+        AvaloniaProperty.RegisterAttached<Control, Control, IControlExchange?>("Hook");
+
+    /// <inheritdoc cref="HookProperty"/>
+    public static IControlExchange? GetHook(Control control) => control.GetValue(HookProperty);
+
+    /// <inheritdoc cref="HookProperty"/>
+    public static void SetHook(Control control, IControlExchange? value) =>
+        control.SetValue(HookProperty, value);
+
+    /// <summary>
+    /// Every control on screen that offers something, so all of them can be marked at once.
+    /// </summary>
+    /// <remarks>
+    /// Weakly, because a control is taken off the screen without anybody telling this: a page
+    /// swapped, a window closed, a strip rebuilt when the song changed. Held strongly this would
+    /// keep every mixer strip of every song ever opened alive for the life of the run. Dead ones
+    /// are dropped on the next walk, which is the only moment their being dead matters.
+    /// </remarks>
+    private static readonly List<WeakReference<Control>> Offering = new();
+
+    /// <summary>
+    /// The hook this control belongs to, found by walking up from it.
+    /// </summary>
+    /// <remarks>
+    /// Up the visual tree rather than the logical one, since the controls that matter here are
+    /// inside data templates and the logical parent of one of those is not the page.
+    /// </remarks>
+    /// <param name="control">The control being marked.</param>
+    private static IControlExchange? Hook(Control? control)
+    {
+        for (var at = control; at is not null;
+             at = Avalonia.VisualTree.VisualExtensions.GetVisualParent(at) as Control)
+        {
+            if (at.GetValue(HookProperty) is { } hook) return hook;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Marks every control that offers something, which is what Ctrl+Shift+M shows.
+    /// </summary>
+    /// <remarks>
+    /// All of them each time rather than the ones that moved, because what changed is almost
+    /// always the whole picture: the mode was turned over, or a template was laid down, and a
+    /// template is every control on the page at once.
+    /// </remarks>
+    private static void MarkEverything()
+    {
+        for (int at = Offering.Count - 1; at >= 0; at--)
+        {
+            if (!Offering[at].TryGetTarget(out var control))
+            {
+                Offering.RemoveAt(at);
+                continue;
+            }
+
+            Mark(control);
+        }
+    }
+
+    /// <summary>
+    /// Puts the quiet mark on one control, or takes it off.
+    /// </summary>
+    /// <remarks>
+    /// Only while the mode is on. Outside it the page is a page and a red ring on the mixer's
+    /// faders would be decoration nobody asked for; the whole point of the mark is that turning
+    /// the mode on is how you see what your controller is wired to.
+    ///
+    /// Both a flag and a class, which is the same split the offer glow already keeps: a knob and
+    /// a fader paint themselves and read the flag, and a control made of a template cannot paint
+    /// anything and wears the class instead.
+    /// </remarks>
+    /// <param name="control">The control to mark.</param>
+    private static void Mark(Control control)
+    {
+        bool wired =
+            ControlLink.Current is { IsLinking: true }
+            && control.GetValue(OffersProperty) is { } template
+            && Hook(control) is { } hook
+            && hook.Wired(template);
+
+        LinkGlow.SetTaken(control, wired);
+
+        if (wired) control.Classes.Add(Wired);
+        else control.Classes.Remove(Wired);
+    }
+
+    /// <summary>The class a templated control wears while something is already pointed at it.</summary>
+    private const string Wired = "wired";
 
     /// <summary>The class a templated control wears while it is being offered.</summary>
     private const string Glow = "offered";

@@ -388,3 +388,66 @@ and then it gets the same part for the same reason.
 **More options.** The part exists to be added to. Anything a machine's own face should be able to
 offer, that the machine cannot know by itself, is a word in `MenuOptionWords` and a line from
 whoever fills the menu.
+
+## The exchange hook
+
+**Three places a controller can be pointed at, one contract, both directions.** A sound device's
+face wherever it is standing, the mixer, and the pads. `IControlExchange` is that contract and
+`ControlExchange` is the one implementation; each of the three holds one and nothing else knows
+how any of this works.
+
+It answers three things and they are the whole of it:
+
+- **what there is**, `Offered()`, read out of the templates block rather than cut again. One
+  controller against this thing is one line
+- **exchanging one in**, `Take(template)`, which is what choosing it on the Menu does. Through
+  `ControlLink.Take`, the one door a batch of links goes through, so a template chosen off a face
+  and one imported off the disc cannot come to mean different things
+- **what is wired here now**, `Wired(control)`, asked with the very mapping the control already
+  offers a knob
+
+**Nothing is ever applied on its own.** A template sits in the block until somebody picks it. What
+picking it does is lay its links on the desk, where they stay for the session and are written to
+`remotecontrol-links.json`. Nothing anywhere remembers that a template was involved: what is left
+is links like any other, displacing what held their controls and what was pointed at their target.
+
+**Whether a link then answers is a different rule and is not this one's.** A link on a sound device
+answers only while that device is the one in front of you, which is what makes one knob able to be
+OddSkilla's `tune` and the mixer's pan on TR-01 at the same time: they can never both fire. The
+mixer and the pads name a strip and a pad outright, so theirs answer from anywhere.
+
+### What was missing, and it was the second direction
+
+The taking half worked everywhere. The **marking** half existed only for a drawn face: `PanelView`
+is handed `KeysOn` and rings the parameters somebody has wired, so turning the mode on is how you
+see what your controller does. The mixer and the pads are ordinary controls, nothing asked them
+anything, and **a template applied there marked nothing whatever** -- which reads exactly like a
+template that had not been applied, and was reported as one.
+
+`Pointable.Hook` is hung once on the mixer's page and on FIRE, and a control finds it by walking
+up from itself, so a control three templates deep needs nothing passed down. A page with no hook
+marks nothing, which is the right answer rather than a fallback: marking from the desk directly
+would be a second way of asking the one question the hook exists to answer.
+
+`LinkGlow.Taken` is the mark. A knob and a fader paint it themselves, the way they already paint
+the offer ring; a control made of a template wears the `wired` class and `App.axaml` does the rest.
+One quiet ring in the same red the offer glow uses, since a mark in another colour reads as another
+thing.
+
+### Two faults under "loaded, but not working"
+
+Both came from links being kept by the controller's **name** rather than by a port, which is right
+and is what a box on two ports forces, and both were something downstream still expecting a port.
+
+**`ControlTemplates.Take` wrote a port into the link.** It resolved the controller's name to
+whichever of this computer's ports matched first. A MiniLab is `Minilab3 MIDI` and `Minilab3 ALV`;
+the knobs arrive on whichever its running program uses, and a link holding the other answers
+nothing at all. The template applied, said how many controls it carried, and moved nothing. The
+ports are still walked, for the one question they can answer, which is whether the controller is
+here; that decides the wording and never the links.
+
+**The controller's screen was addressed by a port too.** A reading is raised with `mapping.Device`,
+which is now the name, and `ControllerScreens.Where` only understood ports, so it gave up: the knob
+was reaching for a parameter under takeover, the screen was the one thing that would have said so,
+and it stayed on the standing text. It takes either now, since both really arrive -- a message off
+the wire knows its port and a link knows the controller.

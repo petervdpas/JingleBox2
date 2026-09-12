@@ -64,6 +64,38 @@ public sealed class SoundDeviceRemote
     {
         if (Midi.ControlLink.Current is { } link) link.Changed += Show;
 
+        _face.PropertyChanged += Drawn;
+
+        Show();
+    }
+
+    /// <summary>
+    /// The face is drawing a different device, so what is pointed at it is asked again.
+    /// </summary>
+    /// <remarks>
+    /// **A panel is shown one device and then another while it stays exactly where it is**, which
+    /// is what the rack does: the page and its data context are the same objects throughout and
+    /// only the face and the values underneath are swapped, through bindings, with no code of
+    /// this window's running at all. Told only when it was built and when its data context moved,
+    /// this went on reporting the keys of the machine before it.
+    ///
+    /// Which is not a mark in the wrong place so much as a mark that is wrong: a face draws a
+    /// control as already pointed at by its parameter's key, and machines share those names, so
+    /// a fresh machine's cutoff, resonance, attack and release all came up as taken on a device
+    /// nobody had ever pointed anything at.
+    ///
+    /// Asked of the face rather than of whoever swapped it, so no call site can forget: what this
+    /// decorates is that control, and the two things it is drawn from are the face and the
+    /// values.
+    /// </remarks>
+    /// <param name="sender">The face.</param>
+    /// <param name="what">Which of its properties moved.</param>
+    private void Drawn(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs what)
+    {
+        if (what.Property != Rack.Controls.PanelView.FaceProperty
+            && what.Property != Rack.Controls.PanelView.ValuesProperty)
+            return;
+
         Show();
     }
 
@@ -71,6 +103,8 @@ public sealed class SoundDeviceRemote
     public void Stop()
     {
         if (Midi.ControlLink.Current is { } link) link.Changed -= Show;
+
+        _face.PropertyChanged -= Drawn;
     }
 
     /// <summary>Tells the face what mode the pointer is in and what is already pointed at.</summary>

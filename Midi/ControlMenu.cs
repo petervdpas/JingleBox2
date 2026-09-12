@@ -103,6 +103,10 @@ public sealed class ControlMenu : IPanelMenu
     /// goes through as well, so a template laid down from a face and one opened off the disc
     /// cannot come to mean different things.
     /// </param>
+    /// <param name="exchange">
+    /// The hook this is a face over. Left out, one built from everything above, which is what
+    /// every caller wants: the hook is where the rule lives and this is where it is worded.
+    /// </param>
     public ControlMenu(
         Func<string> which,
         Func<string>? named = null,
@@ -110,7 +114,8 @@ public sealed class ControlMenu : IPanelMenu
         IControllerProfiles? profiles = null,
         ILinkTargets? naming = null,
         string kind = LinkTargets.SoundDevice,
-        IControlTemplates? templates = null)
+        IControlTemplates? templates = null,
+        IControlExchange? exchange = null)
     {
         _which = which;
         _kind = kind;
@@ -119,7 +124,23 @@ public sealed class ControlMenu : IPanelMenu
         _profiles = profiles ?? new ControllerProfiles();
         _naming = naming ?? new LinkTargets();
         _templates = templates ?? new ControlTemplates();
+
+        Hook = exchange ?? new ControlExchange(_which, _kind, _desk, _templates, _profiles, _naming);
     }
+
+    /// <summary>
+    /// The hook this menu is a face over: what there is for this thing, and laying one down.
+    /// </summary>
+    /// <remarks>
+    /// The menu is wording and nothing else now. Which templates there are, what choosing one
+    /// does and what is already wired are the hook's, so a sound device's face, the mixer and the
+    /// pads answer one rule rather than three that would drift; and the marking half, which is
+    /// what Ctrl+Shift+M shows, can be asked by a page that draws no menu at all.
+    ///
+    /// Given out rather than kept private, because the page holding this menu is exactly the page
+    /// that has to mark its own controls.
+    /// </remarks>
+    public IControlExchange Hook { get; }
 
     /// <summary>How a template becomes links again.</summary>
     private readonly IControlTemplates _templates;
@@ -146,48 +167,14 @@ public sealed class ControlMenu : IPanelMenu
 
         string called = _named() is { Length: > 0 } word ? word : id;
 
-        var offers = Templates(link, id)
-            .Select(one => Pointed(link, called, one))
+        var offers = Hook.Offered()
+            .Select(one => Pointed(called, one))
             .ToList();
 
         offers.Add(Learning(link, called));
 
         return offers;
     }
-
-    /// <summary>
-    /// The templates on this thing, read out of the block.
-    /// </summary>
-    /// <remarks>
-    /// **Read rather than worked out**, which is the whole of what the block buys here. A
-    /// template is one controller against one thing it is pointed at, and this used to cut the
-    /// links into them itself: a third spelling of a rule the page already draws its cards by and
-    /// a file is already written by, with its own grouping, its own ordering and its own idea of
-    /// what counts as one desk.
-    ///
-    /// What is left is which of them are this menu's, and that is two comparisons against what
-    /// the template already says it is about. A menu that names no particular one takes every
-    /// template of its kind, which is the mixer, where a link is on a strip and the whole desk is
-    /// one thing to point a controller at.
-    ///
-    /// Nothing here compares an id itself beyond that, and the order is the block's, which is the
-    /// order the page lists them in.
-    /// </remarks>
-    /// <param name="link">Where the links live, and what carries the block.</param>
-    /// <param name="id">Which one, or nothing for every one of this kind.</param>
-    private IEnumerable<ControlTemplate> Templates(ControlLink link, string id) =>
-        link.Templates?.Templates.Where(one => Mine(one, id)) ?? Enumerable.Empty<ControlTemplate>();
-
-    /// <summary>Whether that template is one of this menu's.</summary>
-    /// <remarks>
-    /// Against what the template says it is about rather than against a link inside it, since
-    /// that is what a template carries and what a file written by hand would say.
-    /// </remarks>
-    /// <param name="one">The template to place.</param>
-    /// <param name="id">Which one this menu is about, or nothing for every one of its kind.</param>
-    private bool Mine(ControlTemplate one, string id) =>
-        string.Equals(one.Target.Kind, _kind, StringComparison.Ordinal)
-        && (!Names || string.Equals(one.Target.Id, id, StringComparison.Ordinal));
 
     /// <summary>Whether this menu is about one particular thing rather than a whole kind.</summary>
     /// <remarks>
@@ -215,10 +202,9 @@ public sealed class ControlMenu : IPanelMenu
     /// therefore comes back exactly as it was, and one whose knobs have since been pointed
     /// somewhere else on this machine takes them back.
     /// </remarks>
-    /// <param name="link">Where the links live, and what carries the ports.</param>
     /// <param name="called">What the machine is called, for the wording.</param>
     /// <param name="template">The template, as the block holds it.</param>
-    private PanelMenuItem Pointed(ControlLink link, string called, ControlTemplate template)
+    private PanelMenuItem Pointed(string called, ControlTemplate template)
     {
         string controller = template.Controller.Length > 0 ? template.Controller : Anonymous;
 
@@ -230,10 +216,7 @@ public sealed class ControlMenu : IPanelMenu
                   + "at the same thing since.",
             Chosen = () =>
             {
-                var reading = _templates.Take(
-                    template, link.Ports?.Invoke(), port => _profiles.Called(port));
-
-                link.Take(reading.Links);
+                var reading = Hook.Take(template);
 
                 Say("Pointed " + controller + " at " + called + ": "
                     + Counted(reading.Links.Count) + "."
