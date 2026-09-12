@@ -76,8 +76,6 @@ public sealed class ControlMenu : IPanelMenu
     /// </remarks>
     private readonly Func<ControlLink?> _desk;
 
-    /// <summary>What is known about the controllers plugged in. Shared, since it remembers.</summary>
-    private readonly IControllerProfiles _profiles;
 
     /// <summary>What a target is called, so this cuts the links exactly as a card and a file do.</summary>
     private readonly ILinkTargets _naming;
@@ -121,11 +119,15 @@ public sealed class ControlMenu : IPanelMenu
         _kind = kind;
         _named = named ?? which;
         _desk = desk ?? Door;
-        _profiles = profiles ?? new ControllerProfiles();
         _naming = naming ?? new LinkTargets();
-        _templates = templates ?? new ControlTemplates();
 
-        Hook = exchange ?? new ControlExchange(_which, _kind, _desk, _templates, _profiles, _naming);
+        Hook = exchange ?? new ControlExchange(
+            _which,
+            _kind,
+            _desk,
+            templates ?? new ControlTemplates(),
+            profiles ?? new ControllerProfiles(),
+            _naming);
     }
 
     /// <summary>
@@ -142,8 +144,6 @@ public sealed class ControlMenu : IPanelMenu
     /// </remarks>
     public IControlExchange Hook { get; }
 
-    /// <summary>How a template becomes links again.</summary>
-    private readonly IControlTemplates _templates;
 
     /// <summary>
     /// Where a line saying what happened goes, or nowhere.

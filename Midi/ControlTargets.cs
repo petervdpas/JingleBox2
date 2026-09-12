@@ -78,6 +78,11 @@ public sealed class ControlTargets : IControlTargets
     /// The pads, for a button pointed at one. Optional, and without one a pad link finds nothing,
     /// which is what a test with no window wants.
     /// </param>
+    /// <param name="pages">
+    /// Which of the pages a controller can be pointed at is on the screen, so a mixer link
+    /// answers only while the mixer is up and a pad link only while the pads are. Left out,
+    /// everything answers, which is what a test with no screen wants.
+    /// </param>
     /// <param name="toggles">
     /// Whether a pad hit twice stops rather than starting again. Asked per press rather than
     /// held, since it is a setting somebody can change while the show is running. Left out, it is
@@ -87,8 +92,10 @@ public sealed class ControlTargets : IControlTargets
                           RackViewModel? rack = null, ITransportPresses? presses = null,
                           SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null,
                           ViewModels.Interfaces.ISoundEffectInFront? front = null,
-                          IPadTrigger? pads = null, Func<bool>? toggles = null)
+                          IPadTrigger? pads = null, Func<bool>? toggles = null,
+                          ViewModels.Interfaces.IPageInFront? pages = null)
     {
+        _pages = pages;
         _pads = pads;
         _toggles = toggles;
         _tracker = tracker;
@@ -101,6 +108,23 @@ public sealed class ControlTargets : IControlTargets
 
     /// <summary>The transport, where there is one.</summary>
     private readonly ITransportPresses? _presses;
+
+    /// <summary>
+    /// Which of the pages a controller can be pointed at is on the screen, or nothing.
+    /// </summary>
+    /// <remarks>
+    /// **The gate a sound device has had all along, for the two things that are not devices.** A
+    /// link on a machine answers only while that machine's face is in front, which is what lets
+    /// one knob carry a template for the mixer and another for OddSkilla: at most one of them can
+    /// be looking back at you. A mixer link names strip one outright and a pad link names a pad,
+    /// so without this both answered wherever you were, and one turn of a knob moved a machine on
+    /// the rack and the pan of track one together.
+    ///
+    /// Nothing means everything answers, which is what this did before the gate existed and is
+    /// what a test with no window wants: a rule about what is on the screen cannot be asked where
+    /// there is no screen.
+    /// </remarks>
+    private readonly ViewModels.Interfaces.IPageInFront? _pages;
 
     /// <summary>The pads, where there are any.</summary>
     private readonly IPadTrigger? _pads;
@@ -681,6 +705,8 @@ public sealed class ControlTargets : IControlTargets
     /// </remarks>
     private IControlTarget? OnStrip(ControlMapping mapping, int track)
     {
+        if (_pages is not null && !_pages.Mixer) return null;
+
         var strip = track == Tracker.TrackerPlayer.MasterStrip
             ? _tracker.MasterStrip
             : _tracker.Strips.FirstOrDefault(one => one.Track == track);
@@ -765,6 +791,8 @@ public sealed class ControlTargets : IControlTargets
     private IControlTarget? OnPad(ControlMapping mapping)
     {
         if (_pads is null || mapping.Pad < 0) return null;
+
+        if (_pages is not null && !_pages.Pads) return null;
 
         int pad = mapping.Pad;
 

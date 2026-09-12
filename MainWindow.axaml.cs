@@ -539,6 +539,11 @@ public partial class MainWindow : Window
 
         if (DataContext is not ViewModels.MainViewModel main) return;
 
+        // Said before the tab moves, since while the mixer is out its tab is hidden and you are
+        // sent to the tracker: the tab alone would read the mixer as not in front while it is the
+        // one thing on the screen, and its links would go silent the moment it was given a window.
+        main.MixerInWindow = away;
+
         main.SelectedTab = away ? TrackerTabIndex : MixerTabIndex;
     }
 

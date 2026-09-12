@@ -42,7 +42,7 @@ namespace JingleBox2.ViewModels;
 /// than on a page view model of their own, because two pages show them: PADS is where they are
 /// laid out and FIRE is where they are played.
 /// </remarks>
-public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAudioFlowing, IShortcutContext
+public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageInFront, IOutputChosen, IAudioFlowing, IShortcutContext
 {
     /// <summary>
     /// What is known about the controllers plugged in, for the whole application.
@@ -612,6 +612,46 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// FIRE and USE.
     /// </remarks>
     private bool OnThePads => SelectedTab is PadsTab or UseTab;
+
+    /// <summary>
+    /// True while the mixer is the thing in front of you: its page, or its own window.
+    /// </summary>
+    /// <remarks>
+    /// **The gate a sound device has had all along, for the two things that are not devices.** A
+    /// link on a machine answers only while that machine's face is in front, which is what lets
+    /// one knob carry a template for the mixer and another for a machine: at most one of them can
+    /// be looking back at you. A mixer link names strip one outright, so without this it answered
+    /// wherever you were, and one turn of a knob moved a machine on the rack and the pan of track
+    /// one together, marking the song unsaved for a knob that had nothing to do with the song.
+    ///
+    /// A page **or a window**, since the mixer is taken out into one of its own and is still the
+    /// mixer. Asked of the two facts this object already keeps rather than of the view: whether a
+    /// control is on the screen is <c>IsEffectivelyVisible</c>, which Avalonia does not raise a
+    /// change for, so anything counting it would be right once and stale afterwards.
+    /// </remarks>
+    public bool MixerInFront => MixerInWindow || SelectedTab == MixerTab;
+
+    /// <inheritdoc/>
+    bool Interfaces.IPageInFront.Mixer => MixerInFront;
+
+    /// <inheritdoc/>
+    bool Interfaces.IPageInFront.Pads => PadsInFront;
+
+    /// <summary>True while either page that draws the pads is in front.</summary>
+    /// <remarks>
+    /// Both of them: FIRE is where a show is run from and PADS is where one is set up, and a pad
+    /// hit while filling one in is how you hear what you have just pointed at a file.
+    /// </remarks>
+    public bool PadsInFront => OnThePads;
+
+    /// <summary>True while the mixer is out in a window of its own.</summary>
+    /// <remarks>
+    /// Told by the window that takes it out, since the page being elsewhere is that window's own
+    /// business and nothing else can see it. While it is out, its tab is hidden and you are sent
+    /// to the tracker, so the tab alone would say the mixer is not in front while it is the one
+    /// thing on the screen.
+    /// </remarks>
+    public bool MixerInWindow { get; set; }
 
     /// <inheritdoc/>
     /// <remarks>
@@ -2453,7 +2493,8 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
 
         var targets = new ControlTargets(
             Tracker, _machines, Machines, new TransportPresses(Transport), _effects, _effectInFront,
-            padTrigger, () => _cfg.Midi.ToggleMode);
+            padTrigger, () => _cfg.Midi.ToggleMode,
+            this);
 
         var controlRouter = new MidiControlRouter(
             () => ControlLink.Live,

@@ -267,7 +267,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             Cursor = Cursor.Clamp(pattern.Lines, Song.TrackCount, new NoteColumns(pattern.ColumnCounts()));
 
             OnPropertyChanged();
-            MarkDirty();
+            MarkDirty("a pattern's length");
 
             Status = $"Pattern {pattern.Name} is {lines} line(s) long";
         }
@@ -348,14 +348,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             targets, () => Song, () => CurrentPattern, () => LinesPerBeat, () => PlayingLine)
         {
             Taking = History.Taking,
-            Dirtied = MarkDirty
+            Dirtied = () => MarkDirty("automation")
         };
 
         MasterLanes = new AutomationViewModel(
             targets, () => Song, () => CurrentPattern, () => LinesPerBeat, () => PlayingLine)
         {
             Taking = History.Taking,
-            Dirtied = MarkDirty
+            Dirtied = () => MarkDirty("automation")
         };
 
         MasterLanes.Show(TrackerPlayer.MasterStrip);
@@ -480,7 +480,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         if (!walk()) return;
 
-        MarkDirty();
+        MarkDirty("undo");
     }
 
     /// <summary>
@@ -787,11 +787,26 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     [ObservableProperty] private bool isAutomating;
 
+    /// <summary>
+    /// The song's own watch: whether anything in it is off disc, and what put it there.
+    /// </summary>
+    /// <remarks>
+    /// One object rather than a flag here, because a flag can only ever answer that something
+    /// happened. Thirty edits say what they were and they all say it to this, so the song can be
+    /// asked why it is unsaved rather than only whether it is.
+    /// </remarks>
+    public Tracker.Interfaces.ISongWatch Watch { get; } = new Tracker.SongWatch();
+
     /// <summary>Set by every edit, cleared by a save. Nothing here is on disk until then.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(NeedsSaving))]
-    [NotifyPropertyChangedFor(nameof(CanRevertSong))]
-    private bool isDirty;
+    private bool IsDirty
+    {
+        get => Watch.Unsaved;
+        set
+        {
+            if (value) Watch.Changed(Watch.Because.Length > 0 ? Watch.Because : "an edit");
+            else Watch.Saved();
+        }
+    }
 
     /// <summary>The switch and the recorder are one thing said twice, so they are kept in step.</summary>
     /// <remarks>
@@ -832,7 +847,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             _player.Mode = value;
 
             OnPropertyChanged();
-            MarkDirty();
+            MarkDirty("the play mode");
 
             NeighboursMoved();
         }
@@ -881,7 +896,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Song.KeyboardOctave = value;
 
-        if (!_followingOctave) MarkDirty();
+        if (!_followingOctave) MarkDirty("the keyboard octave");
     }
 
     /// <summary>True while the octave is chasing a note rather than being set by hand.</summary>
@@ -1085,14 +1100,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         var config = _config;
         Plugins = plugins ?? new PluginLibraryViewModel();
         TrackEffect = new PluginChainViewModel(Plugins, Ours, front: front);
-        TrackEffect.Changed += MarkDirty;
+        TrackEffect.Changed += () => MarkDirty("a track's effects");
 
         MasterEffect = new PluginChainViewModel(Plugins, Ours, front: front)
         {
             Nothing = "No effect across the mix yet."
         };
 
-        MasterEffect.Changed += MarkDirty;
+        MasterEffect.Changed += () => MarkDirty("the master's effects");
 
         ignoreVelocity = config?.IgnoreKeyVelocity ?? false;
         typedVelocity = config?.TypedVelocity ?? false;
@@ -1116,7 +1131,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             work => Dispatcher.UIThread.Post(work))
         {
             Taking = History.Taking,
-            Dirtied = MarkDirty
+            Dirtied = () => MarkDirty("automation")
         };
 
         TrackEffect.Changing += () =>
@@ -1147,6 +1162,15 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         _meters = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         _meters.Tick += (_, _) => ReadMeters();
+
+        // The two buttons that light on one fact: green on Save while there is something off
+        // disc, warm on Cancel changes. Said when the watch really moves rather than on every
+        // edit, or a fader dragged across its range would rebuild them a hundred times.
+        Watch.Moved += () =>
+        {
+            OnPropertyChanged(nameof(NeedsSaving));
+            OnPropertyChanged(nameof(CanRevertSong));
+        };
 
         _keeping = (hints ?? new Hints.HintClock()).Gathered(
             "the song's rescue copy",
@@ -1186,7 +1210,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
             Song.Bpm = Math.Clamp(value, TrackerTiming.MinBpm, TrackerTiming.MaxBpm);
             OnPropertyChanged();
-            MarkDirty();
+            MarkDirty("the tempo");
         }
     }
 
@@ -1209,7 +1233,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             Song.LinesPerBeat = Math.Clamp(value, TrackerTiming.MinLinesPerBeat, TrackerTiming.MaxLinesPerBeat);
             OnPropertyChanged();
             OnPropertyChanged(nameof(QuantizeChoices));
-            MarkDirty();
+            MarkDirty("lines per beat");
         }
     }
 
@@ -1375,7 +1399,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Song.SetLoop(from, to);
 
         RefreshOrder();
-        MarkDirty();
+        MarkDirty("the loop range");
 
         OnPropertyChanged(nameof(HasLoop));
 
@@ -1996,7 +2020,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>Any edit to the pattern on screen is work that is not on disc.</summary>
-    private void OnPatternEdited(object? sender, EventArgs e) => MarkDirty();
+    private void OnPatternEdited(object? sender, EventArgs e) => MarkDirty("the pattern");
 
     /// <summary>
     /// A different song is a different description, different neighbours, and a different mix
@@ -2021,7 +2045,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </summary>
     partial void OnSongNameChanged(string value)
     {
-        MarkDirty();
+        MarkDirty("the song's name");
         OnPropertyChanged(nameof(CanDeleteSong));
         OnPropertyChanged(nameof(CanRevertSong));
     }
@@ -2361,7 +2385,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             _player.Loop = value;
 
             OnPropertyChanged();
-            MarkDirty();
+            MarkDirty("looping");
 
             Status = value
                 ? "Looping: it comes round again at the end"
@@ -2622,7 +2646,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _player.ReloadInstrument(from);
         _player.ReloadInstrument(to);
 
-        if (moved) MarkDirty();
+        if (moved) MarkDirty("renaming a recording");
     }
 
     /// <summary>
@@ -2782,11 +2806,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// The log line is written once, where it changes, and not on every call: one turn of a
     /// plugin's knob is eighty of these.
     /// </remarks>
-    private void MarkDirty()
+    private void MarkDirty(string what)
     {
-        if (!IsDirty) Log.Write(LogArea.Tracker, "the song has something unsaved in it now");
-
-        IsDirty = true;
+        Watch.Changed(what);
 
         _keeping.Moved();
     }
@@ -3261,7 +3283,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Cursor = Cursor.Clamp(CurrentPattern?.Lines ?? 0, Song.TrackCount, Widths);
         Selection = PatternSelection.None;
 
-        MarkDirty();
+        MarkDirty("a track's note columns");
         ColumnsMoved();
     }
 
@@ -3301,7 +3323,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Cursor = Cursor.Clamp(CurrentPattern?.Lines ?? 0, Song.TrackCount, Widths);
         Selection = PatternSelection.None;
 
-        MarkDirty();
+        MarkDirty("a track's note columns");
         ColumnsMoved();
     }
 
@@ -3342,7 +3364,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         SyncInstruments();
         RefreshStrips();
         PointEffectSlot();
-        MarkDirty();
+        MarkDirty("pointing a track at an instrument");
 
         if (previous == track)
             Status = $"'{chosen.Name}' is already on track {track + 1:00}";
@@ -3390,7 +3412,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         int changed = Song.PointNotesAtTrackInstrument(track, instrument);
 
         RefreshStrips();
-        MarkDirty();
+        MarkDirty("pointing the notes at an instrument");
 
         Status = $"Pointed {changed} note(s) on track {track + 1:00} at '{chosen.Name}'";
     }
@@ -3423,7 +3445,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         SyncInstruments();
         RefreshStrips();
         PointEffectSlot();
-        MarkDirty();
+        MarkDirty("moving a track");
 
         Cursor = Cursor with { Track = Song.WhereTrackWent(Cursor.Track, from, to) };
 
@@ -3445,7 +3467,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         SyncInstruments();
         RefreshStrips();
         PointEffectSlot();
-        MarkDirty();
+        MarkDirty("taking an instrument off a track");
         Status = $"Track {track + 1:00} has no instrument";
     }
 
@@ -3490,7 +3512,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         int index = Song.AddPattern();
         Song.Order.Add(index);
         RefreshOrder();
-        MarkDirty();
+        MarkDirty("adding a pattern");
         OrderIndex = Song.Order.Count - 1;
         Status = $"Added pattern {Song.Patterns[index].Name}";
     }
@@ -3527,7 +3549,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Song.Order.Insert(at + 1, copy);
 
         RefreshOrder();
-        MarkDirty();
+        MarkDirty("copying a pattern");
 
         OrderIndex = at + 1;
 
@@ -3568,7 +3590,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         for (int i = 0; i < more; i++) Song.Order.Insert(at + 1 + i, pattern);
 
         RefreshOrder();
-        MarkDirty();
+        MarkDirty("repeating a pattern");
 
         OrderIndex = at + more;
 
@@ -3611,7 +3633,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Song.Order[at] = pattern;
 
         RefreshOrder();
-        MarkDirty();
+        MarkDirty("pointing a slot at a pattern");
 
         CurrentPattern = Song.PatternAt(at);
 
@@ -3636,7 +3658,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (!Song.MoveOrder(from, to)) return;
 
         RefreshOrder();
-        MarkDirty();
+        MarkDirty("moving an order slot");
 
         OrderIndex = Math.Clamp(to, 0, Song.Order.Count - 1);
         CurrentPattern = Song.PatternAt(OrderIndex);
@@ -3660,7 +3682,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Song.Order.RemoveAt(Math.Clamp(OrderIndex, 0, Song.Order.Count - 1));
         RefreshOrder();
-        MarkDirty();
+        MarkDirty("removing an order slot");
         OrderIndex = Math.Clamp(OrderIndex, 0, Song.Order.Count - 1);
         CurrentPattern = Song.PatternAt(OrderIndex);
     }
@@ -3683,7 +3705,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Cursor = Cursor.Clamp(CurrentPattern?.Lines ?? 0, clamped);
         SyncInstruments();
         RefreshStrips();
-        MarkDirty();
+        MarkDirty("how many tracks");
 
         OnPropertyChanged(nameof(TrackCount));
     }
@@ -3755,7 +3777,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         Changing("the mix");
 
-        MarkDirty();
+        MarkDirty("the mix");
 
         OnMixPlayed();
     }
@@ -3909,7 +3931,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Song.Instruments.Add(taken);
         SyncInstruments();
-        MarkDirty();
+        MarkDirty("adding an instrument");
 
         SelectedInstrument = Song.Instruments.Count - 1;
         Status = $"Added '{taken.Name}' to the song as instrument {SelectedInstrument:00}";
@@ -3960,7 +3982,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (!Song.RemoveInstrumentAt(index)) return;
 
         SyncInstruments();
-        MarkDirty();
+        MarkDirty("taking an instrument out");
         SelectedInstrument = Math.Clamp(index, 0, Math.Max(0, Song.Instruments.Count - 1));
         Status = $"Removed '{instrument.Name}' from the song. It is still in the rack.";
     }
@@ -4461,7 +4483,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         slot.Instrument.Name = wanted;
         slot.Refresh();
 
-        MarkDirty();
+        MarkDirty("renaming an instrument");
 
         Status = "Renamed instrument " + slot.Number + " to '" + wanted + "'";
     }
@@ -4478,7 +4500,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         foreach (var slot in Instruments) slot.Refresh();
 
-        MarkDirty();
+        MarkDirty("an instrument's own settings");
     }
 
     /// <summary>
@@ -4572,7 +4594,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
             if (wasOpen)
             {
-                MarkDirty();
+                MarkDirty("the song's file being deleted");
                 OnPropertyChanged(nameof(CanDeleteSong));
                 OnPropertyChanged(nameof(CanRevertSong));
             OnPropertyChanged(nameof(CanRevertSong));

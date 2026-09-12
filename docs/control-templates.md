@@ -517,3 +517,55 @@ was on.
 `Song.Controls` is emptied as a song is read, so the next save is written without it, and the field
 is kept only so a file holding one can be opened at all. `ControlLink` has no second list, no
 merge, no override and no per-song dirty hooks.
+
+## The page is the gate, as the face already was
+
+A link answers only while the thing it is pointed at is the thing in front of you. That was true
+of a sound device from the beginning: a link names the machine, and `ControlTargets` refuses it
+unless the track really plays that machine, or the rack really has it open, or its window is the
+one in front. It is what makes two templates on one knob safe, since at most one of them can be
+looking back at you.
+
+**The mixer and the pads had nothing to be refused by.** A mixer link names strip one outright and
+a pad link names a pad, so both answered wherever you were. A knob carrying a mixer template
+alongside a machine's fired both, every time:
+
+```
+controls: Pan on TR-01 moved to 0.0394 (CC 86 sent 66)
+controls: OddSkilla Tune on the rack moved to 0.9449 (CC 86 sent 66)
+the song has something unsaved in it now
+```
+
+One turn, two writes, one of them wanted, and the unwanted one marking the song unsaved because a
+pan is a song setting.
+
+`IPageInFront` is the gate and `MainViewModel` answers it, since it is the one object that knows
+where you are. **A page or a window**: the mixer is taken out into one of its own, and while it is
+out its tab is hidden and you are sent to the tracker, so the tab alone would read the mixer as not
+in front while it is the only thing on the screen. `MainWindow.MixerAway` says which it is.
+
+It was written first as a count off the views themselves, each saying when it came on the screen,
+and that cannot work: a page that is not the chosen tab is hidden by something above it rather than
+by itself, so its own `IsVisible` stays true and every page reads as showing at once. The honest
+question is `IsEffectivelyVisible`, and Avalonia raises no change for it, so anything counting that
+would be right once and stale for the rest of the run.
+
+The transport is the one thing left ungated, deliberately: its four keys mean the same on every
+page, exactly as the space bar does.
+
+## Who tells the song
+
+There is no watcher over the song noticing it moved. A song is a few thousand cells, an order, a
+mix and a list of instruments held by reference by half the application, and comparing all of that
+against the file on a clock would be constant work to answer a question the edits already know.
+
+So the edits tell it, and `ISongWatch` is the one thing they tell. Thirty places, one answer, and
+each of them says **what it was** in the same words `Changing` gives the history. Told in thirty
+places and kept in thirty places, all anybody could ever learn is that something happened; kept
+here, the song can say why.
+
+That is what this cost an evening for want of. A knob on a machine on the rack marked a song
+holding no instruments at all as unsaved, and the one word that would have ended it in a minute is
+`the mix`: a mixer link was answering from a page the mixer was not on. What the log could say was
+"the song has something unsaved in it now", which is true of every edit there is.
+
