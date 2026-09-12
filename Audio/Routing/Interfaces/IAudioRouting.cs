@@ -22,6 +22,18 @@ public interface IAudioRouting
     /// than worked out from the platform: a Linux box with no PipeWire tools installed has
     /// nothing to patch. An implementation may also turn itself off here after the underlying
     /// tools have failed enough times to make the point.
+    ///
+    /// **It is a property, so it costs about nothing to ask**, and that is part of the contract
+    /// rather than a courtesy. It is read from a binding and from the head of a timer's tick,
+    /// which is to say on the drawing thread, and nothing about reading a property warns a
+    /// caller that they have just paid for a reading of the machine's own hardware. An
+    /// implementation that has to look at something to answer looks once and keeps what it
+    /// found, settling it again where it is already reading, which is <see cref="GetRoutes"/>
+    /// and is somewhere that may take as long as it likes.
+    ///
+    /// The two implementations differ by four orders of magnitude here and the contract said
+    /// nothing about it, which is how one of them came to enumerate every audio endpoint on the
+    /// machine twice a second on the thread that draws.
     /// </remarks>
     bool IsAvailable { get; }
 

@@ -47,28 +47,78 @@ public sealed class WindowsRouting : IAudioRouting
     /// <param name="recording">What is actually pointed somewhere.</param>
     public WindowsRouting(IRecordingService recording) => _recording = recording;
 
+    /// <summary>What the last look found, which is what <see cref="IsAvailable"/> answers.</summary>
+    /// <remarks>
+    /// Written by <see cref="GetRoutes"/>, which runs on the pool, and read by the drawing
+    /// thread, so the pair is ordered rather than merely present: the answer is written first
+    /// and <see cref="_looked"/> after it, and both are volatile, so nobody can see that a look
+    /// has happened and read the answer from before it. Two threads looking at once is harmless,
+    /// since they are asking the machine the same question and it has one answer.
+    /// </remarks>
+    private volatile bool _can;
+
+    /// <summary>Whether anything has looked yet.</summary>
+    /// <inheritdoc cref="_can" path="/remarks"/>
+    private volatile bool _looked;
+
     /// <inheritdoc/>
     /// <remarks>
     /// Windows, and the system really offering something this page can reach: a loopback output
     /// or a program playing on its own. With neither, this offers nothing the recorder's own
     /// device picker does not already, so it stands down rather than showing the same devices
     /// twice.
+    /// **What that costs is the whole reason this is not worked out per ask.** Both halves of it
+    /// are a walk of the machine's audio endpoints through COM, which is hundreds of milliseconds
+    /// on an ordinary box, and a property is read from a binding and from the head of a tick on
+    /// the drawing thread. Asked there twice a second it is the drawing thread gone for a third
+    /// of a second at a time, which is not audible and is entirely visible: the tracker's picture
+    /// stops while the transport does not, so the pattern arrives in clumps of three or four
+    /// lines. Measured on a machine it was reported on as steps landing 0.1 ms apart and then
+    /// not for 455 ms, against a mean of exactly 125.0.
+    ///
+    /// So it looks once, where the first ask happens to be, and keeps what it found;
+    /// <see cref="GetRoutes"/> settles it again every time it reads, which is off the drawing
+    /// thread and is already walking both lists. There is no clock in it and nothing to keep in
+    /// step: the answer is a by-product of the reading that was going to happen anyway.
     /// </remarks>
     public bool IsAvailable
     {
         get
         {
             if (!OperatingSystem.IsWindows()) return false;
+            if (_looked) return _can;
 
-            try
-            {
-                return _recording.GetLoopbackDevices().Count > 0 || _recording.GetPrograms().Count > 0;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
+            return Looked(Look());
         }
+    }
+
+    /// <summary>Asks the machine whether there is anything here to offer.</summary>
+    /// <remarks>
+    /// The slow one, and the only place it is worked out. Anything thrown is no rather than a
+    /// fault, since a page that cannot read the machine has nothing to show either way.
+    /// </remarks>
+    private bool Look()
+    {
+        try
+        {
+            return _recording.GetLoopbackDevices().Count > 0 || _recording.GetPrograms().Count > 0;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Writes down what a look found, and hands it straight back.</summary>
+    /// <inheritdoc cref="_can" path="/remarks"/>
+    /// <param name="can">What was found.</param>
+    /// <returns>The same answer, so a caller can settle and answer in one line.</returns>
+    private bool Looked(bool can)
+    {
+        _can = can;
+        _looked = true;
+
+        return can;
     }
 
     /// <inheritdoc/>
@@ -83,19 +133,30 @@ public sealed class WindowsRouting : IAudioRouting
     ///
     /// Anything that goes wrong reading the two lists comes back as no routes at all rather
     /// than half of them, since half a list is a page that looks complete and is not.
+    ///
+    /// **This is also where <see cref="IsAvailable"/> is settled**, out of the two lists it was
+    /// going to walk anyway, so the expensive question is asked once per reading and on a thread
+    /// that may take as long as it likes. Both lists are taken before anything is offered, since
+    /// with neither there is nothing here the recorder's own device picker does not already show
+    /// and the capture devices are left out with the rest.
     /// </remarks>
     public IReadOnlyList<AudioRoute> GetRoutes()
     {
-        if (!IsAvailable) return Array.Empty<AudioRoute>();
+        if (!OperatingSystem.IsWindows()) return Array.Empty<AudioRoute>();
 
         var routes = new List<AudioRoute>();
 
         try
         {
+            var outputs = _recording.GetLoopbackDevices();
+            var programs = _recording.GetPrograms();
+
+            if (!Looked(outputs.Count > 0 || programs.Count > 0)) return Array.Empty<AudioRoute>();
+
             foreach (var device in _recording.GetInputDevices())
                 routes.Add(new AudioRoute(DevicePrefix + device, device, AudioRouteKind.Input));
 
-            foreach (var output in _recording.GetLoopbackDevices())
+            foreach (var output in outputs)
             {
                 routes.Add(new AudioRoute(
                     LoopbackPrefix + output.Index.ToString(CultureInfo.InvariantCulture),
@@ -103,7 +164,7 @@ public sealed class WindowsRouting : IAudioRouting
                     AudioRouteKind.Monitor));
             }
 
-            foreach (var program in _recording.GetPrograms())
+            foreach (var program in programs)
             {
                 routes.Add(new AudioRoute(
                     ProgramPrefix + program.ProcessId.ToString(CultureInfo.InvariantCulture),

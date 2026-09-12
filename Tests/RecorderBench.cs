@@ -208,11 +208,39 @@ public sealed class RecorderBench
         /// <inheritdoc/>
         public int? LoopbackDevice { get; set; }
 
-        /// <inheritdoc/>
-        public IReadOnlyList<LoopbackDevice> GetLoopbackDevices() => Array.Empty<LoopbackDevice>();
+        /// <summary>What this machine is pretending to have playing out of it.</summary>
+        public IReadOnlyList<LoopbackDevice> Outputs { get; set; } = Array.Empty<LoopbackDevice>();
+
+        /// <summary>And what it is pretending is playing.</summary>
+        public IReadOnlyList<AudioProgram> Playing { get; set; } = Array.Empty<AudioProgram>();
+
+        /// <summary>How many times the outputs have really been walked.</summary>
+        /// <remarks>
+        /// Counted because on a real machine this is a walk of every audio endpoint through COM
+        /// and takes a good part of a second, so how often it is asked is the thing under test
+        /// rather than what it answers.
+        /// </remarks>
+        public int OutputWalks { get; private set; }
+
+        /// <summary>And how many times the programs have been.</summary>
+        /// <inheritdoc cref="OutputWalks" path="/remarks"/>
+        public int ProgramWalks { get; private set; }
 
         /// <inheritdoc/>
-        public IReadOnlyList<AudioProgram> GetPrograms() => Array.Empty<AudioProgram>();
+        public IReadOnlyList<LoopbackDevice> GetLoopbackDevices()
+        {
+            OutputWalks++;
+
+            return Outputs;
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyList<AudioProgram> GetPrograms()
+        {
+            ProgramWalks++;
+
+            return Playing;
+        }
 
         /// <inheritdoc/>
         public int? LoopbackProgram { get; set; }

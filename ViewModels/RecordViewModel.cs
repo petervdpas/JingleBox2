@@ -2084,6 +2084,19 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// <remarks>
     /// The tools take a moment, so this happens off the UI thread.
     ///
+    /// **All of it, and the guard in front is the half that was not.** An <c>async</c> method
+    /// runs on whoever called it until it reaches its first <c>await</c>, so everything written
+    /// above the first <see cref="System.Threading.Tasks.Task.Run(System.Action)"/> is on the
+    /// drawing thread however the rest is arranged. The two real readings were properly off that
+    /// thread; the availability test in front of them was on it, and on Windows that question
+    /// used to be a walk of every audio endpoint on the machine. Twice a second, for as long as
+    /// the page was watching, the thread that draws was gone for a third of a second: the
+    /// transport kept perfect time and the pattern arrived in clumps of three or four lines.
+    /// The guard stays exactly where it is, because
+    /// <see cref="Audio.Routing.Interfaces.IAudioRouting.IsAvailable"/> is now what its contract
+    /// always said it was, which is a property that costs nothing to read. **What was wrong was
+    /// never where it was asked; it was what asking cost.**
+    ///
     /// The route on show is matched to the current one by node rather than by object, because
     /// the list is read afresh every time and the object from before is not in it.
     ///
