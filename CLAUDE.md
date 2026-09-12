@@ -849,16 +849,52 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   back up to **9.6** to save half of an editing cost that the cursor layer then removed entirely.
   **A cull is only a saving where the thing being culled is not redrawn more often because of
   it**, and on a 64 line pattern the whole picture is barely two screens anyway
-- **All of that was measured here, and the picture is reported as bumpy on Windows, where three
-  things about the toolkit are different.** Read out of the two backend assemblies rather than
-  assumed: `Avalonia.Win32` imports `SetTimer`, `KillTimer` and `DwmFlush`, and `Avalonia.X11`
-  waits in `epoll_wait`. So a `DispatcherTimer` there is a `WM_TIMER`, whose resolution is the
-  system tick, 15.6 ms unless something in the process has raised it, and which Windows
-  synthesises only when nothing else is pending and never queues twice; here the same timer is an
-  epoll wait with a millisecond timeout in the same ordered queue as everything else. And the
-  present is locked to the compositor there and is a swap here. The tracker page runs `ReadMeters`
-  on a 50 ms timer, which walks every strip and every instrument row, so on Windows that work
-  arrives in clumps on the thread that also has to move the playhead
+- **All of that was measured here, and the picture was bumpy on Windows and smooth on Linux, and
+  the cause was this application's own code rather than anything about the toolkit.**
+  `RecordViewModel.RefreshRoutes` is `async void`, and an `async` method runs on whoever called
+  it until it reaches its first `await`: the two readings it does are properly handed to the pool
+  with `Task.Run`, and the `IAudioRouting.IsAvailable` test written in front of them was not. On
+  Windows that test walked every audio endpoint on the machine and every program playing through
+  it, through COM, with nothing kept, on a two second timer. So the thread that draws was gone
+  for a third of a second twice a second for as long as RECORD had ever been opened, while the
+  transport, which keeps perfect time, went on posting lines into a queue nobody was draining:
+  three or four would land a tenth of a millisecond apart and then nothing for 455 ms
+- **The toolkit was read first and it explained nothing, which is worth leaving here so nobody
+  spends the afternoon again.** `Avalonia.Win32` imports `SetTimer`, `KillTimer` and `DwmFlush`
+  where `Avalonia.X11` waits in `epoll_wait`, so a `DispatcherTimer` there really is a `WM_TIMER`
+  at the system tick and the present really is locked to the compositor. All true, none of it the
+  cause, and reasoning from it is what produced a plausible paragraph that stood here for a while
+  saying the meter poll arrived in clumps. **A platform difference that is real is not thereby the
+  one you are looking at**
+- **What found it was a stack sample of the running application**, which is the step that should
+  have come first. `dotnet-stack report` caught the drawing thread inside
+  `BassWasapi.get_DeviceCount()` in two snapshots out of six, under `AsyncMethodBuilderCore.Start`,
+  which is the frame that says an async method is still running on its caller. Nothing about what
+  the routing *answered* was ever wrong, so no test about the routes could have caught it, and no
+  amount of reading the drawing code would have either: **what was wrong was not where the
+  question was asked, it was what asking cost**
+- **`IAudioRouting.IsAvailable` says what it may cost now, and that is the durable half.** It is a
+  property, read from a binding and from the head of a tick, and nothing about reading one warns a
+  caller that the machine's hardware is about to be walked. The two implementations answered the
+  same contract four orders of magnitude apart, a PATH lookup on Linux against a COM enumeration
+  on Windows, and the contract said nothing about it. `WindowsRouting` looks once and keeps what
+  it found; `GetRoutes` settles it again out of the two lists it was walking anyway, so a reading
+  walks each list once where it used to walk both twice and the answer is a by-product of work
+  that was going to happen
+- **Kept is not frozen, which is the trap any kept answer invites.** A no that stuck would be a
+  page that never came alive on a machine where the first ask happened to land before there was
+  anything to find, so the reading that already runs every two seconds off the drawing thread is
+  what re-settles it. `Tests/RoutingAvailableTests.cs` counts the walks rather than reading the
+  answers, since the answers were never the fault, and every rule in it was checked by putting the
+  fault back: asking per read fails the first, and the old guard inside `GetRoutes` fails the
+  other two, the sticky no included. Each test says something on both machines, one walk on
+  Windows and nought elsewhere, since a version written for one of them would have passed here
+  for the rest of its life
+- Measured either side on the machine it was reported on, at 120 to the minute: mean 125.0 ms
+  both times, `0.1 to 455.4, worst 330.4 ms out` before and `124.9 to 125.2, worst 0.2 ms out`
+  after. **The first look is still on whichever thread asks first**, which is one hitch of about
+  200 ms the first time RECORD is opened in a run and never again; left alone deliberately, since
+  warming it off-thread at startup is machinery for something you would have to be watching for
 - **A picture that steps by a length that is not a whole number of device pixels limps, and it
   limps at exactly the scalings where that length is not one.** A row is 18, which is 18 pixels at
   100% and 27 at 150%, both whole, and **22.5 at 125%**: the pattern moves 22 pixels under the
@@ -874,15 +910,35 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   display scaling is set to is how "works on my machine" is arrived at. `Tests/DevicePixelsTests.cs`
   is written at 100, 125, 150 and 175 per cent for that reason, and putting the fault back is what
   says so: the rows-are-equal test notices at 125 and 175 and is perfectly happy at 100 and 150
+- **Which is a real rule that was not the reported fault, and the two were confused for an
+  afternoon.** The machine the bumpiness was reported on runs at 96 DPI, which is 100 per cent, so
+  a row of 18 lands on 18 whole pixels and this rule does nothing whatever there. It is kept
+  because it is true of the machines where it is not one, and it is named here so the next reader
+  starts by asking what the screen is really at rather than assuming the rule is doing something
 - **And the timing half is measured on the machine being complained about rather than reasoned
   about here.** `IPlayheadFlow` times the gaps between one line reaching the drawing thread and
   the next, which is the far end of a journey whose near end the transport already spins onto:
   everything in between is the toolkit's. One line every five seconds, the same window the render
   cost reports in so the two can be read against each other. **The spread is the whole point of it
-  and the mean is only there to read the spread against**, since a limp is one step early and the
-  next one late and reads as a perfect mean: 125 ms a line at 60 Hz is seven and a half frames, so
-  a picture that can only move on a frame shows one step after seven and the next after eight and
-  reports `mean 125.0 ms, 109.0 to 141.0, worst 16.0 ms out`
+  and the mean is only there to read the spread against**, since a stall is one step late and the
+  next one on top of it and reads as a perfect mean: the run that started this reported
+  `mean 125.0 ms, 0.1 to 455.4, worst 330.4 ms out`, which is a transport that is exactly right
+  and a picture arriving in clumps
+- **What it measures is delivery and never the frame**, which is worth being exact about because
+  the sentence here used to predict the wrong number. The moment is stamped when the posted job
+  runs on the drawing thread, and the picture reaches the screen after that, in the compositor. So
+  the frame beat is invisible to it: 125 ms a line at 60 Hz is seven and a half frames, a picture
+  can only move on a frame, so the playhead steps after seven and then after eight for ever, and
+  this line reads 0.2 ms out through the whole of it. That beat is real and is the floor: **half a
+  frame, whatever the tempo**, since a step can only ever be rounded to the nearer frame. It is
+  left alone, since the only way to be rid of it is to move the band a fraction of a row per frame
+  from where the transport has got to, and a pattern that slides rather than steps is a different
+  thing to read
+- Which also says what the line is good for and what it is not. A window taken while the tempo is
+  being dragged reports a spread that is the tempo moving rather than anything being late, since
+  all it knows is gaps, and a tempo raised mid-window puts the next line already past due and
+  fires it at once: `9.4 to 131.7` on a run where somebody was turning the tempo knob is the clock
+  catching up correctly. **A reading is only a reading at a tempo that is standing still**
 - **The gen-2 collections were chased and are not a fault, but what keeps them harmless is.** On
   the tracker page with the transport running the runtime does about three or four full
   collections a second on a heap that never grows: 26 to 30 MB, gen 2 flat at 22, the large object

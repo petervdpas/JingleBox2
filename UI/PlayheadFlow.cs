@@ -97,8 +97,10 @@ public sealed class PlayheadFlow : IPlayheadFlow
     /// <remarks>
     /// **The spread is the whole point of the line and the mean is only there to read it
     /// against.** A pattern at 120 to the minute and four lines to the beat steps every 125
-    /// milliseconds, and a mean of 125 is what a transport that is working says whether the steps
-    /// came evenly or alternated 109 and 141 for ever.
+    /// milliseconds, and a mean of exactly 125 is what a working transport reports whether the
+    /// steps arrived evenly or three of them landed together and the fourth 455 milliseconds
+    /// later. The second of those is what the drawing thread being held up looks like, and the
+    /// mean alone says nothing whatever about it.
     ///
     /// In the invariant reading of a number, deliberately: a log is read by whoever is fixing
     /// something, often on another machine than it was written on, and a decimal comma in a file

@@ -8,10 +8,17 @@ namespace JingleBox2.UI.Interfaces;
 /// <remarks>
 /// **The clock being right says nothing about the picture being even.** The transport waits out
 /// each step against a stopwatch and spins onto it, so a line is sent when it is due; what this
-/// measures is the other end, which is when the drawing thread got round to it. Everything
-/// between the two is the toolkit's: a posted message waiting behind whatever else is in the
-/// queue, a frame that has to wait for the screen, and on some systems a timer that is only
-/// delivered when nothing else is pending.
+/// measures is the other end, which is when the drawing thread got round to it. What sits between
+/// the two is a posted message waiting behind whatever else is in the queue, which is usually the
+/// drawing thread being somewhere else entirely.
+///
+/// **It ends there and never reaches the screen**, which is the one thing to be exact about. The
+/// moment is stamped when the job runs, and the picture is presented after that, so a step can
+/// only move on a frame and this cannot see which one it landed on: at 120 to the minute on a
+/// 60 Hz screen a line is seven and a half frames, the playhead steps after seven and then after
+/// eight for ever, and this reads a fifth of a millisecond through the whole of it. That beat is
+/// half a frame at any tempo and is the floor of what a stepping picture can do; what this is
+/// for is everything above it.
 ///
 /// So what it answers is the one question a bumpy pattern asks, which is whether the steps are
 /// arriving evenly. Even steps at the wrong rate is a tempo; uneven steps at the right mean rate
