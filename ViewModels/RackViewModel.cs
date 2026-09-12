@@ -108,6 +108,8 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
             {
                 OfferedChanged();
             };
+
+            plugins.Turned += OfferedChanged;
         }
 
         _saveTimer = (hints ?? new Hints.HintClock()).Gathered(
@@ -711,7 +713,9 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
 
             if (_plugins == null) return offered;
 
-            var plugins = _plugins.Plugins.Where(_host.CanPlay).ToList();
+            var plugins = _plugins.Plugins
+                .Where(one => _plugins.Wanted(one) && _host.CanPlay(one))
+                .ToList();
 
             var twice = plugins
                 .GroupBy(one => one.Name, System.StringComparer.OrdinalIgnoreCase)

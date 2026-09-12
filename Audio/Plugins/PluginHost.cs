@@ -1,3 +1,4 @@
+using System.Linq;
 using JingleBox2.Audio.Plugins.Bridge;
 using System;
 using System.Collections.Generic;
@@ -126,22 +127,18 @@ public sealed class PluginHost : IPluginHost
         (Isolated || !PluginCrashGuard.IsLoadBlocked(plugin));
 
     /// <inheritdoc/>
-    public IReadOnlyList<string> SearchPaths(IEnumerable<string>? extra = null)
+    public IReadOnlyList<Records.PluginPlace> Places(IEnumerable<string>? extra = null)
     {
-        var paths = new List<string>();
+        var places = new List<Records.PluginPlace>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var path in _clap.SearchPaths(extra))
-        {
-            if (seen.Add(path)) paths.Add(path);
-        }
+            if (seen.Add("clap:" + path)) places.Add(new Records.PluginPlace(path, Enums.PluginFormat.Clap));
 
         foreach (var path in _vst3.SearchPaths(extra))
-        {
-            if (seen.Add(path)) paths.Add(path);
-        }
+            if (seen.Add("vst3:" + path)) places.Add(new Records.PluginPlace(path, Enums.PluginFormat.Vst3));
 
-        return paths;
+        return places;
     }
 
     /// <inheritdoc/>
@@ -153,9 +150,11 @@ public sealed class PluginHost : IPluginHost
     }
 
     /// <inheritdoc/>
-    public List<PluginInfo> Scan(IReadOnlyList<string> folders)
+    public List<PluginInfo> Scan(IReadOnlyList<string> folders, IReadOnlyList<Records.PluginPlace>? off = null)
     {
-        return InProcessAsked ? ScanHere(folders) : ScanElsewhere(folders);
+        var skipped = off ?? Array.Empty<Records.PluginPlace>();
+
+        return InProcessAsked ? ScanHere(folders, skipped) : ScanElsewhere(folders, skipped);
     }
 
     /// <summary>
@@ -175,10 +174,10 @@ public sealed class PluginHost : IPluginHost
     /// executable, in which case the assembly has to be named as the first argument or the child
     /// would be a bare runtime with nothing to run.
     /// </remarks>
-    private List<PluginInfo> ScanElsewhere(IReadOnlyList<string> folders)
+    private List<PluginInfo> ScanElsewhere(IReadOnlyList<string> folders, IReadOnlyList<Records.PluginPlace> off)
     {
         string? self = Environment.ProcessPath;
-        if (string.IsNullOrEmpty(self)) return ScanHere(folders);
+        if (string.IsNullOrEmpty(self)) return ScanHere(folders, off);
 
         string answer = Path.Combine(Path.GetTempPath(), "jinglebox-scan-" + Guid.NewGuid().ToString("N") + ".json");
 
@@ -194,7 +193,7 @@ public sealed class PluginHost : IPluginHost
         if (string.Equals(Path.GetFileNameWithoutExtension(self), "dotnet", StringComparison.OrdinalIgnoreCase))
         {
             string assembly = System.Reflection.Assembly.GetEntryAssembly()?.Location ?? "";
-            if (string.IsNullOrEmpty(assembly)) return ScanHere(folders);
+            if (string.IsNullOrEmpty(assembly)) return ScanHere(folders, off);
 
             start.ArgumentList.Add(assembly);
         }
@@ -203,6 +202,8 @@ public sealed class PluginHost : IPluginHost
         start.ArgumentList.Add(answer);
 
         foreach (var folder in folders) start.ArgumentList.Add(folder);
+
+        foreach (var place in off) start.ArgumentList.Add(OffArgument + PluginSwitches.Said(place));
 
         try
         {
@@ -234,6 +235,17 @@ public sealed class PluginHost : IPluginHost
     /// <summary>How long a whole scan is given before it is assumed to have hung.</summary>
     private const int ScanSeconds = 120;
 
+    /// <summary>
+    /// What a folder the scan is to leave alone is written behind, on the child's command line.
+    /// </summary>
+    /// <remarks>
+    /// A marker rather than a position, because the folders to look in are a list of unknown
+    /// length and so are the folders to leave alone, and two lists of unknown length cannot be
+    /// told apart by counting. Everything after it on one argument is the place itself, written
+    /// as the standard, a colon and the path.
+    /// </remarks>
+    public const string OffArgument = "--not:";
+
     /// <summary>The scan itself, run wherever it is called: in the child, or in this process
     /// when isolation has been turned off.</summary>
     /// <remarks>
@@ -244,11 +256,16 @@ public sealed class PluginHost : IPluginHost
     /// Sorted by name and then by format, so a vendor who ships both a CLAP and a VST3 of the
     /// same plugin has them next to each other rather than at opposite ends of the list.
     /// </remarks>
-    internal List<PluginInfo> ScanHere(IReadOnlyList<string> folders)
+    internal List<PluginInfo> ScanHere(IReadOnlyList<string> folders, IReadOnlyList<Records.PluginPlace>? off = null)
     {
         var found = new List<PluginInfo>();
 
-        foreach (var path in _clap.Bundles(folders))
+        var skipped = off ?? Array.Empty<Records.PluginPlace>();
+
+        var clapOff = skipped.Where(one => one.Format == Enums.PluginFormat.Clap).Select(one => one.Path).ToList();
+        var vst3Off = skipped.Where(one => one.Format == Enums.PluginFormat.Vst3).Select(one => one.Path).ToList();
+
+        foreach (var path in _clap.Bundles(folders, clapOff))
         {
             var bundle = ClapBundle.Acquire(path);
             if (bundle == null) continue;
@@ -258,7 +275,7 @@ public sealed class PluginHost : IPluginHost
             bundle.Dispose();
         }
 
-        foreach (var path in _vst3.Bundles(folders))
+        foreach (var path in _vst3.Bundles(folders, vst3Off))
         {
             var module = Vst3Module.Acquire(path);
             if (module == null) continue;

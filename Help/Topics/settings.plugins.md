@@ -37,6 +37,21 @@ makes hosts crash.
 Folders of your own are searched before the standard ones, and are kept with the
 rest of the settings.
 
+**Looked for in** lists every folder a scan walks, one line per standard, each with
+a tick. Untick one and the next scan leaves that folder alone. A folder is listed
+once per standard because it is walked once per standard, so a folder of yours full
+of CLAPs can be left out of the VST3 walk, which would otherwise search it on every
+scan and find nothing. Nothing is deleted: the folder stays listed and one tick
+brings it back.
+
+**Each plugin has a tick too.** Untick one and it is not offered anywhere a plugin is
+chosen, while staying on this list with its path and its maker. That is for the
+plugins you have and never reach for: the same plugin often ships as both a CLAP and
+a VST3, and a bundle often holds an instrument and its effect twin, so a picker can
+run to hundreds of rows when a dozen are the ones you use. **A song that already
+names a plugin you have switched off still loads it.** The tick says what may be
+offered, not what may be played.
+
 A plugin cannot be pointed at with a controller, and that is a decision rather than a
 gap. A plugin is somebody else's program and brings its own MIDI learn, which it
 keeps itself, so a link made here would be a second mapping beside the plugin's own

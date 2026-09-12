@@ -74,7 +74,21 @@ public interface IPluginHost
     bool CanPlay(PluginInfo plugin);
 
     /// <summary>Every directory either standard keeps plugins in, plus the user's own.</summary>
-    IReadOnlyList<string> SearchPaths(IEnumerable<string>? extra = null);
+    /// <summary>
+    /// Every folder a scan would walk, each with the standard it is walked for.
+    /// </summary>
+    /// <remarks>
+    /// **The format is half of what a place is.** The two standards keep their plugins in
+    /// different folders and a machine has six or seven at once, so a list of bare paths says
+    /// which is which only by the last word of a path; and a folder somebody added by hand is
+    /// walked by both, which a deduped list of paths cannot show at all.
+    ///
+    /// It is also what makes a place switchable: turning one off has to mean one standard or the
+    /// other, since a folder of CLAPs walked for VST3 bundles on every scan is time spent finding
+    /// nothing, and that is the case somebody wants rid of.
+    /// </remarks>
+    /// <param name="extra">Folders of somebody's own, on top of the ones each standard specifies.</param>
+    IReadOnlyList<Records.PluginPlace> Places(IEnumerable<string>? extra = null);
 
     /// <summary>
     /// True when a plugin is still where it was found. A CLAP plugin is a file and a VST3
@@ -97,5 +111,5 @@ public interface IPluginHost
     /// plugin that dies while being asked what it is would take the application down every time
     /// it started, before anybody had chosen to use it.
     /// </remarks>
-    List<PluginInfo> Scan(IReadOnlyList<string> folders);
+    List<PluginInfo> Scan(IReadOnlyList<string> folders, IReadOnlyList<Records.PluginPlace>? off = null);
 }

@@ -225,12 +225,24 @@ public static class PluginHostProcess
 
         string destination = args[1];
         var folders = new List<string>();
+        var off = new List<Records.PluginPlace>();
 
-        for (int index = 2; index < args.Length; index++) folders.Add(args[index]);
+        for (int index = 2; index < args.Length; index++)
+        {
+            string said = args[index];
+
+            if (!said.StartsWith(PluginHost.OffArgument, StringComparison.Ordinal))
+            {
+                folders.Add(said);
+                continue;
+            }
+
+            if (PluginSwitches.Read(said[PluginHost.OffArgument.Length..]) is { } place) off.Add(place);
+        }
 
         try
         {
-            var found = new PluginHost().ScanHere(folders);
+            var found = new PluginHost().ScanHere(folders, off);
 
             var json = System.Text.Json.JsonSerializer.Serialize(found);
 

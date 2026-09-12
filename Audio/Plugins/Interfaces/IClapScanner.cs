@@ -39,5 +39,5 @@ public interface IClapScanner
     /// their own. A directory that cannot be read is one place with no plugins in it rather than
     /// a reason for the application to have no plugins at all, so it is stepped over in silence.
     /// </remarks>
-    IReadOnlyList<string> Bundles(IEnumerable<string>? extra = null);
+    IReadOnlyList<string> Bundles(IEnumerable<string>? extra = null, IEnumerable<string>? skip = null);
 }

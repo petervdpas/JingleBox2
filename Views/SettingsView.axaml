@@ -576,21 +576,27 @@
 
               <Border Classes="inset" IsVisible="{Binding Plugins.HasPlugins}">
                 <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
-                  <ItemsControl ItemsSource="{Binding Plugins.Plugins}">
+                  <ItemsControl ItemsSource="{Binding Plugins.Rows}">
                     <ItemsControl.ItemTemplate>
-                      <DataTemplate>
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,2">
-                          <StackPanel Grid.Column="0" Spacing="1">
+                      <DataTemplate x:DataType="vm:PluginRowViewModel">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Margin="0,2">
+                          <!-- Unticked, the plugin stays on this list and is left out of every
+                               picker. A song that already names it still loads it. -->
+                          <CheckBox Grid.Column="0" VerticalAlignment="Center"
+                                    IsChecked="{Binding Offered}"
+                                    ToolTip.Tip="Off, this plugin is not offered anywhere. It stays installed and a song that already uses it still loads it." />
+
+                          <StackPanel Grid.Column="1" Spacing="1">
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
-                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding FormatName}" />
+                              <TextBlock Text="{Binding Plugin.Name}" FontWeight="SemiBold" FontSize="13" />
+                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Plugin.FormatName}" />
                               <TextBlock Classes="cardHint" VerticalAlignment="Center"
-                                         Text="instrument" IsVisible="{Binding IsInstrument}" />
+                                         Text="instrument" IsVisible="{Binding Plugin.IsInstrument}" />
                             </StackPanel>
-                            <TextBlock Classes="cardHint" Text="{Binding Path}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Classes="cardHint" Text="{Binding Plugin.Path}" TextTrimming="CharacterEllipsis" />
                           </StackPanel>
-                          <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
-                                     Text="{Binding Vendor}" />
+                          <TextBlock Grid.Column="2" Classes="cardHint" VerticalAlignment="Center"
+                                     Text="{Binding Plugin.Vendor}" />
                         </Grid>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -627,8 +633,29 @@
                 </StackPanel>
               </Border>
 
+              <!-- Where a scan walks, one row per standard, each switchable. A folder of your
+                   own is walked by both scanners, so it is two rows and each can be turned off
+                   on its own: a folder of CLAPs walked for VST3 bundles is time spent finding
+                   nothing on every scan. -->
               <TextBlock Classes="cardHint" Text="Looked for in:" />
-              <TextBlock Classes="cardHint" Text="{Binding Plugins.SearchPaths}" />
+
+              <ItemsControl ItemsSource="{Binding Plugins.Places}" IsVisible="{Binding Plugins.HasPlaces}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:PluginPlaceViewModel">
+                    <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8" Margin="0,1">
+                      <CheckBox Grid.Column="0" VerticalAlignment="Center"
+                                IsChecked="{Binding LookedIn}"
+                                ToolTip.Tip="Off, a scan does not walk this folder for this standard." />
+
+                      <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
+                                 MinWidth="42" Text="{Binding Format}" />
+
+                      <TextBlock Grid.Column="2" Classes="cardHint" VerticalAlignment="Center"
+                                 TextTrimming="CharacterEllipsis" Text="{Binding Path}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
 
               <!-- Folders of your own, on top of the standard ones. Kept with the settings. -->
               <StackPanel Orientation="Horizontal" Spacing="8">

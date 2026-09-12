@@ -41,6 +41,16 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     private readonly AppConfig? _config;
 
     /// <summary>
+    /// What is switched off: folders that are not walked and plugins that are not offered.
+    /// </summary>
+    /// <remarks>
+    /// Over the settings' own two lists, so a tick is written where everything else here is.
+    /// Given out, because the pickers ask it: this is what decides whether a plugin is offered
+    /// and the rack's instrument list has to ask the same question the effects list does.
+    /// </remarks>
+    public Audio.Plugins.Interfaces.IPluginSwitches Switches { get; }
+
+    /// <summary>
     /// Takes the folders and the last scan's results out of the settings, without scanning.
     /// </summary>
     /// <remarks>
@@ -55,6 +65,9 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
 
         var config = _config;
 
+        Switches = new Audio.Plugins.PluginSwitches(
+            config?.PluginPlacesOff, config?.PluginsOff, () => settings?.Moved());
+
         foreach (var folder in config?.PluginFolders ?? new List<string>())
         {
             if (!string.IsNullOrWhiteSpace(folder)) Folders.Add(folder);
@@ -63,6 +76,26 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
         Audio.Plugins.PluginShelf.Wants(config?.KnownPlugins);
 
         Remember(config?.KnownPlugins);
+
+        Restock();
+    }
+
+    /// <summary>
+    /// The folders a scan walks, one row per standard, each with its own tick.
+    /// </summary>
+    /// <remarks>
+    /// Rebuilt rather than kept in step, since the list only moves when a folder is added or
+    /// taken away, and rebuilding it is a handful of rows.
+    /// </remarks>
+    public ObservableCollection<PluginPlaceViewModel> Places { get; } = new();
+
+    /// <summary>Fills the list of folders from what a scan would really walk.</summary>
+    private void Restock()
+    {
+        Places.Clear();
+
+        foreach (var place in _plugins.Places(Folders))
+            Places.Add(new PluginPlaceViewModel(place, Switches));
     }
 
     /// <summary>
@@ -92,6 +125,7 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
             Plugins.Add(plugin);
         }
 
+        Listed();
         Sort();
 
         Status = gone == 0
@@ -172,7 +206,10 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     private void SaveFolders()
     {
         OnPropertyChanged(nameof(HasFolders));
-        OnPropertyChanged(nameof(SearchPaths));
+
+        Restock();
+
+        OnPropertyChanged(nameof(HasPlaces));
 
         if (_settings == null || _config == null) return;
 
@@ -222,6 +259,16 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     public ObservableCollection<PluginInfo> Plugins { get; } = new();
 
     /// <summary>
+    /// The same list as rows, each with the tick that says whether it is offered.
+    /// </summary>
+    /// <remarks>
+    /// Beside <see cref="Plugins"/> rather than instead of it, because the two answer different
+    /// questions: that one is what this installation has, which is what everything else reads,
+    /// and this is the page showing it with something to do to each entry.
+    /// </remarks>
+    public ObservableCollection<PluginRowViewModel> Rows { get; } = new();
+
+    /// <summary>
     /// The ones that can go in a chain. An instrument makes sound from notes and has no audio
     /// input at all, so putting one on a pad would replace the pad with silence. They stay on
     /// the SETTINGS list, because knowing they are installed is worth something.
@@ -242,12 +289,51 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
 
         foreach (var plugin in Plugins)
         {
-            if (plugin.CanInsert && !Audio.Plugins.PluginCrashGuard.IsLoadBlocked(plugin)) Effects.Add(plugin);
+            if (plugin.CanInsert
+                && Switches.Wanted(plugin)
+                && !Audio.Plugins.PluginCrashGuard.IsLoadBlocked(plugin))
+                Effects.Add(plugin);
         }
 
         OnPropertyChanged(nameof(HasPlugins));
         OnPropertyChanged(nameof(HasEffects));
+
+        Turned?.Invoke();
     }
+
+    /// <summary>
+    /// Builds the rows the page shows, one per plugin.
+    /// </summary>
+    /// <remarks>
+    /// **Only where the plugins themselves change**, which is a scan or the list being read back
+    /// at startup, and deliberately not when a tick moves. A row rebuilt under the pointer is the
+    /// tick somebody has just clicked being thrown away and replaced, which loses the scroll
+    /// position on a list of two hundred and reads as a click that did not take.
+    /// </remarks>
+    private void Listed()
+    {
+        Rows.Clear();
+
+        foreach (var plugin in Plugins) Rows.Add(new PluginRowViewModel(plugin, Switches, Sort));
+    }
+
+    /// <summary>
+    /// Told whenever what is offered has moved, for a picker that is not bound to these lists.
+    /// </summary>
+    /// <remarks>
+    /// The rack's instrument list is built from the plugins rather than from
+    /// <see cref="Effects"/>, since an instrument is picked beside the machines rather than off a
+    /// chain, so it has to hear about a tick some other way.
+    /// </remarks>
+    public Action? Turned { get; set; }
+
+    /// <summary>Whether that plugin may be offered, which is the tick on its row.</summary>
+    /// <remarks>
+    /// Asked rather than filtered into a list of its own, because the one place that wants it is
+    /// the rack, which is already building its own list out of these and the machines together.
+    /// </remarks>
+    /// <param name="plugin">The plugin to ask about.</param>
+    public bool Wanted(PluginInfo plugin) => Switches.Wanted(plugin);
 
     /// <summary>What the last thing that happened here has to say, for the line on the page.</summary>
     /// <remarks>
@@ -256,12 +342,8 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     /// </remarks>
     [ObservableProperty] private string status = "Not scanned yet";
 
-    /// <summary>The directories a scan looks in, as one line for the page to show.</summary>
-    /// <remarks>
-    /// Printed because a plugin somebody expects and cannot see is nearly always a plugin
-    /// somewhere nobody looked.
-    /// </remarks>
-    public string SearchPaths => string.Join("\n", _plugins.SearchPaths(Folders));
+    /// <summary>True when there is anywhere at all to look, so the page can say when there is not.</summary>
+    public bool HasPlaces => Places.Count > 0;
 
     /// <summary>True when anything at all is known, scanned now or remembered from last time.</summary>
     public bool HasPlugins => Plugins.Count > 0;
@@ -295,11 +377,14 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
         try
         {
             var folders = Folders.ToList();
-            var found = await Task.Run(() => _plugins.Scan(folders));
+            var off = Switches.Off;
+
+            var found = await Task.Run(() => _plugins.Scan(folders, off));
 
             Plugins.Clear();
             foreach (var plugin in found) Plugins.Add(plugin);
 
+            Listed();
             Sort();
 
             Save(found);

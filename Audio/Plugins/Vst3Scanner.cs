@@ -60,14 +60,16 @@ public sealed class Vst3Scanner : IVst3Scanner
     }
 
     /// <inheritdoc/>
-    public IReadOnlyList<string> Bundles(IEnumerable<string>? extra = null)
+    public IReadOnlyList<string> Bundles(IEnumerable<string>? extra = null, IEnumerable<string>? skip = null)
     {
         var found = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var off = new HashSet<string>(skip ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
 
         foreach (var directory in SearchPaths(extra))
         {
             if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory)) continue;
+            if (off.Contains(directory)) continue;
 
             Walk(directory, found, seen, 0);
         }

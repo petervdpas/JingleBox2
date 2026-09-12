@@ -40,5 +40,5 @@ public interface IVst3Scanner
     /// somebody has no permission on is a thing to walk past, not a thing to stop the scan
     /// over: the other forty plugins are still there.
     /// </remarks>
-    IReadOnlyList<string> Bundles(IEnumerable<string>? extra = null);
+    IReadOnlyList<string> Bundles(IEnumerable<string>? extra = null, IEnumerable<string>? skip = null);
 }

@@ -210,6 +210,32 @@ public sealed class AppConfig
     public List<string> PluginFolders { get; set; } = new();
 
     /// <summary>
+    /// The folders a scan is told not to walk, written as the format and the path.
+    /// </summary>
+    /// <remarks>
+    /// Off rather than gone: the folder is still listed and is one tick away from being looked in
+    /// again. Kept as words rather than as a shape of its own because it has to survive a settings
+    /// file being read by a build that has never heard of it, and because a scan runs in a process
+    /// of its own and is told where not to look on a command line.
+    ///
+    /// <c>clap:/usr/lib/clap</c> is the spelling: the standard, a colon, and the folder. A line
+    /// this build cannot read is left alone rather than dropped, so a folder switched off by a
+    /// later version is not quietly switched back on by this one.
+    /// </remarks>
+    public List<string> PluginPlacesOff { get; set; } = new();
+
+    /// <summary>
+    /// The plugins that are installed and are not offered, by the id the scanner gave them.
+    /// </summary>
+    /// <remarks>
+    /// By id and never by path, which is the rule the rest of this half keeps: a bundle lives
+    /// somewhere else on another machine, and two classes in one bundle share a path and are two
+    /// plugins. A song that already names one still loads it, since this says what may be offered
+    /// rather than what may be played.
+    /// </remarks>
+    public List<string> PluginsOff { get; set; } = new();
+
+    /// <summary>
     /// What the tracker and the synth run at, in Hz.
     /// </summary>
     /// <remarks>
