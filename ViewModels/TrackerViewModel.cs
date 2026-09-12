@@ -111,6 +111,35 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     private readonly DispatcherTimer _meters;
 
+    /// <summary>
+    /// How evenly the picture really moved, measured on the thread that draws it.
+    /// </summary>
+    /// <remarks>
+    /// **The transport being on time says nothing about the picture being even**, and the
+    /// distance between the two is the toolkit's rather than this application's: a posted
+    /// message waits behind whatever else is in the queue and a frame waits for the screen. So
+    /// it is measured where it lands instead of being reasoned about, and it is measured on
+    /// whichever machine is being complained about rather than on the one this was written on.
+    /// See <see cref="UI.Interfaces.IPlayheadFlow"/>.
+    /// </remarks>
+    private readonly UI.Interfaces.IPlayheadFlow _flow = new UI.PlayheadFlow();
+
+    /// <summary>
+    /// The clock the flow is measured against, which runs for the life of the page.
+    /// </summary>
+    /// <remarks>
+    /// Its own rather than the one behind <see cref="Elapsed"/>, which is the take's length and
+    /// is put back to nought on every stop: a measurement of how evenly steps arrive cannot be
+    /// taken against a clock that keeps starting again.
+    /// </remarks>
+    private readonly System.Diagnostics.Stopwatch _flowing = System.Diagnostics.Stopwatch.StartNew();
+
+    /// <summary>Writes a line the flow had something to say, and nothing otherwise.</summary>
+    private static void Say(string? line)
+    {
+        if (line is { } said) Log.Write(LogArea.Tracker, () => said);
+    }
+
     /// <summary>Writes the song down while it is unsaved, so a crash costs a minute, not a session.</summary>
     /// <remarks>
     /// **Said by every edit and answered once they stop**, which is a change from a clock that
@@ -1803,6 +1832,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private void OnPositionChanged(object? sender, TrackerPosition position) =>
         Dispatcher.UIThread.Post(() =>
         {
+            Say(_flow.Stepped(_flowing.Elapsed));
+
             PlayingLine = position.Line;
 
             Running();
@@ -1943,6 +1974,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private void OnPlayerStopped(object? sender, EventArgs e) =>
         Dispatcher.UIThread.Post(() =>
         {
+            Say(_flow.Stopped());
+
             var failed = _player.FailedInstruments;
             if (failed.Count > 0)
                 Status = $"Stopped. {failed.Count} instrument file(s) could not be loaded.";

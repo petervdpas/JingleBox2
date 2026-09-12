@@ -130,7 +130,7 @@ public partial class TrackerView : UserControl
         {
             var metrics = Grid.Metrics;
             if (metrics.CharWidth > 0) Header.CharWidth = metrics.CharWidth;
-            Header.RowHeight = Grid.RowHeight;
+            Header.RowHeight = Grid.RowPixels;
             Header.Columns = metrics.Columns;
         };
 
@@ -156,6 +156,20 @@ public partial class TrackerView : UserControl
     /// jump rather than step.
     /// </remarks>
     private const double ScrollSlop = 0.5;
+
+    /// <summary>The rule that holds a length or a place to whole pixels of the screen in use.</summary>
+    private readonly UI.Interfaces.IDevicePixels _pixels = new UI.DevicePixels();
+
+    /// <summary>
+    /// What this screen multiplies a device independent pixel by, or one before there is a screen.
+    /// </summary>
+    /// <remarks>
+    /// **Every layer over the pattern is drawn on the same grid of pixels or none of them
+    /// are.** The rows, the room above line 00 and where the view is scrolled to are three
+    /// numbers that have to agree, and a row held to a whole pixel inside a view scrolled to
+    /// half of one is the same limp one layer out.
+    /// </remarks>
+    private double Scaling => TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
 
     /// <summary>The song and everything about it, or nothing before the page has been given one.</summary>
     private TrackerViewModel? ViewModel => DataContext as TrackerViewModel;
@@ -812,7 +826,9 @@ public partial class TrackerView : UserControl
     /// </remarks>
     private void MeasureHalfView()
     {
-        double half = Math.Max(0, (GridScroll.Viewport.Height - Grid.RowHeight) / 2);
+        double half = Math.Max(0, (GridScroll.Viewport.Height - Grid.RowPixels) / 2);
+
+        half = _pixels.Lands(half, Scaling);
 
         if (Math.Abs(half - Grid.HalfView) < ScrollSlop) return;
 
@@ -833,7 +849,7 @@ public partial class TrackerView : UserControl
         double offset = _scroll.CentreRow(
             GridScroll.Viewport.Height, Grid.Metrics, row, pattern.Lines);
 
-        SetScrollOffset(offset, GridScroll.Offset.X);
+        SetScrollOffset(_pixels.Lands(offset, Scaling), GridScroll.Offset.X);
     }
 
     /// <summary>

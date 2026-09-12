@@ -489,7 +489,7 @@
               </views:PatternGrid>
 
               <views:PlayingLineMark x:Name="Playhead" PlayingLine="{Binding PlayingLine}"
-                                     RowHeight="{Binding #Grid.RowHeight}"
+                                     RowHeight="{Binding #Grid.RowPixels}"
                                      TopPad="{Binding #Grid.HalfView}" />
 
               <views:PatternCursorMark Box="{Binding #Grid.CursorBox}" />

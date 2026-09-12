@@ -849,6 +849,40 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   back up to **9.6** to save half of an editing cost that the cursor layer then removed entirely.
   **A cull is only a saving where the thing being culled is not redrawn more often because of
   it**, and on a 64 line pattern the whole picture is barely two screens anyway
+- **All of that was measured here, and the picture is reported as bumpy on Windows, where three
+  things about the toolkit are different.** Read out of the two backend assemblies rather than
+  assumed: `Avalonia.Win32` imports `SetTimer`, `KillTimer` and `DwmFlush`, and `Avalonia.X11`
+  waits in `epoll_wait`. So a `DispatcherTimer` there is a `WM_TIMER`, whose resolution is the
+  system tick, 15.6 ms unless something in the process has raised it, and which Windows
+  synthesises only when nothing else is pending and never queues twice; here the same timer is an
+  epoll wait with a millisecond timeout in the same ordered queue as everything else. And the
+  present is locked to the compositor there and is a swap here. The tracker page runs `ReadMeters`
+  on a 50 ms timer, which walks every strip and every instrument row, so on Windows that work
+  arrives in clumps on the thread that also has to move the playhead
+- **A picture that steps by a length that is not a whole number of device pixels limps, and it
+  limps at exactly the scalings where that length is not one.** A row is 18, which is 18 pixels at
+  100% and 27 at 150%, both whole, and **22.5 at 125%**: the pattern moves 22 pixels under the
+  playhead and then 23, for ever, and every glyph on the page is rasterised at a different
+  fraction of a pixel on each step. Nothing about it depends on how fast the steps arrive, so it
+  is there on a machine whose clock is perfect. `IDevicePixels` is the rule, `PatternGrid.RowPixels`
+  is the height everything really draws at, and the header, the playing line band and the scroll
+  offset are all held to the same grid, or three pictures laid over each other would be drawn on
+  three different ones
+- **The answer is worked out at whatever scaling the screen is really at, which is the whole
+  reason it is a rule rather than a number.** A row height that happens to land on a pixel on the
+  machine it was written on says nothing about anybody else's, and asking somebody what their
+  display scaling is set to is how "works on my machine" is arrived at. `Tests/DevicePixelsTests.cs`
+  is written at 100, 125, 150 and 175 per cent for that reason, and putting the fault back is what
+  says so: the rows-are-equal test notices at 125 and 175 and is perfectly happy at 100 and 150
+- **And the timing half is measured on the machine being complained about rather than reasoned
+  about here.** `IPlayheadFlow` times the gaps between one line reaching the drawing thread and
+  the next, which is the far end of a journey whose near end the transport already spins onto:
+  everything in between is the toolkit's. One line every five seconds, the same window the render
+  cost reports in so the two can be read against each other. **The spread is the whole point of it
+  and the mean is only there to read the spread against**, since a limp is one step early and the
+  next one late and reads as a perfect mean: 125 ms a line at 60 Hz is seven and a half frames, so
+  a picture that can only move on a frame shows one step after seven and the next after eight and
+  reports `mean 125.0 ms, 109.0 to 141.0, worst 16.0 ms out`
 - **The gen-2 collections were chased and are not a fault, but what keeps them harmless is.** On
   the tracker page with the transport running the runtime does about three or four full
   collections a second on a heap that never grows: 26 to 30 MB, gen 2 flat at 22, the large object

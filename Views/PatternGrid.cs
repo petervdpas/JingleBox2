@@ -64,6 +64,28 @@ public sealed class PatternGrid : ThemedControl
     public static readonly StyledProperty<double> RowHeightProperty =
         AvaloniaProperty.Register<PatternGrid, double>(nameof(RowHeight), 18);
 
+    /// <summary>
+    /// How tall a line really is: the height asked for, held to a whole number of the screen's
+    /// own pixels.
+    /// </summary>
+    /// <remarks>
+    /// **What is asked for and what a screen can draw are two different numbers**, and only one
+    /// of them may be used for anything. <see cref="RowHeight"/> is the ask and this is the
+    /// answer: at 125% a row of 18 is 22.5 device pixels, so a pattern running under the playhead
+    /// moves 22 pixels and then 23 for ever, and each step re-rasterises every glyph on the page
+    /// at a different fraction of a pixel. Held to a whole one it steps the same distance every
+    /// time at every scaling. See <see cref="IDevicePixels"/>.
+    ///
+    /// Everything that draws a row goes through this rather than through the ask, the header and
+    /// the playing line band included, or the three pictures laid over each other would be drawn
+    /// on three different grids.
+    ///
+    /// Read only, since nothing decides it but the ask and the screen it is being drawn on.
+    /// </remarks>
+    public static readonly DirectProperty<PatternGrid, double> RowPixelsProperty =
+        AvaloniaProperty.RegisterDirect<PatternGrid, double>(
+            nameof(RowPixels), o => o.RowPixels);
+
     /// <summary>The block being worked on, dragged here and shown here.</summary>
     public static readonly StyledProperty<PatternSelection> SelectionProperty =
         AvaloniaProperty.Register<PatternGrid, PatternSelection>(
@@ -100,9 +122,9 @@ public sealed class PatternGrid : ThemedControl
     static PatternGrid()
     {
         AffectsRender<PatternGrid>(PatternProperty,
-            LinesPerBeatProperty, RowHeightProperty, DropTargetTrackProperty,
+            LinesPerBeatProperty, RowHeightProperty, RowPixelsProperty, DropTargetTrackProperty,
             BeforeProperty, AfterProperty, HalfViewProperty);
-        AffectsMeasure<PatternGrid>(PatternProperty, RowHeightProperty,
+        AffectsMeasure<PatternGrid>(PatternProperty, RowHeightProperty, RowPixelsProperty,
             BeforeProperty, AfterProperty, HalfViewProperty);
         FocusableProperty.OverrideDefaultValue<PatternGrid>(true);
     }
@@ -163,6 +185,33 @@ public sealed class PatternGrid : ThemedControl
         set => SetValue(RowHeightProperty, value);
     }
 
+    /// <summary>Backing field for <see cref="RowPixels"/>.</summary>
+    private double rowPixels = 18;
+
+    /// <inheritdoc cref="RowPixelsProperty"/>
+    public double RowPixels
+    {
+        get => rowPixels;
+        private set => SetAndRaise(RowPixelsProperty, ref rowPixels, value);
+    }
+
+    /// <summary>The rule that holds a length to whole pixels of whatever screen this is on.</summary>
+    private readonly IDevicePixels _pixels = new DevicePixels();
+
+    /// <summary>
+    /// Works out what a row really comes to on the screen this is being drawn on.
+    /// </summary>
+    /// <remarks>
+    /// Asked of the window rather than remembered, since a window dragged onto a second
+    /// screen is drawn at that screen's scaling from the next pass onwards and nothing announces
+    /// it here. One before there is a root at all, which is every pass before the grid is on a
+    /// window: the answer is the ask, which is what it was for the whole of this control's life
+    /// before this existed.
+    /// </remarks>
+    private void HoldRows() =>
+        RowPixels = _pixels.Whole(
+            RowHeight, Avalonia.Controls.TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
+
     /// <inheritdoc cref="SelectionProperty"/>
     public PatternSelection Selection
     {
@@ -211,7 +260,7 @@ public sealed class PatternGrid : ThemedControl
     /// the cells really are.
     /// </remarks>
     public PatternMetrics Metrics =>
-        new(_charWidth, RowHeight, Pattern?.TrackCount ?? 0, Pad, Pad, Widths);
+        new(_charWidth, RowPixels, Pattern?.TrackCount ?? 0, Pad, Pad, Widths);
 
     /// <summary>How many note columns each track of the bound pattern shows.</summary>
     /// <remarks>
@@ -300,7 +349,8 @@ public sealed class PatternGrid : ThemedControl
             return;
         }
 
-        if (change.Property == RowHeightProperty || change.Property == HalfViewProperty)
+        if (change.Property == RowHeightProperty || change.Property == RowPixelsProperty ||
+            change.Property == HalfViewProperty)
         {
             PlaceCursor();
 
@@ -387,12 +437,12 @@ public sealed class PatternGrid : ThemedControl
         for (int line = 0; line < pattern.Lines; line++)
         {
             double y = metrics.RowY(line);
-            if (y + RowHeight < 0 || y > visibleHeight) continue;
+            if (y + RowPixels < 0 || y > visibleHeight) continue;
 
             if (line % (lpb * 4) == 0)
-                context.FillRectangle(barShade, new Rect(0, y, rowWidth, RowHeight));
+                context.FillRectangle(barShade, new Rect(0, y, rowWidth, RowPixels));
             else if (line % lpb == 0)
-                context.FillRectangle(beatShade, new Rect(0, y, rowWidth, RowHeight));
+                context.FillRectangle(beatShade, new Rect(0, y, rowWidth, RowPixels));
 
             DrawRow(context, metrics, pattern, line, y, text, muted);
         }
@@ -461,21 +511,21 @@ public sealed class PatternGrid : ThemedControl
 
         if (Before is { } before && metrics.TopPad > 0)
         {
-            int rows = (int)Math.Ceiling(metrics.TopPad / RowHeight);
+            int rows = (int)Math.Ceiling(metrics.TopPad / RowPixels);
 
             for (int back = 1; back <= rows && back <= before.Lines; back++)
                 DrawGhost(context, metrics, palette, before, before.Lines - back,
-                    metrics.TopPad - back * RowHeight, rowWidth, text, ghost);
+                    metrics.TopPad - back * RowPixels, rowWidth, text, ghost);
         }
 
         if (After is { } after && metrics.BottomPad > 0)
         {
-            int rows = (int)Math.Ceiling(metrics.BottomPad / RowHeight);
+            int rows = (int)Math.Ceiling(metrics.BottomPad / RowPixels);
             double first = metrics.RowY(lines);
 
             for (int ahead = 0; ahead < rows && ahead < after.Lines; ahead++)
                 DrawGhost(context, metrics, palette, after, ahead,
-                    first + ahead * RowHeight, rowWidth, text, ghost);
+                    first + ahead * RowPixels, rowWidth, text, ghost);
         }
     }
 
@@ -489,7 +539,7 @@ public sealed class PatternGrid : ThemedControl
     private void DrawGhost(DrawingContext context, PatternMetrics metrics, ThemePalette palette,
         Pattern pattern, int line, double y, double rowWidth, Color text, Color muted)
     {
-        context.FillRectangle(palette.RowShade(0x0A), new Rect(0, y, rowWidth, RowHeight));
+        context.FillRectangle(palette.RowShade(0x0A), new Rect(0, y, rowWidth, RowPixels));
 
         DrawRow(context, metrics, pattern, line, y, text, muted);
     }
@@ -504,7 +554,7 @@ public sealed class PatternGrid : ThemedControl
         if (block.IsEmpty) return;
 
         double top = metrics.RowY(block.FirstLine);
-        double height = block.LineCount * RowHeight;
+        double height = block.LineCount * RowPixels;
 
         double left = metrics.TrackDividerX(block.FirstTrack);
         double width = metrics.TrackDividerX(block.LastTrack + 1) - left;
@@ -589,7 +639,7 @@ public sealed class PatternGrid : ThemedControl
             metrics.ColumnX(cursor.Track, cursor.Column, cursor.NoteColumn) - 1,
             metrics.RowY(cursor.Line),
             metrics.ColumnWidth(cursor.Column) + 2,
-            RowHeight);
+            RowPixels);
     }
 
     /// <summary>
@@ -625,7 +675,7 @@ public sealed class PatternGrid : ThemedControl
             _lettering[key] = formatted;
         }
 
-        context.DrawText(formatted, new Point(x, y + (RowHeight - formatted.Height) / 2));
+        context.DrawText(formatted, new Point(x, y + (RowPixels - formatted.Height) / 2));
     }
 
     /// <summary>The brush for a colour, made once.</summary>
@@ -834,10 +884,12 @@ public sealed class PatternGrid : ThemedControl
     /// </remarks>
     private void EnsureMetrics()
     {
-        if (_measuredAt == RowHeight) return;
+        HoldRows();
 
-        _measuredAt = RowHeight;
-        _fontSize = Math.Max(9, RowHeight - 5);
+        if (_measuredAt == RowPixels) return;
+
+        _measuredAt = RowPixels;
+        _fontSize = Math.Max(9, RowPixels - 5);
         _typeface = new Typeface(PatternFont.Family);
 
         var probe = new FormattedText("0", CultureInfo.InvariantCulture,
