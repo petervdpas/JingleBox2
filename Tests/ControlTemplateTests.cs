@@ -358,6 +358,33 @@ public class ControlLinksPageTests
         Cc = cc
     };
 
+    /// <summary>
+    /// A link with a templates block behind it, filled the way the application fills it.
+    /// </summary>
+    /// <remarks>
+    /// **The page reads its cards out of the block**, so a page with no block behind it is a page
+    /// with no cards. Filled through the real <see cref="ControlTemplatesFromLinks"/> rather than
+    /// by hand, since a fixture that filled it another way would be testing the fixture.
+    ///
+    /// Filled once and deliberately not kept up from <see cref="ControlLink.Changed"/>, which the
+    /// window does: that is delivered on the drawing thread, and a run in which another test has
+    /// pinned a dispatcher posts to a loop that never runs.
+    /// </remarks>
+    /// <param name="links">What is on the desk.</param>
+    private static ControlLink Wired(List<ControlMapping> links)
+    {
+        var made = new ControlLink(links, () => { });
+
+        var block = new ControlTemplateBlock();
+
+        new ControlTemplatesFromLinks(block, () => links, new JingleBox2.Controllers.ControllerProfiles())
+            .Fill(said: false);
+
+        made.Templates = block;
+
+        return made;
+    }
+
     /// <summary>A desk with two links on one machine, and the page over it.</summary>
     /// <param name="desk">The links, kept so a test can count them.</param>
     private static ControlLinksViewModel Page(out List<ControlMapping> desk)
@@ -365,7 +392,7 @@ public class ControlLinksPageTests
         desk = new List<ControlMapping> { OnMachine("attack", 0), OnMachine("decay", 1) };
 
         return new ControlLinksViewModel(
-            new ControlLink(desk, () => { }),
+            Wired(desk),
             ports: () => new[] { "nanoKONTROL2 _ CTRL" });
     }
 
@@ -468,7 +495,7 @@ public class ControlLinksPageTests
             }
         };
 
-        var page = new ControlLinksViewModel(new ControlLink(desk, () => { }));
+        var page = new ControlLinksViewModel(Wired(desk));
 
         Assert.Equal(2, page.Cards.Count);
 

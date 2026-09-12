@@ -33,6 +33,17 @@ public interface IMemoryBlocks
     /// <summary>What the input is set to this run, which is never written down.</summary>
     IInputSetting Input { get; }
 
+    /// <summary>
+    /// What every controller does to everything, which is the templates.
+    /// </summary>
+    /// <remarks>
+    /// A block of its own rather than a corner of the settings, because it is read by everything
+    /// that answers what a control is for: the router per message, a mixer strip, and a sound
+    /// device's face and its menu. A list every one of those keeps a reading of is a list they
+    /// can come to disagree about.
+    /// </remarks>
+    Midi.Interfaces.IControlTemplateBlock Templates { get; }
+
     /// <summary>Every block, for whatever walks them rather than naming one.</summary>
     IReadOnlyList<IMemoryBlock> Blocks { get; }
 }

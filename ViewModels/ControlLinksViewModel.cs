@@ -210,51 +210,60 @@ public sealed class ControlLinksViewModel : ObservableObject
 
         foreach (var mapping in order) Links.Add(new ControlLinkRow(mapping, _link, _profiles));
 
-        foreach (var target in order
-                     .GroupBy(_naming.KeyOf, StringComparer.Ordinal)
-                     .OrderBy(one => _naming.RankOf(one.First()))
-                     .ThenBy(one => _naming.TitleOf(one), StringComparer.OrdinalIgnoreCase))
-            foreach (var card in Made(target))
-            {
-                card.Open = card.Key == _open;
+        foreach (var template in _link.Templates?.Templates ?? Enumerable.Empty<ControlTemplate>())
+        {
+            if (Made(template, order) is not { } card) continue;
 
-                Cards.Add(card);
-            }
+            card.Open = card.Key == _open;
+
+            Cards.Add(card);
+        }
 
         OnPropertyChanged(nameof(HasLinks));
     }
 
     /// <summary>
-    /// The cards for one thing pointed at: one for each controller pointed at it.
+    /// One card, over one template the block is holding.
     /// </summary>
     /// <remarks>
-    /// The heading is worked out once and handed down to every row under it, so the rows can
-    /// leave it off. Worked out rather than read, because a link made before the name was kept
-    /// has only its ids, and a card headed with a folder name is a card nobody recognises.
+    /// **The cards are read rather than cut.** This used to group the links by target and then by
+    /// port and make a card of each, which was the second spelling of a rule the block is now
+    /// filled by, and the two had already drifted: this cut by the port a link carries and the
+    /// rule cuts by what a profile calls it, so a device on two ports was one template and two
+    /// cards.
     ///
-    /// Almost always one card, since almost nobody points two desks at the same machine. Where
-    /// somebody does, they are two templates and are two cards, which is the same answer the
-    /// file gives.
+    /// What is still the links' own is the rows. A row is edited: its cross takes the link off
+    /// and its pickup button writes onto the mapping, so the rows have to be over the live links
+    /// and never over what a template says about them. Which links a template is about is
+    /// <see cref="IControlTemplates.Covers"/>, which is the same rule said backwards and is asked
+    /// rather than written out here for the reason the cut is.
+    ///
+    /// Nothing where a template covers no link, which is a template the block is holding for
+    /// something that has since been taken off: the block catches up on the next fill, and a card
+    /// with no rows in the meantime is a heading nobody can open.
     /// </remarks>
-    /// <param name="target">Every link pointed at one thing.</param>
-    private IEnumerable<ControlTemplateLinks> Made(IEnumerable<ControlMapping> target)
+    /// <param name="template">The template, as the block holds it.</param>
+    /// <param name="order">Every link, in the order the flat list shows them.</param>
+    private ControlTemplateLinks? Made(ControlTemplate template, IReadOnlyList<ControlMapping> order)
     {
-        var all = target.ToList();
-        string owner = _naming.TitleOf(all);
-        string kind = _naming.KindOf(all[0]);
-        string key = _naming.KeyOf(all[0]);
+        var mine = order
+            .Where(one => _templates.Covers(template, one, port => _profiles.Called(port)))
+            .ToList();
 
-        return all.GroupBy(one => one.Device, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(one => one.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(controller => new ControlTemplateLinks(
-                owner,
-                kind,
-                key,
-                controller.Key,
-                controller.Select(one => new ControlLinkRow(one, _link, _profiles, owner)),
-                controller.ToList(),
-                _profiles,
-                Folded));
+        if (mine.Count == 0) return null;
+
+        string owner = _naming.TitleOf(mine);
+
+        return new ControlTemplateLinks(
+            owner,
+            template.Target.Kind,
+            _naming.KeyOf(mine[0]),
+            template.Controller,
+            mine.Select(one => new ControlLinkRow(one, _link, _profiles, owner)),
+            mine,
+            _profiles,
+            Folded,
+            template);
     }
 
     /// <summary>
@@ -404,11 +413,7 @@ public sealed class ControlLinksViewModel : ObservableObject
 
     /// <summary>This section as a template, or nothing when there is nothing to write.</summary>
     /// <param name="which">The controller's links on one target.</param>
-    private ControlTemplate? Written(ControlTemplateLinks which) =>
-        _templates.Describe(
-            _profiles.Called(which.Device),
-            which.Mappings,
-            (channel, cc) => _profiles.Named(which.Device, channel, cc));
+    private ControlTemplate? Written(ControlTemplateLinks which) => which.Template;
 }
 
 /// <summary>
@@ -446,6 +451,10 @@ public sealed class ControlTemplateLinks : ObservableObject
     /// Told when this card is opened or folded away, so the list can fold the others. Left out
     /// where a card stands on its own and there is nothing for it to be one of.
     /// </param>
+    /// <param name="template">
+    /// The template this card is over, as the block holds it, which is what Export writes. Left
+    /// out for a card standing over links alone, which then has nothing to write.
+    /// </param>
     public ControlTemplateLinks(
         string title,
         string kind,
@@ -454,8 +463,10 @@ public sealed class ControlTemplateLinks : ObservableObject
         IEnumerable<ControlLinkRow> links,
         IReadOnlyList<ControlMapping> mappings,
         IControllerProfiles profiles,
-        Action<ControlTemplateLinks>? folded = null)
+        Action<ControlTemplateLinks>? folded = null,
+        ControlTemplate? template = null)
     {
+        Template = template;
         _profiles = profiles;
         _folded = folded;
         Title = title;
@@ -466,6 +477,16 @@ public sealed class ControlTemplateLinks : ObservableObject
 
         foreach (var one in links) Links.Add(one);
     }
+
+    /// <summary>
+    /// The template this card is over, as the block holds it.
+    /// </summary>
+    /// <remarks>
+    /// **What Export writes, rather than the card being described again.** The block already
+    /// holds the answer, cut by the one rule, so working it out a second time here was a second
+    /// chance to answer differently from the file a face lays down.
+    /// </remarks>
+    public ControlTemplate? Template { get; }
 
     /// <summary>What the target is called, which is the heading over the card.</summary>
     public string Title { get; }

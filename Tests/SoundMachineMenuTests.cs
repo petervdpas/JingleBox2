@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using JingleBox2.Controllers;
 using JingleBox2.Rack.SoundDevices.Faces;
 using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.Rack.SoundDevices.Faces.Records;
@@ -53,6 +54,40 @@ public class SoundMachineMenuTests
         Cc = cc
     };
 
+    /// <summary>
+    /// A link with a templates block behind it, kept up the way the application keeps it.
+    /// </summary>
+    /// <remarks>
+    /// **What a face reads is the block, so a test of a face has to have one.** The links are
+    /// still what a gesture writes, and <see cref="ControlTemplatesFromLinks"/> is what they come
+    /// to; wiring the real one here rather than filling a block by hand is what makes these tests
+    /// say something about the application rather than about a fixture.
+    ///
+    /// The ports are the machine's, and there are none: a test has no MIDI hardware, so a
+    /// template laid down here keeps the name it carried and its links wait for a controller that
+    /// is not coming. That is the rule the application keeps for a device left in the other room.
+    ///
+    /// Filled once and deliberately not kept up from <see cref="ControlLink.Changed"/>, which the
+    /// window does: that is delivered on the drawing thread, a test has none, and one that has
+    /// had a dispatcher pinned by another test in the same run posts to a loop that never runs.
+    /// A test that needs a second fill says so where it needs it.
+    /// </remarks>
+    /// <param name="links">What is on the desk.</param>
+    private static ControlLink Wired(List<ControlMapping> links)
+    {
+        var made = new ControlLink(links, () => { });
+
+        var block = new ControlTemplateBlock();
+
+        var filling = new ControlTemplatesFromLinks(block, () => links, new ControllerProfiles());
+
+        filling.Fill(said: false);
+
+        made.Templates = block;
+
+        return made;
+    }
+
     /// <summary>The part over a desk holding those links, with that machine on the panel.</summary>
     /// <param name="desk">The links, kept so a test can count them.</param>
     /// <param name="link">The desk itself, for the tests about the mode.</param>
@@ -65,7 +100,7 @@ public class SoundMachineMenuTests
         params ControlMapping[] links)
     {
         var kept = new List<ControlMapping>(links);
-        var made = new ControlLink(kept, () => { });
+        var made = Wired(kept);
         string last = "";
 
         desk = kept;
@@ -97,7 +132,7 @@ public class SoundMachineMenuTests
     [Fact]
     public void A_panel_with_no_machine_offers_nothing_at_all()
     {
-        var part = new ControlMenu(() => "", desk: () => new ControlLink(new List<ControlMapping>(), () => { }));
+        var part = new ControlMenu(() => "", desk: () => Wired(new List<ControlMapping>()));
 
         Assert.Empty(part.Read());
     }
@@ -106,7 +141,7 @@ public class SoundMachineMenuTests
     [Fact]
     public void A_machine_named_nothing_offers_nothing_at_all()
     {
-        Assert.Empty(new ControlMenu(() => null!, desk: () => new ControlLink(new List<ControlMapping>(), () => { })).Read());
+        Assert.Empty(new ControlMenu(() => null!, desk: () => Wired(new List<ControlMapping>())).Read());
     }
 
     /// <summary>
@@ -412,10 +447,12 @@ public class SoundMachineMenuTests
 
         desk = kept;
 
+        var made = Wired(kept);
+
         return new ControlMenu(
             () => "",
             () => "the mixer",
-            () => new ControlLink(kept, () => { }),
+            () => made,
             kind: LinkTargets.Mixer);
     }
 

@@ -175,6 +175,12 @@ public partial class MainWindow : Window
 
         _ = new Config.SettingsOnDisc(_store, blocks.Settings, _hints);
 
+        // And the templates, on the same clock and by the same rule: told when the block moves,
+        // and looking anyway, since the router changes a template's pickup from the MIDI thread
+        // with nobody having asked for anything. The block is filled by the window's view model,
+        // which is the first moment both the links and the controller profiles exist.
+        _ = new Midi.ControlTemplatesOnDisc(new Midi.ControlTemplates(), blocks.Templates, _hints);
+
         _routing = new AudioRoutingFactory().Create(_recording);
 
         Audio.RealtimeThread.Wants(cfg.RealtimeAudio);

@@ -56,7 +56,7 @@ public sealed class MemoryBlockTests
     {
         IMemoryBlocks blocks = new MemoryBlocks(new AppConfig());
 
-        Assert.Equal(2, blocks.Blocks.Count);
+        Assert.Equal(3, blocks.Blocks.Count);
         Assert.DoesNotContain(blocks.Blocks, block => string.IsNullOrWhiteSpace(block.Name));
     }
 

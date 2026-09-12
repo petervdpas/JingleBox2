@@ -81,6 +81,38 @@ public sealed class ControlLink
     /// </remarks>
     public Func<List<ControlMapping>?>? Song { get; set; }
 
+    /// <summary>
+    /// The templates block, when there is one, which is what the links come to.
+    /// </summary>
+    /// <remarks>
+    /// Set once as the window is built, the same as <see cref="Song"/> and for the same reason:
+    /// nothing here reads it, and what it is for is whoever is handed this. A machine's face
+    /// reaches its links through this object already, and the templates are the same fact said
+    /// the way a face wants to read it, so handing the block through here is one wiring rather
+    /// than one per place a face can be drawn.
+    ///
+    /// Deliberately not a door of its own. There is one application and so one block, and an
+    /// ambient <c>Current</c> is a static class wearing another hat: whatever a test put in it is
+    /// still there for the next test, and this executable runs again as a plugin's host where
+    /// there are no blocks at all.
+    /// </remarks>
+    public Interfaces.IControlTemplateBlock? Templates { get; set; }
+
+    /// <summary>
+    /// Which MIDI ports this computer has, for settling a template's controller on arrival.
+    /// </summary>
+    /// <remarks>
+    /// The one part of a template that does not travel. A file names the controller as its
+    /// profile calls it, since one nanoKONTROL2 is <c>nanoKONTROL2 _ CTRL</c> to the ALSA
+    /// sequencer and something else to rawmidi and a third thing on Windows, so what a template
+    /// is laid down onto has to be looked up in what this machine can see.
+    ///
+    /// Nothing here uses it either: it is handed on to whoever turns a template back into links.
+    /// A controller that is not plugged in keeps the name the template carried and its links wait
+    /// for it, which is the rule a link already keeps.
+    /// </remarks>
+    public Func<IEnumerable<string>>? Ports { get; set; }
+
     /// <summary>Told when the song's own layout changed, so the song reads as unsaved.</summary>
     public Action? SongChanged { get; set; }
 

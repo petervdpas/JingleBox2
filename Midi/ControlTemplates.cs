@@ -74,6 +74,39 @@ public sealed class ControlTemplates : IControlTemplates
         return path;
     }
 
+    /// <summary>What the file holding this installation's own templates is called.</summary>
+    public const string KeptFile = "templates.json";
+
+    /// <inheritdoc/>
+    public string Kept() => System.IO.Path.Combine(_app.Path(), KeptFile);
+
+    /// <inheritdoc/>
+    public string Written(IEnumerable<ControlTemplate>? templates) =>
+        JsonSerializer.Serialize(templates?.ToList() ?? new List<ControlTemplate>(), Layout);
+
+    /// <inheritdoc/>
+    public void Keep(string written) => _files.Write(Kept(), written);
+
+    /// <inheritdoc/>
+    public IReadOnlyList<ControlTemplate> Read()
+    {
+        try
+        {
+            string path = Kept();
+
+            if (!File.Exists(path)) return Array.Empty<ControlTemplate>();
+
+            return JsonSerializer.Deserialize<List<ControlTemplate>>(File.ReadAllText(path), Layout)
+                   ?? (IReadOnlyList<ControlTemplate>)Array.Empty<ControlTemplate>();
+        }
+        catch (Exception bad)
+        {
+            Log.Write(LogArea.Midi, () => "templates: what the last run kept would not read: " + bad.Message);
+
+            return Array.Empty<ControlTemplate>();
+        }
+    }
+
     /// <inheritdoc/>
     public string FileName(ControlTemplate template)
     {
@@ -130,6 +163,55 @@ public sealed class ControlTemplates : IControlTemplates
             });
 
         return template;
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<ControlTemplate> Cut(
+        IEnumerable<ControlMapping>? links,
+        Func<string, string>? called = null,
+        Func<string, int, int, string>? named = null)
+    {
+        var all = links?.Where(one => one is not null).ToList() ?? new List<ControlMapping>();
+
+        var made = new List<ControlTemplate>();
+
+        foreach (var target in all
+                     .GroupBy(_targets.KeyOf, StringComparer.Ordinal)
+                     .OrderBy(one => _targets.RankOf(one.First()))
+                     .ThenBy(one => _targets.TitleOf(one), StringComparer.OrdinalIgnoreCase))
+        foreach (var desk in target
+                     .GroupBy(one => one.Device, StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(one => one.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            string port = desk.Key;
+
+            var template = Describe(
+                called?.Invoke(port) ?? port,
+                desk.ToList(),
+                (channel, cc) => named?.Invoke(port, channel, cc) ?? "");
+
+            if (template is not null) made.Add(template);
+        }
+
+        return made;
+    }
+
+    /// <inheritdoc/>
+    public bool Covers(ControlTemplate? template, ControlMapping? one, Func<string, string>? called = null)
+    {
+        if (template is null || one is null) return false;
+
+        if (!string.Equals(_targets.KindOf(one), template.Target.Kind, StringComparison.Ordinal))
+            return false;
+
+        if (template.Target.Id.Length > 0
+            && !string.Equals(_targets.IdOf(one), template.Target.Id, StringComparison.Ordinal))
+            return false;
+
+        return string.Equals(
+            called?.Invoke(one.Device) ?? one.Device,
+            template.Controller,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     /// <inheritdoc/>

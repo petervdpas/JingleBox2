@@ -98,13 +98,19 @@ public sealed class ControlMenu : IPanelMenu
     /// hands the same one to everything, since what a device is doing is remembered in it.
     /// </param>
     /// <param name="naming">What a target is called, shared with the page so the two agree.</param>
+    /// <param name="templates">
+    /// How a template becomes links again, defaulted to the real rule. The one door an import
+    /// goes through as well, so a template laid down from a face and one opened off the disc
+    /// cannot come to mean different things.
+    /// </param>
     public ControlMenu(
         Func<string> which,
         Func<string>? named = null,
         Func<ControlLink?>? desk = null,
         IControllerProfiles? profiles = null,
         ILinkTargets? naming = null,
-        string kind = LinkTargets.SoundDevice)
+        string kind = LinkTargets.SoundDevice,
+        IControlTemplates? templates = null)
     {
         _which = which;
         _kind = kind;
@@ -112,7 +118,11 @@ public sealed class ControlMenu : IPanelMenu
         _desk = desk ?? Door;
         _profiles = profiles ?? new ControllerProfiles();
         _naming = naming ?? new LinkTargets();
+        _templates = templates ?? new ControlTemplates();
     }
+
+    /// <summary>How a template becomes links again.</summary>
+    private readonly IControlTemplates _templates;
 
     /// <summary>
     /// Where a line saying what happened goes, or nowhere.
@@ -137,7 +147,7 @@ public sealed class ControlMenu : IPanelMenu
         string called = _named() is { Length: > 0 } word ? word : id;
 
         var offers = Templates(link, id)
-            .Select(one => Pointed(link, called, one.Key, one.Value))
+            .Select(one => Pointed(link, called, one))
             .ToList();
 
         offers.Add(Learning(link, called));
@@ -146,36 +156,38 @@ public sealed class ControlMenu : IPanelMenu
     }
 
     /// <summary>
-    /// The templates on this thing, which is its links cut by controller.
+    /// The templates on this thing, read out of the block.
     /// </summary>
     /// <remarks>
-    /// Exactly the cards the MIDI CC page draws, by the same rule and for the same reason: one
-    /// controller against one thing it is pointed at is what a template is, and two spellings of
-    /// that would eventually disagree about what this thing has.
+    /// **Read rather than worked out**, which is the whole of what the block buys here. A
+    /// template is one controller against one thing it is pointed at, and this used to cut the
+    /// links into them itself: a third spelling of a rule the page already draws its cards by and
+    /// a file is already written by, with its own grouping, its own ordering and its own idea of
+    /// what counts as one desk.
     ///
-    /// Cut by <see cref="ILinkTargets"/> and never by comparing an id here: how exact an id is is
-    /// that rule's business. A menu that names no particular one takes every link of its kind,
-    /// which is the mixer, where a link is on a strip and the whole desk is one thing to point a
-    /// controller at.
+    /// What is left is which of them are this menu's, and that is two comparisons against what
+    /// the template already says it is about. A menu that names no particular one takes every
+    /// template of its kind, which is the mixer, where a link is on a strip and the whole desk is
+    /// one thing to point a controller at.
     ///
-    /// Grouped by what the profile calls the device rather than by the port, since that is the
-    /// name a person reads and a device on two ports is one desk.
+    /// Nothing here compares an id itself beyond that, and the order is the block's, which is the
+    /// order the page lists them in.
     /// </remarks>
-    /// <param name="link">Where the links live.</param>
+    /// <param name="link">Where the links live, and what carries the block.</param>
     /// <param name="id">Which one, or nothing for every one of this kind.</param>
-    private IEnumerable<KeyValuePair<string, List<ControlMapping>>> Templates(ControlLink link, string id) =>
-        link.Desk
-            .Where(one => Mine(one, id))
-            .GroupBy(one => _profiles.Called(one.Device), StringComparer.OrdinalIgnoreCase)
-            .OrderBy(one => one.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(one => new KeyValuePair<string, List<ControlMapping>>(one.Key, one.ToList()));
+    private IEnumerable<ControlTemplate> Templates(ControlLink link, string id) =>
+        link.Templates?.Templates.Where(one => Mine(one, id)) ?? Enumerable.Empty<ControlTemplate>();
 
-    /// <summary>Whether that link is one of this menu's.</summary>
-    /// <param name="one">The link to place.</param>
+    /// <summary>Whether that template is one of this menu's.</summary>
+    /// <remarks>
+    /// Against what the template says it is about rather than against a link inside it, since
+    /// that is what a template carries and what a file written by hand would say.
+    /// </remarks>
+    /// <param name="one">The template to place.</param>
     /// <param name="id">Which one this menu is about, or nothing for every one of its kind.</param>
-    private bool Mine(ControlMapping one, string id) =>
-        string.Equals(_naming.KindOf(one), _kind, StringComparison.Ordinal)
-        && (!Names || string.Equals(_naming.IdOf(one), id, StringComparison.Ordinal));
+    private bool Mine(ControlTemplate one, string id) =>
+        string.Equals(one.Target.Kind, _kind, StringComparison.Ordinal)
+        && (!Names || string.Equals(one.Target.Id, id, StringComparison.Ordinal));
 
     /// <summary>Whether this menu is about one particular thing rather than a whole kind.</summary>
     /// <remarks>
@@ -203,16 +215,14 @@ public sealed class ControlMenu : IPanelMenu
     /// therefore comes back exactly as it was, and one whose knobs have since been pointed
     /// somewhere else on this machine takes them back.
     /// </remarks>
-    /// <param name="link">Where the links live.</param>
+    /// <param name="link">Where the links live, and what carries the ports.</param>
     /// <param name="called">What the machine is called, for the wording.</param>
-    /// <param name="controller">The controller as its profile calls it.</param>
-    /// <param name="links">Its links on this machine.</param>
-    private PanelMenuItem Pointed(
-        ControlLink link,
-        string called,
-        string controller,
-        IReadOnlyList<ControlMapping> links) =>
-        new((controller.Length > 0 ? controller : Anonymous) + Beside + Counted(links.Count))
+    /// <param name="template">The template, as the block holds it.</param>
+    private PanelMenuItem Pointed(ControlLink link, string called, ControlTemplate template)
+    {
+        string controller = template.Controller.Length > 0 ? template.Controller : Anonymous;
+
+        return new PanelMenuItem(controller + Beside + Counted(template.Controls.Count))
         {
             Option = MenuOptionWords.Surfaces,
             Tip = "Points that controller at " + called + " the way this template says. One "
@@ -220,12 +230,18 @@ public sealed class ControlMenu : IPanelMenu
                   + "at the same thing since.",
             Chosen = () =>
             {
-                link.Take(links);
+                var reading = _templates.Take(
+                    template, link.Ports?.Invoke(), port => _profiles.Called(port));
 
-                Say("Pointed " + (controller.Length > 0 ? controller : Anonymous)
-                    + " at " + called + ": " + Counted(links.Count) + ".");
+                link.Take(reading.Links);
+
+                Say("Pointed " + controller + " at " + called + ": "
+                    + Counted(reading.Links.Count) + "."
+                    + (reading.Found ? "" : " " + controller + " is not plugged in, so its "
+                                             + "controls wait for it."));
             }
         };
+    }
 
     /// <summary>
     /// The line that starts learning, which is Ctrl+Shift+M and nothing else.

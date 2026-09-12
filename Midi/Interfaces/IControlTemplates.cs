@@ -27,6 +27,45 @@ public interface IControlTemplates
     /// </remarks>
     string Folder();
 
+    /// <summary>
+    /// Where the templates this installation is really using are kept.
+    /// </summary>
+    /// <remarks>
+    /// **A file of its own and not the folder**, which are two different things and are worth
+    /// keeping apart. <see cref="Folder"/> is what somebody owns: templates they exported, were
+    /// given, or wrote by hand, one file each, that the program reads rather than writes. This is
+    /// what the desk is actually doing at this moment, written whole by a writer that observes
+    /// the block, the way the settings file is.
+    ///
+    /// Beside the settings under the application folder, since it is the same sort of thing:
+    /// what this installation knows, written by the program, read at startup.
+    /// </remarks>
+    string Kept();
+
+    /// <summary>
+    /// The templates as the file holds them, without touching a disc.
+    /// </summary>
+    /// <remarks>
+    /// Apart from the writing for the reason <c>IConfigStore.Written</c> is: a writer that has to
+    /// be right rather than merely quick compares what it would write with what it wrote, and
+    /// that comparison costs nothing only where working out the text is not a write.
+    /// </remarks>
+    /// <param name="templates">Everything the block is holding.</param>
+    /// <returns>The file's whole text.</returns>
+    string Written(IEnumerable<ControlTemplate>? templates);
+
+    /// <summary>Puts that text on the disc, whole or not at all.</summary>
+    /// <param name="written">What <see cref="Written"/> answered.</param>
+    void Keep(string written);
+
+    /// <summary>What the last run left, or nothing where there has not been one.</summary>
+    /// <remarks>
+    /// A file that will not read is no templates rather than a start that fails: what is lost is
+    /// a layout somebody can point at again, and what would be lost the other way is the
+    /// application, since this is read before there is a window to report it in.
+    /// </remarks>
+    IReadOnlyList<ControlTemplate> Read();
+
     /// <summary>What to call the file, from what is in it.</summary>
     /// <remarks>
     /// The controller and the target, in the words a person would use, cut down to what every
@@ -53,6 +92,63 @@ public interface IControlTemplates
     /// with no controller, no profile folder and no disc.
     /// </param>
     ControlTemplate? Describe(string controller, IEnumerable<ControlMapping> links, Func<int, int, string>? named = null);
+
+    /// <summary>
+    /// Every template a list of links comes to: one per controller per thing pointed at.
+    /// </summary>
+    /// <remarks>
+    /// **The cut is <see cref="ILinkTargets.KeyOf"/> and then the controller**, which is what a
+    /// template is: what your nanoKONTROL2 does to OddSkilla. Two desks pointed at one machine
+    /// are two templates and never one, since a link answers only its own controller's messages,
+    /// so the two can never compete and are two things somebody keeps, hands on or lays down
+    /// apart.
+    ///
+    /// One rule, said here, because the page cuts its cards by it and the file is written by it
+    /// and now the block is filled by it: three spellings would eventually disagree, and the way
+    /// that fails is a template that means one thing to whoever exported it and another to
+    /// whoever reads the block.
+    ///
+    /// A group that describes nothing is left out rather than carried as an empty template, which
+    /// is what <see cref="Describe"/> answers for a target it cannot write.
+    /// </remarks>
+    /// <param name="links">Everything pointed at anything, in any order.</param>
+    /// <param name="called">
+    /// What a controller is called, asked by the port name a link carries. Left out, the port's
+    /// own name is used, which is the one thing in a template that does not travel.
+    /// </param>
+    /// <param name="named">
+    /// What a control is called on the front of the device, asked by the port, the channel and
+    /// the number. Left out, the templates carry no legends and read by their numbers.
+    /// </param>
+    /// <returns>The templates, in the order the page lists them.</returns>
+    IReadOnlyList<ControlTemplate> Cut(
+        IEnumerable<ControlMapping>? links,
+        Func<string, string>? called = null,
+        Func<string, int, int, string>? named = null);
+
+    /// <summary>
+    /// Whether a link is one the template is about.
+    /// </summary>
+    /// <remarks>
+    /// **The cut said backwards**, and here because it must be the same rule: a page showing a
+    /// template's rows and a face offering that template have to agree about which links it
+    /// covers, and two spellings of that end as a card listing a knob the template it is headed
+    /// by does not carry.
+    ///
+    /// A target that names nothing takes every link of its kind, which is the mixer: a link there
+    /// is on a strip and the whole desk is one thing to point a controller at, so the strip is
+    /// written on each line rather than in the target.
+    ///
+    /// The controller is compared as a profile calls it rather than as a port, since a device on
+    /// two ports is one desk.
+    /// </remarks>
+    /// <param name="template">The template.</param>
+    /// <param name="one">The link to place.</param>
+    /// <param name="called">
+    /// What a controller is called, asked by the port name a link carries. Left out, the port's
+    /// own name is compared, which is right where nothing knows any better.
+    /// </param>
+    bool Covers(ControlTemplate? template, ControlMapping? one, Func<string, string>? called = null);
 
     /// <summary>
     /// The links a template describes, ready to be laid down.

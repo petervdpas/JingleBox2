@@ -234,6 +234,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// </remarks>
     private IEnumerable<string> Ports() => Midi.Devices.Select(one => one.Name).ToList();
 
+
     /// <summary>RECORD: taking a recording, and the shelf everything else fetches takes off.</summary>
     public RecordViewModel Record { get; }
 
@@ -2353,6 +2354,16 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
 
         ControlLink = new ControlLink(_cfg.Midi.Controls, () => _settings.Moved());
 
+        // The write path: a hand points a control at something, that comes to a link, and the
+        // block is what the links come to. Filled quietly first, since that is what was already
+        // on disc, and said every time after. See Midi/ControlTemplatesFromLinks.cs.
+        var templates = new Midi.ControlTemplatesFromLinks(
+            blocks.Templates, () => _cfg.Midi.Controls, _profiles);
+
+        templates.Fill(said: false);
+
+        ControlLink.Changed += () => templates.Fill(said: true);
+
         var targets = new ControlTargets(
             Tracker, _machines, Machines, new TransportPresses(Transport), _effects, _effectInFront,
             padTrigger, () => _cfg.Midi.ToggleMode);
@@ -2375,6 +2386,12 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         Tracker.Player.StateChanged += (_, _) => Patchbay.Read();
 
         ControlLink.SongChanging = () => Tracker.ControlsChanging();
+
+        // Set once as the window is built, beside the song's own list: a machine's face reaches
+        // its links through this object already, so the block and the ports ride with them rather
+        // than being threaded through every place a face can be drawn.
+        ControlLink.Templates = blocks.Templates;
+        ControlLink.Ports = Ports;
 
         Links = new ControlLinksViewModel(ControlLink, profiles: _profiles, ports: Ports);
 
