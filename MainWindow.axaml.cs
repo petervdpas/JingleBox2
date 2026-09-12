@@ -531,6 +531,11 @@ public partial class MainWindow : Window
     /// hidden tab still counts and the page would simply go blank. The tracker is the neighbour
     /// and is what somebody mixing was most likely looking at. Coming back, the tab is not only
     /// shown but chosen: closing that window is asking for the mixer, so it should be in front.
+    ///
+    /// The view model is told the mixer is in a window before the tab moves. While it is out its
+    /// tab is hidden and you are sent to the tracker, so the tab alone would read the mixer as not
+    /// in front while it is the one thing on the screen, and its links would go silent the moment
+    /// it was given a window.
     /// </remarks>
     /// <param name="away">True as the page leaves, false as it comes home.</param>
     private void MixerAway(bool away)
@@ -539,9 +544,6 @@ public partial class MainWindow : Window
 
         if (DataContext is not ViewModels.MainViewModel main) return;
 
-        // Said before the tab moves, since while the mixer is out its tab is hidden and you are
-        // sent to the tracker: the tab alone would read the mixer as not in front while it is the
-        // one thing on the screen, and its links would go silent the moment it was given a window.
         main.MixerInWindow = away;
 
         main.SelectedTab = away ? TrackerTabIndex : MixerTabIndex;

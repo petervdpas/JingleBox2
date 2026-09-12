@@ -794,6 +794,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// One object rather than a flag here, because a flag can only ever answer that something
     /// happened. Thirty edits say what they were and they all say it to this, so the song can be
     /// asked why it is unsaved rather than only whether it is.
+    ///
+    /// The two buttons that light on it, green on Save and warm on Cancel changes, are told when
+    /// it really moves rather than on every edit, or a fader dragged across its range would
+    /// rebuild them a hundred times.
     /// </remarks>
     public Tracker.Interfaces.ISongWatch Watch { get; } = new Tracker.SongWatch();
 
@@ -1163,9 +1167,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _meters = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         _meters.Tick += (_, _) => ReadMeters();
 
-        // The two buttons that light on one fact: green on Save while there is something off
-        // disc, warm on Cancel changes. Said when the watch really moves rather than on every
-        // edit, or a fader dragged across its range would rebuild them a hundred times.
         Watch.Moved += () =>
         {
             OnPropertyChanged(nameof(NeedsSaving));

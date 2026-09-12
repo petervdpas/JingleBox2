@@ -218,8 +218,6 @@ public class CancelChangesTests
         tracker.Song.Master.Volume = 0.28;
         tracker.Song.Bpm = 400;
 
-        // An ordinary edit that touches the song and marks it unsaved, which is what every
-        // edit on that page does: the object is written and the song is told there is work in it.
         tracker.MarkLoop(0, 0);
 
         Assert.True(tracker.CanRevertSong, "a changed song that was never saved could not be cancelled");

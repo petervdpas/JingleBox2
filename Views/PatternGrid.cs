@@ -119,11 +119,20 @@ public sealed class PatternGrid : ThemedControl
     /// What changes the drawing and what changes the room asked for, and the grid takes the
     /// keyboard, which is what makes it focusable.
     /// </summary>
+    /// <remarks>
+    /// **The block is drawn by the grid, so the block has to be one of the things that repaints
+    /// it.** It was not, and nothing showed: a drag moves the cursor as well, and while the cursor
+    /// was drawn here too every movement repainted the whole page and the block came along with
+    /// it. The cursor is a layer of its own now, the grid repaints for it only when the track
+    /// changes, and a block dragged down one track existed, was copied and cut correctly, and was
+    /// never seen. A selection moves on a gesture and never on a line of the transport, so this
+    /// costs nothing the transport pays.
+    /// </remarks>
     static PatternGrid()
     {
         AffectsRender<PatternGrid>(PatternProperty,
             LinesPerBeatProperty, RowHeightProperty, RowPixelsProperty, DropTargetTrackProperty,
-            BeforeProperty, AfterProperty, HalfViewProperty);
+            BeforeProperty, AfterProperty, HalfViewProperty, SelectionProperty);
         AffectsMeasure<PatternGrid>(PatternProperty, RowHeightProperty, RowPixelsProperty,
             BeforeProperty, AfterProperty, HalfViewProperty);
         FocusableProperty.OverrideDefaultValue<PatternGrid>(true);
@@ -715,9 +724,13 @@ public sealed class PatternGrid : ThemedControl
     /// Puts the cursor where the click landed, and decides what happens to the block.
     /// </summary>
     /// <remarks>
-    /// Shift keeps the anchor where it was, which is how a block is grown after the fact. A plain
-    /// click puts the cursor down and drops any block, and a drag from there turns into one as
-    /// soon as the pointer moves onto another cell. A right click outside the block works on what
+    /// Shift keeps the anchor where it was, which is how a block is grown after the fact, and a
+    /// drag that follows goes on growing it. **A shift press has to take hold of the pattern the
+    /// way a plain press does**, or every movement after it is thrown away before it is read: the
+    /// drag handler starts by asking whether a press anchored one, and a shift press that only
+    /// set the block and did not say so left shift and drag selecting the cell it was pressed on
+    /// and nothing more. A plain click puts the cursor down and drops any block, and a drag from
+    /// there turns into one as soon as the pointer moves onto another cell. A right click outside the block works on what
     /// was clicked rather than on a block that happens to be somewhere else.
     ///
     /// A right click moves the cursor too, so the menu that follows acts on the track under the
@@ -742,6 +755,10 @@ public sealed class PatternGrid : ThemedControl
             Selection = Selection.IsEmpty
                 ? PatternSelection.At(EditCursor).ExtendTo(cursor)
                 : Selection.ExtendTo(cursor);
+
+            _dragAnchor = cursor;
+            _pressedAt = e.GetPosition(null);
+            Grabbed = true;
         }
         else if (left)
         {
@@ -821,6 +838,7 @@ public sealed class PatternGrid : ThemedControl
         base.OnPointerMoved(e);
 
         var pattern = Pattern;
+
         if (pattern == null || _dragAnchor == null) return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
