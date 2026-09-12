@@ -55,6 +55,95 @@ back into a page.
 Settings are the same three parts, and doing it this way leaves the application with one pattern
 instead of two.
 
+## The flow as it really is
+
+The sketch above is the shape being aimed at. This is what the code does on 2026-09-12, with the
+real type names in it so it can be checked against the tree rather than believed, and with what is
+still missing drawn rather than left out: a diagram of the intention is the thing that goes stale
+without anybody noticing.
+
+```mermaid
+flowchart TB
+    file[("config.json")]
+    jibx[("the song's .jibx")]
+    wire["the machine's audio graph"]
+    busses["the engine's four busses"]
+
+    subgraph ui["the interface, and the MIDI thread beside it"]
+        pages["the pages<br/>RECORD, PADS, SETTINGS, TRACKER,<br/>DESIGNER, MIDI CC"]
+        desk["MixerDesk<br/>IN, PLAY, PADS, MASTER"]
+        link["ControlLink<br/>a knob being learned"]
+    end
+
+    subgraph blocks["IMemoryBlocks, built in MainWindow and handed down"]
+        settings["SettingsBlock<br/>holds AppConfig, kept<br/>pads, MIDI, engine, desk"]
+        input["InputBlock<br/>holds InputSetting, not kept"]
+    end
+
+    subgraph watchers["what watches a block"]
+        onDisc["SettingsOnDisc"]
+        arrangement["InputArrangement"]
+    end
+
+    hints["HintClock<br/>the one clock deferred work runs on"]
+
+    subgraph loose["still owned by a page, in no block"]
+        song["Song, held by TrackerViewModel"]
+    end
+
+    pages -->|Moved| settings
+    desk -->|Moved| settings
+    link -->|Moved| settings
+    settings -->|read| pages
+    settings -->|read| desk
+
+    desk -->|"level, pan, mute"| busses
+
+    settings -->|Changed| onDisc
+    hints -.->|"once it settles, and every five seconds"| onDisc
+    onDisc --> file
+    file -.->|"read once, at startup"| settings
+
+    pages -->|Say| input
+    input -->|Changed| arrangement
+    arrangement --> wire
+    arrangement -.->|Arranged| pages
+
+    pages <--> song
+    song --> store["SongStore"] --> jibx
+    hints -.->|"once the edits settle"| song
+```
+
+**What that says, and what it says that the shape above does not.**
+
+- **The desk is a section of the settings, not a block with a writer of its own.** `MixerDesk`
+  holds the four strips that belong to this machine rather than to a song: the recording input, a
+  take being auditioned, the pads together, and what leaves the machine. Each value is in
+  `AppConfig` and the bus is told, so there is one of it. Before this they were fields on the
+  busses and in no file at all: set the master fader, restart, and it was at unity again with
+  nothing saying why.
+- **The input's fader is the one thing on the desk that is not a bus's level.** It is the gain on
+  what is coming in, before anything is written, so it decides what a take holds rather than what
+  the desk sends out. That is why the strip says Gain where the others say Level, and why the
+  number stays in `AppConfig.RecordGainDb`, where every settings file already written has it.
+- **There is one clock for deferred work and it is `HintClock`.** Six classes each kept a timer of
+  their own at five different rates, started and stopped by hand: the settings file, the rack, a
+  pad's chain, the recorder's chain, the input closing and the song's rescue copy. They are hints
+  now, and letting the clock go on the way out answers everything still owed. What is left in the
+  application are polls, which are a different family: meters, plugin parameters, the graph
+  reading.
+- **Two blocks exist, not five.** The pads are not one: `AppConfig.Pads` and `Profiles` are fields
+  in the settings document, so they are inside the settings block and written by its writer.
+- **The song is still not in the manager.** `TrackerViewModel` owns it and `SongStore` writes it.
+  It keeps the shape anyway, which is why it was the argument for all of this, and nothing hands
+  it down: no other page can ask the manager for it. It is the one box left outside the blocks.
+- **The interface is not the only writer.** `ControlLink` writes a learned knob from the MIDI
+  thread, which is why the settings file used to be written from two threads at once.
+- **Nothing observes a block except its watchers.** A view reads the block it is drawn from and is
+  told by the ordinary property change of whichever page holds it. That is the half of the sketch
+  above that is not built: there is no general "the block moved, redraw" anywhere, and where two
+  views show one fact they do it by both reading the same object.
+
 ## What a section is
 
 A named block of facts that belong together, which says two things about itself: **what it
@@ -216,6 +305,19 @@ Each step is worth doing on its own and leaves the application working.
    `{app}/` before putting it back in a `finally`, which is fine on the thread that asked and is
    not fine on a clock: the window it opens is over the path every pad plays. It works on a copy
    now, and normalising goes with it, since the document is put in order when it is read.
+
+5. **The mixer desk.** Done on 2026-09-12. `IMixerDesk` is the four strips that belong to this
+   machine rather than to a song, and it is a section of the settings rather than a block of its
+   own: a second block would want a second writer, and there is one of those already. Each value
+   is in `AppConfig` and the bus is told in the same breath, so a strip is one value rather than
+   one on each side of a copy. What it ended was three strips whose level, pan, mute and solo
+   lived on the engine's busses and in no file at all.
+6. **One clock for deferred work.** Done on 2026-09-12. `IHintClock` and `IHint` in `Hints/`:
+   something says it moved as often as it likes, and the work follows once the saying stops, or
+   anyway once it has waited as long as it is allowed to. Six classes each kept a timer of their
+   own at five different rates, and a seventh would have been written the next time somebody
+   needed the same thing. Letting the clock go on the way out answers everything still owed,
+   which is what six separate `Stop` calls could not promise between them.
 
 ## Left open
 

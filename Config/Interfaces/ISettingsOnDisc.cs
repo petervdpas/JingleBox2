@@ -1,5 +1,3 @@
-using System;
-
 namespace JingleBox2.Config.Interfaces;
 
 /// <summary>
@@ -25,8 +23,12 @@ namespace JingleBox2.Config.Interfaces;
 /// **Nothing it does reaches into what anybody else is holding.** Writing the settings down does
 /// not change them, which is <see cref="IConfigStore.Save"/>'s promise and is what lets this run
 /// where it likes.
+///
+/// It holds no clock. Both halves hang off <c>IHintClock</c>, which is the one clock every piece
+/// of deferred work in this application is driven by, and which answers whatever is owed on the
+/// way out.
 /// </remarks>
-public interface ISettingsOnDisc : IDisposable
+public interface ISettingsOnDisc
 {
     /// <summary>
     /// Looks once, and writes the file where it is behind.

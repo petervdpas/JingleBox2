@@ -131,6 +131,14 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// </remarks>
     private readonly IRecordingService _recording;
 
+    /// <summary>The one clock every piece of deferred work in the application hangs off.</summary>
+    /// <remarks>
+    /// Handed down rather than made per page, which is what it was: a rack, a pad's chain, the
+    /// recorder's chain and the song's rescue copy each kept a timer of their own at a rate of
+    /// their own. See <see cref="Hints.Interfaces.IHintClock"/>.
+    /// </remarks>
+    private readonly Hints.Interfaces.IHintClock _hints;
+
     /// <summary>The settings block: the document to read and write, and the word that it moved.</summary>
     /// <remarks>
     /// **What this page can do to the settings file is say that something changed.** When and how
@@ -952,6 +960,16 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// <summary>The fader scale, so a level in decibels can be turned into what an engine wants.</summary>
     private readonly UI.Interfaces.IGainScale _gain = new UI.GainScale();
 
+    /// <summary>
+    /// The mixer desk: the four strips that belong to this machine rather than to a song.
+    /// </summary>
+    /// <remarks>
+    /// Built here because this is where the engine's busses and the settings block meet, and
+    /// handed to the strips that draw it. See <see cref="Config.Interfaces.IMixerDesk"/> for why
+    /// it is a section of the settings rather than a block with a writer of its own.
+    /// </remarks>
+    private readonly Config.MixerDesk _desk;
+
     /// <summary>Backing field for <see cref="RecorderInput"/>.</summary>
     private SourceStripViewModel? recorderInput;
 
@@ -983,7 +1001,8 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             _audio.MonitorBus,
             ApplySolo,
             source: Record,
-            reading: "Gain");
+            reading: "Gain",
+            strip: _desk.In);
 
     /// <summary>
     /// Quiet enough to be nothing. A meter that has just fallen still reads a hair above nought.
@@ -1273,9 +1292,11 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             "Everything this application is playing, on its way out of the machine.",
             _gain.MinimumDecibels,
             _gain.MaximumDecibels,
-            () => _gain.ToDecibels(_audio.Output.Level),
-            value => _audio.Output.Level = (float)_gain.ToAmplitude(value),
-            _audio.Output);
+            () => _desk.Master.Level,
+            value => _desk.Master.Level = value,
+            _audio.Output,
+            ApplySolo,
+            strip: _desk.Master);
 
     /// <summary>Backing field for <see cref="RecorderPlay"/>.</summary>
     private SourceStripViewModel? recorderPlay;
@@ -1289,7 +1310,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// everything else however many of them are open.
     /// </remarks>
     public SourceStripViewModel RecorderPlay =>
-        recorderPlay ??= Over("PLAY", "A take being auditioned on RECORD, against the rest of the mix.", _audio.TakeBus);
+        recorderPlay ??= Over("PLAY", "A take being auditioned on RECORD, against the rest of the mix.", _audio.TakeBus, _desk.Play);
 
     /// <summary>Backing field for <see cref="PadsStrip"/>.</summary>
     private SourceStripViewModel? padsStrip;
@@ -1303,7 +1324,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// what the desk wants is the pads against the song.
     /// </remarks>
     public SourceStripViewModel PadsStrip =>
-        padsStrip ??= Over("PADS", "Every pad, together, against the rest of the mix.", _audio.PadBus);
+        padsStrip ??= Over("PADS", "Every pad, together, against the rest of the mix.", _audio.PadBus, _desk.Pads);
 
     /// <summary>A strip over one of the output bus's own sub-busses.</summary>
     /// <remarks>
@@ -1314,15 +1335,18 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// <param name="label">What the badge says.</param>
     /// <param name="tip">The longer version.</param>
     /// <param name="bus">The sub-bus this strip is over.</param>
-    private SourceStripViewModel Over(string label, string tip, Audio.Interfaces.IOutputBus bus) =>
+    /// <param name="strip">What it is set to on the desk, which is where those settings live.</param>
+    private SourceStripViewModel Over(
+        string label, string tip, Audio.Interfaces.IOutputBus bus, Config.Interfaces.IDeskStrip strip) =>
         new(label,
             tip,
             _gain.MinimumDecibels,
             _gain.MaximumDecibels,
-            () => _gain.ToDecibels(bus.Level),
-            value => bus.Level = (float)_gain.ToAmplitude(value),
+            () => strip.Level,
+            value => strip.Level = value,
             bus,
-            ApplySolo);
+            ApplySolo,
+            strip: strip);
 
     /// <summary>
     /// Works out what the row's solos come to and tells the output bus.
@@ -2108,10 +2132,12 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         IWaveformService waveformService,
         IAudioRouting routing,
         ISoundMachineProjects machines,
-        SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null)
+        SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null,
+        Hints.Interfaces.IHintClock? hints = null)
     {
         _blocks = blocks;
         _settings = blocks.Settings;
+        _hints = hints ?? new Hints.HintClock();
 
         var settings = _settings;
         var cfg = settings.Config;
@@ -2135,7 +2161,21 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             settings.Moved();
         });
 
-        Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, settings, routing, _audio.TakeBus, _audio.Recordings, setting: _blocks.Input);
+        Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, settings, routing, _audio.TakeBus, _audio.Recordings, setting: _blocks.Input, hints: _hints);
+
+        // The desk is built after RECORD, since the input's own fader is the recorder's gain and
+        // is read and written through the page that owns it, and before anything draws a strip.
+        _desk = new Config.MixerDesk(
+            settings,
+            _audio.MonitorBus,
+            _audio.TakeBus,
+            _audio.PadBus,
+            _audio.Output,
+            _gain,
+            () => Record.RecordGainDb,
+            value => Record.RecordGainDb = value);
+
+        _desk.Restore();
 
         Record.UsePlugins(Plugins, _effects, _effectInFront);
 
@@ -2164,9 +2204,9 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         var rack = new SoundMachineRack();
 
         Tracker = new TrackerViewModel(
-            audio, rack, Record.Recordings, _machines, settings, Plugins, waveformService, _effects,
+            audio, rack, Record.Recordings, _machines, settings, _hints, Plugins, waveformService, _effects,
             _effectInFront);
-        Machines = new RackViewModel(rack, Tracker, _machines, Record.Recordings, waveformService, Plugins, _effects);
+        Machines = new RackViewModel(rack, Tracker, _machines, Record.Recordings, waveformService, Plugins, _effects, _hints);
 
         MachineShelf = new SoundMachineShelfViewModel(_machines);
 
@@ -2953,7 +2993,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         {
             var padCfg = profile.Pads[i];
 
-            var pad = new PadViewModel(i, _audio)
+            var pad = new PadViewModel(i, _audio, _hints)
             {
                 Name = padCfg.Name,
                 FilePath = padCfg.Source,

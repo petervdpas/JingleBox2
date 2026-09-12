@@ -426,9 +426,33 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     private const int ChainSettleMs = 600;
 
-    /// <summary>Restarted by every change to the chain, so it fires once the hand has stopped.</summary>
-    private readonly DispatcherTimer _chainSave =
-        new() { Interval = TimeSpan.FromMilliseconds(ChainSettleMs) };
+    /// <summary>The one clock every piece of deferred work in the application hangs off.</summary>
+    private readonly Hints.Interfaces.IHintClock _hints;
+
+    /// <summary>Said by every change to the chain, and answered once the hand has stopped.</summary>
+    /// <remarks>
+    /// On the application's own clock rather than one of this page's, since waiting for a flurry
+    /// to stop is the same job wherever it is done. See <see cref="Hints.Interfaces.IHintClock"/>.
+    /// </remarks>
+    private Hints.Interfaces.IHint? _chainSave;
+
+    /// <summary>
+    /// Reads the chain's patches and writes the whole of it into the settings.
+    /// </summary>
+    /// <remarks>
+    /// On the drawing thread, because reading a patch is a round trip to every plugin on the
+    /// chain and those are held by the page. The hint that calls this runs on the application's
+    /// own clock, which is not that thread, so getting there is this method's business rather
+    /// than the clock's.
+    /// </remarks>
+    private void KeepChain()
+    {
+        _patches = _chains.Patches(_chain.Chain);
+
+        _cfg.RecordEffects = _chains.Capture(_chain.Chain, patches: true);
+
+        _settings.Moved();
+    }
 
     /// <summary>
     /// Gives the page its effect chain and puts back whatever was on it last time.
@@ -454,21 +478,13 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             Nothing = "Nothing yet, so a take is kept exactly as it arrives."
         };
 
-        Effect.Changed += () =>
-        {
-            _chainSave.Stop();
-            _chainSave.Start();
-        };
+        _chainSave = _hints.Gathered(
+            "the recorder's chain",
+            TimeSpan.FromMilliseconds(ChainSettleMs),
+            TimeSpan.FromMilliseconds(ChainSettleMs * 10),
+            () => Dispatcher.UIThread.Post(KeepChain));
 
-        _chainSave.Tick += (_, _) =>
-        {
-            _chainSave.Stop();
-
-            _patches = _chains.Patches(_chain.Chain);
-
-            _cfg.RecordEffects = _chains.Capture(_chain.Chain, patches: true);
-            _settings.Moved();
-        };
+        Effect.Changed += _chainSave.Moved;
 
         if (_cfg.RecordEffects is { IsEmpty: false } saved)
         {
@@ -689,8 +705,11 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, Config.Interfaces.ISettingsBlock settings, IAudioRouting routing, JingleBox2.Audio.Interfaces.IOutputBus? takes = null, JingleBox2.Audio.Interfaces.IRecordingSource? recordings = null, IWorkingCopy? copy = null, ITakeSteps? steps = null,
         Audio.Routing.Interfaces.IInputSetting? setting = null,
         Audio.Routing.Interfaces.IInputPath? input = null,
-        Audio.Routing.Interfaces.IInputArrangement? arrangement = null)
+        Audio.Routing.Interfaces.IInputArrangement? arrangement = null,
+        Hints.Interfaces.IHintClock? hints = null)
     {
+        _hints = hints ?? new Hints.HintClock();
+
         _copy = copy ?? new WorkingCopy();
         _steps = steps ?? new TakeSteps(waveformService);
 
@@ -2729,9 +2748,9 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// <summary>How many pages showing the input's meter are on screen.</summary>
     private int _watching;
 
-    /// <summary>Started when the last watcher goes, so a re-template does not close the input.</summary>
+    /// <summary>Said when the last watcher goes, so a re-template does not close the input.</summary>
     /// <remarks><inheritdoc cref="IInputWatch.LetGo" path="/remarks"/></remarks>
-    private DispatcherTimer? _closingInput;
+    private Hints.Interfaces.IHint? _closingInput;
 
     /// <summary>
     /// How long a departure has to last before the input is really let go of. A second is long
@@ -2749,7 +2768,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     public void Watch()
     {
         _watching++;
-        _closingInput?.Stop();
 
         if (_watching > 1) return;
 
@@ -2772,29 +2790,29 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         _closingInput ??= Closing();
 
-        _closingInput.Stop();
-        _closingInput.Start();
+        _closingInput.Moved();
     }
 
-    /// <summary>The clock that lets the input go, made once so it carries one handler.</summary>
+    /// <summary>The hint that lets the input go, made once so it carries one answer.</summary>
     /// <remarks>
-    /// Hung here rather than at each departure, because a handler added per call is a handler
+    /// Made here rather than at each departure, because an answer added per call is an answer
     /// added per departure and the input would be closed as many times as the page had been
     /// left. That is the shape this codebase has already paid for elsewhere.
+    ///
+    /// **Nothing stops it when somebody comes back**, unlike the clock it replaces: a page
+    /// arriving is a watcher, and the answer asks whether there are any before it closes
+    /// anything. Saying it moved again while it is owed simply puts it off, which is what a page
+    /// leaving and arriving a moment later is.
     /// </remarks>
-    private DispatcherTimer Closing()
-    {
-        var timer = new DispatcherTimer { Interval = InputCloseDelay };
-
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
-
-            if (_watching == 0) CloseInput();
-        };
-
-        return timer;
-    }
+    private Hints.Interfaces.IHint Closing() =>
+        _hints.Gathered(
+            "letting the input go",
+            InputCloseDelay,
+            InputCloseDelay,
+            () => Dispatcher.UIThread.Post(() =>
+            {
+                if (_watching == 0) CloseInput();
+            }));
 
     /// <summary>Lets the input go, unless a take is running, which keeps it open anyway.</summary>
     private void CloseInput()

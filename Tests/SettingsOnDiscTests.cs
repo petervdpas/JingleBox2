@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using JingleBox2.Config;
 using JingleBox2.Config.Interfaces;
+using JingleBox2.Hints;
 using Xunit;
 
 namespace JingleBox2.Tests;
@@ -92,7 +93,9 @@ public sealed class SettingsOnDiscTests
         var paper = new Paper();
         var block = new SettingsBlock(new AppConfig { SelectedTheme = "Ember" });
 
-        using var disc = new SettingsOnDisc(paper, block);
+        using var hints = new HintClock();
+
+        var disc = new SettingsOnDisc(paper, block, hints);
 
         Assert.True(disc.Check());
         Assert.Equal(new[] { "Ember" }, paper.Wrote);
@@ -109,7 +112,9 @@ public sealed class SettingsOnDiscTests
         var paper = new Paper();
         var block = new SettingsBlock(new AppConfig { SelectedTheme = "Ember" });
 
-        using var disc = new SettingsOnDisc(paper, block);
+        using var hints = new HintClock();
+
+        var disc = new SettingsOnDisc(paper, block, hints);
 
         disc.Check();
 
@@ -133,7 +138,9 @@ public sealed class SettingsOnDiscTests
         var settings = new AppConfig { SelectedTheme = "Ember" };
         var block = new SettingsBlock(settings);
 
-        using var disc = new SettingsOnDisc(paper, block);
+        using var hints = new HintClock();
+
+        var disc = new SettingsOnDisc(paper, block, hints);
 
         disc.Check();
 
@@ -151,7 +158,9 @@ public sealed class SettingsOnDiscTests
         var settings = new AppConfig { SelectedTheme = "Ember" };
         var block = new SettingsBlock(settings);
 
-        using var disc = new SettingsOnDisc(paper, block);
+        using var hints = new HintClock();
+
+        var disc = new SettingsOnDisc(paper, block, hints);
 
         settings.SelectedTheme = "Neon";
         block.Moved();
@@ -176,7 +185,9 @@ public sealed class SettingsOnDiscTests
         var paper = new Paper { Throws = new InvalidOperationException("collection was modified") };
         var block = new SettingsBlock(new AppConfig { SelectedTheme = "Ember" });
 
-        using var disc = new SettingsOnDisc(paper, block);
+        using var hints = new HintClock();
+
+        var disc = new SettingsOnDisc(paper, block, hints);
 
         Assert.False(disc.Check());
         Assert.Empty(paper.Wrote);
@@ -195,13 +206,15 @@ public sealed class SettingsOnDiscTests
         var settings = new AppConfig { SelectedTheme = "Ember" };
         var block = new SettingsBlock(settings);
 
-        var disc = new SettingsOnDisc(paper, block);
+        var hints = new HintClock();
+
+        var disc = new SettingsOnDisc(paper, block, hints);
 
         disc.Check();
 
         settings.SelectedTheme = "Orchid";
 
-        disc.Dispose();
+        hints.Dispose();
 
         Assert.Equal(new[] { "Ember", "Orchid" }, paper.Wrote);
     }
@@ -214,9 +227,11 @@ public sealed class SettingsOnDiscTests
         var settings = new AppConfig { SelectedTheme = "Ember" };
         var block = new SettingsBlock(settings);
 
-        var disc = new SettingsOnDisc(paper, block);
+        var hints = new HintClock();
 
-        disc.Dispose();
+        var disc = new SettingsOnDisc(paper, block, hints);
+
+        hints.Dispose();
 
         int asked = paper.Asked;
 

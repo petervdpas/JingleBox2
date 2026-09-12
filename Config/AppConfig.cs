@@ -158,6 +158,14 @@ public sealed class AppConfig
     public double RecordGainDb { get; set; } = 0;
 
     /// <summary>
+    /// The mixer desk: the four strips that belong to this machine rather than to a song.
+    /// </summary>
+    /// <remarks>
+    /// <inheritdoc cref="MixerDeskConfig" path="/remarks"/>
+    /// </remarks>
+    public MixerDeskConfig MixerDesk { get; set; } = new();
+
+    /// <summary>
     /// Whether a note typed in from a keyboard is written at full level whatever it was played
     /// at.
     /// </summary>

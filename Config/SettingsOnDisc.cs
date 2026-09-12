@@ -1,16 +1,15 @@
 using System;
-using System.Diagnostics;
-using System.Timers;
 using JingleBox2.Config.Interfaces;
 using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Hints.Interfaces;
 
 namespace JingleBox2.Config;
 
 /// <inheritdoc/>
 public sealed class SettingsOnDisc : ISettingsOnDisc
 {
-    /// <summary>How long the hints have to stop before the file is written.</summary>
+    /// <summary>How long the settings have to stop moving before the file is written.</summary>
     /// <remarks>
     /// A level dragged across a strip is one thing somebody did and several hundred hints, so the
     /// file is written when the hand stops rather than while it moves. Under half a second, which
@@ -18,35 +17,20 @@ public sealed class SettingsOnDisc : ISettingsOnDisc
     /// </remarks>
     private static readonly TimeSpan Settles = TimeSpan.FromMilliseconds(400);
 
-    /// <summary>And how long a look is put off for while nothing is being said.</summary>
+    /// <summary>And how long a look may be put off in all.</summary>
     /// <remarks>
-    /// **This is the net rather than the writing**, so it is as slow as it can be without
-    /// somebody losing work: five seconds is the most that can be between a setting nobody hinted
-    /// at and it being on the disc. It is also what bounds a gesture that never stops, since a
-    /// hand on a fader for a minute would otherwise hold the file back for a minute.
-    ///
-    /// What a look costs where nothing has moved is one serialising of a document a few
-    /// kilobytes long, which is the same work the writing would have done anyway, and no disc at
-    /// all. Slow on purpose all the same, since this application is meant to run on machines with
-    /// nothing to spare.
+    /// Five seconds is the most that can be between a setting and it being on the disc, whether
+    /// because a hand has not let go of a fader or because nobody said it had moved at all. What
+    /// a look costs where nothing has moved is one serialising of a document a few kilobytes
+    /// long, and no disc.
     /// </remarks>
     private static readonly TimeSpan Often = TimeSpan.FromSeconds(5);
-
-    /// <summary>How often the two above are compared against, which is the clock's own rate.</summary>
-    private static readonly TimeSpan Tick = TimeSpan.FromMilliseconds(200);
 
     /// <summary>How the settings are turned into a file, and written whole.</summary>
     private readonly IConfigStore _store;
 
     /// <summary>The block being followed.</summary>
     private readonly ISettingsBlock _settings;
-
-    /// <summary>The clock, which runs for as long as this does.</summary>
-    /// <remarks>
-    /// Not the drawing thread's. Writing the settings is a serialising and a file, and neither
-    /// belongs in front of a window that is being drawn.
-    /// </remarks>
-    private readonly Timer _clock;
 
     /// <summary>What was last written, so a look is a comparison rather than a write.</summary>
     /// <remarks>
@@ -57,64 +41,44 @@ public sealed class SettingsOnDisc : ISettingsOnDisc
     /// </remarks>
     private string? _wrote;
 
-    /// <summary>How long since something said it had moved, or nothing since the last look.</summary>
-    private Stopwatch? _hinted;
-
-    /// <summary>And how long since the last look, which is what the net is measured against.</summary>
-    private readonly Stopwatch _looked = Stopwatch.StartNew();
-
     /// <summary>One look at a time, since the clock and the way out can both ask.</summary>
     private readonly object _looking = new();
 
     /// <summary>Follows a settings block, and keeps the file saying what it says.</summary>
+    /// <remarks>
+    /// **Holds no clock of its own.** Being told and looking anyway are the two halves of every
+    /// deferred write in this application, and they are one module:
+    /// <see cref="IHintClock"/> drives both, so a hint here runs at the same rate, on the same
+    /// thread and under the same rules as the one under a pad's chain.
+    /// </remarks>
     /// <param name="store">How the settings are turned into a file.</param>
     /// <param name="settings">The block to follow.</param>
-    public SettingsOnDisc(IConfigStore store, ISettingsBlock settings)
+    /// <param name="hints">The one clock every hint runs on.</param>
+    public SettingsOnDisc(IConfigStore store, ISettingsBlock settings, IHintClock hints)
     {
         _store = store;
         _settings = settings;
 
-        _settings.Changed += Hinted;
+        var said = hints.Gathered("the settings file", Settles, Often, () => Check());
 
-        _clock = new Timer(Tick.TotalMilliseconds) { AutoReset = true };
-        _clock.Elapsed += (_, _) => Due();
-        _clock.Start();
-    }
+        hints.Often("the settings file, unasked", Often, () => Check());
 
-    /// <summary>Something moved, which is a reason to look sooner rather than a reason to write.</summary>
-    private void Hinted() => _hinted = Stopwatch.StartNew();
-
-    /// <summary>
-    /// Whether this tick is one to look on: the hints have stopped, or the net has come round.
-    /// </summary>
-    private void Due()
-    {
-        bool quiet = _hinted is { } since && since.Elapsed >= Settles;
-
-        if (!quiet && _looked.Elapsed < Often) return;
-
-        Check();
+        _settings.Changed += said.Moved;
     }
 
     /// <inheritdoc/>
     /// <remarks>
     /// **Anything thrown costs one look.** What is being read is the document the rest of the
     /// application is working in, from a thread that is not the one working in it, so a list
-    /// added to at the moment it is walked can refuse to be serialised. The window is a
-    /// fraction of a millisecond and the answer is to come back in a moment, which is what the
-    /// clock does anyway; what may not happen is the application going down from a thread nobody
-    /// is watching, over a settings file.
-    ///
-    /// The hint is cleared before the work rather than after it, so a change arriving while this
-    /// is serialising is a hint that stands rather than one that has just been answered.
+    /// added to at the moment it is walked can refuse to be serialised. The window is a fraction
+    /// of a millisecond and the answer is to come back in a moment, which is what the clock does
+    /// anyway; what may not happen is the application going down from a thread nobody is
+    /// watching, over a settings file.
     /// </remarks>
     public bool Check()
     {
         lock (_looking)
         {
-            _hinted = null;
-            _looked.Restart();
-
             try
             {
                 string written = _store.Written(_settings.Config);
@@ -134,21 +98,5 @@ public sealed class SettingsOnDisc : ISettingsOnDisc
                 return false;
             }
         }
-    }
-
-    /// <inheritdoc/>
-    /// <remarks>
-    /// **One last look on the way out**, since the way out is the one moment that cannot be
-    /// waited through: whatever was changed in the last fraction of a second is otherwise the
-    /// thing somebody comes back to find missing.
-    /// </remarks>
-    public void Dispose()
-    {
-        _settings.Changed -= Hinted;
-
-        _clock.Stop();
-        _clock.Dispose();
-
-        Check();
     }
 }

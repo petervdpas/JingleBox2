@@ -73,14 +73,15 @@ public partial class MainWindow : Window
     /// </summary>
     private Config.Interfaces.ISettingsBlock? _settings;
 
-    /// <summary>What keeps the settings file saying what the settings say.</summary>
+    /// <summary>The one clock every piece of deferred work in this application hangs off.</summary>
     /// <remarks>
-    /// Built here because this is where the settings are read and where the way out is. Nothing
-    /// else in the application writes that file, and nothing else may: a drag of the window's
-    /// edge announces itself per pixel, and the rate a file is written at is one decision rather
-    /// than one per place that changes something.
+    /// Built here because this is where the way out is, and letting it go is what answers
+    /// everything still owed. It used to be six clocks in six classes at five different rates,
+    /// each started and stopped by hand: a settings file, a rack, a pad's chain, the recorder's
+    /// chain, the input closing and the song's rescue copy. What that really cost is that a fault
+    /// in one of them was a fault in one of them.
     /// </remarks>
-    private Config.Interfaces.ISettingsOnDisc? _disc;
+    private Hints.Interfaces.IHintClock? _hints;
 
     /// <summary>Set once the startup size has been applied, so layout does not trigger saves.</summary>
     private bool _windowRestored;
@@ -166,7 +167,13 @@ public partial class MainWindow : Window
         var blocks = new Config.MemoryBlocks(cfg);
 
         _settings = blocks.Settings;
-        _disc = new Config.SettingsOnDisc(_store, blocks.Settings);
+
+        // The one clock every piece of deferred work in this application is driven by: a settings
+        // file after a fader stops moving, a chain read once a drag ends, the song's rescue copy.
+        // Letting it go on the way out answers everything that was owed. See Hints/.
+        _hints = new Hints.HintClock();
+
+        _ = new Config.SettingsOnDisc(_store, blocks.Settings, _hints);
 
         // The routing is made after the settings rather than before, because taking a source
         // aside on a machine with no graph needs somewhere to send it and that is a choice
@@ -243,7 +250,7 @@ public partial class MainWindow : Window
 
         saying?.Doing("Building the pages");
 
-        var vm = new MainViewModel(_audio, blocks, _midi, _recording, _waveform, _routing, projects, made);
+        var vm = new MainViewModel(_audio, blocks, _midi, _recording, _waveform, _routing, projects, made, hints: _hints);
 
         // The same object the routing was given, so the picker on the mixer and what actually
         // sends a source away cannot disagree about which output is the quiet one.
@@ -286,8 +293,9 @@ public partial class MainWindow : Window
             vm.MatrixSizeChanged -= OnMatrixSizeChanged;
 
             // Last, and after the pages have been told the run is over, since what they do on
-            // the way out is the last thing there is to write down. Letting it go writes.
-            _disc?.Dispose();
+            // the way out is the last thing there is to write down. Letting it go answers
+            // everything that was still owed.
+            _hints?.Dispose();
 
             _midi.Dispose();
             _audio.Dispose();

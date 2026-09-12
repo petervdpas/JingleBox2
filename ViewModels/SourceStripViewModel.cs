@@ -45,6 +45,18 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
     /// </remarks>
     private readonly Audio.Interfaces.IOutputBus? _bus;
 
+    /// <summary>
+    /// What this strip is set to, which is the desk's and is written down with the settings.
+    /// </summary>
+    /// <remarks>
+    /// **The level, the pan, the mute and the solo are the desk's rather than the bus's**, and
+    /// that is the whole of what made them survive a restart. They were fields on the bus and
+    /// nowhere else, so nothing wrote them and nothing read them back: the desk came up at unity
+    /// every morning however it had been left. The bus is still what is told, by the strip
+    /// itself, so there is one value rather than one on each side of a copy.
+    /// </remarks>
+    private readonly Config.Interfaces.IDeskStrip? _strip;
+
     /// <summary>Builds a strip over one source.</summary>
     /// <param name="label">What the badge says, which is what the thing is called.</param>
     /// <param name="tip">The longer version, for resting on the badge.</param>
@@ -65,6 +77,11 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
     /// The word under the fader, which is a level unless somebody says otherwise. See
     /// <see cref="Reading"/> for the one strip that says otherwise and why.
     /// </param>
+    /// <param name="strip">
+    /// What this strip is set to on the mixer desk, which is where the pan, the mute and the solo
+    /// live and are written down. Nothing for a strip that is not on the desk, which then has a
+    /// fader and a meter and no buttons.
+    /// </param>
     public SourceStripViewModel(
         string label,
         string tip,
@@ -75,9 +92,11 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
         Audio.Interfaces.IOutputBus? bus = null,
         Action? soloed = null,
         Interfaces.IInputSource? source = null,
-        string reading = "Level")
+        string reading = "Level",
+        Config.Interfaces.IDeskStrip? strip = null)
     {
         Reading = reading;
+        _strip = strip;
 
         _bus = bus;
         _soloed = soloed;
@@ -148,19 +167,17 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
     /// <summary>Where it sits between the speakers, -1 hard left to 1 hard right.</summary>
     public double Pan
     {
-        get => _bus?.Pan ?? 0;
+        get => _strip?.Pan ?? 0;
         set
         {
-            if (_bus == null || Math.Abs(_bus.Pan - value) < 0.0001) return;
+            if (_strip == null || Math.Abs(_strip.Pan - value) < 0.0001) return;
 
-            _bus.Pan = value;
+            _strip.Pan = value;
 
             OnPropertyChanged();
         }
     }
 
-    /// <summary>Backing field for <see cref="Solo"/>.</summary>
-    private bool solo;
 
     /// <summary>
     /// Whether this is the only thing being heard.
@@ -175,12 +192,12 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
     /// </remarks>
     public bool Solo
     {
-        get => solo;
+        get => _strip?.Solo ?? false;
         set
         {
-            if (solo == value) return;
+            if (_strip == null || _strip.Solo == value) return;
 
-            solo = value;
+            _strip.Solo = value;
 
             OnPropertyChanged();
 
@@ -212,12 +229,12 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
     /// <inheritdoc/>
     public bool Mute
     {
-        get => _bus?.Mute ?? false;
+        get => _strip?.Mute ?? false;
         set
         {
-            if (_bus == null || _bus.Mute == value) return;
+            if (_strip == null || _strip.Mute == value) return;
 
-            _bus.Mute = value;
+            _strip.Mute = value;
 
             OnPropertyChanged();
         }

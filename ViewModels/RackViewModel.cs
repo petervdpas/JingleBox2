@@ -61,7 +61,11 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     /// <summary>The plugins this machine has, for building an instrument out of one.</summary>
     private readonly PluginLibraryViewModel? _plugins;
     /// <summary>What holds a write back until the knobs have been still for a moment.</summary>
-    private readonly DispatcherTimer _saveTimer;
+    /// <remarks>
+    /// On the application's own clock rather than one of this page's, since waiting for a flurry
+    /// to stop is the same job wherever it is done. See <see cref="Hints.Interfaces.IHintClock"/>.
+    /// </remarks>
+    private readonly Hints.Interfaces.IHint _saveTimer;
 
     /// <summary>The instrument waiting to be written, or null when nothing is.</summary>
     /// <remarks>
@@ -87,7 +91,8 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
         ObservableCollection<Recording> recordings,
         IWaveformService? waveforms = null,
         PluginLibraryViewModel? plugins = null,
-        SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null)
+        SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null,
+        Hints.Interfaces.IHintClock? hints = null)
     {
         _machines = machines;
         _effects = effects;
@@ -105,8 +110,11 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
             };
         }
 
-        _saveTimer = new DispatcherTimer { Interval = SaveDelay };
-        _saveTimer.Tick += (_, _) => Flush();
+        _saveTimer = (hints ?? new Hints.HintClock()).Gathered(
+            "the rack",
+            SaveDelay,
+            SaveDelay * 10,
+            () => Dispatcher.UIThread.Post(Flush));
 
         Sounding.Ticked += MovePlayhead;
 
@@ -540,8 +548,6 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     /// </remarks>
     public void Flush()
     {
-        _saveTimer.Stop();
-
         var instrument = _pendingSave;
         _pendingSave = null;
         if (instrument == null) return;
@@ -673,8 +679,8 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
         InstrumentChanged?.Invoke(this, instrument);
 
         _pendingSave = instrument;
-        _saveTimer.Stop();
-        _saveTimer.Start();
+
+        _saveTimer.Moved();
     }
 
     /// <summary>
@@ -907,7 +913,7 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
 
         try
         {
-            _saveTimer.Stop();
+            _saveTimer.Forget();
             _pendingSave = null;
 
             _rack.Delete(row.Id);

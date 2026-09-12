@@ -117,11 +117,7 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     /// The chain changed, so the profile has something new to save. A knob dragged across its
     /// travel is a hundred of these, so the writing waits for the hand to stop.
     /// </summary>
-    private void OnEffectChanged()
-    {
-        _effectSave.Stop();
-        _effectSave.Start();
-    }
+    private void OnEffectChanged() => _effectSave.Moved();
 
     /// <summary>
     /// How long the chain has to be still before the pad is written down, in milliseconds.
@@ -133,10 +129,14 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     private const int ChainSettleMs = 600;
 
     /// <summary>
-    /// Restarted by every change to the chain, so it only ever fires once the hand has stopped.
+    /// Said by every change to the chain, so it is only ever answered once the hand has stopped.
     /// </summary>
-    private readonly DispatcherTimer _effectSave =
-        new() { Interval = TimeSpan.FromMilliseconds(ChainSettleMs) };
+    /// <remarks>
+    /// On the application's own clock rather than one of this pad's, since waiting for a flurry
+    /// to stop is the same job wherever it is done, and there is one of these per pad: thirty two
+    /// pads used to be thirty two timers. See <see cref="Hints.Interfaces.IHintClock"/>.
+    /// </remarks>
+    private readonly Hints.Interfaces.IHint _effectSave;
 
     /// <summary>
     /// What the plugins on this pad are holding inside themselves, by their place in the chain.
@@ -439,10 +439,16 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     /// the matrix is resized while the application runs, so a pad object can be built over a
     /// pad that is on air.
     /// </remarks>
-    public PadViewModel(int index, IAudioEngine audio)
+    public PadViewModel(int index, IAudioEngine audio, Hints.Interfaces.IHintClock? hints = null)
     {
         Index = index;
         _audio = audio;
+
+        _effectSave = (hints ?? new Hints.HintClock()).Gathered(
+            "pad " + (index + 1) + "'s chain",
+            TimeSpan.FromMilliseconds(ChainSettleMs),
+            TimeSpan.FromMilliseconds(ChainSettleMs * 10),
+            () => Dispatcher.UIThread.Post(KeepChain));
 
         IsPlaying = _audio.IsPadPlaying(Index);
 
@@ -520,14 +526,19 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
         };
         _progressTimer.Start();
 
-        _effectSave.Tick += (_, _) =>
-        {
-            _effectSave.Stop();
+    }
 
-            ReadPatches();
+    /// <summary>Reads the chain's patches and says the pad has something new to write down.</summary>
+    /// <remarks>
+    /// On the drawing thread, because reading a patch is a round trip to every plugin on the
+    /// chain and those are held here. The hint that calls this runs on the application's own
+    /// clock, which is not that thread.
+    /// </remarks>
+    private void KeepChain()
+    {
+        ReadPatches();
 
-            OnPropertyChanged(nameof(Effect));
-        };
+        OnPropertyChanged(nameof(Effect));
     }
 
     /// <summary>

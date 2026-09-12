@@ -112,7 +112,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private readonly DispatcherTimer _meters;
 
     /// <summary>Writes the song down while it is unsaved, so a crash costs a minute, not a session.</summary>
-    private readonly DispatcherTimer _keeping;
+    /// <remarks>
+    /// **Said by every edit and answered once they stop**, which is a change from a clock that
+    /// fired every twenty seconds whether anything had moved or not. On the application's own
+    /// clock, since waiting for a flurry to stop is the same job wherever it is done. See
+    /// <see cref="Hints.Interfaces.IHintClock"/>.
+    /// </remarks>
+    private readonly Hints.Interfaces.IHint _keeping;
 
     /// <summary>How often unsaved work is written down.</summary>
     private const int KeepSeconds = 20;
@@ -1009,6 +1015,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// The settings block the handful of preferences here live in. Null in a test, where there
     /// is nothing to keep them in and nothing reading them.
     /// </param>
+    /// <param name="hints">
+    /// The one clock every piece of deferred work in the application hangs off, which here is the
+    /// rescue copy kept while a song is dirty. One of its own in a test.
+    /// </param>
     /// <param name="plugins">The plugin library, shared with the pads. One is made if none is given.</param>
     /// <param name="effects">What effects of ours this installation has, for the chains.</param>
     /// <param name="front">
@@ -1028,6 +1038,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         ObservableCollection<Recording> recordings,
         ISoundMachineProjects machines,
         Config.Interfaces.ISettingsBlock? settings = null,
+        Hints.Interfaces.IHintClock? hints = null,
         PluginLibraryViewModel? plugins = null,
         IWaveformService? waveforms = null,
         SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null,
@@ -1108,9 +1119,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _meters = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         _meters.Tick += (_, _) => ReadMeters();
 
-        _keeping = new DispatcherTimer { Interval = TimeSpan.FromSeconds(KeepSeconds) };
-        _keeping.Tick += (_, _) => Keep();
-        _keeping.Start();
+        _keeping = (hints ?? new Hints.HintClock()).Gathered(
+            "the song's rescue copy",
+            TimeSpan.FromSeconds(KeepSeconds),
+            TimeSpan.FromSeconds(KeepSeconds),
+            () => Dispatcher.UIThread.Post(Keep));
 
         Recovered = LookForRecovered();
 
@@ -2651,12 +2664,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// rescue. Closing the window on unsaved work is Cancel changes said another way, and this
     /// is the half of Cancel changes that reaches the copy kept for a crash.
     ///
-    /// The timer is stopped first, or a tick arriving while the window is going would write the
-    /// file back after it had been thrown away.
+    /// What was owed is forgotten first, or the answer arriving while the window is going would
+    /// write the file back after it had been thrown away.
     /// </remarks>
     public void Finished()
     {
-        _keeping.Stop();
+        _keeping.Forget();
 
         Drop();
     }
@@ -2700,6 +2713,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (!IsDirty) Log.Write(LogArea.Tracker, "the song has something unsaved in it now");
 
         IsDirty = true;
+
+        _keeping.Moved();
     }
 
     /// <summary>Says which way it went, since the difference is invisible until you type.</summary>
