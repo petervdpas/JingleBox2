@@ -1560,14 +1560,21 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public string SongDescription => Song.Description;
 
     /// <summary>
-    /// True when there is a saved copy to go back to and something to go back from.
+    /// True when there is something to go back from, whether or not it was ever written down.
     /// </summary>
     /// <remarks>
-    /// Both halves matter. A song never written down has nothing to return to, and a song with
-    /// no changes has nothing to lose, so in either case the button is dead rather than a thing
-    /// that looks like it might do something.
+    /// **A song that has never been saved has somewhere to go back to as much as one that has**,
+    /// and it used to be refused on the reasoning that there was no file to read. That reasoning
+    /// was about where the answer comes from rather than about whether there is one: a song
+    /// nobody has written down began as an empty song this session made, and going back to it is
+    /// exactly what cancelling means. What it looked like from a chair is a mixer fader moved,
+    /// Save lighting up to say so, and the button beside it that undoes exactly that sitting
+    /// grey.
+    ///
+    /// The other half still matters: a song with nothing changed has nothing to lose, so the
+    /// button is dead rather than a thing that looks like it might do something.
     /// </remarks>
-    public bool CanRevertSong => IsDirty && CanDeleteSong;
+    public bool CanRevertSong => IsDirty;
 
     /// <summary>
     /// Throws away everything since the last save and reads the song back off disc.
@@ -1595,6 +1602,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         string name = SongName.Trim();
 
+        if (!CanDeleteSong)
+        {
+            await StartAgain();
+
+            return;
+        }
+
         bool confirmed = await ConfirmDialog.AskAsync(
             "Cancel the changes",
             $"Throw away everything done to '{name}' since it was last saved, and read it back "
@@ -1618,6 +1632,34 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (arrived.Count > 0) RecordingsArrived?.Invoke(this, EventArgs.Empty);
 
         Status = $"'{name}' is back as it was last saved.";
+    }
+
+    /// <summary>
+    /// Puts a song that was never written down back to the empty one this session started it as.
+    /// </summary>
+    /// <remarks>
+    /// **There is no file to read, and that is the only thing that differs.** What is being gone
+    /// back to is what an unsaved song came from, which is the same song
+    /// <see cref="Song.CreateDefault"/> makes, so the act is the ordinary cancel with a different
+    /// source: poured into the song everything is already holding rather than swapped for a new
+    /// one, so the transport is left running and no page has to be told.
+    ///
+    /// Said differently in the asking, because "read it back as it was last saved" would be a
+    /// sentence about a file that is not there.
+    /// </remarks>
+    private async Task StartAgain()
+    {
+        bool confirmed = await ConfirmDialog.AskAsync(
+            "Cancel the changes",
+            "This song has never been saved, so cancelling takes it back to the empty song it "
+                + "started as. Everything in it goes, and so does what you have undone and redone.",
+            "Cancel changes");
+
+        if (!confirmed) return;
+
+        Restore(Song.CreateDefault());
+
+        Status = "The song is back as it started.";
     }
 
     /// <summary>False for a song that has never been written down, which has nothing to delete.</summary>

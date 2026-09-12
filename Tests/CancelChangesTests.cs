@@ -308,6 +308,49 @@ public class CancelChangesTests
     }
 
     /// <summary>
+    /// **A song that has never been saved can still be cancelled**, and what it goes back to is
+    /// the empty song it started as.
+    /// </summary>
+    /// <remarks>
+    /// It used to be refused on the reasoning that there was no file to read back, which is about
+    /// where the answer comes from rather than about whether there is one. From a chair it was a
+    /// mixer fader moved, Save lighting up to say the song had changed, and the button beside it
+    /// that undoes exactly that sitting grey.
+    ///
+    /// The asking is not in here, for the reason the transport test gives: what was wrong was
+    /// never the asking.
+    /// </remarks>
+    [Fact]
+    public void A_song_that_was_never_saved_can_still_be_cancelled()
+    {
+        var tracker = new TrackerViewModel(
+            new Quiet(),
+            new SoundMachineRack(),
+            new ObservableCollection<Recording>(),
+            new SoundMachineProjects());
+
+        Assert.False(tracker.CanRevertSong, "an untouched song has nothing to go back from");
+
+        tracker.Song.Master.Volume = 0.28;
+        tracker.Song.Bpm = 400;
+
+        // What the mixer does when a strip is moved: the song's own object is written and the
+        // song is told it has something unsaved in it.
+        tracker.ControlsChanged();
+
+        Assert.True(tracker.CanRevertSong, "a changed song that was never saved could not be cancelled");
+        Assert.False(tracker.CanDeleteSong, "the song under this test is supposed to be one nobody has saved");
+
+        tracker.Restore(Song.CreateDefault());
+
+        Assert.Equal(Song.CreateDefault().Master.Volume, tracker.Song.Master.Volume);
+        Assert.Equal(Song.CreateDefault().Bpm, tracker.Song.Bpm);
+        Assert.False(tracker.CanRevertSong, "cancelling left the song looking changed");
+
+        tracker.Finished();
+    }
+
+    /// <summary>
     /// Pouring keeps the object, which is what everything holding the song depends on.
     /// </summary>
     /// <remarks>

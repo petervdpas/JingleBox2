@@ -176,8 +176,9 @@
                 ToolTip.Tip="Writes the song to disc. The button goes green while there are changes that are not on disc yet." />
         <Button Grid.Column="4" Content="Save as..." Command="{Binding SaveAsCommand}" />
 
-        <!-- The other half of saving, and the one nothing offered until now: putting it back.
-             Dead unless there is both a saved copy to return to and something to return from. -->
+        <!-- The other half of saving: putting it back. Dead only when there is nothing to put
+             back, since a song that was never written down goes back to the empty one it
+             started as. -->
         <Button Grid.Column="5" Content="Cancel changes"
                 IsEnabled="{Binding CanRevertSong}"
                 Classes.discard="{Binding CanRevertSong}"
