@@ -76,7 +76,7 @@ What is covered is the parts that can be got wrong quietly: the MIDI wire, contr
 ## Requirements
 
 - .NET SDK 10
-- Windows or Linux (x64, and linux-arm64)
+- Windows or Linux (x64, and arm64, which is the 64 bit Raspberry Pi)
 - An audio device BASS can open
 
 ---
@@ -90,9 +90,16 @@ dotnet run
 
 dotnet publish -c Release -r win-x64      # Windows
 dotnet publish -c Release -r linux-x64    # Linux
+dotnet publish -c Release -r linux-arm64  # Raspberry Pi, 64 bit
 ```
 
 The BASS binaries in `native/` are copied to the output by the build. `bassasio.dll` is the ASIO add-on and is copied on Windows only; without it the output list has no ASIO drivers in it and SETTINGS says why.
+
+A release carries an installer per platform: an Inno Setup `.exe` and a portable zip for Windows, an RPM for Fedora, and a `.deb` for Debian and Ubuntu on `amd64` and for the Raspberry Pi on `arm64`. The Pi package wants the 64 bit Raspberry Pi OS; there is no 32 bit one, since BASS for `armhf` is not in this tree and a package that installs and then cannot open the audio library is worse than none.
+
+```bash
+sudo apt install ./jinglebox2_<version>_arm64.deb
+```
 
 ---
 

@@ -4927,3 +4927,26 @@ whole exercise and is worth writing down rather than summarising:
   warning, which is the line the Windows step already draws. Proved by publishing and taking the
   library back out rather than by reading the workflow, which is the only way this is ever caught:
   the payload that shipped is refused, and the one missing only the decoder passes with a warning
+- **The Raspberry Pi is a row in a matrix rather than a job of its own**, and that decision is
+  the same lesson one layer up. What a Debian package of this program is was written out inside
+  the workflow, once, for amd64: the tree, the launcher, the desktop entry, the control file and
+  the rack check. Adding a second architecture that way would have been the whole of it copied
+  and then kept in step by hand, which is exactly what `linux-natives.sh` exists because of.
+  `.github/scripts/build-deb.sh` is the one spelling, and what differs between a desktop and a
+  Pi is one argument
+- **The runtime identifier decides the architecture rather than being told it.** A payload built
+  for one machine and labelled for another installs perfectly and runs nothing, and apt cannot
+  know: the arch in a control file is a claim about the files inside it. So the script maps the
+  rid it published from, and then reads the program it actually packaged and refuses where the
+  two disagree. Checked by building an aarch64 payload as amd64, which answers `a package marked
+  amd64 was built out of a payload whose program reads: ELF 64-bit ... ARM aarch64` and exits 1
+- **arm64 alone, deliberately.** The 32 bit Raspberry Pi OS would need a BASS build for `armhf`
+  that this tree does not carry, and since the output bus stopped being a switch a payload
+  without BASS is not a smaller feature set, it is an application that cannot start. A package
+  that installs and then does nothing whatever is worse than no package
+- Cross published from the x64 runner, which is not a shortcut: a self contained publish for
+  another runtime lays that runtime's files out and compiles nothing for it, and the only native
+  thing this program carries is BASS, which is in `native/linux-arm64` already. Proved by
+  building both packages by hand rather than by reading the workflow, which is the only way any
+  of this is ever caught: 39.5 MB installed at 136 MB, `Architecture: arm64`, the program inside
+  reading `ARM aarch64`, and 123 of 123 rack files in it

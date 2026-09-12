@@ -382,10 +382,30 @@ jobs:
           name: artifacts-fedora${{ matrix.fedora }}-rpm-x64
           path: dist/*.rpm
 
-  deb_ubuntu:
-    name: Ubuntu/Debian .deb (amd64, self-contained)
+  deb:
+    name: Debian package (${{ matrix.arch }})
     needs: test
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The desktop one, for Debian and Ubuntu.
+          - rid: linux-x64
+            arch: amd64
+
+          # And the Raspberry Pi, which is a 64 bit Debian and is packaged by the same script
+          # from the same payload rules. Cross published from the x64 runner: a self contained
+          # publish for another runtime lays that runtime's files out and compiles nothing for
+          # it, and the only native thing this program carries is BASS, which is in the tree for
+          # aarch64 already. Nothing else in the package is architecture specific, which is why
+          # this is a row in a matrix rather than a job of its own.
+          #
+          # arm64 alone, deliberately: the 32 bit Raspberry Pi OS would need a BASS build this
+          # repository does not carry, and a package that installs on it and cannot open the
+          # audio library is worse than no package.
+          - rid: linux-arm64
+            arch: arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -403,112 +423,60 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            dpkg dpkg-dev fakeroot tar gzip \
+            dpkg dpkg-dev fakeroot tar gzip file \
             libasound2t64 libasound2-dev
 
       - name: Restore
         shell: bash
         run: dotnet restore
 
-      - name: Publish (linux-x64 self-contained, not single-file)
+      - name: Publish (${{ matrix.rid }} self-contained, not single-file)
         shell: bash
         run: |
           set -euo pipefail
           VER="${GITHUB_REF_NAME#v}"
           dotnet publish "$PROJECT_PATH" \
             -c "$CONFIGURATION" \
-            -r linux-x64 \
+            -r "${{ matrix.rid }}" \
             --self-contained true \
             -p:PublishSingleFile=false \
             -p:IncludeNativeLibrariesForSelfExtract=false \
             -p:Version="$VER" \
-            -o "out/linux-x64"
+            -o "out/${{ matrix.rid }}"
 
       - name: Fix DEB payload (BASS + remove .NET lttng tracepoints)
         shell: bash
         run: |
           set -euo pipefail
-          OUT="out/linux-x64"
-          bash .github/scripts/linux-natives.sh "$OUT" linux-x64
+          OUT="out/${{ matrix.rid }}"
+          bash .github/scripts/linux-natives.sh "$OUT" "${{ matrix.rid }}"
           test -f "$OUT/${APP_NAME}"
 
       - name: Verify the rack is packaged
         shell: bash
         run: |
           set -euo pipefail
-          bash .github/scripts/verify-rack.sh out/linux-x64
+          bash .github/scripts/verify-rack.sh "out/${{ matrix.rid }}"
 
+      # The tree, the launcher, the desktop entry, the control file, and the two checks on what
+      # came out: one script, so the Pi's package cannot drift from the desktop's.
       - name: Build .deb
         shell: bash
         run: |
           set -euo pipefail
-
           VER="${GITHUB_REF_NAME#v}"
-          ARCH="amd64"
-          NAME="$DEB_PKG_NAME"
-
-          ROOT="$(mktemp -d)"
-          PKGDIR="$ROOT/${NAME}_${VER}_${ARCH}"
-
-          mkdir -p "$PKGDIR/DEBIAN"
-          mkdir -p "$PKGDIR/opt/${APP_NAME}"
-          mkdir -p "$PKGDIR/usr/bin"
-          mkdir -p "$PKGDIR/usr/share/applications"
-          mkdir -p "$PKGDIR/usr/share/icons/hicolor/256x256/apps"
-
-          cp -a "out/linux-x64/." "$PKGDIR/opt/${APP_NAME}/"
-          chmod 0755 "$PKGDIR/opt/${APP_NAME}/${APP_NAME}" || true
-
-          printf '#!/usr/bin/env bash\nset -euo pipefail\nexec /opt/%s/%s "$@"\n' \
-            "$APP_NAME" "$APP_NAME" \
-            > "$PKGDIR/usr/bin/$NAME"
-          chmod 0755 "$PKGDIR/usr/bin/$NAME"
-
-          printf '[Desktop Entry]\nType=Application\nName=JingleBox2\nComment=Audio pad launcher\nExec=/usr/bin/%s\nIcon=%s\nTerminal=false\nCategories=Audio;AudioVideo;\n' \
-            "$NAME" "$NAME" \
-            > "$PKGDIR/usr/share/applications/$NAME.desktop"
-
-          if [ -f packaging/fedora/icons/jinglebox2.png ]; then
-            cp -a packaging/fedora/icons/jinglebox2.png \
-              "$PKGDIR/usr/share/icons/hicolor/256x256/apps/$NAME.png"
-          fi
-
-          INSTALLED_SIZE="$(du -sk "$PKGDIR/opt/${APP_NAME}" | awk '{print $1}')"
-
-          # Ubuntu 24.04: libasound2 is virtual; depend on libasound2t64 (or libasound2 on older distros)
-          printf 'Package: %s\nVersion: %s\nSection: sound\nPriority: optional\nArchitecture: %s\nMaintainer: JingleBox2 CI <noreply@github.com>\nInstalled-Size: %s\nDepends: libasound2t64 | libasound2\nDescription: JingleBox2\n Lightweight cross-platform audio pad launcher built with .NET and Avalonia UI.\n' \
-            "$NAME" "$VER" "$ARCH" "$INSTALLED_SIZE" \
-            > "$PKGDIR/DEBIAN/control"
-
-          mkdir -p dist
-          fakeroot dpkg-deb --build "$PKGDIR" "dist/${NAME}_${VER}_${ARCH}.deb"
+          bash .github/scripts/build-deb.sh "out/${{ matrix.rid }}" "${{ matrix.rid }}" "$VER"
           ls -la dist
-
-      - name: Verify the rack inside the .deb
-        shell: bash
-        run: |
-          set -euo pipefail
-          EXPECTED="$(find rack -type f \( -name '*.json' -o -name '*.wav' \) | wc -l | tr -d '[:space:]')"
-          ACTUAL="$(dpkg-deb -c dist/*.deb | grep -c ' \./opt/JingleBox2/rack/.*\.\(json\|wav\)$' || true)"
-          echo "rack in .deb: $ACTUAL/$EXPECTED"
-          if [ "$EXPECTED" -eq 0 ]; then
-            echo "ERROR: nothing on the rack in the source tree; the check itself is broken"
-            exit 1
-          fi
-          if [ "$ACTUAL" -ne "$EXPECTED" ]; then
-            echo "ERROR: the .deb does not carry every file on the rack"
-            exit 1
-          fi
 
       - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
         with:
-          name: artifacts-deb-amd64
+          name: artifacts-deb-${{ matrix.arch }}
           path: dist/*.deb
 
   release:
     name: Publish GitHub Release
-    needs: [build, rpm_fedora, deb_ubuntu]
+    needs: [build, rpm_fedora, deb]
     runs-on: ubuntu-latest
 
     steps:
