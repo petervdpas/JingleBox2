@@ -34,6 +34,16 @@ public interface IMemoryBlocks
     IInputSetting Input { get; }
 
     /// <summary>
+    /// What every controller is pointed at, which is what is stored.
+    /// </summary>
+    /// <remarks>
+    /// The links themselves, port and all, in a file of their own. <see cref="Templates"/> is the
+    /// same fact in the form a face reads and a person carries between machines; this is the form
+    /// this installation keeps.
+    /// </remarks>
+    Midi.Interfaces.IControlLinkBlock Links { get; }
+
+    /// <summary>
     /// What every controller does to everything, which is the templates.
     /// </summary>
     /// <remarks>

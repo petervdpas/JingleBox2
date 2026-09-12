@@ -39,12 +39,25 @@ public sealed class MidiConfig
     public List<MidiMapping> Pads { get; set; } = new();
 
     /// <summary>
-    /// Every knob and fader that has been pointed at something.
+    /// What a settings file written before the links had a file of their own is still holding.
     /// </summary>
     /// <remarks>
-    /// In the settings rather than in a song, because the controller is in the room and the
-    /// song is in a file. A mapping names a machine and a parameter, so it is true of every
-    /// song you open rather than of the one it was made in: see <see cref="ControlMapping"/>.
+    /// **Read and never written.** Every knob and fader pointed at something lives in
+    /// <c>remotecontrol-links.json</c> now, which is
+    /// <see cref="Interfaces.IRemoteControlLinks"/>: they are written from the MIDI thread as a
+    /// hand learns a knob, they were a fifth of a settings document that is serialised whole
+    /// whenever anything on any page moves, and they are the one thing in it somebody carries
+    /// between machines.
+    ///
+    /// The field stays so that a file already on somebody's disc can be read, exactly as
+    /// <see cref="MidiMapping"/> stays for the pad table above it. It is carried across once and
+    /// emptied, and an empty one is the flag that it has been: see <c>MainWindow.Carried</c>,
+    /// which is the one place that holds both. The pad table's own carry over still lands here
+    /// first, since that happens as the settings are read.
+    ///
+    /// In neither file is it in a song, and that has not changed: the controller is in the room
+    /// and the song is in a file, and a link names a machine and a parameter, so it is true of
+    /// every song you open rather than of the one it was made in.
     /// </remarks>
     public List<ControlMapping> Controls { get; set; } = new();
 

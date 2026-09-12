@@ -27,45 +27,6 @@ public interface IControlTemplates
     /// </remarks>
     string Folder();
 
-    /// <summary>
-    /// Where the templates this installation is really using are kept.
-    /// </summary>
-    /// <remarks>
-    /// **A file of its own and not the folder**, which are two different things and are worth
-    /// keeping apart. <see cref="Folder"/> is what somebody owns: templates they exported, were
-    /// given, or wrote by hand, one file each, that the program reads rather than writes. This is
-    /// what the desk is actually doing at this moment, written whole by a writer that observes
-    /// the block, the way the settings file is.
-    ///
-    /// Beside the settings under the application folder, since it is the same sort of thing:
-    /// what this installation knows, written by the program, read at startup.
-    /// </remarks>
-    string Kept();
-
-    /// <summary>
-    /// The templates as the file holds them, without touching a disc.
-    /// </summary>
-    /// <remarks>
-    /// Apart from the writing for the reason <c>IConfigStore.Written</c> is: a writer that has to
-    /// be right rather than merely quick compares what it would write with what it wrote, and
-    /// that comparison costs nothing only where working out the text is not a write.
-    /// </remarks>
-    /// <param name="templates">Everything the block is holding.</param>
-    /// <returns>The file's whole text.</returns>
-    string Written(IEnumerable<ControlTemplate>? templates);
-
-    /// <summary>Puts that text on the disc, whole or not at all.</summary>
-    /// <param name="written">What <see cref="Written"/> answered.</param>
-    void Keep(string written);
-
-    /// <summary>What the last run left, or nothing where there has not been one.</summary>
-    /// <remarks>
-    /// A file that will not read is no templates rather than a start that fails: what is lost is
-    /// a layout somebody can point at again, and what would be lost the other way is the
-    /// application, since this is read before there is a window to report it in.
-    /// </remarks>
-    IReadOnlyList<ControlTemplate> Read();
-
     /// <summary>What to call the file, from what is in it.</summary>
     /// <remarks>
     /// The controller and the target, in the words a person would use, cut down to what every

@@ -74,39 +74,6 @@ public sealed class ControlTemplates : IControlTemplates
         return path;
     }
 
-    /// <summary>What the file holding this installation's own templates is called.</summary>
-    public const string KeptFile = "templates.json";
-
-    /// <inheritdoc/>
-    public string Kept() => System.IO.Path.Combine(_app.Path(), KeptFile);
-
-    /// <inheritdoc/>
-    public string Written(IEnumerable<ControlTemplate>? templates) =>
-        JsonSerializer.Serialize(templates?.ToList() ?? new List<ControlTemplate>(), Layout);
-
-    /// <inheritdoc/>
-    public void Keep(string written) => _files.Write(Kept(), written);
-
-    /// <inheritdoc/>
-    public IReadOnlyList<ControlTemplate> Read()
-    {
-        try
-        {
-            string path = Kept();
-
-            if (!File.Exists(path)) return Array.Empty<ControlTemplate>();
-
-            return JsonSerializer.Deserialize<List<ControlTemplate>>(File.ReadAllText(path), Layout)
-                   ?? (IReadOnlyList<ControlTemplate>)Array.Empty<ControlTemplate>();
-        }
-        catch (Exception bad)
-        {
-            Log.Write(LogArea.Midi, () => "templates: what the last run kept would not read: " + bad.Message);
-
-            return Array.Empty<ControlTemplate>();
-        }
-    }
-
     /// <inheritdoc/>
     public string FileName(ControlTemplate template)
     {

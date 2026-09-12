@@ -69,6 +69,46 @@ public partial class MainWindow : Window
     private readonly IAudioRouting _routing;
 
     /// <summary>
+    /// The links this installation has, wherever they were last written down.
+    /// </summary>
+    /// <remarks>
+    /// **The carry over for a settings file written before the links had a file of their own**,
+    /// and it happens once: what is carried is written to the new file and the old list is
+    /// emptied, which is the flag that it has been done, exactly as the pad table's carry over
+    /// reads an empty table as one already carried.
+    ///
+    /// The file wins where both have something, since the settings' copy is then the older one.
+    /// A fresh installation has neither and points at nothing, which is what it always did.
+    /// </remarks>
+    /// <param name="store">Where the links are kept now.</param>
+    /// <param name="cfg">The settings, which may still be holding them.</param>
+    /// <returns>The links to work over for this run.</returns>
+    private static System.Collections.Generic.List<Midi.ControlMapping> Carried(
+        Midi.Interfaces.IRemoteControlLinks store,
+        Config.AppConfig cfg)
+    {
+        var kept = store.Read();
+
+        if (kept.Count > 0) return new System.Collections.Generic.List<Midi.ControlMapping>(kept);
+
+        var carried = cfg.Midi.Controls;
+
+        if (carried.Count == 0) return new System.Collections.Generic.List<Midi.ControlMapping>();
+
+        var moved = new System.Collections.Generic.List<Midi.ControlMapping>(carried);
+
+        Diagnostics.Log.Write(
+            Diagnostics.Enums.LogArea.Midi,
+            () => "links: carried " + moved.Count + " out of the settings into their own file");
+
+        store.Keep(store.Written(moved));
+
+        cfg.Midi.Controls = new System.Collections.Generic.List<Midi.ControlMapping>();
+
+        return moved;
+    }
+
+    /// <summary>
     /// The settings block, kept so the window's own size can be written into it and said.
     /// </summary>
     private Config.Interfaces.ISettingsBlock? _settings;
@@ -164,7 +204,13 @@ public partial class MainWindow : Window
         // read, and the input's own state, which is never written down. Handed to the pages
         // rather than reachable from them, so that no page owns a fact about the machine. See
         // docs/memory-blocks.md.
-        var blocks = new Config.MemoryBlocks(cfg);
+        // The links are stored in a file of their own rather than in the settings document, and a
+        // settings file written before that is carried across once. See Midi/RemoteControlLinks.cs.
+        var linkStore = new Midi.RemoteControlLinks();
+
+        var links = Carried(linkStore, cfg);
+
+        var blocks = new Config.MemoryBlocks(cfg, links: links);
 
         _settings = blocks.Settings;
 
@@ -175,11 +221,10 @@ public partial class MainWindow : Window
 
         _ = new Config.SettingsOnDisc(_store, blocks.Settings, _hints);
 
-        // And the templates, on the same clock and by the same rule: told when the block moves,
-        // and looking anyway, since the router changes a template's pickup from the MIDI thread
-        // with nobody having asked for anything. The block is filled by the window's view model,
-        // which is the first moment both the links and the controller profiles exist.
-        _ = new Midi.ControlTemplatesOnDisc(new Midi.ControlTemplates(), blocks.Templates, _hints);
+        // And the links, on the same clock and by the same rule: told when the block moves, and
+        // looking anyway, since the router writes a pickup onto a link from the MIDI thread with
+        // nobody having asked for anything.
+        _ = new Midi.ControlLinksOnDisc(linkStore, blocks.Links, _hints);
 
         _routing = new AudioRoutingFactory().Create(_recording);
 

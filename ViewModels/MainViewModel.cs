@@ -2352,13 +2352,13 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
 
         var noteRouter = new MidiNoteRouter(Keys);
 
-        ControlLink = new ControlLink(_cfg.Midi.Controls, () => _settings.Moved());
+        ControlLink = new ControlLink(blocks.Links.Links, () => blocks.Links.Moved());
 
         // The write path: a hand points a control at something, that comes to a link, and the
         // block is what the links come to. Filled quietly first, since that is what was already
         // on disc, and said every time after. See Midi/ControlTemplatesFromLinks.cs.
         var templates = new Midi.ControlTemplatesFromLinks(
-            blocks.Templates, () => _cfg.Midi.Controls, _profiles);
+            blocks.Templates, () => blocks.Links.Links, _profiles);
 
         templates.Fill(said: false);
 
