@@ -277,23 +277,21 @@ public sealed class Song
     public TrackMix Master { get; set; } = new();
 
     /// <summary>
-    /// What this song's own controller layout is, over the top of the one in the settings.
+    /// Empty, and kept only so the type a song file is read into still has the field.
     /// </summary>
     /// <remarks>
-    /// Two layers, because a controller is two things at once. Some of what you wire up is
-    /// about the desk and true of everything you ever open: these faders are the track levels,
-    /// that knob is the filter on whatever machine is in front of me. That belongs in the
-    /// settings, where the hardware lives, and it is there.
+    /// **A song does not hold what your hardware is pointed at.** A knob pointed at something is
+    /// a fact about the box on your desk and about the thing it drives, true of every song that
+    /// plays that thing, so it lives on the desk and is written to the links file beside the
+    /// settings. There is one layer and everything pointed at anything lands on it.
     ///
-    /// The rest is about one piece of music. This song's third track is the lead and its filter
-    /// is the one your hand should fall on, and next week's song will have the lead somewhere
-    /// else. That cannot live with the hardware, because it is not about the hardware. It
-    /// travels with the song, and a song handed to somebody else arrives with its own layout on
-    /// it.
+    /// It was two, decided by where you pointed: an instrument on a track or a strip on the mixer
+    /// put the link in the song. That is the same work done again for every song, it cannot be
+    /// handed to anybody, and which of two identical looking panels the pointer was over decided
+    /// which layer a link landed in.
     ///
-    /// The song's win where the two name the same control, which is what makes them overrides
-    /// rather than a second list: the desk is what a control does unless this song has
-    /// something to say about it.
+    /// A song written while that was true is still opened, and what it was holding is dropped as
+    /// it is read, so the next save is written without it.
     /// </remarks>
     public List<Midi.ControlMapping> Controls { get; set; } = new();
 

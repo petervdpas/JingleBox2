@@ -2444,9 +2444,11 @@ whole exercise and is worth writing down rather than summarising:
   of the same layout per song is the same work done again for every song, it cannot be handed to
   anybody, and the layer it lands in depended on which of two identical-looking panels the
   pointer happened to be over. `ControlLink.Handle` writes to the desk and nothing else does,
-  `Pointable.InSong` and `SoundDevicePanel.InSong` are gone with the decision they carried, and
-  what an older song is still holding is still read and is still displaced by an arriving link,
-  so nothing laid down before this starts fighting what is laid down now
+  and `Pointable.InSong` and `SoundDevicePanel.InSong` are gone with the decision they carried.
+  The song's half is gone too, not merely unwritten: `Song.Controls` is emptied as a song is read,
+  so the next save is written without it, and `ControlLink` has no second list, no merge and no
+  override. Four songs on this machine were still carrying one, and every link in them was dead
+  weight that could only mask a live one
 - **A card is one controller against one target, which is a template.** `Views/ControlLinksView.axaml`
   draws one for each pair, headed with the thing pointed at, the sort of thing it is and the
   controller, and opened by the same chevron the machine editor's cards use. **Folded away to

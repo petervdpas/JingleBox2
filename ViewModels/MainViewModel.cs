@@ -2456,23 +2456,21 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             padTrigger, () => _cfg.Midi.ToggleMode);
 
         var controlRouter = new MidiControlRouter(
-            () => ControlLink.Mappings,
+            () => ControlLink.Live,
             targets,
             () => ControlLink.Say(),
             Layout,
-            _profiles);
+            _profiles,
+            () => _cfg.Midi.InstantPickup);
         ControlLink.UseThis();
 
         Tracker.UseAutomation(targets);
 
         controlRouter.Moved += (mapping, target, value) => Tracker.Automation.Moved(mapping, target, value);
 
-        ControlLink.Song = () => Tracker.Song?.Controls;
-        ControlLink.SongChanged = Tracker.ControlsChanged;
 
         Tracker.Player.StateChanged += (_, _) => Patchbay.Read();
 
-        ControlLink.SongChanging = () => Tracker.ControlsChanging();
 
         // Set once as the window is built, beside the song's own list: a machine's face reaches
         // its links through this object already, so the block and the ports ride with them rather

@@ -63,6 +63,9 @@ public sealed partial class MidiViewModel : ObservableObject
     /// <summary>Whether a pad's key toggles it or only starts it.</summary>
     [ObservableProperty] private bool toggleMode;
 
+    /// <summary>Whether a knob takes hold of a value on its first movement.</summary>
+    [ObservableProperty] private bool instantPickup;
+
     /// <summary>The line under the table saying what just happened, or what is wrong.</summary>
     [ObservableProperty] private string status = "";
 
@@ -90,6 +93,7 @@ public sealed partial class MidiViewModel : ObservableObject
         _cfg.Midi.Devices ??= new();
 
         ToggleMode = _cfg.Midi.ToggleMode;
+        InstantPickup = _cfg.Midi.InstantPickup;
         clockSource = _cfg.Midi.ClockSource;
         clockPort = _cfg.Midi.ClockPort;
 
@@ -264,6 +268,18 @@ public sealed partial class MidiViewModel : ObservableObject
     partial void OnToggleModeChanged(bool value)
     {
         _cfg.Midi.ToggleMode = value;
+        SaveMidi();
+    }
+
+    /// <summary>Stores it. The router reads the settings each message rather than this.</summary>
+    /// <remarks>
+    /// Thrown while the show is running and it lands on the next message, since the router asks
+    /// per message: somebody who has just laid a template down can turn it off, take hold of
+    /// every control on it, and turn it back on without stopping.
+    /// </remarks>
+    partial void OnInstantPickupChanged(bool value)
+    {
+        _cfg.Midi.InstantPickup = value;
         SaveMidi();
     }
 

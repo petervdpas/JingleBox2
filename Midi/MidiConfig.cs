@@ -35,6 +35,32 @@ public sealed class MidiConfig
     /// </remarks>
     public bool ToggleMode { get; set; } = true;
 
+    /// <summary>
+    /// Whether a knob takes hold of a value on its first movement rather than waiting to be
+    /// swept past it.
+    /// </summary>
+    /// <remarks>
+    /// Off, which is what a hardware desk does and what this has always done: a control that says
+    /// where it is takes hold only once your hand has passed where the parameter already sits, so
+    /// a knob left at three o'clock does not snap a filter wide open the moment it is nudged.
+    ///
+    /// On, the value follows the knob at once. **That is what somebody wants who has just applied
+    /// a template**, where otherwise every control on it has to be swept to the value it is
+    /// already about to set before it does anything: from a chair, a knob that is picking up and
+    /// a knob that is not wired at all look exactly alike, and hunting for eight values in turn is
+    /// worse than the lurch picking up avoids.
+    ///
+    /// One setting for the whole desk rather than one per link, the shape <see cref="ToggleMode"/>
+    /// already keeps: it is how somebody is working rather than a fact about one knob, and per
+    /// link it would be a decision to make every time anything was pointed at anything.
+    ///
+    /// It reaches only the controls it is about, which are the ones saying where they are. An
+    /// endless encoder sends how far it turned and has nothing to reconcile, so nothing here
+    /// touches it; and what a control is is still worked out by watching it, since that is a fact
+    /// about the hardware rather than a preference.
+    /// </remarks>
+    public bool InstantPickup { get; set; }
+
     /// <summary>Which button fires which pad.</summary>
     public List<MidiMapping> Pads { get; set; } = new();
 

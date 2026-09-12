@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using JingleBox2.Midi;
 using Xunit;
@@ -54,6 +55,80 @@ public class ControlRouterTests
         var list = new List<ControlMapping> { link };
 
         return (new MidiControlRouter(() => list, new OneTarget(knob)), knob, link);
+    }
+
+    /// <summary>The same, with the instant pickup switch thrown.</summary>
+    /// <param name="pickup">What the link is read as.</param>
+    /// <param name="at">Where the parameter starts.</param>
+    /// <param name="instant">What the switch in SETTINGS says, asked per message.</param>
+    private static (MidiControlRouter Router, Knob Knob, ControlMapping Link) Desk(
+        ControlPickup pickup, double at, Func<bool> instant)
+    {
+        var link = Link(pickup, "MPD218 Port A", 20);
+        var knob = new Knob(at);
+        var list = new List<ControlMapping> { link };
+
+        return (new MidiControlRouter(() => list, new OneTarget(knob), null, null, null, instant),
+                knob, link);
+    }
+
+    /// <summary>
+    /// **Instant pickup moves the parameter on the first message, wherever the knob was.**
+    /// </summary>
+    /// <remarks>
+    /// The case it exists for is a template just applied: every control on it is sitting wherever
+    /// a hand left it and every parameter is wherever the song has it, so with picking up nothing
+    /// moves until each knob in turn has been swept to the value it is already about to set. From
+    /// a chair, a control that is picking up and one that is not wired at all look exactly alike.
+    /// </remarks>
+    [Fact]
+    public void Instant_pickup_follows_the_first_movement()
+    {
+        var (router, knob, link) = Desk(ControlPickup.Takeover, 0.8, () => true);
+
+        router.Handle(Turn(link, 0));
+
+        Assert.Equal(0.0, knob.Value, 3);
+    }
+
+    /// <summary>And with it off the same control picks up, exactly as before it existed.</summary>
+    /// <remarks>
+    /// Both halves in two tests over one harness, since a switch that is read but never consulted
+    /// passes any test written about only the position it is in.
+    /// </remarks>
+    [Fact]
+    public void With_it_off_the_same_control_still_picks_up()
+    {
+        var (router, knob, link) = Desk(ControlPickup.Takeover, 0.8, () => false);
+
+        router.Handle(Turn(link, 0));
+
+        Assert.Equal(0.8, knob.Value, 3);
+    }
+
+    /// <summary>
+    /// It is asked per message, so it can be thrown while the transport is running.
+    /// </summary>
+    /// <remarks>
+    /// Which is what somebody actually does with it: turn it on, take hold of everything a
+    /// template just laid down, turn it off again without stopping.
+    /// </remarks>
+    [Fact]
+    public void It_is_asked_each_message_rather_than_when_the_router_was_built()
+    {
+        bool instant = false;
+
+        var (router, knob, link) = Desk(ControlPickup.Takeover, 0.8, () => instant);
+
+        router.Handle(Turn(link, 0));
+
+        Assert.Equal(0.8, knob.Value, 3);
+
+        instant = true;
+
+        router.Handle(Turn(link, 0));
+
+        Assert.Equal(0.0, knob.Value, 3);
     }
 
     /// <summary>A button's parameter goes where the button says, with nothing to reconcile.</summary>

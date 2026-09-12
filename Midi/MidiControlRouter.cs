@@ -111,16 +111,35 @@ public sealed class MidiControlRouter
     /// What is known about the controllers plugged in. Left out, one of its own; the application
     /// hands the same one to everything, since what a device is doing is remembered in it.
     /// </param>
+    /// <param name="instant">
+    /// Whether a control that says where it is takes hold of a value on its first movement rather
+    /// than waiting to be swept past it. Asked per message, since it is a setting somebody can
+    /// change while the show is running. Left out it is off, which is picking up, and is what
+    /// this did before the setting existed.
+    /// </param>
     public MidiControlRouter(Func<IReadOnlyList<ControlMapping>> mappings, IControlTargets targets,
                              Action? learned = null, DefaultLayout? layout = null,
-                             IControllerProfiles? profiles = null)
+                             IControllerProfiles? profiles = null, Func<bool>? instant = null)
     {
         _profiles = profiles ?? new ControllerProfiles();
         _mappings = mappings;
         _targets = targets;
         _learned = learned;
         _layout = layout;
+        _instant = instant;
     }
+
+    /// <summary>
+    /// Whether a control that says where it is takes hold on its first movement.
+    /// </summary>
+    /// <remarks>
+    /// Asked per message rather than held, since it is a setting somebody can change while the
+    /// show is running and the answer is one comparison. The same shape the pads' toggle keeps.
+    ///
+    /// Left out it is off, which is picking up and is what this did before the setting existed,
+    /// so nothing built without one behaves differently.
+    /// </remarks>
+    private readonly Func<bool>? _instant;
 
     /// <summary>What a control does before anybody has pointed it at anything, or nothing.</summary>
     private readonly DefaultLayout? _layout;
@@ -456,7 +475,7 @@ public sealed class MidiControlRouter
             return;
         }
 
-        if (mapping.Pickup == ControlPickup.Jump)
+        if (mapping.Pickup == ControlPickup.Jump || _instant?.Invoke() == true)
         {
             hand.Was = data;
 

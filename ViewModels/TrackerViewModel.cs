@@ -1448,19 +1448,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public event EventHandler? RecordingsArrived;
 
     /// <summary>
-    /// The song's own controller layout changed, so there is something to save.
-    /// </summary>
-    /// <remarks>
-    /// A link made while a song is open belongs to that song and travels in its file, so it
-    /// counts as work the same as a note does. Without this, pointing a knob at something and
-    /// closing the song would lose it without a word.
-    /// </remarks>
-    public void ControlsChanged() => MarkDirty();
-
-    /// <summary>The song's own controller layout is about to change. See ControlLink.</summary>
-    public void ControlsChanging() => Changing("a controller link");
-
-    /// <summary>
     /// Puts down every plugin the song is holding, for going away to work somewhere else.
     /// </summary>
     /// <remarks>

@@ -352,10 +352,16 @@ public sealed class ControlTargets : IControlTargets
     }
 
     /// <summary>The machine open on the rack, which is the other half of the same question.</summary>
+    /// <remarks>
+    /// A link that names no parameter is one nobody made: it means the third knob on whatever
+    /// face is in front of you, and on the rack that face is this one. It was refused here, so a
+    /// controller nobody has pointed at anything reached the track's instrument while the rack
+    /// was being worked on, which is the one machine on the screen it should not have moved.
+    /// </remarks>
     /// <param name="mapping">What the control was pointed at.</param>
     private IControlTarget? OnRackMachine(ControlMapping mapping)
     {
-        if (mapping.Key.Length == 0) return null;
+        if (mapping.Key.Length == 0 && mapping.Ordinal < 0) return null;
         if (_rack?.Editor is not { } editor) return null;
 
         string machine = editor.MachineId;
@@ -367,7 +373,13 @@ public sealed class ControlTargets : IControlTargets
 
         if (_machines.For(machine) is not { } project) return null;
 
-        var parameter = project.Parameters.FirstOrDefault(one => one.Key == mapping.Key);
+        string key = mapping.Key.Length > 0
+            ? mapping.Key
+            : _order.At(project.Panel, mapping.Ordinal);
+
+        if (key.Length == 0) return null;
+
+        var parameter = project.Parameters.FirstOrDefault(one => one.Key == key);
         if (parameter is null) return null;
 
         var values = editor.Values;
@@ -379,8 +391,8 @@ public sealed class ControlTargets : IControlTargets
             project.Name + " " + said + " on the rack",
             parameter.Min,
             parameter.Max,
-            () => values.Get(mapping.Key),
-            value => Written(values, mapping.Key, value),
+            () => values.Get(key),
+            value => Written(values, key, value),
             this,
             mapping,
             parameter.Unit);
@@ -505,15 +517,29 @@ public sealed class ControlTargets : IControlTargets
     /// neither answers nothing, which is the ordinary case for a knob pointed at something the
     /// track you are on has not got.
     ///
-    /// The rack is tried last for a machine, since a machine open on the rack is being worked on
-    /// rather than played and a track that really has it should win.
+    /// **Which of the track and the rack is tried first is decided by which of them you are
+    /// looking at**, and it had to be, because the two really do compete. A song with OddSkilla
+    /// on a track, opened while the rack is showing OddSkilla, is two of that machine with two
+    /// sets of settings: the song's instrument and the one on the rack, which is where a sound
+    /// starts. Resolved against the track regardless, a knob turned while the rack was in front
+    /// moved the song's instrument and left the face under the hand exactly where it was, which
+    /// reads as a link that was never made rather than as a write that went somewhere else. The
+    /// log said so in one word, `on TR-01`, at the end of a line that otherwise looked right.
+    ///
+    /// So the rack wins while the rack is the page showing, and the track wins otherwise, which
+    /// is the pattern and is where a song is worked on. An instrument window in front is already
+    /// answered before this, since that is what the track in front of you means.
     /// </remarks>
     /// <param name="mapping">What the control was pointed at.</param>
     /// <param name="track">The track it resolves against, which is the one in front of you.</param>
     private IControlTarget? OnDevice(ControlMapping mapping, int track) =>
-        OnMachine(mapping, track)
-        ?? OnEffect(mapping, _tracker.InsertsOn(track), Named(track))
-        ?? OnRack(mapping);
+        _tracker.ShowsMachines
+            ? OnRack(mapping)
+              ?? OnMachine(mapping, track)
+              ?? OnEffect(mapping, _tracker.InsertsOn(track), Named(track))
+            : OnMachine(mapping, track)
+              ?? OnEffect(mapping, _tracker.InsertsOn(track), Named(track))
+              ?? OnRack(mapping);
 
     /// <summary>
     /// One of ours on whichever chain has its face open in front, which beats everything.

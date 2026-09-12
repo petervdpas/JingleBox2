@@ -179,6 +179,8 @@ public sealed class ControlExchangeTests
 
         var hook = Hook(Desk(links), LinkTargets.Mixer, "");
 
+        hook.Take(hook.Offered()[0]);
+
         Assert.True(hook.Wired(MixLinks.On(MixControl.Volume, 0)));
         Assert.False(hook.Wired(MixLinks.On(MixControl.Volume, 1)));
         Assert.False(hook.Wired(MixLinks.On(MixControl.Pan, 0)));
@@ -199,8 +201,11 @@ public sealed class ControlExchangeTests
 
         var hook = Hook(Desk(links), LinkTargets.Mixer, "");
 
-        Assert.True(hook.Wired(MixLinks.On(MixControl.Volume, 0)));
         Assert.Equal(2, hook.Offered().Count);
+
+        hook.Take(hook.Offered()[0]);
+
+        Assert.True(hook.Wired(MixLinks.On(MixControl.Volume, 0)));
     }
 
     /// <summary>A control offering nothing is not wired, whatever is on the desk.</summary>
@@ -234,5 +239,82 @@ public sealed class ControlExchangeTests
 
         Assert.True(hook.Wired(MixLinks.On(MixControl.Volume, 0)));
         Assert.True(hook.Wired(MixLinks.On(MixControl.Volume, 1)));
+    }
+
+    /// <summary>
+    /// **Nothing is live until somebody applies it**, however much is on the disc.
+    /// </summary>
+    /// <remarks>
+    /// The links on the disc are the library: every template ever made, for hardware that is not
+    /// on the desk this afternoon and for machines this song does not play. Live on start, the
+    /// first knob touched would do whatever it was last pointed at months ago.
+    /// </remarks>
+    [Fact]
+    public void Nothing_is_live_until_it_is_applied()
+    {
+        var links = new List<ControlMapping> { OnStrip(0, 30), OnStrip(1, 31) };
+
+        var hook = Hook(Desk(links), LinkTargets.Mixer, "");
+
+        Assert.False(hook.Wired(MixLinks.On(MixControl.Volume, 0)));
+        Assert.False(hook.Wired(MixLinks.On(MixControl.Volume, 1)));
+    }
+
+    /// <summary>
+    /// **Applying one controller's template puts the other controller's to sleep.**
+    /// </summary>
+    /// <remarks>
+    /// The case the whole arrangement exists for: two boxes on the desk, both with a template for
+    /// the mixer, both plugged in. Which of them is driving it is chosen by applying that one,
+    /// and choosing means nothing if the one chosen before simply joins in. Nothing is lost,
+    /// since the sleeping one is still on the desk and still in its own template, one press away.
+    /// </remarks>
+    [Fact]
+    public void Applying_one_controller_puts_the_other_to_sleep()
+    {
+        var links = new List<ControlMapping>
+        {
+            OnStrip(0, 30),
+            OnStrip(0, 5, "MPD218 Port A")
+        };
+
+        var link = Desk(links);
+        var hook = Hook(link, LinkTargets.Mixer, "");
+
+        var first = hook.Offered()[0];
+        var second = hook.Offered()[1];
+
+        hook.Take(first);
+
+        Assert.Single(link.Live);
+
+        hook.Take(second);
+
+        var only = Assert.Single(link.Live);
+
+        Assert.Equal(second.Controller, only.Device);
+    }
+
+    /// <summary>And a template on something else is left running, since it is not the same thing.</summary>
+    /// <remarks>
+    /// One controller against one target is one template, so what a second desk takes over is the
+    /// mixer and never whatever the first is doing to a machine.
+    /// </remarks>
+    [Fact]
+    public void Applying_a_mixer_template_leaves_a_machine_alone()
+    {
+        var links = new List<ControlMapping> { OnDevice("attack", 14), OnStrip(0, 30) };
+
+        var link = Desk(links);
+
+        var device = Hook(link);
+        var mixer = Hook(link, LinkTargets.Mixer, "");
+
+        device.Take(device.Offered()[0]);
+        mixer.Take(mixer.Offered()[0]);
+
+        Assert.Equal(2, link.Live.Count);
+        Assert.True(device.Wired(OnDevice("attack", 14)));
+        Assert.True(mixer.Wired(MixLinks.On(MixControl.Volume, 0)));
     }
 }

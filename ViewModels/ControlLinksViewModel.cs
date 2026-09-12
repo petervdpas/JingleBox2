@@ -683,15 +683,6 @@ public sealed class ControlLinkRow
     public bool Reads => Mapping.Kind != ControlKind.Pad;
 
     /// <summary>
-    /// Whether this belongs to the song that is open or to the desk.
-    /// </summary>
-    /// <remarks>
-    /// Kept for the tip on the button rather than shown. Each list is one layer now, so a
-    /// column saying which would say the same thing on every row of it.
-    /// </remarks>
-    public string Home => _link.IsSong(Mapping) ? "this song" : "the desk";
-
-    /// <summary>
     /// Says it is something else, for the times the guess was wrong.
     /// </summary>
     /// <remarks>

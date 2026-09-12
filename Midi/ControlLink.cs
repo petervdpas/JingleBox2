@@ -72,20 +72,10 @@ public sealed class ControlLink
     public void UseThis() => Current = this;
 
     /// <summary>
-    /// The open song's own layout, when there is one, and how to say it has changed.
-    /// </summary>
-    /// <remarks>
-    /// Set once as the window is built. A link is not a setting of the song in the way a
-    /// pattern is: nothing here reaches into the tracker, it is handed a list and a way of
-    /// saying the list moved.
-    /// </remarks>
-    public Func<List<ControlMapping>?>? Song { get; set; }
-
-    /// <summary>
     /// The templates block, when there is one, which is what the links come to.
     /// </summary>
     /// <remarks>
-    /// Set once as the window is built, the same as <see cref="Song"/> and for the same reason:
+    /// Set once as the window is built, the same as the rest of these and for the same reason:
     /// nothing here reads it, and what it is for is whoever is handed this. A machine's face
     /// reaches its links through this object already, and the templates are the same fact said
     /// the way a face wants to read it, so handing the block through here is one wiring rather
@@ -140,12 +130,6 @@ public sealed class ControlLink
     /// </remarks>
     /// <param name="port">The port a message arrived on.</param>
     private string Named(string port) => Called is { } called ? called(port) : port;
-
-    /// <summary>Told when the song's own layout changed, so the song reads as unsaved.</summary>
-    public Action? SongChanged { get; set; }
-
-    /// <summary>True when there is a song open for a link to be kept in or moved to.</summary>
-    public bool HasSong => Song?.Invoke() is not null;
 
     /// <summary>Whether the panels are being laid out rather than played.</summary>
     private bool _linking;
@@ -314,20 +298,18 @@ public sealed class ControlLink
         wanted.Cc = message.Value;
         wanted.Sends = message.Type;
 
-        Changing();
-
-        Displace(Song?.Invoke(), wanted);
-
         int held;
 
         lock (_lock)
         {
-            Displace(_mappings, wanted);
+            Displace(wanted);
 
             _mappings.Add(wanted);
 
             held = _mappings.Count;
         }
+
+        Wake(new[] { wanted });
 
         _offered = null;
 
@@ -370,23 +352,22 @@ public sealed class ControlLink
 
         if (all.Count == 0) return 0;
 
-        Changing();
-
         foreach (var one in all)
         {
-            Displace(Song?.Invoke(), one);
-
             lock (_lock)
             {
-                Displace(_mappings, one);
+                Displace(one);
 
                 _mappings.Add(one);
             }
         }
 
+        Wake(all, alone: true);
+
         _changed();
 
-        Log.Write(LogArea.Midi, () => "link: took " + all.Count + " links on to the desk");
+        Log.Write(LogArea.Midi, () =>
+            "link: took " + all.Count + " links on to the desk, live for this session");
 
         Say(() =>
         {
@@ -399,61 +380,173 @@ public sealed class ControlLink
     }
 
     /// <summary>
-    /// Everything pointed at anything: the song's layout first, then the desk's.
+    /// Everything pointed at anything, which is the library.
     /// </summary>
     /// <remarks>
-    /// The song's win where both name the same control, which is what makes the song's an
-    /// override rather than a second list. The desk is what a control does unless this song has
-    /// something to say about it.
+    /// **One layer.** A knob pointed at something is a fact about the box on your desk and about
+    /// the thing it drives, true of every song that plays it, so there is one list and everything
+    /// lands on it. It was two for a while, a song's and the desk's, and which one a link landed
+    /// in depended on which of two identical looking panels the pointer happened to be over.
     ///
-    /// A copy, taken safely, because the desk's half is written from the MIDI thread.
+    /// Not what the hardware reaches, which is <see cref="Live"/>: this is every template there
+    /// is and that is the part somebody has applied.
+    ///
+    /// A copy, taken safely, because it is written from the MIDI thread.
     /// </remarks>
     public IReadOnlyList<ControlMapping> Mappings
     {
         get
         {
-            var song = Song?.Invoke();
-
             lock (_lock)
             {
-                if (_merged is not null
-                    && ReferenceEquals(_songWas, song)
-                    && _songCount == (song?.Count ?? 0)
-                    && _deskWas == _edits)
-                    return _merged;
+                if (_merged is not null && _deskWas == _edits) return _merged;
 
-                var desk = _mappings;
-
-                if (song is null || song.Count == 0)
-                {
-                    _merged = desk.ToArray();
-                }
-                else
-                {
-                    var all = new List<ControlMapping>(song.Count + desk.Count);
-                    all.AddRange(song);
-
-                    foreach (var one in desk)
-                    {
-                        bool covered = false;
-
-                        for (int at = 0; at < song.Count && !covered; at++)
-                            covered = song[at].Channel == one.Channel && song[at].Cc == one.Cc;
-
-                        if (!covered) all.Add(one);
-                    }
-
-                    _merged = all;
-                }
-
-                _songWas = song;
-                _songCount = song?.Count ?? 0;
+                _merged = _mappings.ToArray();
                 _deskWas = _edits;
 
                 return _merged;
             }
         }
     }
+
+    /// <summary>
+    /// What is live this session, which is what the hardware actually reaches.
+    /// </summary>
+    /// <remarks>
+    /// **Nothing whatever is live when the application starts.** The links on the disc are the
+    /// library: every template you have ever made, for the mixer, for the pads and for each sound
+    /// device, and most of them are for hardware that is not on the desk this afternoon and for
+    /// machines this song does not play. A library that wired itself up on start would mean the
+    /// first knob you touched doing whatever you last pointed it at, months ago, with nothing
+    /// anywhere saying so.
+    ///
+    /// Two things make a link live and both are somebody asking: applying a template from a
+    /// Menu, and learning a control, which is live from the moment it is learned or the gesture
+    /// would appear not to have worked. It stays live for the session and no longer, since being
+    /// live is not a fact about the link and is not written down.
+    ///
+    /// By the object rather than by what it names, so applying a template wakes exactly the links
+    /// it laid down. The stored ones it displaced are gone from the list by then, and anything
+    /// else in the library is left asleep where it is.
+    /// </remarks>
+    private readonly System.Collections.Generic.HashSet<ControlMapping> _live =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance as
+            System.Collections.Generic.IEqualityComparer<ControlMapping>);
+
+    /// <summary>
+    /// Everything live, which is what the routing reads.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Mappings"/> is the library and this is the part of it somebody has asked for.
+    /// Apart rather than one filtered list, because the two answer different questions and both
+    /// are asked: the MIDI CC page draws every template there is, and a knob may only reach what
+    /// has been applied.
+    ///
+    /// **Off the desk rather than off the merged list, and that is not a shortcut.** The merge
+    /// drops a desk link whenever the song holds one on the same channel and number, whatever the
+    /// two are pointed at, which is right for two things competing to answer a message and wrong
+    /// here: a song link is never applied, so it is not live, and filtering the merge let a dead
+    /// link mask a live one. What that looked like was a template applied on the rack, its twelve
+    /// links on the desk, and a knob driving the instrument of the track the cursor was on,
+    /// because with nothing live to answer the message the default layout took it.
+    ///
+    /// Which also says what a song's own links now are, which is nothing: they are read so an
+    /// older song still opens, they are still displaced by an arriving link, and they never drive
+    /// anything, since the only two things that wake a link are on the desk.
+    ///
+    /// Kept until the desk is edited, since it is asked once per message.
+    /// </remarks>
+    public IReadOnlyList<ControlMapping> Live
+    {
+        get
+        {
+            lock (_lock)
+            {
+                if (_awake is not null && _awakeWas == _edits) return _awake;
+
+                var kept = new List<ControlMapping>();
+
+                foreach (var one in _mappings)
+                    if (_live.Contains(one)) kept.Add(one);
+
+                _awake = kept;
+                _awakeWas = _edits;
+
+                return kept;
+            }
+        }
+    }
+
+    /// <summary>The live list, kept until the desk is edited.</summary>
+    private IReadOnlyList<ControlMapping>? _awake;
+
+    /// <summary>What <see cref="_edits"/> stood at when it was built.</summary>
+    private int _awakeWas = -1;
+
+    /// <summary>
+    /// Makes those links live for the rest of the session.
+    /// </summary>
+    /// <remarks>
+    /// Said out loud in the log, because being live is the difference between a knob that works
+    /// and one that does nothing, and it is the one thing about a link that nothing on the disc
+    /// records.
+    /// </remarks>
+    /// <param name="links">What was applied or learned.</param>
+    /// <param name="alone">
+    /// Whether these are the only thing that may be live on what they are pointed at, which is
+    /// true of a template being applied and false of one control being learned.
+    /// </param>
+    private void Wake(IReadOnlyList<ControlMapping> links, bool alone = false)
+    {
+        lock (_lock)
+        {
+            if (alone) Sleep(links);
+
+            foreach (var one in links) _live.Add(one);
+
+            _edits++;
+            _awake = null;
+            _merged = null;
+        }
+    }
+
+    /// <summary>
+    /// Puts to sleep whatever else is live on the things these are pointed at.
+    /// </summary>
+    /// <remarks>
+    /// **One controller drives one thing at a time, and that is the whole reason applying is a
+    /// deliberate act.** Two boxes on the desk both have a template for the mixer; you choose
+    /// which of them is driving it this afternoon by applying that one, and choosing is
+    /// meaningless if the one you chose last simply joins in.
+    ///
+    /// It is not a displacement and nothing is lost. A link taken off here is still on the desk
+    /// and still in its own template, ready to be applied again in a moment; what it stops being
+    /// is live. The links being laid down at the same moment do the displacing, by the ordinary
+    /// rule, which is one control doing one job.
+    ///
+    /// By what a target is called rather than by <see cref="ControlMapping.SameTarget"/>, since a
+    /// mixer template is the whole desk and same target there is one strip: matched that way,
+    /// applying one controller's mixer template would silence the other's fader four and leave
+    /// its fader five running.
+    /// </remarks>
+    /// <param name="links">What is arriving.</param>
+    private void Sleep(IReadOnlyList<ControlMapping> links)
+    {
+        var taken = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var one in links) taken.Add(_naming.KeyOf(one));
+
+        int gone = _live.RemoveWhere(one => taken.Contains(_naming.KeyOf(one)));
+
+        if (gone > 0) _awake = null;
+
+        if (gone > 0)
+            Log.Write(LogArea.Midi, () =>
+                "link: " + gone + " link(s) already live on the same thing went to sleep");
+    }
+
+    /// <summary>What a target is called, so this sleeps by the rule a template is cut by.</summary>
+    private readonly Interfaces.ILinkTargets _naming = new LinkTargets();
 
     /// <summary>
     /// The merged list, kept until something moves underneath it.
@@ -472,16 +565,10 @@ public sealed class ControlLink
     /// </remarks>
     private IReadOnlyList<ControlMapping>? _merged;
 
-    /// <summary>The song's list the merge was built from, compared by reference.</summary>
-    private List<ControlMapping>? _songWas;
-
-    /// <summary>How long it was then, since a song edits its own list in place.</summary>
-    private int _songCount = -1;
-
-    /// <summary>What <see cref="_edits"/> stood at then, which covers the desk's half.</summary>
+    /// <summary>What <see cref="_edits"/> stood at when it was built.</summary>
     private int _deskWas = -1;
 
-    /// <summary>How many times either list has been edited through this.</summary>
+    /// <summary>How many times the list has been edited through this.</summary>
     private int _edits;
 
     /// <summary>Says the merged list is out of date. Called by everything that edits either.</summary>
@@ -494,34 +581,15 @@ public sealed class ControlLink
         }
     }
 
-    /// <summary>
-    /// Told before the song's own list is about to change, so it can be taken back.
-    /// </summary>
+    /// <summary>Everything on the desk, which is every link there is.</summary>
     /// <remarks>
-    /// Apart from <see cref="SongChanged"/>, which says it already happened. A history needs the
-    /// state being left rather than the one being arrived at, and afterwards the first is gone.
-    /// Nothing at all for the desk's half: that lives in the settings and is not part of any
-    /// song, so undoing a song has nothing to say about it.
+    /// The same list <see cref="Mappings"/> gives, under the name a page that shows the links
+    /// asks for. There was a second list beside it, the open song's own, and there is not now.
     /// </remarks>
-    public Action? SongChanging;
-
-    /// <summary>Says the song is about to lose or gain a link, when there is a song.</summary>
-    private void Changing()
-    {
-        if (Song?.Invoke() is not null) SongChanging?.Invoke();
-    }
-
-    /// <summary>Just the desk's, for a list that shows the two apart.</summary>
     public IReadOnlyList<ControlMapping> Desk
     {
         get { lock (_lock) return _mappings.ToArray(); }
     }
-
-    /// <summary>And just the song's.</summary>
-    public IReadOnlyList<ControlMapping> Kept => Song?.Invoke()?.ToArray() ?? Array.Empty<ControlMapping>();
-
-    /// <summary>True when that mapping is one the song keeps rather than one of the desk's.</summary>
-    public bool IsSong(ControlMapping mapping) => Song?.Invoke()?.Contains(mapping) == true;
 
     /// <summary>Takes off whatever the new link is replacing: its control, and its target.</summary>
     /// <remarks>
@@ -540,10 +608,10 @@ public sealed class ControlLink
     /// the surfaces line on a machine's face lists is what survived, so the repair somebody
     /// reaches for was itself made out of the damage.
     /// </remarks>
-    private void Displace(List<ControlMapping>? from, ControlMapping wanted) =>
-        from?.RemoveAll(one => SameDesk(one, wanted)
-                               && (one.SameTarget(wanted)
-                                   || (SameKnob(one, wanted) && !Apart(one, wanted))));
+    private void Displace(ControlMapping wanted) =>
+        _mappings.RemoveAll(one => SameDesk(one, wanted)
+                                   && (one.SameTarget(wanted)
+                                       || (SameKnob(one, wanted) && !Apart(one, wanted))));
 
     /// <summary>
     /// True when those two are the same control, the box having already been settled.
@@ -691,7 +759,7 @@ public sealed class ControlLink
     /// </remarks>
     /// <param name="wanted">What the control offers, which names the target and nothing else.</param>
     public bool Holds(ControlMapping? wanted) =>
-        wanted is not null && Mappings.Any(one => one.SameTarget(wanted));
+        wanted is not null && Live.Any(one => one.SameTarget(wanted));
 
     /// <summary>
     /// Takes off whatever is pointed at that parameter or that button of that machine.
@@ -703,14 +771,9 @@ public sealed class ControlLink
     /// </remarks>
     public void Unlink(string machine, string key)
     {
-        Changing();
+        int gone;
 
-        int gone = Song?.Invoke()?.RemoveAll(one =>
-            (one.Kind == ControlKind.SoundDevice || one.Kind == ControlKind.Action)
-            && string.Equals(one.Machine, machine, StringComparison.Ordinal)
-            && string.Equals(one.Key, key, StringComparison.Ordinal)) ?? 0;
-
-        lock (_lock) gone += _mappings.RemoveAll(one =>
+        lock (_lock) gone = _mappings.RemoveAll(one =>
             (one.Kind == ControlKind.SoundDevice || one.Kind == ControlKind.Action)
             && string.Equals(one.Machine, machine, StringComparison.Ordinal)
             && string.Equals(one.Key, key, StringComparison.Ordinal));
@@ -754,16 +817,13 @@ public sealed class ControlLink
     {
         if (string.IsNullOrWhiteSpace(device)) return 0;
 
-        Changing();
+        int gone;
 
-        int gone = Song?.Invoke()?.RemoveAll(one => MidiService.SameName(one.Device, device)) ?? 0;
-
-        lock (_lock) gone += _mappings.RemoveAll(one => MidiService.SameName(one.Device, device));
+        lock (_lock) gone = _mappings.RemoveAll(one => MidiService.SameName(one.Device, device));
 
         if (gone == 0) return 0;
 
         _changed();
-        SongChanged?.Invoke();
 
         Say(() => Changed?.Invoke());
 
@@ -775,9 +835,9 @@ public sealed class ControlLink
     {
         if (mapping is null) return;
 
-        bool removed = Song?.Invoke()?.Remove(mapping) == true;
+        bool removed;
 
-        if (!removed) lock (_lock) removed = _mappings.Remove(mapping);
+        lock (_lock) removed = _mappings.Remove(mapping);
 
         if (!removed) return;
 

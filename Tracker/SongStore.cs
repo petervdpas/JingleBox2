@@ -797,7 +797,20 @@ public sealed class SongStore : ISongStore
         /// </summary>
         public TrackMix Master { get; set; } = new();
 
-        /// <summary>This song's own controller layout. See <see cref="Song.Controls"/>.</summary>
+        /// <summary>
+        /// What a song written before the links had one home is still holding.
+        /// </summary>
+        /// <remarks>
+        /// **Read and never written, and never put into the song either.** A knob pointed at
+        /// something is a fact about the hardware in the room and about the thing pointed at, so
+        /// it lives on the desk and nowhere else. A layer per song was a second answer to the one
+        /// question, and which of the two a link landed in depended on which of two identical
+        /// looking panels the pointer happened to be over.
+        ///
+        /// Kept only so a file holding one can be opened. What is in it is dropped as the song is
+        /// read, so the next save is written without it and the song stops carrying a layout that
+        /// drives nothing.
+        /// </remarks>
         public List<Midi.ControlMapping> Controls { get; set; } = new();
         public List<TrackerInstrument> Instruments { get; set; } = new();
         public List<PatternDocument> Patterns { get; set; } = new();
@@ -829,7 +842,6 @@ public sealed class SongStore : ISongStore
             TrackInstruments = new List<int>(song.TrackInstruments),
             Mix = song.Mix.Select(m => m.Clone()).ToList(),
             Master = song.Master.Clone(),
-            Controls = song.Controls.Select(Midi.ControlMapping.Copy).ToList(),
             Instruments = song.Instruments.Select(Written).ToList(),
             Patterns = song.Patterns.Select(PatternDocument.From).ToList()
         };
@@ -960,7 +972,6 @@ public sealed class SongStore : ISongStore
                 TrackInstruments = new List<int>(TrackInstruments),
                 Mix = Mix.Select(m => m.Clone()).ToList(),
                 Master = (Master ?? new TrackMix()).Clone(),
-                Controls = Controls.Select(Midi.ControlMapping.Copy).ToList(),
                 Instruments = Instruments.Select(Read).ToList()
             };
 

@@ -406,10 +406,38 @@ It answers three things and they are the whole of it:
 - **what is wired here now**, `Wired(control)`, asked with the very mapping the control already
   offers a knob
 
-**Nothing is ever applied on its own.** A template sits in the block until somebody picks it. What
-picking it does is lay its links on the desk, where they stay for the session and are written to
-`remotecontrol-links.json`. Nothing anywhere remembers that a template was involved: what is left
-is links like any other, displacing what held their controls and what was pointed at their target.
+**Nothing is applied on start, and the links on the disc are a library rather than a wiring.**
+Every template ever made is in that file: for hardware that is not on the desk this afternoon, for
+machines this song does not play, for a way of working from months ago. Live on start, the first
+knob touched would do whatever it was last pointed at, with nothing anywhere saying so.
+
+**The reason is several controllers, all plugged in at once.** Two boxes on the desk both have a
+template for the mixer. Which of them is driving it this afternoon is a thing you choose, and
+choosing is meaningless if the library wires both of them up on start. So being live is not a fact
+about a link, is not written down, and lasts one session.
+
+`ControlLink.Live` is what the routing reads and `ControlLink.Mappings` is the library, and they
+are deliberately two lists rather than one filtered at the point of use: the MIDI CC page draws
+every template there is, and a knob may only reach what somebody has applied.
+
+**Two things wake a link and both are somebody asking.** Applying a template from a Menu, and
+learning a control, which is live from the moment it is learned or the gesture would look as though
+it had not worked.
+
+**Applying one controller's template puts the other controller's to sleep on that same target.**
+One controller drives one thing at a time, which is the whole of what choosing means. Nothing is
+lost: the sleeping links are still on the desk and still in their own template, one press away. By
+what a target is called rather than by `SameTarget`, since a mixer template is the whole desk and
+same target there is one strip: matched that way, applying one controller's mixer template would
+silence the other's fader four and leave its fader five running.
+
+**The rack in the tracker is where this is done.** It is where you sit before playing and decide
+which controller drives which machine, and every face there carries the Menu.
+
+What picking a template does, once, is lay its links on the desk, where they stay for the session
+and are written to `remotecontrol-links.json`. Nothing anywhere remembers that a template was
+involved: what is left is links like any other, displacing what held their controls and what was
+pointed at their target.
 
 **Whether a link then answers is a different rule and is not this one's.** A link on a sound device
 answers only while that device is the one in front of you, which is what makes one knob able to be
@@ -451,3 +479,41 @@ which is now the name, and `ControllerScreens.Where` only understood ports, so i
 was reaching for a parameter under takeover, the screen was the one thing that would have said so,
 and it stayed on the standing text. It takes either now, since both really arrive -- a message off
 the wire knows its port and a link knows the controller.
+
+## Picking up, and the option not to
+
+**A knob that reports where it is takes hold of a value only once your hand has passed it.** That
+is what a hardware desk does and it is what stops a filter snapping wide open on the first nudge.
+
+It is also the thing that makes a freshly applied template look dead. Every control on it is
+sitting wherever your hand left it and every parameter is wherever the song has it, so nothing
+moves until each knob in turn has been swept to the value it is already about to set. From a chair
+a control that is picking up and a control that is not wired at all look exactly alike.
+
+`MidiConfig.InstantPickup` is the switch, in SETTINGS, MIDI, on a card of its own called **Knobs and
+faders**: on the hardware's card rather than the pads', since a fader on the mixer and a knob on a
+machine's face both answer to it and neither is a pad. **On, the first movement of a knob moves
+what it is pointed at**, wherever the knob happens to be sitting; off is picking up, which is what
+happened before the switch existed and is therefore the default.
+
+Asked per message rather than held, so it can be thrown while the transport runs: turn it on, take
+hold of everything a template just laid down, turn it off again. Endless encoders are untouched
+either way, having nothing to reconcile, and what a control *is* is still worked out by watching
+it, since that is a fact about the hardware rather than a preference.
+
+## There is one layer, and the song's is gone
+
+A knob pointed at something is a fact about the box on your desk and about the thing it drives,
+true of every song that plays it. It lives on the desk, in `remotecontrol-links.json`, and nowhere
+else.
+
+It was two for a while, the desk's and the song's, decided by where you pointed. That was removed
+in the code and left behind in the files: four songs here were still carrying links written before
+the rule, they were read back into the song and saved again, and the merge let one of them mask a
+desk link on the same channel and number whatever either pointed at. What that looked like from a
+chair was a template applied on the rack whose knob drove the instrument of the track the cursor
+was on.
+
+`Song.Controls` is emptied as a song is read, so the next save is written without it, and the field
+is kept only so a file holding one can be opened at all. `ControlLink` has no second list, no
+merge, no override and no per-song dirty hooks.
