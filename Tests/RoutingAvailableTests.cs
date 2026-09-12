@@ -1,6 +1,11 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
 using JingleBox2.Audio.Records;
 using JingleBox2.Audio.Routing;
+using JingleBox2.Audio.Routing.Interfaces;
+using JingleBox2.Audio.Routing.Records;
 using Xunit;
 
 namespace JingleBox2.Tests;
@@ -114,5 +119,112 @@ public class RoutingAvailableTests
 
         Assert.Empty(routing.GetRoutes());
         Assert.False(routing.IsAvailable);
+    }
+
+    /// <summary>
+    /// A routing that only knows what is there once it has read, which is the real one's rule.
+    /// </summary>
+    /// <remarks>
+    /// The whole of what <see cref="WindowsRouting"/> now does, with the walk taken out: it
+    /// answers no until a reading has happened and whatever the last reading found afterwards.
+    /// Written out here rather than using the real one because the real one answers no on
+    /// anything but Windows whatever it is handed, so a page driven by it would be a test that
+    /// says nothing on the machine most of these run on.
+    /// </remarks>
+    private sealed class Quiet : IAudioRouting
+    {
+        /// <summary>Whether this machine has anything to offer at the moment.</summary>
+        public bool Anything { get; set; }
+
+        /// <summary>What the last reading found.</summary>
+        private bool _can;
+
+        /// <inheritdoc/>
+        public bool IsAvailable => _can;
+
+        /// <inheritdoc/>
+        public IReadOnlyList<AudioRoute> GetRoutes()
+        {
+            _can = Anything;
+
+            return Anything ? new[] { RecorderBench.Firefox } : Array.Empty<AudioRoute>();
+        }
+
+        /// <inheritdoc/>
+        public AudioRoute? GetCurrentRoute() => null;
+
+        /// <inheritdoc/>
+        public bool Connect(AudioRoute route) => Anything;
+
+        /// <inheritdoc/>
+        public bool CanTakeAside => false;
+
+        /// <inheritdoc/>
+        public string AsideNote => "";
+
+        /// <inheritdoc/>
+        public bool TakeAside(AudioRoute route) => false;
+
+        /// <inheritdoc/>
+        public bool HoldAside(AudioRoute route) => false;
+
+        /// <inheritdoc/>
+        public void GiveBack() { }
+
+        /// <inheritdoc/>
+        public bool? IsOurOutput(AudioRoute source, string? output) => null;
+    }
+
+    /// <summary>Long enough for a reading on the pool, short enough to fail rather than hang.</summary>
+    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(3);
+
+    /// <summary>Waits for a reading to have landed, or gives up.</summary>
+    private static bool Within(Func<bool> done)
+    {
+        var clock = Stopwatch.StartNew();
+
+        while (clock.Elapsed < Patience)
+        {
+            if (done()) return true;
+
+            Thread.Sleep(10);
+        }
+
+        return done();
+    }
+
+    /// <summary>
+    /// **A page that hears no reads again, or the answer can never change.**
+    /// </summary>
+    /// <remarks>
+    /// The other half of keeping the answer, and the half that undoes it if it is forgotten. The
+    /// reading is what settles whether there is anything here, the page is what does the reading,
+    /// and the page used to refuse to read whenever the answer was no: so a machine that lost its
+    /// last output answered no once and could never answer anything else, with the watch still
+    /// ticking every two seconds and turning round at the door.
+    ///
+    /// **An answer that is kept may only be guarded on by somebody who is not the one who would
+    /// refresh it.** Nothing about the routing itself can say this, which is why it is asked of
+    /// the page: put the guard back in <c>RefreshRoutes</c> and the routing's own tests all still
+    /// pass.
+    /// </remarks>
+    [Fact]
+    public void A_page_that_heard_no_reads_again()
+    {
+        var routing = new Quiet();
+        var bench = new RecorderBench(routing);
+
+        bench.Page.RefreshRoutes();
+
+        Assert.False(Within(() => bench.Page.Routes.Count > 0));
+        Assert.False(routing.IsAvailable);
+
+        routing.Anything = true;
+
+        bench.Page.RefreshRoutes();
+
+        Assert.True(
+            Within(() => bench.Page.Routes.Count > 0),
+            "a page that was told there was nothing here never asked again, so the picker is dead for the session");
     }
 }

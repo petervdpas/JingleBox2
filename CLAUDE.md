@@ -881,10 +881,25 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   it found; `GetRoutes` settles it again out of the two lists it was walking anyway, so a reading
   walks each list once where it used to walk both twice and the answer is a by-product of work
   that was going to happen
-- **Kept is not frozen, which is the trap any kept answer invites.** A no that stuck would be a
-  page that never came alive on a machine where the first ask happened to land before there was
-  anything to find, so the reading that already runs every two seconds off the drawing thread is
-  what re-settles it. `Tests/RoutingAvailableTests.cs` counts the walks rather than reading the
+- **Kept is not frozen, which is the trap any kept answer invites, and the first go at it fell
+  into the trap one layer out.** A no that stuck would be a page that never came alive on a
+  machine where the first ask happened to land before there was anything to find, so the reading
+  that already runs every two seconds off the drawing thread is what re-settles it. **Except that
+  the reading is reached through `RecordViewModel.RefreshRoutes`, which refused to read whenever
+  the answer was no.** So the answer settled itself into a corner: a machine that lost its last
+  loopback output answered no once, the watch went on ticking every two seconds and turning round
+  at the door, and nothing could ever have said otherwise until the application was started again.
+  The guard is gone and the one that is about this method rather than about the machine is left,
+  which is that two readings may not run at once. Nothing is paid for it, since the reading itself
+  is inside the `Task.Run` it always was and a routing with nothing behind it answers an empty list
+  without walking anything
+- **An answer that is kept may only be guarded on by somebody who is not the one who would refresh
+  it**, which is the rule worth keeping out of it, and it is not a rule either half can state on
+  its own: put the guard back and every test the routing has still passes, because the routing is
+  right. `A_page_that_heard_no_reads_again` is asked of the page for that reason, over a routing
+  double that answers no until it has read, since the real one answers no on anything but Windows
+  whatever it is handed and a test driven by it would say nothing on the machine the suite mostly
+  runs on. `Tests/RoutingAvailableTests.cs` counts the walks rather than reading the
   answers, since the answers were never the fault, and every rule in it was checked by putting the
   fault back: asking per read fails the first, and the old guard inside `GetRoutes` fails the
   other two, the sticky no included. Each test says something on both machines, one walk on

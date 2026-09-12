@@ -335,15 +335,22 @@ public sealed class RecorderBench
     /// remembers what it really moved, and a second one over the same routing would be a second
     /// memory of that.
     /// </remarks>
-    public RecorderBench()
+    /// <param name="routing">
+    /// The wiring to build the page over, or nothing for <see cref="Wiring"/>, which answers yes
+    /// to everything. Handed in for the tests that are about a routing which answers something
+    /// else, since what the page does with a no is a rule of the page's.
+    /// </param>
+    public RecorderBench(IAudioRouting? routing = null)
     {
+        var wiring = routing ?? Wiring;
+
         var setting = new InputSetting();
-        var input = new InputPath(Wiring);
+        var input = new InputPath(wiring);
 
         var arrangement = new InputArrangement(setting, input, work => work());
 
         Page = new RecordViewModel(
-            Recorder, new Flat(), new Blank(), Block, Wiring,
+            Recorder, new Flat(), new Blank(), Block, wiring,
             setting: setting, input: input, arrangement: arrangement);
     }
 }

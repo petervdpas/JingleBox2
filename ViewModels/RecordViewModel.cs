@@ -2092,10 +2092,20 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// used to be a walk of every audio endpoint on the machine. Twice a second, for as long as
     /// the page was watching, the thread that draws was gone for a third of a second: the
     /// transport kept perfect time and the pattern arrived in clumps of three or four lines.
-    /// The guard stays exactly where it is, because
-    /// <see cref="Audio.Routing.Interfaces.IAudioRouting.IsAvailable"/> is now what its contract
-    /// always said it was, which is a property that costs nothing to read. **What was wrong was
-    /// never where it was asked; it was what asking cost.**
+    /// **What was wrong was never where it was asked; it was what asking cost**, and the guard
+    /// went all the same, because once the answer is kept the guard is what stops it ever being
+    /// worked out again. <see cref="Audio.Routing.Interfaces.IAudioRouting.IsAvailable"/> is
+    /// settled by the reading, the reading is here, and here used to be refused whenever the
+    /// answer was no: so a machine that lost its last loopback output answered no once and could
+    /// never answer anything else, with the watch still ticking every two seconds and turning
+    /// round at the door. **An answer that is kept may only be guarded on by somebody who is not
+    /// the one who would refresh it.** What is left is the one guard that is about this method
+    /// rather than about the machine, which is that two readings may not run at once.
+    ///
+    /// Nothing is paid for dropping it. The reading itself is what costs, it is inside
+    /// <see cref="System.Threading.Tasks.Task.Run(System.Action)"/> where it always was, and a
+    /// routing with nothing behind it answers an empty list from the first line of its own
+    /// <c>GetRoutes</c> without walking anything.
     ///
     /// The route on show is matched to the current one by node rather than by object, because
     /// the list is read afresh every time and the object from before is not in it.
@@ -2115,7 +2125,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     public async void RefreshRoutes()
     {
-        if (!_routing.IsAvailable || _refreshingRoutes) return;
+        if (_refreshingRoutes) return;
 
         try
         {
