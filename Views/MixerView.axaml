@@ -142,28 +142,6 @@
                       IsChecked="{Binding Source.Hearing, Mode=TwoWay}"
                       ToolTip.Tip="Hear what is coming in, through the Recording Effects chain, out of the master. It arrives a buffer or two late, and the output this application is playing through cannot be heard this way, since that is a loop." />
 
-            <!-- Only drawn where a source has to be sent somewhere rather than simply unplugged,
-                 which is a machine with no graph. A cable is the usual answer and a spare socket
-                 is as good; without one chosen there is nowhere for a source to go and choosing a
-                 source cannot take it off its own output. -->
-            <StackPanel Spacing="2" IsVisible="{Binding Source.NeedsSilentOutput}">
-              <TextBlock Classes="cardHint" HorizontalAlignment="Center" Text="Send it to" />
-
-              <ComboBox Width="118"
-                        HorizontalAlignment="Center"
-                        FontSize="11"
-                        ItemsSource="{Binding Source.SilentOutputs}"
-                        SelectedItem="{Binding Source.SilentOutput, Mode=TwoWay}"
-                        PlaceholderText="Nothing yet"
-                        ToolTip.Tip="Where a source goes when it is taken off its own output. A cable, or an output nobody is listening to.">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="arec:AudioEndpoint">
-                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
-                               ToolTip.Tip="{Binding Name}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-            </StackPanel>
 
           </StackPanel>
         </Grid>

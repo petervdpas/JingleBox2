@@ -175,12 +175,7 @@ public partial class MainWindow : Window
 
         _ = new Config.SettingsOnDisc(_store, blocks.Settings, _hints);
 
-        // The routing is made after the settings rather than before, because taking a source
-        // aside on a machine with no graph needs somewhere to send it and that is a choice
-        // stored here. On a graph it is not asked for at all.
-        var silent = new Config.SilentOutput(blocks.Settings);
-
-        _routing = new AudioRoutingFactory().Create(_recording, silent);
+        _routing = new AudioRoutingFactory().Create(_recording);
 
         Audio.RealtimeThread.Wants(cfg.RealtimeAudio);
 
@@ -252,9 +247,6 @@ public partial class MainWindow : Window
 
         var vm = new MainViewModel(_audio, blocks, _midi, _recording, _waveform, _routing, projects, made, hints: _hints);
 
-        // The same object the routing was given, so the picker on the mixer and what actually
-        // sends a source away cannot disagree about which output is the quiet one.
-        vm.Record.UseSilentOutput(silent);
         DataContext = vm;
 
         saying?.Doing(vm.SelectedOutputDevice is { } output

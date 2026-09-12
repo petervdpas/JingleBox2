@@ -80,14 +80,6 @@ public interface IInputChoice
     /// taken aside is heard here alone.
     /// </remarks>
     bool CanHear { get; }
-
-    /// <summary>Which of them is chosen, or nothing while none is.</summary>
-    /// <remarks>
-    /// A cable is the usual answer and a spare socket is as good. With nothing chosen there is
-    /// nowhere to send a source, so choosing one cannot take it off its own output and the
-    /// routing says so rather than half doing it.
-    /// </remarks>
-    Audio.Records.AudioEndpoint? SilentOutput { get; set; }
 }
 
 /// <summary>
@@ -116,8 +108,8 @@ public interface IInputOffers
     /// <summary>False where there is nothing behind the picker, which leaves it empty and dead.</summary>
     /// <remarks>
     /// Whether a routing is available at all, which is not the same question as whether the
-    /// machine has a graph: Windows has no graph and answers true whenever there is an output or
-    /// a program it can capture. <see cref="NeedsSilentOutput"/> is the graph question.
+    /// machine can take a source off its own output: Windows has no graph and answers true
+    /// whenever there is an output or a program it can capture, and takes nothing aside.
     /// </remarks>
     bool IsRoutingAvailable { get; }
 
@@ -137,14 +129,4 @@ public interface IInputOffers
     /// <summary>Says one of those pages has gone.</summary>
     void LetRoutesGo();
 
-    /// <summary>Whether a source has to be sent somewhere rather than simply unplugged.</summary>
-    /// <remarks>
-    /// True on a machine with no graph, where the only way to take a source off its own output
-    /// is to point it at another one. The picker for that is drawn only there, since on a graph
-    /// there is nothing to choose.
-    /// </remarks>
-    bool NeedsSilentOutput { get; }
-
-    /// <summary>Every output a source could be sent to so nobody hears it.</summary>
-    System.Collections.Generic.IReadOnlyList<Audio.Records.AudioEndpoint> SilentOutputs { get; }
 }

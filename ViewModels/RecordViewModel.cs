@@ -2222,88 +2222,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         Agree();
     }
 
-    /// <summary>Where a source is sent so nobody hears it, or nothing on a machine with a graph.</summary>
-    private ISilentOutput? _silent;
-
-    /// <summary>
-    /// Tells the page where a source can be sent to be unheard.
-    /// </summary>
-    /// <remarks>
-    /// Handed in rather than made here, because it is the same object the routing was given: two
-    /// of them over one setting would be two answers to which output is the quiet one, and the
-    /// picker would then be setting something the routing never reads.
-    /// </remarks>
-    /// <param name="silent">The choice and the list it comes from.</param>
-    public void UseSilentOutput(ISilentOutput silent)
-    {
-        _silent = silent;
-
-        OnPropertyChanged(nameof(NeedsSilentOutput));
-        OnPropertyChanged(nameof(SilentOutputs));
-        OnPropertyChanged(nameof(SilentOutput));
-    }
-
-    /// <inheritdoc/>
-    public bool NeedsSilentOutput => SilentOutputs.Count > 0;
-
-    /// <inheritdoc/>
-    /// <remarks>
-    /// **Never this application's own output**, which it used to offer and which is the single
-    /// worst answer in the list. A source is sent somewhere so that nobody hears it; sent to the
-    /// device JingleBox2 is playing through it is not quieted at all, it arrives on top of
-    /// everything else and out of the same speakers. The picker was showing the Model 12 while the
-    /// Model 12 was the output in SETTINGS.
-    ///
-    /// It had the settings in its hand the whole time and only ever read the half about which
-    /// output is the quiet one, never the half about which output is ours. Audio goes out as well
-    /// as in and a picker about outputs has to know both.
-    ///
-    /// By name, since the list and the output picker are two different enumerations and the name
-    /// is the only half they share: the same trade-off
-    /// <see cref="Audio.Routing.Interfaces.IAudioRouting.IsOurOutput"/> already names.
-    /// </remarks>
-    public IReadOnlyList<Audio.Records.AudioEndpoint> SilentOutputs
-    {
-        get
-        {
-            var all = _silent?.Outputs ?? Array.Empty<Audio.Records.AudioEndpoint>();
-
-            if (string.IsNullOrWhiteSpace(PlayingOut)) return all;
-
-            var kept = new List<Audio.Records.AudioEndpoint>(all.Count);
-
-            foreach (var one in all)
-                if (!string.Equals(one.Name.Trim(), PlayingOut.Trim(), StringComparison.OrdinalIgnoreCase))
-                    kept.Add(one);
-
-            return kept;
-        }
-    }
-
-    /// <inheritdoc/>
-    public Audio.Records.AudioEndpoint? SilentOutput
-    {
-        get
-        {
-            if (_silent?.Chosen is not { } chosen) return null;
-
-            foreach (var output in SilentOutputs)
-                if (string.Equals(output.Id, chosen, StringComparison.Ordinal)) return output;
-
-            return null;
-        }
-        set
-        {
-            if (_silent == null) return;
-
-            _silent.Chosen = value?.Id;
-
-            OnPropertyChanged();
-
-            Agree();
-        }
-    }
-
     /// <inheritdoc/>
     /// <remarks>
     /// Kept on the recorder rather than here, since the capture is what pushes the audio and the
@@ -2400,9 +2318,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             playingOut = value;
 
             Listening();
-
-            OnPropertyChanged(nameof(SilentOutputs));
-            OnPropertyChanged(nameof(NeedsSilentOutput));
         }
     }
 

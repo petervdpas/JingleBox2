@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using JingleBox2.Audio;
 using JingleBox2.Audio.Routing;
 using JingleBox2.Audio.Routing.Enums;
 using JingleBox2.Audio.Routing.Interfaces;
@@ -158,72 +157,6 @@ public class TakeAsideTests
     public void Addresses_are_compared_as_they_are_written()
     {
         Assert.Empty(_graph.LinksAway(Both(), "firefox", Ours));
-    }
-
-    /// <summary>The plain endpoint id is wrapped in the form the system's own call takes.</summary>
-    /// <remarks>
-    /// **The one that fails in silence.** The enumerator hands back a plain id and the policy
-    /// call wants it inside a device interface path; handed the plain one, Windows accepts the
-    /// call, moves nothing, and says nothing about it.
-    /// </remarks>
-    [Fact]
-    public void An_endpoint_is_wrapped_the_way_the_system_wants_it()
-    {
-        var token = new MmDeviceToken();
-
-        string wrapped = token.Wrap("{0.0.0.00000000}.{a-guid}");
-
-        Assert.StartsWith(@"\\?\SWD#MMDEVAPI#", wrapped, StringComparison.Ordinal);
-        Assert.EndsWith("#{e6327cad-dcec-4949-ae8a-991e976a79d2}", wrapped, StringComparison.Ordinal);
-        Assert.Contains("{0.0.0.00000000}.{a-guid}", wrapped, StringComparison.Ordinal);
-    }
-
-    /// <summary>And unwrapping it gives the plain id back.</summary>
-    [Fact]
-    public void Unwrapping_gives_the_plain_id_back()
-    {
-        var token = new MmDeviceToken();
-
-        Assert.Equal("{0.0.0.00000000}.{a-guid}", token.Unwrap(token.Wrap("{0.0.0.00000000}.{a-guid}")));
-    }
-
-    /// <summary>Nothing wrapped is nothing, which is what says no preference of ours.</summary>
-    /// <remarks>
-    /// An empty path is handed to the system as no string at all, and that is what gives a
-    /// program its own choice of output back. Wrapping an empty id would make a path naming
-    /// nothing, which is a different thing entirely.
-    /// </remarks>
-    [Fact]
-    public void Nothing_wrapped_stays_nothing()
-    {
-        var token = new MmDeviceToken();
-
-        Assert.Equal("", token.Wrap(""));
-        Assert.Equal("", token.Wrap(null!));
-        Assert.Equal("", token.Unwrap(""));
-        Assert.Equal("", token.Unwrap(null!));
-    }
-
-    /// <summary>Something that was never wrapped comes back as it was.</summary>
-    /// <remarks>
-    /// Which is what the system answers for a program that has no output of its own, and it is
-    /// read rather than refused: an id that is already plain is the answer somebody wanted.
-    /// </remarks>
-    [Fact]
-    public void Something_never_wrapped_comes_back_as_it_was()
-    {
-        Assert.Equal("plain", new MmDeviceToken().Unwrap("plain"));
-    }
-
-    /// <summary>A machine that cannot be told where a program plays says so and does nothing.</summary>
-    [Fact]
-    public void A_machine_that_cannot_point_says_so()
-    {
-        var none = new NoProgramOutput();
-
-        Assert.False(none.CanPoint);
-        Assert.False(none.Point(1234, "anything"));
-        Assert.False(none.Release(1234));
     }
 
     /// <summary>A machine with no graph says it cannot, and changes nothing.</summary>

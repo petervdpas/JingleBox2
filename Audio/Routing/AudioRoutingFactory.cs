@@ -7,12 +7,12 @@ namespace JingleBox2.Audio.Routing;
 public sealed class AudioRoutingFactory : IAudioRoutingFactory
 {
     /// <inheritdoc/>
-    public IAudioRouting Create(IRecordingService recording, ISilentOutput? silent = null)
+    public IAudioRouting Create(IRecordingService recording)
     {
         var pipewire = new PipeWireRouting();
         if (pipewire.IsAvailable) return pipewire;
 
-        var loopback = new WindowsRouting(recording, silent);
+        var loopback = new WindowsRouting(recording);
         if (loopback.IsAvailable) return loopback;
 
         return new NoAudioRouting();

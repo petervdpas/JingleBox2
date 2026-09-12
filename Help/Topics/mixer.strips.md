@@ -16,11 +16,10 @@ IN is the desk's input channel and its fader is the input's own gain, so it deci
 what a take holds. At the foot of it are the source it is listening to and **Hear it**,
 which puts what is coming in through the Recording Effects chain and out of the master.
 Choosing a source is what takes it off its own output, so a browser picked here goes
-quiet everywhere else and Hear it is what brings it back through the desk. On Windows
-that taking aside does not work at the moment, and there is a way to do the same thing
-by hand under Recording input in SETTINGS; a machine that needs somewhere to send an
-unheard source has a **Send it to** picker under Hear it. Its mute, its placement and a
-solo are about what Hear it is sending; with that off, nothing of it is in the mix.
+quiet everywhere else and Hear it is what brings it back through the desk. On Windows the
+taking aside does not happen, so a source is heard twice; there is a way to do the same
+thing by hand under Recording input in SETTINGS. Its mute, its placement and a solo are
+about what Hear it is sending; with that off, nothing of it is in the mix.
 
 The difference matters when you pull a fader down. A track is the song's, so moving it
 changes the song and is saved with it. RECORDER and PADS are this installation's, so

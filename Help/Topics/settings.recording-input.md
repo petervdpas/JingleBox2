@@ -31,15 +31,12 @@ out of the master. Off, the input is captured and nobody hears it.
 
 Picking another source puts the last one back, and so does closing the application.
 
-**On Windows a source needs somewhere to go**, since there is no link to unplug: a program
-can only be pointed at another output. **Send it to**, under Hear it, is where that is
-chosen, and it is only drawn on a machine that needs it.
-
-**And on Windows taking a source aside does not work.** It reaches per-program output
-through an interface of Windows own that this application cannot call: the marshalling it
-needs is not in .NET. The log says so on every start. It is not your machine and it is not
-a setting: the interface is there and answers, and the fault is on this side. The next
-section is how to do the same thing by hand.
+**On Windows a source is not taken off its own output at all.** There is no link to
+unplug there: the only way would be to tell Windows where a program plays, through an
+interface of Windows own that this application cannot call, since the marshalling it needs
+is not in .NET. So a browser picked here goes on playing out of its own output and is
+heard twice, once from it and once through the desk. It is not your machine and it is not
+a setting. The next section is how to do the same thing by hand.
 
 ## Doing it by hand on Windows
 

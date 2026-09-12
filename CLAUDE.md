@@ -4608,8 +4608,13 @@ whole exercise and is worth writing down rather than summarising:
 - **What the act is differs per machine and not one word of it is above the module.** Links moved
   on a graph, a program pointed at another output where there is none: `PipeWireRouting` and
   `WindowsRouting` behind `IAudioRouting.TakeAside`, which is the only place the two systems part
-  company. On Windows `WindowsProgramOutput` throws `MarshalDirectiveException` on .NET 10 and has
-  never worked, so the rule is real on Linux and answers `Refused` there until that is fixed
+  company. On Windows it is refused outright: the only way to take a source off its own output
+  there is to tell the system where a program plays, which is the undocumented
+  `IAudioPolicyConfig`, and that will not activate from this runtime. It never once worked, and
+  what stood on top of it was a **Send it to** picker asking where a source should go, a stored
+  choice, and a call that never came back. Eleven files, a settings field and a control on the
+  mixer, for an act that has never happened. All of it is gone: `WindowsRouting.TakeAside`
+  answers false and `AsideNote` says why. A source on Windows is recorded and is heard twice
 - **The same question is answered once, and that cost a hardware device.** The graph is read on a
   clock and every reading ends by saying what the input is pointed at, which is almost always what
   it was pointed at a second ago. Acted on, that gives the source back and takes it off again on

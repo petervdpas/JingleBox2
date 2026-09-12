@@ -43,31 +43,9 @@ public sealed class WindowsRouting : IAudioRouting
     /// <summary>The recorder, which is what is actually pointed somewhere: nothing is rewired here.</summary>
     private readonly IRecordingService _recording;
 
-    /// <summary>What tells the system where a program plays, for taking a source aside.</summary>
-    private readonly IProgramOutput _output;
-
-    /// <summary>Where a source is sent so nobody hears it, or nothing while none is chosen.</summary>
-    private readonly ISilentOutput? _silent;
-
-    /// <summary>Which program was sent there, so it can be given its own choice back.</summary>
-    private int? _aside;
-
     /// <summary>Takes the recorder this will be pointing at devices, outputs and programs.</summary>
     /// <param name="recording">What is actually pointed somewhere.</param>
-    /// <param name="silent">Where a source goes to be unheard, or nothing where nobody chose.</param>
-    /// <param name="output">
-    /// What tells the system where a program plays. Defaulted to the machine's own, so a caller
-    /// who does not care pays nothing and a test can hand one in.
-    /// </param>
-    public WindowsRouting(
-        IRecordingService recording,
-        ISilentOutput? silent = null,
-        IProgramOutput? output = null)
-    {
-        _recording = recording;
-        _silent = silent;
-        _output = output ?? (OperatingSystem.IsWindows() ? new WindowsProgramOutput() : new NoProgramOutput());
-    }
+    public WindowsRouting(IRecordingService recording) => _recording = recording;
 
     /// <inheritdoc/>
     /// <remarks>
@@ -232,49 +210,24 @@ public sealed class WindowsRouting : IAudioRouting
     /// is why the list is read rather than trusted: a cable uninstalled or a socket unplugged
     /// since the choice was made would send a programme to an id that no longer names anything.
     /// </remarks>
-    public bool CanTakeAside => _output.CanPoint && Silent() != null;
+    public bool CanTakeAside => false;
+
+    /// <inheritdoc/>
+    public string AsideNote => "this build cannot tell Windows where a program plays";
 
     /// <inheritdoc/>
     /// <remarks>
-    /// The two halves of <see cref="CanTakeAside"/> said apart, because only one of them is
-    /// anybody's to fix. No output chosen is a picker two lines above the switch; no way to point
-    /// a program is this installation, and telling somebody to choose an output when the answer
-    /// would not be taken either is sending them somewhere pointless.
+    /// **Nothing can be taken aside on Windows in this build**, and it is refused rather than
+    /// half done. Taking a source aside here would mean telling the system where a program plays,
+    /// which is <c>IAudioPolicyConfig</c>: an interface that is on the machine, is not documented,
+    /// and will not activate from this runtime. What stood on top of it was a picker asking where
+    /// a source should be sent, a stored choice, and a call that never came back, which is three
+    /// moving parts around a thing that has never once worked.
     ///
-    /// The order is the order they can be acted on: what somebody can do first is said first.
+    /// A source can still be recorded here. What it cannot be is silenced where it was playing,
+    /// so it is heard twice, and <see cref="AsideNote"/> is the sentence that says so.
     /// </remarks>
-    public string AsideNote =>
-        !_output.CanPoint
-            ? "this build cannot tell Windows where a program plays"
-            : Silent() == null
-                ? "nothing is chosen under Send it to, and a source here is moved to another "
-                  + "output rather than unplugged, so there has to be one to move it to"
-                : "";
-
-    /// <inheritdoc/>
-    /// <remarks>
-    /// **Only a program can be taken aside here.** A capture device is not something that plays,
-    /// and an output's own playback is the whole of what a machine is doing rather than one
-    /// program's share of it: taking either aside means nothing, so it is refused rather than
-    /// half done.
-    /// </remarks>
-    public bool TakeAside(AudioRoute route)
-    {
-        if (route == null || Silent() is not { } silent) return false;
-        if (!route.Node.StartsWith(ProgramPrefix, StringComparison.Ordinal)) return false;
-
-        string id = route.Node[ProgramPrefix.Length..];
-
-        if (!int.TryParse(id, NumberStyles.Integer, CultureInfo.InvariantCulture, out int program)) return false;
-
-        GiveBack();
-
-        if (!_output.Point(program, silent)) return false;
-
-        _aside = program;
-
-        return true;
-    }
+    public bool TakeAside(AudioRoute route) => false;
 
     /// <inheritdoc/>
     /// <remarks>
@@ -288,12 +241,7 @@ public sealed class WindowsRouting : IAudioRouting
     /// source the picker chose on somebody's behalf: that went through no choice, so a switch
     /// already on has nothing standing behind it.
     /// </remarks>
-    public bool HoldAside(AudioRoute route)
-    {
-        if (route == null || _aside != null) return false;
-
-        return TakeAside(route);
-    }
+    public bool HoldAside(AudioRoute route) => false;
 
     /// <inheritdoc/>
     /// <remarks>
@@ -303,22 +251,6 @@ public sealed class WindowsRouting : IAudioRouting
     /// </remarks>
     public void GiveBack()
     {
-        if (_aside is not int program) return;
-
-        _aside = null;
-
-        _output.Release(program);
-    }
-
-    /// <summary>The chosen output, where it is chosen and still on the machine.</summary>
-    private string? Silent()
-    {
-        if (_silent?.Chosen is not { } chosen || chosen.Length == 0) return null;
-
-        foreach (var output in _silent.Outputs)
-            if (string.Equals(output.Id, chosen, StringComparison.Ordinal)) return chosen;
-
-        return null;
     }
 
     /// <inheritdoc/>
