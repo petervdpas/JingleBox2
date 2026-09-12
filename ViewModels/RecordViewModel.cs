@@ -72,8 +72,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// <summary>What each step is called where somebody reads a list of them.</summary>
     private readonly ITakeStepWords _stepWords = new TakeStepWords();
 
-    /// <summary>Where the input device and the gain are written down, which is the settings file.</summary>
-    private readonly ConfigStore _configStore;
+    /// <summary>The settings block the input device, the gain and the chain live in.</summary>
+    private readonly Config.Interfaces.ISettingsBlock _settings;
 
     /// <summary>The settings themselves, held so a change can be written without reading first.</summary>
     private readonly AppConfig _cfg;
@@ -96,9 +96,13 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// What the IN strip does to the machine, which is the source and the tick as one thing.
     /// </summary>
     /// <remarks>
-    /// Built here from the same route this page was handed, so there is one of it and it is the
-    /// only thing that reaches out and moves somebody else's audio about. The page keeps the two
-    /// facts because it draws them; what they come to is not its business.
+    /// There is one of it and it is the only thing that reaches out and moves somebody else's
+    /// audio about. The page keeps the two facts because it draws them; what they come to is not
+    /// its business.
+    ///
+    /// **The same object the arrangement is watching over**, since it remembers what it really
+    /// moved: a second one over the same route would be a second memory of that, and the one at
+    /// the end of the run would be putting back what it had never taken.
     /// </remarks>
     private readonly Audio.Routing.Interfaces.IInputPath _input;
 
@@ -123,9 +127,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// <summary>Set while a route is being read back, so showing it does not re-apply it.</summary>
     private bool _readingRoute;
 
-    /// <summary>Set while one is being applied, so reading it back does not start another.</summary>
-    private bool _applyingRoute;
-
     /// <summary>Set while the graph is being read, so ticks do not pile up on each other.</summary>
     private bool _refreshingRoutes;
 
@@ -145,30 +146,11 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     private const int LevelPollMs = 50;
 
     /// <summary>
-    /// How long the gain sits still before it is written down.
-    /// </summary>
-    /// <remarks>
-    /// Half a second is longer than the pause inside a drag and shorter than the pause before
-    /// somebody closes the program, which is the only thing this has to get right.
-    /// </remarks>
-    private static readonly TimeSpan GainSaveDelay = TimeSpan.FromMilliseconds(500);
-
-    /// <summary>
     /// What was picked, as opposed to what happens to be wired up. The input is reopened every
     /// time this page comes back, and the system wires the new stream to its own default, so
     /// without this a choice would last until the next tab switch.
     /// </summary>
     private AudioRoute? _preferredRoute;
-
-    /// <summary>
-    /// Holds the gain back from the settings file while it is being dragged.
-    /// </summary>
-    /// <remarks>
-    /// The slider fires on every pixel, and each of those would otherwise be a write of the
-    /// whole settings file. The value reaches the recorder at once either way: only the writing
-    /// down waits.
-    /// </remarks>
-    private readonly DispatcherTimer _gainSaveTimer;
 
     /// <summary>The chain a take is run through, and where it is held.</summary>
     private readonly RecordPluginTarget _chain;
@@ -387,6 +369,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         StopPreview();
 
         _arrangement.PutBack -= Crept;
+        _arrangement.Arranged -= Arranged;
         _arrangement.Dispose();
 
         GiveRoutesBack();
@@ -400,6 +383,10 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// **The page writes this and nothing else.** What the machine is wired to is worked out
     /// from it by <see cref="_arrangement"/>, which watches it, so no page decides where
     /// anybody's audio goes by being drawn or put away.
+    ///
+    /// Handed in, from the one held above every page, so that two pages over the input are two
+    /// views of one fact rather than two facts. Defaulted to its own for a page built on its own,
+    /// which is what a test is, the same way every other dependency here arrives.
     /// </remarks>
     private readonly Audio.Routing.Interfaces.IInputSetting _setting;
 
@@ -480,7 +467,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             _patches = _chains.Patches(_chain.Chain);
 
             _cfg.RecordEffects = _chains.Capture(_chain.Chain, patches: true);
-            _configStore.Save(_cfg);
+            _settings.Moved();
         };
 
         if (_cfg.RecordEffects is { IsEmpty: false } saved)
@@ -500,15 +487,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
     /// <summary>Builds and reads the chain's plugins, which is arithmetic and a round trip.</summary>
     private Audio.Plugins.Interfaces.IPluginChainState _chains = new Audio.Plugins.PluginChainState();
-
-    /// <summary>
-    /// False until the stored gain has been put on the slider.
-    /// </summary>
-    /// <remarks>
-    /// Setting the slider raises a change like any other, and answering that one would write the
-    /// settings file back with the value it was just read from, on every start.
-    /// </remarks>
-    private bool _gainLoaded;
 
     /// <summary>The same guard for the input device, and for the same reason.</summary>
     private bool _deviceLoaded;
@@ -638,8 +616,44 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// <remarks>
     /// Applied to the incoming audio rather than to the file afterwards, which is the point: a
     /// take recorded too quietly cannot be repaired later without bringing the noise up with it.
+    ///
+    /// **Read out of the settings block and written into it, rather than kept here.** There is one
+    /// gain, so there is one place it lives: the page shows the block and moves it, and everything
+    /// else that shows the same gain, which is the mixer's IN strip, is looking at the same number
+    /// rather than at a copy of it that has to be kept in step. Two copies of one fact is the
+    /// fault this codebase keeps naming, and here it had the shape it always has, which is that
+    /// something re-applied one of them over the other and nothing said so.
+    ///
+    /// A guard against the stored value being written straight back on startup is no longer
+    /// needed and is gone with it: reading and writing are the same place, so putting the slider
+    /// where the settings say moves nothing.
     /// </remarks>
-    [ObservableProperty] private double recordGainDb;
+    public double RecordGainDb
+    {
+        get => _cfg.RecordGainDb;
+        set
+        {
+            if (Math.Abs(_cfg.RecordGainDb - value) < 0.0001) return;
+
+            Diagnostics.Log.Write(
+                Diagnostics.Enums.LogArea.Audio,
+                () => "record: the input gain is now " + value.ToString("0.0") + " dB");
+
+            if (Math.Abs(value - 1.0) < 0.01)
+            {
+                Diagnostics.Log.Write(
+                    Diagnostics.Enums.LogArea.Audio,
+                    () => "record: and that one came from\n" + System.Environment.StackTrace);
+            }
+
+            _cfg.RecordGainDb = value;
+            _recordingService.GainDb = value;
+
+            _settings.Moved();
+
+            OnPropertyChanged();
+        }
+    }
 
     /// <summary>True when the input has hit the ceiling, so the meter can say so in red.</summary>
     [ObservableProperty] private bool isClipping;
@@ -672,7 +686,10 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// The preview's row goes back to idle when it stops, whether it ran out on its own or
     /// somebody stopped it, since those are the same thing to whoever is looking at the list.
     /// </remarks>
-    public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, ConfigStore configStore, AppConfig cfg, IAudioRouting routing, JingleBox2.Audio.Interfaces.IOutputBus? takes = null, JingleBox2.Audio.Interfaces.IRecordingSource? recordings = null, IWorkingCopy? copy = null, ITakeSteps? steps = null)
+    public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, Config.Interfaces.ISettingsBlock settings, IAudioRouting routing, JingleBox2.Audio.Interfaces.IOutputBus? takes = null, JingleBox2.Audio.Interfaces.IRecordingSource? recordings = null, IWorkingCopy? copy = null, ITakeSteps? steps = null,
+        Audio.Routing.Interfaces.IInputSetting? setting = null,
+        Audio.Routing.Interfaces.IInputPath? input = null,
+        Audio.Routing.Interfaces.IInputArrangement? arrangement = null)
     {
         _copy = copy ?? new WorkingCopy();
         _steps = steps ?? new TakeSteps(waveformService);
@@ -682,28 +699,22 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         _preview = Playing(recordings, takes);
 
         _routing = routing;
-        _input = new Audio.Routing.InputPath(routing);
-        _setting = new Audio.Routing.InputSetting();
-        _arrangement = new Audio.Routing.InputArrangement(_setting, _input);
+        _input = input ?? new Audio.Routing.InputPath(routing);
+        _setting = setting ?? new Audio.Routing.InputSetting();
+        _arrangement = arrangement ?? new Audio.Routing.InputArrangement(_setting, _input);
         _arrangement.PutBack += Crept;
+        _arrangement.Arranged += Arranged;
+
+        _settings = settings;
+
+        var cfg = settings.Config;
 
         _cfg = cfg;
         _recordingService = recordingService;
         _levelMeter = levelMeter;
         _waveformService = waveformService;
-        _configStore = configStore;
 
-        _gainSaveTimer = new DispatcherTimer { Interval = GainSaveDelay };
-        _gainSaveTimer.Tick += (_, _) =>
-        {
-            _gainSaveTimer.Stop();
-            _cfg.RecordGainDb = _recordingService.GainDb;
-            _configStore.Save(_cfg);
-        };
-
-        RecordGainDb = cfg.RecordGainDb;
         _recordingService.GainDb = cfg.RecordGainDb;
-        _gainLoaded = true;
 
         _recordingService.Rang += Ringing;
 
@@ -1148,23 +1159,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         _names.NextName(basedOn, Recordings.Select(r => r.Name));
 
     /// <summary>
-    /// The gain reaches the recorder at once and the settings file half a second later.
-    /// </summary>
-    /// <remarks>
-    /// Nothing is written while the stored value is being put on the slider, or every start
-    /// would rewrite the settings file with the value it had just read out of it.
-    /// </remarks>
-    partial void OnRecordGainDbChanged(double value)
-    {
-        _recordingService.GainDb = value;
-
-        if (!_gainLoaded) return;
-
-        _gainSaveTimer.Stop();
-        _gainSaveTimer.Start();
-    }
-
-    /// <summary>
     /// Points the recorder at that input and remembers it for the next session.
     /// </summary>
     /// <remarks>
@@ -1183,7 +1177,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         if (_cfg.RecordInputDevice == value) return;
 
         _cfg.RecordInputDevice = value;
-        _configStore.Save(_cfg);
+        _settings.Moved();
     }
 
     /// <summary>
@@ -2206,8 +2200,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         _preferredRoute = value;
 
-        ApplyRoute(value, announce: true);
-
         Agree();
     }
 
@@ -2487,17 +2479,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     }
 
     /// <summary>
-    /// Makes the machine agree with the source and the switch, without saying anything.
-    /// </summary>
-    /// <remarks>
-    /// **The act on its own, for the reading pass, because the sentence is not wanted there.**
-    /// <see cref="Said"/> writes the status line whenever it has something to say, which is right
-    /// where somebody has just done something and wrong on a clock: asked every two seconds it
-    /// would pin the bar to the input's own sentence and rub out whatever else the page had put
-    /// there. The arrangement itself costs nothing when it already stands, so the two want
-    /// different rates and are two calls.
-    /// </remarks>
-    /// <summary>
     /// Says that the machine had put a source back onto its own output and it was taken off again.
     /// </summary>
     /// <remarks>
@@ -2510,12 +2491,51 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         Dispatcher.UIThread.Post(() =>
             Status = $"{source.Display} had got back onto its own output and was taken off again.");
 
-    private void Arrange()
-    {
-        _setting.Say(SelectedRoute, Hearing, PlayingOut);
+    /// <summary>
+    /// Makes the machine agree with the source and the switch, without saying anything.
+    /// </summary>
+    /// <remarks>
+    /// **Writing the setting is the whole of it.** What the machine does about it is the
+    /// arrangement's, on its own thread, and what came of it arrives back through
+    /// <see cref="Arranged"/>: nothing here waits for the graph's tools to run.
+    ///
+    /// **The act on its own, for the reading pass, because the sentence is not wanted there.**
+    /// <see cref="Said"/> writes the status line whenever it has something to say, which is right
+    /// where somebody has just done something and wrong on a clock: asked every two seconds it
+    /// would pin the bar to the input's own sentence and rub out whatever else the page had put
+    /// there. Writing the setting costs nothing when it already says that, so the two want
+    /// different rates and are two calls.
+    /// </remarks>
+    private void Arrange() => _setting.Say(SelectedRoute, Hearing, PlayingOut);
 
-        _aside = _arrangement.Aside;
-    }
+    /// <summary>
+    /// The machine was made to match, so the line on the screen is said again with the truth.
+    /// </summary>
+    /// <remarks>
+    /// It arrives on the arrangement's own thread. The picker is put back onto the source that
+    /// really connected for the same reason it always was: the list is read afresh off the graph,
+    /// so the object somebody picked is not the object in the list a moment later.
+    /// </remarks>
+    /// <param name="came">What came of it: the aside, and whether the capture is being fed.</param>
+    private void Arranged(Audio.Routing.Records.InputArranged came) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            _aside = came.Aside;
+
+            if (came.Connected && SelectedRoute is { } wanted)
+            {
+                _readingRoute = true;
+
+                if (Routes.FirstOrDefault(route => route.Node == wanted.Node) is { } showing
+                    && !ReferenceEquals(showing, SelectedRoute)) SelectedRoute = showing;
+
+                _readingRoute = false;
+            }
+
+            Listening();
+
+            Said(came.Connected);
+        });
 
     /// <summary>What became of taking the chosen source off its own output.</summary>
     /// <remarks>
@@ -2669,81 +2689,41 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     }
 
     /// <summary>
-    /// Puts the chosen source back after the input has been reopened. Silent when the choice is
-    /// already in place, and gives up when whatever was chosen has since stopped playing.
+    /// Puts the chosen source back where the graph has pointed the capture somewhere else.
     /// </summary>
     /// <remarks>
-    /// A retry rather than a request, so it says nothing unless it works: a source coming and
-    /// going is normal, and there is nothing anybody could do about it if it were announced.
+    /// **The one thing a reading of the graph is allowed to conclude.** The capture belongs to
+    /// the machine and its session manager re-points it whenever the stream is remade, so a
+    /// reading really can show a source nobody here chose. What somebody chose is still what they
+    /// chose, so the picker goes back to it and the arrangement is asked for again through
+    /// <see cref="Audio.Routing.Interfaces.IInputArrangement.Again"/>: the setting never moved, so
+    /// nothing would have been said by writing it.
+    ///
+    /// A retry rather than a request, so it says nothing: a source coming and going is normal,
+    /// and there is nothing anybody could do about it if it were announced. Nothing at all where
+    /// the graph agrees, or where whatever was chosen has since stopped playing and is not in the
+    /// list to go back to.
+    ///
+    /// The picker is put back with the reading guard up, so it is the graph being disagreed with
+    /// rather than somebody choosing again.
     /// </remarks>
+    /// <param name="current">What the graph says the capture is taking, or nothing.</param>
     private void RestorePreferred(AudioRoute? current)
     {
-        if (_applyingRoute || _preferredRoute == null) return;
+        if (_preferredRoute == null) return;
         if (current != null && current.Node == _preferredRoute.Node) return;
 
         var still = Routes.FirstOrDefault(r => r.Node == _preferredRoute.Node);
         if (still == null) return;
 
-        ApplyRoute(still, announce: false);
-    }
-
-    /// <summary>
-    /// Rewires the input. Off the UI thread: connecting runs a handful of command line tools,
-    /// and half a second of frozen window is not something a dropdown should cost.
-    /// </summary>
-    /// <remarks>
-    /// Connecting replaces whatever the system wired up, which is the whole point of the
-    /// picker: the system's own choice is a default, not a decision.
-    ///
-    /// What was applied is then shown, with the reading guard up so that showing it does not
-    /// count as a fresh choice and start the whole thing again.
-    ///
-    /// **The loop is said again at the end, and it has to be, because this is what was writing
-    /// over it.** Choosing a source says whether it can be heard at once, since by then the audio
-    /// would already be going round; this then ran and put "Taking audio from" and "Recording
-    /// from" on the line after it, so the one sentence explaining why nothing is heard was on the
-    /// screen for as long as it took a thread to be given a core. From a chair that is a source
-    /// that is silent with nothing anywhere saying why, which is exactly what the switch was
-    /// reported as.
-    ///
-    /// It cost a test the day it was found, and the way it cost it is worth keeping: the test
-    /// passed by relying on this method still being in flight when the source changed under it, so
-    /// it was green for a reason that had nothing to do with what it was about. **A race can be
-    /// stably won as well as stably lost**, and the tell was that it failed three times out of
-    /// three after a change that only made the work either side of it a little longer.
-    /// </remarks>
-    /// <param name="route">The input to wire up, taken from the picker or from what was preferred last.</param>
-    /// <param name="announce">
-    /// False for a retry, which must stay quiet: see <see cref="RestorePreferred"/>.
-    /// </param>
-    private async void ApplyRoute(AudioRoute route, bool announce)
-    {
-        if (_applyingRoute) return;
-
-        try
+        if (!ReferenceEquals(still, SelectedRoute))
         {
-            _applyingRoute = true;
-            if (announce) Status = _words.Taking(route);
-
-            bool connected = await Task.Run(() => _routing.Connect(route));
-
             _readingRoute = true;
-            var showing = Routes.FirstOrDefault(r => r.Node == route.Node);
-            if (connected && showing != null) SelectedRoute = showing;
+            SelectedRoute = still;
             _readingRoute = false;
+        }
 
-            Listening();
-
-            Said(connected);
-        }
-        catch (Exception ex)
-        {
-            Status = $"Could not change the input: {ex.Message}";
-        }
-        finally
-        {
-            _applyingRoute = false;
-        }
+        _arrangement.Again();
     }
 
     /// <summary>How many pages showing the input's meter are on screen.</summary>

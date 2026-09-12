@@ -7,30 +7,39 @@ namespace JingleBox2.ViewModels.Interfaces;
 /// What the recording input is taken from, and what it could be taken from.
 /// </summary>
 /// <remarks>
+/// The two halves together, which is what the pages hold while the input's own state and the
+/// reading of the graph are still owned by one object. The halves are
+/// <see cref="IInputChoice"/>, which is a setting, and <see cref="IInputOffers"/>, which is the
+/// machine. Whoever binds to one of them says which it means.
+///
 /// The source is picked on the mixer, at the foot of the IN strip, because that is the strip it
 /// is about: a strip says what a thing is doing and where it comes from is the first half of
 /// that. RECORD shows the same answer as a line of words, since one choice said twice in two
-/// pickers is two ways of doing one thing, which is the fault this codebase keeps naming.
+/// pickers is two ways of doing one thing.
 ///
-/// Separate from <see cref="IInputWatch"/> although one class answers both, because they are
-/// two different questions asked by two different pages. Watching is "somebody is showing the
-/// meter, hold the input open", which is true of any page with a meter on it. This is "what is
-/// feeding it", which is only true of a page that lets you say.
-///
-/// Reading the graph is in here rather than in the watching for the same reason it always was:
-/// it puts the preferred source back when the system has wired something else up, which is
-/// rewiring the machine's audio graph, and only a page carrying the picker has any business
-/// doing that. What changed is which page that is.
+/// Separate from <see cref="IInputWatch"/> although one class answers both, because they are two
+/// different questions asked by two different pages. Watching is "somebody is showing the meter,
+/// hold the input open", which is true of any page with a meter on it. This is "what is feeding
+/// it", which is only true of a page that lets you say.
 /// </remarks>
-public interface IInputSource
+public interface IInputSource : IInputChoice, IInputOffers
 {
-    /// <summary>Everything with audio to give right now, as the picker shows it.</summary>
-    /// <remarks>
-    /// Live rather than a snapshot: a program is only in the list while it is playing, so the
-    /// list a picker is bound to is one that changes under it while it is open.
-    /// </remarks>
-    ObservableCollection<AudioRoute> Routes { get; }
+}
 
+/// <summary>
+/// What somebody has chosen about the input: a setting, and nothing about the machine.
+/// </summary>
+/// <remarks>
+/// **Four of the seam's members are settings and the rest are not**, and carrying them together
+/// is what let the mixer's IN strip change what the machine is wired to by reaching through a
+/// page. A setting is written by the interface and observed by the routing; what the machine is
+/// offering is read off the graph by whatever reads graphs. See <c>docs/memory-blocks.md</c>.
+///
+/// Named apart before the implementation moves, deliberately: a page binds to the half it means
+/// now and can be handed a different object later without the bindings changing again.
+/// </remarks>
+public interface IInputChoice
+{
     /// <summary>Which of them the input is being taken from, or nothing while none is chosen.</summary>
     /// <remarks>
     /// Written by somebody picking one and by the graph being read back, which is why setting it
@@ -38,30 +47,6 @@ public interface IInputSource
     /// choice.
     /// </remarks>
     AudioRoute? SelectedRoute { get; set; }
-
-    /// <summary>False where there is nothing behind the picker, which leaves it empty and dead.</summary>
-    /// <remarks>
-    /// Whether a routing is available at all, which is not the same question as whether the
-    /// machine has a graph: Windows has no graph and answers true whenever there is an output or
-    /// a program it can capture. <see cref="NeedsSilentOutput"/> is the graph question.
-    /// </remarks>
-    bool IsRoutingAvailable { get; }
-
-    /// <summary>Reads the graph again, for a program that has started playing since.</summary>
-    void RefreshRoutes();
-
-    /// <summary>
-    /// Says a page carrying the picker is on screen, so the graph is read and kept read.
-    /// </summary>
-    /// <remarks>
-    /// Counted rather than switched, the same as <see cref="IInputWatch.Watch"/> and for the
-    /// same reason: RECORD and the mixer are both entitled to ask, and a flag would have
-    /// whichever page left last stop the reading under the page still up.
-    /// </remarks>
-    void WatchRoutes();
-
-    /// <summary>Says one of those pages has gone.</summary>
-    void LetRoutesGo();
 
     /// <summary>
     /// Whether what is coming in is heard through the desk while it comes in.
@@ -96,6 +81,62 @@ public interface IInputSource
     /// </remarks>
     bool CanHear { get; }
 
+    /// <summary>Which of them is chosen, or nothing while none is.</summary>
+    /// <remarks>
+    /// A cable is the usual answer and a spare socket is as good. With nothing chosen there is
+    /// nowhere to send a source, so choosing one cannot take it off its own output and the
+    /// routing says so rather than half doing it.
+    /// </remarks>
+    Audio.Records.AudioEndpoint? SilentOutput { get; set; }
+}
+
+/// <summary>
+/// What the machine is offering the input, and the asking that keeps that true.
+/// </summary>
+/// <remarks>
+/// Not settings. The list is read off the audio graph every couple of seconds and is live rather
+/// than a snapshot, since a program is only in it while it is playing; whether there is a graph
+/// to read at all is a fact about the machine; and the watching is a page saying it is looking.
+///
+/// Reading the graph belongs to a page carrying the picker, which is what the watching counts.
+/// **Holding a source off its own output does not**, and used to live in here: that is
+/// <see cref="Audio.Routing.Interfaces.IInputArrangement"/>, which runs for the session, because
+/// a source let back onto the speakers by a page being put away is audio going out that nobody
+/// asked for.
+/// </remarks>
+public interface IInputOffers
+{
+    /// <summary>Everything with audio to give right now, as the picker shows it.</summary>
+    /// <remarks>
+    /// Live rather than a snapshot: a program is only in the list while it is playing, so the
+    /// list a picker is bound to is one that changes under it while it is open.
+    /// </remarks>
+    ObservableCollection<AudioRoute> Routes { get; }
+
+    /// <summary>False where there is nothing behind the picker, which leaves it empty and dead.</summary>
+    /// <remarks>
+    /// Whether a routing is available at all, which is not the same question as whether the
+    /// machine has a graph: Windows has no graph and answers true whenever there is an output or
+    /// a program it can capture. <see cref="NeedsSilentOutput"/> is the graph question.
+    /// </remarks>
+    bool IsRoutingAvailable { get; }
+
+    /// <summary>Reads the graph again, for a program that has started playing since.</summary>
+    void RefreshRoutes();
+
+    /// <summary>
+    /// Says a page carrying the picker is on screen, so the graph is read and kept read.
+    /// </summary>
+    /// <remarks>
+    /// Counted rather than switched, the same as <see cref="IInputWatch.Watch"/> and for the
+    /// same reason: RECORD and the mixer are both entitled to ask, and a flag would have
+    /// whichever page left last stop the reading under the page still up.
+    /// </remarks>
+    void WatchRoutes();
+
+    /// <summary>Says one of those pages has gone.</summary>
+    void LetRoutesGo();
+
     /// <summary>Whether a source has to be sent somewhere rather than simply unplugged.</summary>
     /// <remarks>
     /// True on a machine with no graph, where the only way to take a source off its own output
@@ -106,12 +147,4 @@ public interface IInputSource
 
     /// <summary>Every output a source could be sent to so nobody hears it.</summary>
     System.Collections.Generic.IReadOnlyList<Audio.Records.AudioEndpoint> SilentOutputs { get; }
-
-    /// <summary>Which of them is chosen, or nothing while none is.</summary>
-    /// <remarks>
-    /// A cable is the usual answer and a spare socket is as good. With nothing chosen there is
-    /// nowhere to send a source, so choosing one cannot take it off its own output and the
-    /// routing says so rather than half doing it.
-    /// </remarks>
-    Audio.Records.AudioEndpoint? SilentOutput { get; set; }
 }

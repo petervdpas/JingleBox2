@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Records;
+using JingleBox2.Audio.Routing;
 using JingleBox2.Audio.Routing.Enums;
 using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Audio.Routing.Records;
@@ -61,9 +62,25 @@ public sealed class RecorderBench
         /// <inheritdoc/>
         public AudioRoute? GetCurrentRoute() => _current;
 
+        /// <summary>
+        /// The machine pointing the capture somewhere nobody here chose.
+        /// </summary>
+        /// <remarks>
+        /// What a session manager does whenever the stream is remade, and the one thing a reading
+        /// of the graph can turn up that this application did not do itself. Said in the double
+        /// rather than done through <see cref="Connect"/>, since going through there would be this
+        /// application choosing it.
+        /// </remarks>
+        /// <param name="route">What the machine has wired the capture to.</param>
+        public void Wired(AudioRoute route) => _current = route;
+
+        /// <summary>How many times the capture was pointed at something.</summary>
+        public int Connected { get; private set; }
+
         /// <inheritdoc/>
         public bool Connect(AudioRoute route)
         {
+            Connected++;
             _current = route;
 
             return true;
@@ -269,13 +286,36 @@ public sealed class RecorderBench
     /// <summary>The machine's wiring, so a test can count what was moved.</summary>
     public Rewiring Wiring { get; } = new();
 
-    /// <summary>The settings the page is built over, so a test can name an input before it opens.</summary>
-    public AppConfig Settings { get; } = new();
+    /// <summary>The settings block the page is built over.</summary>
+    public SettingsBlock Block { get; } = new(new AppConfig());
+
+    /// <summary>The settings themselves, so a test can name an input before the page opens.</summary>
+    public AppConfig Settings => Block.Config;
 
     /// <summary>The page itself.</summary>
     public RecordViewModel Page { get; }
 
-    /// <summary>Builds the page over the doubles.</summary>
-    public RecorderBench() =>
-        Page = new RecordViewModel(Recorder, new Flat(), new Blank(), new ConfigStore(), Settings, Wiring);
+    /// <summary>
+    /// Builds the page over the doubles, with the arrangement made where the test stands.
+    /// </summary>
+    /// <remarks>
+    /// **The arrangement is handed in so that saying a thing and it having happened are one
+    /// moment here.** In the application the setting is written by the drawing thread and the
+    /// machine is made to match on a thread of its own, since that runs the graph's own tools; a
+    /// test that asserted straight afterwards would be reading the answer to a question still in
+    /// flight. The path is handed in with it because the two must be the same object: it
+    /// remembers what it really moved, and a second one over the same routing would be a second
+    /// memory of that.
+    /// </remarks>
+    public RecorderBench()
+    {
+        var setting = new InputSetting();
+        var input = new InputPath(Wiring);
+
+        var arrangement = new InputArrangement(setting, input, work => work());
+
+        Page = new RecordViewModel(
+            Recorder, new Flat(), new Blank(), Block, Wiring,
+            setting: setting, input: input, arrangement: arrangement);
+    }
 }

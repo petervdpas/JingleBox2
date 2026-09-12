@@ -17,16 +17,15 @@ public sealed class PatchPlaces : IPatchPlaces
     /// <summary>The settings, holding the places among everything else.</summary>
     private readonly AppConfig _cfg;
 
-    /// <summary>What writes them out.</summary>
-    private readonly IConfigStore _store;
+    /// <summary>The block the settings are a part of, told whenever they move.</summary>
+    private readonly ISettingsBlock _settings;
 
-    /// <summary>Takes the settings to keep the places in, and what writes them.</summary>
-    /// <param name="cfg">The settings this installation is running on.</param>
-    /// <param name="store">What puts them on the disc.</param>
-    public PatchPlaces(AppConfig cfg, IConfigStore store)
+    /// <summary>Takes the settings block to keep the places in.</summary>
+    /// <param name="settings">The settings block this installation is running on.</param>
+    public PatchPlaces(ISettingsBlock settings)
     {
-        _cfg = cfg;
-        _store = store;
+        _settings = settings;
+        _cfg = settings.Config;
     }
 
     /// <inheritdoc/>
@@ -69,7 +68,7 @@ public sealed class PatchPlaces : IPatchPlaces
         place.X = x;
         place.Y = y;
 
-        _store.Save(_cfg);
+        _settings.Moved();
     }
 
     /// <summary>Whether a number is one a block can actually be drawn at.</summary>

@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Threading;
 using JingleBox2.Audio;
 using JingleBox2.Audio.Routing;
 using JingleBox2.Config;
@@ -70,17 +69,18 @@ public partial class MainWindow : Window
     private readonly IAudioRouting _routing;
 
     /// <summary>
-    /// The settings as they stand, kept so the window's own size can be written back into them
-    /// without reading the file again.
+    /// The settings block, kept so the window's own size can be written into it and said.
     /// </summary>
-    private AppConfig? _cfg;
+    private Config.Interfaces.ISettingsBlock? _settings;
 
-    /// <summary>
-    /// Gathers a drag of the window's edge into one write. Resizing announces itself
-    /// continuously, and a settings file written per pixel is a settings file written a
-    /// thousand times for one gesture.
-    /// </summary>
-    private DispatcherTimer? _saveWindowTimer;
+    /// <summary>What keeps the settings file saying what the settings say.</summary>
+    /// <remarks>
+    /// Built here because this is where the settings are read and where the way out is. Nothing
+    /// else in the application writes that file, and nothing else may: a drag of the window's
+    /// edge announces itself per pixel, and the rate a file is written at is one decision rather
+    /// than one per place that changes something.
+    /// </remarks>
+    private Config.Interfaces.ISettingsOnDisc? _disc;
 
     /// <summary>Set once the startup size has been applied, so layout does not trigger saves.</summary>
     private bool _windowRestored;
@@ -109,12 +109,6 @@ public partial class MainWindow : Window
 
     /// <inheritdoc cref="DefaultWidth"/>
     private const double DefaultHeight = 800;
-
-    /// <summary>
-    /// How long a resize has to settle before it is written down. Long enough to outlast a
-    /// drag, short enough that letting go and quitting still keeps the size.
-    /// </summary>
-    private static readonly TimeSpan WindowSaveDelay = TimeSpan.FromMilliseconds(500);
 
     /// <summary>
     /// Builds the window with nobody watching it be built.
@@ -165,10 +159,19 @@ public partial class MainWindow : Window
 
         var cfg = _store.LoadOrCreateDefault();
 
+        // Everything this run knows, in one place and built here: the settings that were just
+        // read, and the input's own state, which is never written down. Handed to the pages
+        // rather than reachable from them, so that no page owns a fact about the machine. See
+        // docs/memory-blocks.md.
+        var blocks = new Config.MemoryBlocks(cfg);
+
+        _settings = blocks.Settings;
+        _disc = new Config.SettingsOnDisc(_store, blocks.Settings);
+
         // The routing is made after the settings rather than before, because taking a source
         // aside on a machine with no graph needs somewhere to send it and that is a choice
         // stored here. On a graph it is not asked for at all.
-        var silent = new Config.SilentOutput(cfg, _store);
+        var silent = new Config.SilentOutput(blocks.Settings);
 
         _routing = new AudioRoutingFactory().Create(_recording, silent);
 
@@ -240,7 +243,7 @@ public partial class MainWindow : Window
 
         saying?.Doing("Building the pages");
 
-        var vm = new MainViewModel(_audio, _store, cfg, _midi, _recording, _waveform, _routing, projects, made);
+        var vm = new MainViewModel(_audio, blocks, _midi, _recording, _waveform, _routing, projects, made);
 
         // The same object the routing was given, so the picker on the mixer and what actually
         // sends a source away cannot disagree about which output is the quiet one.
@@ -274,7 +277,6 @@ public partial class MainWindow : Window
 
         vm.MatrixSizeChanged += OnMatrixSizeChanged;
 
-        _cfg = cfg;
         RestoreWindowSize(cfg);
 
         Closed += (_, __) =>
@@ -282,6 +284,11 @@ public partial class MainWindow : Window
             vm.Finished();
 
             vm.MatrixSizeChanged -= OnMatrixSizeChanged;
+
+            // Last, and after the pages have been told the run is over, since what they do on
+            // the way out is the last thing there is to write down. Letting it go writes.
+            _disc?.Dispose();
+
             _midi.Dispose();
             _audio.Dispose();
         };
@@ -365,30 +372,11 @@ public partial class MainWindow : Window
 
         _windowRestored = true;
 
-        _saveWindowTimer = new DispatcherTimer { Interval = WindowSaveDelay };
-        _saveWindowTimer.Tick += (_, _) =>
-        {
-            _saveWindowTimer.Stop();
-            SaveWindowSize();
-        };
-
         PropertyChanged += (_, e) =>
         {
             if (e.Property == ClientSizeProperty || e.Property == WindowStateProperty)
-                ScheduleWindowSave();
+                SaveWindowSize();
         };
-    }
-
-    /// <summary>
-    /// Starts the clock on writing the window's size down, restarting it if it was already
-    /// running, so a drag of a hundred steps costs one write at the end of it.
-    /// </summary>
-    private void ScheduleWindowSave()
-    {
-        if (!_windowRestored || _saveWindowTimer == null) return;
-
-        _saveWindowTimer.Stop();
-        _saveWindowTimer.Start();
     }
 
     /// <summary>
@@ -401,17 +389,19 @@ public partial class MainWindow : Window
     /// </remarks>
     private void SaveWindowSize()
     {
-        if (_cfg == null) return;
+        if (!_windowRestored || _settings is not { } settings) return;
 
-        _cfg.WindowMaximized = WindowState == WindowState.Maximized;
+        var cfg = settings.Config;
+
+        cfg.WindowMaximized = WindowState == WindowState.Maximized;
 
         if (WindowState == WindowState.Normal && Width > 0 && Height > 0)
         {
-            _cfg.WindowWidth = Width;
-            _cfg.WindowHeight = Height;
+            cfg.WindowWidth = Width;
+            cfg.WindowHeight = Height;
         }
 
-        _store.Save(_cfg);
+        settings.Moved();
     }
 
     /// <summary>
@@ -440,7 +430,7 @@ public partial class MainWindow : Window
         if (Width < width) Width = width;
         if (Height < height) Height = height;
 
-        ScheduleWindowSave();
+        SaveWindowSize();
     }
 
     /// <summary>Size that keeps the pads roughly square, never below the first-run default.</summary>

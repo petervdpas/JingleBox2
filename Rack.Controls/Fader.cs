@@ -31,7 +31,7 @@ public class Fader : ThemedControl
     private readonly IFaderMath _track = new FaderMath();
 
     /// <summary>Where a value sits in its range, and what a drag does to it. Holds nothing, so one is enough.</summary>
-    private readonly IRangeValue _range = new RangeValue();
+    private static readonly IRangeValue Ranges = new RangeValue();
 
     /// <summary>
     /// How wide the groove is, and the cap that rides it.
@@ -83,37 +83,32 @@ public class Fader : ThemedControl
     private const double TickLength = 5;
 
     /// <summary>
-    /// Where it is set to, which is never outside its own ends.
+    /// Where it is set to, which is whatever it was given.
     /// </summary>
     /// <remarks>
-    /// Held in range by the property itself rather than by whoever writes it. A control drawn
-    /// on a front panel is the last thing standing between a number and somebody's eyes, and it
-    /// has to be able to say what it is showing without asking anything else whether that is
-    /// allowed. Only the drawing used to clamp, so a value from outside the ends was kept whole,
-    /// drawn at the nearest end, and handed straight back to whatever the control was writing
-    /// to: the picture said one thing and the machine held another.
+    /// **The control shows the value and moves it, and never corrects it.** Whoever owns the
+    /// number owns it: a two way binding means every change this control makes is written back,
+    /// so a value this decided to alter is not a picture being tidied, it is somebody's setting
+    /// being overwritten by the thing that was supposed to be displaying it.
     ///
-    /// Nothing sets a knob to a number outside its range on purpose. Things do it by accident,
-    /// through arithmetic that went wrong somewhere else, and this is where that stops rather
-    /// than where it spreads.
+    /// It used to hold the value inside its ends, which cost the setting it was meant to protect.
+    /// The ends are almost always bindings, and a binding whose source goes away falls back to
+    /// what the property was registered with: for a moment the range really is nought to one, and
+    /// an input gain of 6.5 dB clamped to 1 and was written back as though a hand had moved the
+    /// fader. A data context arriving and leaving is ordinary, so the window is not a corner case
+    /// and no guard against a half-arrived range closes it, since the ends are not unset, they
+    /// are set to their defaults.
+    ///
+    /// **Nothing is lost by leaving it alone, because every way a hand moves this already lands
+    /// in range**: a press, a drag, the wheel, the arrow keys and the reset all go through
+    /// <see cref="IRangeValue.Quantize"/> against the ends as they stand. And a value from
+    /// outside the ends still draws at the nearest one, since the picture is worked out through
+    /// <see cref="IRangeValue.Fraction"/>, which clamps. So the picture is honest and the number
+    /// is untouched, which is the pair that could not both be had by correcting it.
     /// </remarks>
     public static readonly StyledProperty<double> ValueProperty =
         AvaloniaProperty.Register<Fader, double>(
-            nameof(Value), defaultBindingMode: BindingMode.TwoWay, coerce: Held);
-
-    /// <summary>A value as this control is prepared to hold it: inside its ends, and a number.</summary>
-    private static double Held(AvaloniaObject sender, double value)
-    {
-        if (sender is not Fader control) return value;
-
-        double low = control.Minimum;
-        double high = control.Maximum;
-
-        if (double.IsNaN(value)) return low;
-        if (high < low) return low;
-
-        return Math.Clamp(value, low, high);
-    }
+            nameof(Value), defaultBindingMode: BindingMode.TwoWay);
 
     /// <summary>Backs <see cref="Minimum"/>, the value at the bottom of the throw.</summary>
     public static readonly StyledProperty<double> MinimumProperty =
@@ -128,17 +123,6 @@ public class Fader : ThemedControl
     /// </remarks>
     public static readonly StyledProperty<double> MaximumProperty =
         AvaloniaProperty.Register<Fader, double>(nameof(Maximum), 1.0);
-
-    /// <summary>
-    /// The ends moved, so what is being held has to be asked again whether it still fits.
-    /// </summary>
-    /// <remarks>
-    /// A panel hands a control its range and its value in whatever order the layout happens to
-    /// build them. Without this, a value set while the ends were still their defaults would
-    /// keep whatever it was coerced to then.
-    /// </remarks>
-    private static void EndsMoved(Fader control, AvaloniaPropertyChangedEventArgs e) =>
-        control.CoerceValue(ValueProperty);
 
     /// <summary>Backs <see cref="SmallStep"/>: the grid the value snaps to, and one arrow key.</summary>
     public static readonly StyledProperty<double> SmallStepProperty =
@@ -286,8 +270,6 @@ public class Fader : ThemedControl
     /// </remarks>
     static Fader()
     {
-        MinimumProperty.Changed.AddClassHandler<Fader>(EndsMoved);
-        MaximumProperty.Changed.AddClassHandler<Fader>(EndsMoved);
 
         AffectsRender<Fader>(LinkGlow.LitProperty);
 
@@ -746,7 +728,7 @@ public class Fader : ThemedControl
         bool fine = _fineDrag || e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
         Value = fine
-            ? _range.FromDrag(_dragStartValue, _dragStartY - y, Minimum, Maximum, SmallStep, trackLength, fine: true)
+            ? Ranges.FromDrag(_dragStartValue, _dragStartY - y, Minimum, Maximum, SmallStep, trackLength, fine: true)
             : _track.ValueAt(y - _grabOffset, trackTop, trackLength, Minimum, Maximum, SmallStep);
 
         e.Handled = true;
@@ -807,11 +789,11 @@ public class Fader : ThemedControl
                 break;
 
             case Key.Home:
-                Value = _range.Quantize(Maximum, Minimum, Maximum, SmallStep);
+                Value = Ranges.Quantize(Maximum, Minimum, Maximum, SmallStep);
                 break;
 
             case Key.End:
-                Value = _range.Quantize(Minimum, Minimum, Maximum, SmallStep);
+                Value = Ranges.Quantize(Minimum, Minimum, Maximum, SmallStep);
                 break;
 
             default:
@@ -828,7 +810,7 @@ public class Fader : ThemedControl
 
         if (DefaultValue is not double reset) return;
 
-        Value = _range.Quantize(reset, Minimum, Maximum, SmallStep);
+        Value = Ranges.Quantize(reset, Minimum, Maximum, SmallStep);
         e.Handled = true;
     }
 
@@ -838,7 +820,7 @@ public class Fader : ThemedControl
         if (direction == 0) return;
 
         double step = modifiers.HasFlag(KeyModifiers.Shift) ? LargeStep : SmallStep;
-        Value = _range.Quantize(Value + direction * step, Minimum, Maximum, SmallStep);
+        Value = Ranges.Quantize(Value + direction * step, Minimum, Maximum, SmallStep);
     }
 
     /// <summary>A colour taken towards white, keeping its transparency, for the lit top of the cap.</summary>

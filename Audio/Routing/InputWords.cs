@@ -8,10 +8,6 @@ namespace JingleBox2.Audio.Routing;
 public sealed class InputWords : IInputWords
 {
     /// <inheritdoc/>
-    public string Taking(AudioRoute source) =>
-        source is null ? "" : "Taking audio from " + source.Name + "...";
-
-    /// <inheritdoc/>
     public string Line(AudioRoute? source, bool heard, bool canHear, InputAside aside, bool connected)
     {
         if (source is null) return "";

@@ -69,15 +69,19 @@ public interface IInputPath
     /// set without the tick and a tick set without the source are two half-answers that can
     /// disagree.
     ///
-    /// **The same question twice moves nothing.** The page reads the graph on a clock and ends
-    /// every reading here, so all but the first of those are the arrangement that is already
-    /// standing; acted on, each one would give the source back and take it off again, which is
-    /// the source out of the desk and back for a fraction of a second, once a second. The
-    /// question is the source and what this application plays out of, and a repeat is answered
-    /// from what the first one came to. Hear it is not in it, since where a source plays is
-    /// settled by choosing it and the tick has nothing to say about that; keeping the
-    /// arrangement standing against a session manager that rewires it is
-    /// <see cref="Hold"/>'s job.
+    /// **The same question twice takes nothing aside again, and still points the capture.** The
+    /// two halves are undone by different things at different rates, so they are asked at
+    /// different rates. Taking a source off its own output is expensive to repeat, since putting
+    /// the links back and pulling them out again is the source out of the desk and back for a
+    /// fraction of a second; what creeps back is put off again by <see cref="Hold"/> on a clock,
+    /// which costs nothing where nothing has. Pointing the capture is a link, and it is the half
+    /// a session manager really does re-point whenever the stream is remade, so it is made good
+    /// on every call: that is what lets a caller who has read the graph and found it wrong ask
+    /// for the arrangement again and get one.
+    ///
+    /// The question is the source and what this application plays out of. Hear it is not in it,
+    /// since where a source plays is settled by choosing it and the tick has nothing to say about
+    /// that.
     ///
     /// Whatever was taken aside is put back before anything new is taken, since a source that is
     /// no longer the input has no business staying unplugged from its own output.
@@ -89,7 +93,7 @@ public interface IInputPath
     /// <param name="heard">Whether Hear it is on.</param>
     /// <param name="playingOut">What this application plays out of, by name, for the loop test.</param>
     /// <returns>What became of taking the source off its own output.</returns>
-    Enums.InputAside Set(AudioRoute? source, bool heard, string? playingOut);
+    Records.InputArranged Set(AudioRoute? source, bool heard, string? playingOut);
 
     /// <summary>
     /// Whether a source is supposed to be off its own output at this moment.

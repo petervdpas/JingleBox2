@@ -1,5 +1,4 @@
 using System;
-using JingleBox2.Audio.Routing.Enums;
 using JingleBox2.Audio.Routing.Records;
 
 namespace JingleBox2.Audio.Routing.Interfaces;
@@ -26,7 +25,28 @@ namespace JingleBox2.Audio.Routing.Interfaces;
 public interface IInputArrangement : IDisposable
 {
     /// <summary>What came of the last arrangement, for whoever has to say so on the screen.</summary>
-    InputAside Aside { get; }
+    InputArranged Aside { get; }
+
+    /// <summary>
+    /// Said when the machine has been made to match, with what came of it.
+    /// </summary>
+    /// <remarks>
+    /// **The way back to the interface, and the only one.** Making the machine match runs the
+    /// graph's own tools and takes a moment, so it happens on this object's thread rather than on
+    /// the one drawing the window: whoever wants to put a line on a screen about it hears about
+    /// it here and is the one that has to get it onto the drawing thread.
+    /// </remarks>
+    event Action<InputArranged>? Arranged;
+
+    /// <summary>
+    /// Makes the machine match the setting again, without the setting having moved.
+    /// </summary>
+    /// <remarks>
+    /// For the case where the machine has wired something else up: the graph is the machine's and
+    /// a reading of it can show a source this application did not choose. Nothing here decides
+    /// that it has; whoever reads the graph does, and asks.
+    /// </remarks>
+    void Again();
 
     /// <summary>
     /// Said when a source had got back onto its own output and was taken off again.

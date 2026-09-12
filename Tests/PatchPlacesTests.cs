@@ -1,3 +1,4 @@
+using System;
 using JingleBox2.Config;
 using JingleBox2.Config.Interfaces;
 using JingleBox2.Config.Records;
@@ -20,29 +21,44 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class PatchPlacesTests
 {
-    /// <summary>A settings store that writes to nothing and counts what it was asked to write.</summary>
-    private sealed class Counting : IConfigStore
+    /// <summary>A settings block that counts how often it was told something had moved.</summary>
+    /// <remarks>
+    /// Nothing here writes a file. Whether the settings reach the disc is
+    /// <c>ISettingsOnDisc</c>'s and is asked about where that is; what matters here is whether a
+    /// gesture that moved nothing said it had, since a hint is what makes the file be written.
+    /// </remarks>
+    private sealed class Counting : ISettingsBlock
     {
-        /// <summary>How many times the settings were written out.</summary>
+        /// <summary>How many times something said the settings had moved.</summary>
         public int Saved { get; private set; }
 
         /// <inheritdoc/>
-        public string ConfigPath => "";
+        public AppConfig Config { get; } = new();
 
         /// <inheritdoc/>
-        public AppConfig LoadOrCreateDefault() => new();
+        public string Name => "Settings";
 
         /// <inheritdoc/>
-        public void Save(AppConfig cfg) => Saved++;
+        public bool Kept => true;
+
+        /// <inheritdoc/>
+        public event Action? Changed;
+
+        /// <inheritdoc/>
+        public void Moved()
+        {
+            Saved++;
+
+            Changed?.Invoke();
+        }
     }
 
     /// <summary>A fresh pair, with nothing remembered.</summary>
     private static (IPatchPlaces Places, AppConfig Config, Counting Store) Bench()
     {
-        var cfg = new AppConfig();
-        var store = new Counting();
+        var block = new Counting();
 
-        return (new PatchPlaces(cfg, store), cfg, store);
+        return (new PatchPlaces(block), block.Config, block);
     }
 
     /// <summary>A block nobody has moved has no place, and the graph's own stands.</summary>

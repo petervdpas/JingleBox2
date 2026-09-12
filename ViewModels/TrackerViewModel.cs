@@ -154,8 +154,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     private readonly ObservableCollection<Recording> _recordings;
 
-    /// <summary>Where the velocity preference is kept. Null in a test or a headless run.</summary>
-    private readonly ConfigStore? _configStore;
+    /// <summary>
+    /// The settings block the handful of preferences here live in. Null in a test or a headless
+    /// run.
+    /// </summary>
+    private readonly Config.Interfaces.ISettingsBlock? _settings;
 
     /// <summary>The settings as they stand, for the handful of preferences the tracker reads.</summary>
     private readonly AppConfig? _config;
@@ -1002,8 +1005,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <param name="audio">The one engine, shared with the pads rather than opened again.</param>
     /// <param name="rack">Where a sound starts, which is not where a song's instruments live.</param>
     /// <param name="recordings">The shelf of takes, shared with RECORD rather than copied.</param>
-    /// <param name="configStore">Where a preference is written down. Null in a test.</param>
-    /// <param name="config">The settings as they stand. Null in a test.</param>
+    /// <param name="settings">
+    /// The settings block the handful of preferences here live in. Null in a test, where there
+    /// is nothing to keep them in and nothing reading them.
+    /// </param>
     /// <param name="plugins">The plugin library, shared with the pads. One is made if none is given.</param>
     /// <param name="effects">What effects of ours this installation has, for the chains.</param>
     /// <param name="front">
@@ -1022,8 +1027,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         SoundMachineRack rack,
         ObservableCollection<Recording> recordings,
         ISoundMachineProjects machines,
-        ConfigStore? configStore = null,
-        AppConfig? config = null,
+        Config.Interfaces.ISettingsBlock? settings = null,
         PluginLibraryViewModel? plugins = null,
         IWaveformService? waveforms = null,
         SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null,
@@ -1035,8 +1039,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Edits.Watching = History.Taking;
 
-        _configStore = configStore;
-        _config = config;
+        _settings = settings;
+        _config = settings?.Config;
+
+        var config = _config;
         Plugins = plugins ?? new PluginLibraryViewModel();
         TrackEffect = new PluginChainViewModel(Plugins, Ours, front: front);
         TrackEffect.Changed += MarkDirty;
@@ -2303,10 +2309,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             ? "Note-offs recorded: letting a key up writes OFF where the cursor is"
             : "Note-offs not recorded: use the note-off key to write one";
 
-        if (_configStore == null || _config == null) return;
+        if (_settings == null || _config == null) return;
 
         _config.RecordNoteOffs = value;
-        _configStore.Save(_config);
+        _settings.Moved();
     }
 
     /// <summary>
@@ -2323,10 +2329,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
               " like a keyboard played at full strength"
             : "Typed notes carry no velocity: the volume column is left blank and the instrument's own level plays";
 
-        if (_configStore == null || _config == null) return;
+        if (_settings == null || _config == null) return;
 
         _config.TypedVelocity = value;
-        _configStore.Save(_config);
+        _settings.Moved();
     }
 
     partial void OnIgnoreVelocityChanged(bool value)
@@ -2335,10 +2341,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             ? "Key velocity ignored: notes come in at the instrument's own level"
             : "Key velocity followed: how hard you play is written into the volume column";
 
-        if (_configStore == null || _config == null) return;
+        if (_settings == null || _config == null) return;
 
         _config.IgnoreKeyVelocity = value;
-        _configStore.Save(_config);
+        _settings.Moved();
     }
 
     /// <summary>What the engine ended up running at, for SETTINGS to report.</summary>

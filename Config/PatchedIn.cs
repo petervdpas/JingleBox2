@@ -17,16 +17,15 @@ public sealed class PatchedIn : IPatchedIn
     /// <summary>The settings, holding the cables among everything else.</summary>
     private readonly AppConfig _cfg;
 
-    /// <summary>What writes them out.</summary>
-    private readonly IConfigStore _store;
+    /// <summary>The block the settings are a part of, told whenever they move.</summary>
+    private readonly ISettingsBlock _settings;
 
-    /// <summary>Takes the settings to keep the cables in, and what writes them.</summary>
-    /// <param name="cfg">The settings this installation is running on.</param>
-    /// <param name="store">What puts them on the disc.</param>
-    public PatchedIn(AppConfig cfg, IConfigStore store)
+    /// <summary>Takes the settings block to keep the cables in.</summary>
+    /// <param name="settings">The settings block this installation is running on.</param>
+    public PatchedIn(ISettingsBlock settings)
     {
-        _cfg = cfg;
-        _store = store;
+        _settings = settings;
+        _cfg = settings.Config;
     }
 
     /// <inheritdoc/>
@@ -43,7 +42,7 @@ public sealed class PatchedIn : IPatchedIn
 
         _cfg.PatchedIntoInput.Add(node);
 
-        _store.Save(_cfg);
+        _settings.Moved();
     }
 
     /// <inheritdoc/>
@@ -52,6 +51,6 @@ public sealed class PatchedIn : IPatchedIn
         if (string.IsNullOrEmpty(node)) return;
         if (_cfg.PatchedIntoInput.RemoveAll(one => string.Equals(one, node, StringComparison.Ordinal)) == 0) return;
 
-        _store.Save(_cfg);
+        _settings.Moved();
     }
 }

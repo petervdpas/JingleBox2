@@ -30,13 +30,12 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     /// <summary>Set while a scan is running, so a second one cannot start on top of it.</summary>
     private bool _scanning;
 
-    /// <summary>Where the settings are written, or null when nothing is to be kept.</summary>
+    /// <summary>The settings block, or null when nothing here is to be kept.</summary>
     /// <remarks>
-    /// Both this and the settings themselves are optional, because the plugin pickers are shown
-    /// in places that have no business writing a settings file, and a scan is worth having in
-    /// those too.
+    /// Optional, because the plugin pickers are shown in places that have no settings behind them
+    /// at all, and a scan is worth having in those too.
     /// </remarks>
-    private readonly ConfigStore? _store;
+    private readonly Config.Interfaces.ISettingsBlock? _settings;
 
     /// <summary>The settings, which is where the folders and the last scan's results live.</summary>
     private readonly AppConfig? _config;
@@ -49,10 +48,12 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     /// before anybody has asked to see a plugin would put the cost of the whole library on
     /// opening the application.
     /// </remarks>
-    public PluginLibraryViewModel(ConfigStore? store = null, AppConfig? config = null)
+    public PluginLibraryViewModel(Config.Interfaces.ISettingsBlock? settings = null)
     {
-        _store = store;
-        _config = config;
+        _settings = settings;
+        _config = settings?.Config;
+
+        var config = _config;
 
         foreach (var folder in config?.PluginFolders ?? new List<string>())
         {
@@ -161,10 +162,10 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     {
         Audio.Plugins.PluginShelf.Wants(found);
 
-        if (_store == null || _config == null) return;
+        if (_settings == null || _config == null) return;
 
         _config.KnownPlugins = found;
-        _store.Save(_config);
+        _settings.Moved();
     }
 
     /// <summary>Writes the folder list out, and tells the page the paths it shows have moved.</summary>
@@ -173,10 +174,10 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
         OnPropertyChanged(nameof(HasFolders));
         OnPropertyChanged(nameof(SearchPaths));
 
-        if (_store == null || _config == null) return;
+        if (_settings == null || _config == null) return;
 
         _config.PluginFolders = Folders.ToList();
-        _store.Save(_config);
+        _settings.Moved();
     }
 
     /// <summary>

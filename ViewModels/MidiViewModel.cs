@@ -33,10 +33,10 @@ public sealed partial class MidiViewModel : ObservableObject
     /// <remarks>Holds nothing of its own, so one is enough for the page's whole life.</remarks>
     private readonly IMidiPortBindings _bindings = new MidiPortBindings();
 
-    /// <summary>Where the settings are written when a job or a pad mapping moves.</summary>
-    private readonly ConfigStore _store;
+    /// <summary>The settings block, told whenever a job or a pad mapping moves.</summary>
+    private readonly Config.Interfaces.ISettingsBlock _settings;
 
-    /// <summary>The settings themselves, edited in place and then saved whole.</summary>
+    /// <summary>The settings themselves, edited in place.</summary>
     private readonly AppConfig _cfg;
 
     /// <summary>The ports, opened and closed from the jobs and listened to while learning.</summary>
@@ -72,18 +72,18 @@ public sealed partial class MidiViewModel : ObservableObject
     /// an older version, or by hand, can be short of any of them, and a page that assumed they
     /// were there would fail before it had drawn anything.
     /// </remarks>
-    /// <param name="store">Where the settings are written when a device's job changes.</param>
-    /// <param name="cfg">The settings as they stand, which is what the page shows.</param>
+    /// <param name="settings">The settings block the page shows and says it has changed.</param>
     /// <param name="midi">The ports, for what is plugged in and what it is saying.</param>
     /// <param name="profiles">
     /// What is known about the controllers plugged in. Left out, one of its own; the application
     /// hands the same one to everything, since what a device is doing is remembered in it.
     /// </param>
-    public MidiViewModel(ConfigStore store, AppConfig cfg, IMidiService midi, IControllerProfiles? profiles = null)
+    public MidiViewModel(Config.Interfaces.ISettingsBlock settings, IMidiService midi,
+        IControllerProfiles? profiles = null)
     {
         _profiles = profiles ?? new ControllerProfiles();
-        _store = store;
-        _cfg = cfg;
+        _settings = settings;
+        _cfg = settings.Config;
         _midi = midi;
 
         _cfg.Midi ??= new MidiConfig();
@@ -279,7 +279,7 @@ public sealed partial class MidiViewModel : ObservableObject
     /// not already the settings' own object: the jobs a port is given are written straight onto
     /// the settings by the rows themselves, so this is the save and nothing more.
     /// </remarks>
-    private void SaveMidi() => _store.Save(_cfg);
+    private void SaveMidi() => _settings.Moved();
 
     /// <summary>
     /// Whose clock the transport runs on: its own, or one named port's.

@@ -43,11 +43,44 @@ public interface IConfigStore
     /// Writes the settings out, having first put them in order.
     /// </summary>
     /// <remarks>
-    /// The tidying happens to the object it was handed rather than to a copy, so the caller's
-    /// settings and the file agree afterwards. That matters more than it sounds: the caller is
-    /// usually holding the same instance the application is running on, and a save that quietly
-    /// corrected the file while leaving the running settings wrong would put the two out of step
-    /// until the next start.
+    /// **The tidying happens to a copy, so writing the settings down does not change them.** The
+    /// document is put in order when it is read, which is where a file somebody edited by hand or
+    /// an older version wrote is dealt with; doing it again on the way out is about the file
+    /// rather than about what is in memory. The caller is holding the instance the whole
+    /// application is running on, and the thing that most wants correcting on the way out is
+    /// every pad's source, which is written as <c>{app}/</c> and is a path the pads are playing
+    /// from while it is.
+    ///
+    /// That is what lets the file be written from a thread of its own. Nothing here reaches into
+    /// what anybody else is reading.
     /// </remarks>
+    /// <param name="cfg">The settings as the application is holding them.</param>
     void Save(AppConfig cfg);
+
+    /// <summary>
+    /// The settings exactly as the file would hold them, without writing anything.
+    /// </summary>
+    /// <remarks>
+    /// **For knowing whether there is anything to write.** Whatever keeps the file up to date has
+    /// to be able to answer that without touching the disc, and the only honest answer is the
+    /// text itself: a document is a wall of fields, several of them lists that are added to in
+    /// place, so nothing shorter than what would be written can say whether it would differ from
+    /// what was.
+    ///
+    /// The same call the writing goes through, so the comparison and the file can never be made
+    /// of two different spellings of the document.
+    /// </remarks>
+    /// <param name="cfg">The settings as the application is holding them.</param>
+    string Written(AppConfig cfg);
+
+    /// <summary>
+    /// Puts that text in the file, whole.
+    /// </summary>
+    /// <remarks>
+    /// The other half of <see cref="Written"/>, for whoever has already worked out what the file
+    /// should say in order to find out whether it needed saying. Without it the text would be
+    /// made twice for every write, once to compare and once to keep.
+    /// </remarks>
+    /// <param name="written">What the file should say, as <see cref="Written"/> answered it.</param>
+    void Write(string written);
 }

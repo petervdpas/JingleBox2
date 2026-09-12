@@ -173,6 +173,31 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   master went through its own branch above that line, which is why a note played by hand moved
   the master's meter and no track's, and why it looked like the tracks were not isolated when
   what was really happening is that nobody was asking them
+- **A control shows a value and moves it, and never corrects it.** `Fader` and `Knob` used to hold
+  what they were given inside their ends, which reads as the obvious thing for a control on a
+  front panel to do and cost the setting it was meant to protect. `Value` is a two way binding, so
+  every change the control makes is written back to whoever owns the number: a value the control
+  decided to alter is not a picture being tidied, it is somebody's setting being overwritten by
+  the thing that was supposed to be displaying it
+- The ends are almost always bindings, and **a binding whose source goes away falls back to what
+  the property was registered with**, which for a fader's maximum is 1. So when a data context
+  changes above the control the range really is nought to one for an instant, the coercion runs,
+  an input gain of 6.5 dB becomes **1**, and the binding hands that back as though a hand had
+  moved the fader. It reached `AppConfig.RecordGainDb` and the disc, three seconds after the drag,
+  with the page never leaving the screen. No guard against a half-arrived range closes it: the
+  ends are not unset, they are set to their defaults, so `IsSet` answers true and the value really
+  is out of range
+- Read out of the log rather than reasoned about. `Environment.StackTrace` on the write named it
+  in one run: `ExpressionNode.SetSource`, `OnNodeError`, `ValueStore.SetLocalValue`,
+  `Fader.EndsMoved`, `BindingExpression.WriteTargetValueToSource`, `set_RecordGainDb(1.0)`. **A
+  value that arrives from nowhere is a stack trace away from being explained**, and guessing at
+  it cost two rounds first
+- **Nothing was lost by leaving the value alone, which is what makes the removal safe rather than
+  a retreat.** Every way a hand moves either control already lands in range: a press, a drag, the
+  wheel, the arrow keys and the reset all go through `IRangeValue.Quantize` against the ends as
+  they stand. And a value from outside the ends still draws at the nearest one, since the picture
+  is worked out through `IRangeValue.Fraction`, which clamps. The picture is honest and the number
+  is untouched, which is the pair that could not both be had by correcting it
 - A fader was as wide as the number under it. `MeasureOverride` measured the current reading, so
   "-10.0 dB" came out a character wider than "0.0 dB", two of the mixer's strips were wider
   inside than the other two, and the meter beside the wide ones was pushed into the strip's own
@@ -399,14 +424,21 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   knowing nothing about songs, devices or pads and unable to, or the thing that keeps every stored
   path honest would depend on all three. `ISongPaths` keeps the instrument walk over it, which is
   forced rather than tidy: the walk knows what a kit, a sampler and a chopped take are
-- Applied in `SoundMachineRack` and `ConfigStore` now. **Packed around the write in a `finally`
-  rather than on a copy**, because the rack hands out the very objects the pages are looking at
-  and one left holding `{app}/` after a save plays nothing until it is read off disc again, which
-  reads as saving having broken the sound. A path outside the folder is left exactly as it was,
-  since it is somewhere the user chose or somebody else's plugin, and an `http://` stream goes
-  through untouched without anything needing to know it is a URL. Nothing to migrate: `Unpack`
-  returns an unstored path unchanged, so every file already written reads as it did and the first
-  save rewrites it
+- Applied in `SoundMachineRack` and `ConfigStore` now. A path outside the folder is left exactly
+  as it was, since it is somewhere the user chose or somebody else's plugin, and an `http://`
+  stream goes through untouched without anything needing to know it is a URL. Nothing to migrate:
+  `Unpack` returns an unstored path unchanged, so every file already written reads as it did and
+  the first save rewrites it
+- **The rack packs around the write in a `finally` and the settings pack a copy**, and the
+  difference is which thread does the writing. The rack hands out the very objects the pages are
+  looking at, and one left holding `{app}/` after a save plays nothing until it is read off disc
+  again, which reads as saving having broken the sound; that window is a few instructions on the
+  thread that asked, and the `finally` is what closes it. The settings file is written on a clock
+  of its own now, so there is no thread to be on the far side of that window: `ConfigStore.Copy`
+  is a round trip through the same serialiser the file is written with, and **writing the
+  settings down does not change them**. Normalising goes with it, which is where it belonged
+  anyway, since the document is put in order when it is read and a save that quietly clamped what
+  somebody was working on would be the file deciding what is in memory
 
 - **The registry is what this installation has, and it is the only thing that answers that.**
   Two folders and only one of them is yours. Beside the program is what ships: a source to take

@@ -156,24 +156,49 @@ public sealed class ConfigStore : IConfigStore
     }
 
     /// <inheritdoc/>
-    public void Save(AppConfig cfg)
+    public void Save(AppConfig cfg) => Write(Written(cfg));
+
+    /// <inheritdoc/>
+    public void Write(string written) => _files.Write(ConfigPath, written);
+
+    /// <inheritdoc/>
+    public string Written(AppConfig cfg)
     {
-        cfg.Version = AppConfig.CurrentVersion;
+        var copy = Copy(cfg);
 
-        Normalize(cfg);
+        copy.Version = AppConfig.CurrentVersion;
 
-        try
-        {
-            Sources(cfg, _portable.Pack);
+        Normalize(copy);
 
-            var json = JsonSerializer.Serialize(cfg, JsonOptions);
-            _files.Write(ConfigPath, json);
-        }
-        finally
-        {
-            Sources(cfg, _portable.Unpack);
-        }
+        Sources(copy, _portable.Pack);
+
+        return JsonSerializer.Serialize(copy, JsonOptions);
     }
+
+    /// <summary>
+    /// The settings as a second object, so nothing done on the way to the file is done to them.
+    /// </summary>
+    /// <remarks>
+    /// **Writing the settings down may not change them**, and it used to change them three times:
+    /// the version was stamped on, the whole document was normalised, and every pad's source was
+    /// rewritten as <c>{app}/</c> and rewritten back in a <c>finally</c>. That was defensible
+    /// while saving happened on whichever thread had just moved something, and the <c>finally</c>
+    /// is what it cost. It is not defensible now that the file is written on a clock of its own:
+    /// the window between packing and unpacking would be open at moments nobody chose, and what
+    /// is in it is the path every pad plays, read by the drawing thread.
+    ///
+    /// A round trip through the same serialiser the file is written with, so a copy cannot hold
+    /// anything the file would not. It is the one place the copy has to be faithful, and being
+    /// the writer's own format is what makes it so.
+    ///
+    /// Normalising then happens to the copy, which is where it belongs: the document was
+    /// normalised when it was read, and a save that quietly clamped what somebody was working on
+    /// would be the file deciding what is in memory.
+    /// </remarks>
+    /// <param name="cfg">The settings as the application is holding them.</param>
+    private static AppConfig Copy(AppConfig cfg) =>
+        JsonSerializer.Deserialize<AppConfig>(JsonSerializer.Serialize(cfg, JsonOptions), JsonOptions)
+        ?? new AppConfig();
 
     /// <summary>
     /// Every pad's source, both ways, so the settings survive the folder moving.

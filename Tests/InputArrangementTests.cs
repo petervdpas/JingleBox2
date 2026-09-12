@@ -50,15 +50,20 @@ public sealed class InputArrangementTests
         /// <inheritdoc/>
         public bool CanHear(AudioRoute? source, string? playingOut) => true;
 
+        /// <summary>Whether the capture is answered as connected, since a source can refuse.</summary>
+        public bool Connects { get; set; } = true;
+
         /// <inheritdoc/>
-        public InputAside Set(AudioRoute? source, bool heard, string? playingOut)
+        public InputArranged Set(AudioRoute? source, bool heard, string? playingOut)
         {
             Arranged++;
 
             Source = source;
             Heard = heard;
 
-            return source == null ? InputAside.Nothing : InputAside.Moved;
+            return new InputArranged(
+                source == null ? InputAside.Nothing : InputAside.Moved,
+                source != null && Connects);
         }
 
         /// <inheritdoc/>
@@ -75,6 +80,15 @@ public sealed class InputArrangementTests
         public void GiveBack() => Source = null;
     }
 
+    /// <summary>Runs the arrangement where it stands, so a test can read what it came to.</summary>
+    /// <remarks>
+    /// The application hands the work to the thread pool, since making the machine match runs the
+    /// graph's own tools and the page that wrote the setting is the drawing thread. Here the work
+    /// is the thing being asked about, so it runs on the asking thread and the answer is there by
+    /// the time the setting has been said.
+    /// </remarks>
+    private static void Here(Action work) => work();
+
     /// <summary>A source of the kind somebody lines up before a show.</summary>
     private static readonly AudioRoute Browser = new("Firefox", "Firefox", AudioRouteKind.Application);
 
@@ -88,12 +102,13 @@ public sealed class InputArrangementTests
         var input = new Pointed();
         var setting = new InputSetting();
 
-        using var arrangement = new InputArrangement(setting, input);
+        using var arrangement = new InputArrangement(setting, input, Here);
 
         setting.Say(Browser, heard: false, playingOut: "Speakers");
 
         Assert.Equal(1, input.Arranged);
-        Assert.Equal(InputAside.Moved, arrangement.Aside);
+        Assert.Equal(InputAside.Moved, arrangement.Aside.Aside);
+        Assert.True(arrangement.Aside.Connected);
     }
 
     /// <summary>
@@ -110,7 +125,7 @@ public sealed class InputArrangementTests
         var input = new Pointed();
         var setting = new InputSetting();
 
-        using var arrangement = new InputArrangement(setting, input);
+        using var arrangement = new InputArrangement(setting, input, Here);
 
         setting.Say(Browser, heard: false, playingOut: "Speakers");
         setting.Say(Again, heard: false, playingOut: "Speakers");
@@ -126,7 +141,7 @@ public sealed class InputArrangementTests
         var input = new Pointed();
         var setting = new InputSetting();
 
-        using var arrangement = new InputArrangement(setting, input);
+        using var arrangement = new InputArrangement(setting, input, Here);
 
         setting.Say(Browser, heard: false, playingOut: "Speakers");
         setting.Say(Browser, heard: true, playingOut: "Speakers");
@@ -149,7 +164,7 @@ public sealed class InputArrangementTests
         var input = new Pointed();
         var setting = new InputSetting();
 
-        using var arrangement = new InputArrangement(setting, input);
+        using var arrangement = new InputArrangement(setting, input, Here);
 
         setting.Say(Browser, heard: false, playingOut: "Speakers");
 
@@ -166,7 +181,7 @@ public sealed class InputArrangementTests
         var input = new Pointed();
         var setting = new InputSetting();
 
-        using var arrangement = new InputArrangement(setting, input);
+        using var arrangement = new InputArrangement(setting, input, Here);
 
         arrangement.Check();
 
@@ -180,7 +195,7 @@ public sealed class InputArrangementTests
         var input = new Pointed();
         var setting = new InputSetting();
 
-        using var arrangement = new InputArrangement(setting, input);
+        using var arrangement = new InputArrangement(setting, input, Here);
 
         setting.Say(Browser, heard: false, playingOut: "Speakers");
 
@@ -204,7 +219,7 @@ public sealed class InputArrangementTests
         var input = new Pointed { Throws = true };
         var setting = new InputSetting();
 
-        using var arrangement = new InputArrangement(setting, input);
+        using var arrangement = new InputArrangement(setting, input, Here);
 
         setting.Say(Browser, heard: false, playingOut: "Speakers");
 
@@ -224,7 +239,7 @@ public sealed class InputArrangementTests
         var input = new Pointed { CreptBack = true };
         var setting = new InputSetting();
 
-        using var arrangement = new InputArrangement(setting, input);
+        using var arrangement = new InputArrangement(setting, input, Here);
 
         AudioRoute? said = null;
 
@@ -244,7 +259,7 @@ public sealed class InputArrangementTests
         var input = new Pointed();
         var setting = new InputSetting();
 
-        using var arrangement = new InputArrangement(setting, input);
+        using var arrangement = new InputArrangement(setting, input, Here);
 
         int said = 0;
 
@@ -265,7 +280,7 @@ public sealed class InputArrangementTests
         var input = new Pointed();
         var setting = new InputSetting();
 
-        var arrangement = new InputArrangement(setting, input);
+        var arrangement = new InputArrangement(setting, input, Here);
 
         setting.Say(Browser, heard: false, playingOut: "Speakers");
 

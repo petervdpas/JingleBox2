@@ -24,15 +24,6 @@ namespace JingleBox2.Audio.Routing.Interfaces;
 /// </remarks>
 public interface IInputWords
 {
-    /// <summary>What to say while a source is being wired up.</summary>
-    /// <remarks>
-    /// The one line here that is not an outcome. Connecting runs command line tools and can take a
-    /// moment, so this says something is happening; it is replaced by <see cref="Line"/> the
-    /// moment there is an answer.
-    /// </remarks>
-    /// <param name="source">The source being taken.</param>
-    string Taking(AudioRoute source);
-
     /// <summary>
     /// The one sentence for what the input channel has just been made to do.
     /// </summary>

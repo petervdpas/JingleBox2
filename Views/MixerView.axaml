@@ -78,9 +78,18 @@
 
           <!-- The reading is the strip's rather than the fader's: see the note on the track
                strip below for why a fader cannot carry the word. -->
+          <!-- The word is the strip's and the rest of the sentence is this template's: the
+               recorder's fader is a gain on what is coming in rather than a level on what is
+               going out, and the same strip is drawn for all three sources. -->
           <TextBlock Grid.Row="4" HorizontalAlignment="Center" Margin="0,4,0,0"
-                     FontFamily="{x:Static ui:PatternFont.Family}" FontSize="11"
-                     Text="{Binding VolumeDecibels, StringFormat='Level: {0:+0.0;-0.0;0.0} dB'}" />
+                     FontFamily="{x:Static ui:PatternFont.Family}" FontSize="11">
+            <TextBlock.Text>
+              <MultiBinding StringFormat="{}{0}: {1:+0.0;-0.0;0.0} dB">
+                <Binding Path="Reading" />
+                <Binding Path="VolumeDecibels" />
+              </MultiBinding>
+            </TextBlock.Text>
+          </TextBlock>
 
           <!-- Where this strip is fed from, in the row a track's strip keeps its ducking in, so
                the desk stays one shape across. Only the recording input has one: what feeds the

@@ -17,7 +17,7 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 /// <remarks>
 /// **It holds a picture and hands decisions on.** What a cable means is the routing's business,
-/// so plugging one in is <see cref="IInputSource.SelectedRoute"/> being set and nothing else:
+/// so plugging one in is <see cref="IInputChoice.SelectedRoute"/> being set and nothing else:
 /// the same act as picking the source at the foot of the IN strip, since they are one choice and
 /// this codebase has already paid for having two ways to make one.
 ///

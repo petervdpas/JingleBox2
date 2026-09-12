@@ -131,11 +131,29 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// </remarks>
     private readonly IRecordingService _recording;
 
-    /// <summary>Where the settings are written, which is the same file for all of them.</summary>
-    private readonly ConfigStore _store;
+    /// <summary>The settings block: the document to read and write, and the word that it moved.</summary>
+    /// <remarks>
+    /// **What this page can do to the settings file is say that something changed.** When and how
+    /// that reaches the disc is <see cref="Config.Interfaces.ISettingsOnDisc"/>'s, which follows
+    /// the block on a clock of its own. There used to be twenty two decisions in this one class
+    /// that now was the moment to write a file.
+    /// </remarks>
+    private readonly Config.Interfaces.ISettingsBlock _settings;
 
     /// <summary>The settings as they stand, which is what everything here reads and writes.</summary>
     private readonly AppConfig _cfg;
+
+    /// <summary>
+    /// Everything this run knows, in one place, held above every page.
+    /// </summary>
+    /// <remarks>
+    /// **Held rather than reached for.** One of them because there is one application, built
+    /// where the settings are read, and handed to whoever needs a block: a page that is built,
+    /// shown, hidden and thrown away then owns nothing about the machine. See
+    /// <c>docs/memory-blocks.md</c>, and <see cref="Config.Interfaces.IMemoryBlocks"/> for why
+    /// there is deliberately no way to ask for it from anywhere.
+    /// </remarks>
+    private readonly Config.Interfaces.IMemoryBlocks _blocks;
 
     /// <summary>
     /// Set while this object is writing to its own properties, so the writes are not read back
@@ -559,7 +577,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             if (_cfg.FreeTrackerPlugins == value) return;
 
             _cfg.FreeTrackerPlugins = value;
-            _store.Save(_cfg);
+            _settings.Moved();
 
             OnPropertyChanged();
         }
@@ -753,7 +771,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
                 if (label != value || _cfg.EngineSampleRate == rate) continue;
 
                 _cfg.EngineSampleRate = rate;
-                _store.Save(_cfg);
+                _settings.Moved();
 
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(EngineRateHint));
@@ -825,7 +843,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             if (_cfg.OutputBufferSize == frames) return;
 
             _cfg.OutputBufferSize = frames;
-            _store.Save(_cfg);
+            _settings.Moved();
 
             ApplyAudioSizes();
 
@@ -871,7 +889,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             if (_cfg.RealtimeAudio == value) return;
 
             _cfg.RealtimeAudio = value;
-            _store.Save(_cfg);
+            _settings.Moved();
 
             Audio.RealtimeThread.Wants(value);
 
@@ -898,7 +916,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             if (_cfg.FastDriveCurve == value) return;
 
             _cfg.FastDriveCurve = value;
-            _store.Save(_cfg);
+            _settings.Moved();
 
             Audio.TangentSwitch.Wants(value);
 
@@ -922,7 +940,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             if (_cfg.OverlapPlugins == value) return;
 
             _cfg.OverlapPlugins = value;
-            _store.Save(_cfg);
+            _settings.Moved();
 
             Audio.OverlapSwitch.Wants(value);
 
@@ -964,7 +982,8 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             value => Record.RecordGainDb = value,
             _audio.MonitorBus,
             ApplySolo,
-            source: Record);
+            source: Record,
+            reading: "Gain");
 
     /// <summary>
     /// Quiet enough to be nothing. A meter that has just fallen still reads a hair above nought.
@@ -1196,9 +1215,9 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     public PatchbayViewModel Patchbay => patchbay ??= new PatchbayViewModel(
         Record,
         this,
-        new Config.PatchPlaces(_cfg, _store),
+        new Config.PatchPlaces(_settings),
         this,
-        patched: new Config.PatchedIn(_cfg, _store),
+        patched: new Config.PatchedIn(_settings),
         audio: Wired);
 
     /// <summary>Backing field for <see cref="Wired"/>.</summary>
@@ -1556,7 +1575,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             if (name != label || held == number) continue;
 
             put(number);
-            _store.Save(_cfg);
+            _settings.Moved();
 
             return;
         }
@@ -1667,7 +1686,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
                 if (label != value || _cfg.RenderAheadMs == milliseconds) continue;
 
                 _cfg.RenderAheadMs = milliseconds;
-                _store.Save(_cfg);
+                _settings.Moved();
 
                 ApplyAudioSizes();
 
@@ -1706,7 +1725,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             if (_cfg.WriteLog == value) return;
 
             _cfg.WriteLog = value;
-            _store.Save(_cfg);
+            _settings.Moved();
 
             if (value) Diagnostics.Log.Open(new Files.AppFolder().Path(), true, Written);
             else Diagnostics.Log.Close();
@@ -1791,7 +1810,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         }
 
         _cfg.LogAreas = (int)wanted;
-        _store.Save(_cfg);
+        _settings.Moved();
 
         if (WriteLog) Diagnostics.Log.Open(new Files.AppFolder().Path(), true, Written);
 
@@ -2083,8 +2102,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
     /// </remarks>
     public MainViewModel(
         IAudioEngine audio,
-        ConfigStore store,
-        AppConfig cfg,
+        Config.Interfaces.IMemoryBlocks blocks,
         IMidiService midiService,
         IRecordingService recordingService,
         IWaveformService waveformService,
@@ -2092,26 +2110,32 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         ISoundMachineProjects machines,
         SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null)
     {
+        _blocks = blocks;
+        _settings = blocks.Settings;
+
+        var settings = _settings;
+        var cfg = settings.Config;
+
         _machines = machines;
         _recording = recordingService;
         _effects = effects ?? new SoundDevices.SoundEffects.SoundEffectProjects();
         _audio = audio;
-        _store = store;
         _cfg = cfg;
 
         Layout = new Midi.DefaultLayout(_profiles);
 
-        Midi = new MidiViewModel(store, cfg, midiService, _profiles);
+        Midi = new MidiViewModel(settings, midiService, _profiles);
 
-        Plugins = new PluginLibraryViewModel(store, cfg);
+        Plugins = new PluginLibraryViewModel(settings);
 
         Shortcuts = new ShortcutsViewModel(keys =>
         {
             cfg.Shortcuts = keys.Count > 0 ? keys : null;
-            store.Save(cfg);
+
+            settings.Moved();
         });
 
-        Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg, routing, _audio.TakeBus, _audio.Recordings);
+        Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, settings, routing, _audio.TakeBus, _audio.Recordings, setting: _blocks.Input);
 
         Record.UsePlugins(Plugins, _effects, _effectInFront);
 
@@ -2140,7 +2164,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         var rack = new SoundMachineRack();
 
         Tracker = new TrackerViewModel(
-            audio, rack, Record.Recordings, _machines, store, cfg, Plugins, waveformService, _effects,
+            audio, rack, Record.Recordings, _machines, settings, Plugins, waveformService, _effects,
             _effectInFront);
         Machines = new RackViewModel(rack, Tracker, _machines, Record.Recordings, waveformService, Plugins, _effects);
 
@@ -2287,7 +2311,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
 
         var noteRouter = new MidiNoteRouter(Keys);
 
-        ControlLink = new ControlLink(_cfg.Midi.Controls, () => _store.Save(_cfg));
+        ControlLink = new ControlLink(_cfg.Midi.Controls, () => _settings.Moved());
 
         var targets = new ControlTargets(
             Tracker, _machines, Machines, new TransportPresses(Transport), _effects, _effectInFront,
@@ -2458,7 +2482,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             if (_cfg.ExtendedPadMatrix == value) return;
 
             _cfg.ExtendedPadMatrix = value;
-            _store.Save(_cfg);
+            _settings.Moved();
 
             OnPropertyChanged();
             OnPropertyChanged(nameof(MostPads));
@@ -2484,7 +2508,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             if (_cfg.ShowMachineEditor == value) return;
 
             _cfg.ShowMachineEditor = value;
-            _store.Save(_cfg);
+            _settings.Moved();
 
             OnPropertyChanged();
         }
@@ -2508,7 +2532,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             if (_cfg.PulseWhilePlaying == value) return;
 
             _cfg.PulseWhilePlaying = value;
-            _store.Save(_cfg);
+            _settings.Moved();
 
             OnPropertyChanged();
         }
@@ -2531,7 +2555,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
             if (_cfg.LinkPadMatrix == value) return;
 
             _cfg.LinkPadMatrix = value;
-            _store.Save(_cfg);
+            _settings.Moved();
 
             OnPropertyChanged();
         }
@@ -2598,7 +2622,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         EnsureProfilesInitialized(PadCount);
         BuildPadsFromSelectedProfile(PadCount);
 
-        _store.Save(_cfg);
+        _settings.Moved();
 
         OnPropertyChanged(nameof(PadCount));
         OnPropertyChanged(nameof(PadColumns));
@@ -2633,7 +2657,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
 
         _cfg.SelectedProfile = EnsureProfileExistsAndReturnResolved(name, padCount: PadCount);
 
-        _store.Save(_cfg);
+        _settings.Moved();
 
         _suspendSave = true;
         try
@@ -2666,7 +2690,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         _cfg.SelectedTheme = resolved;
         ThemeSwitch.Apply(resolved);
 
-        _store.Save(_cfg);
+        _settings.Moved();
     }
 
     /// <summary>
@@ -2775,7 +2799,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
 
             BuildPadsFromSelectedProfile(wanted.Count);
 
-            _store.Save(_cfg);
+            _settings.Moved();
         }
         finally
         {
@@ -2821,7 +2845,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         _cfg.Profiles.Add(newProfile);
         _cfg.SelectedProfile = name;
 
-        _store.Save(_cfg);
+        _settings.Moved();
 
         _suspendSave = true;
         try
@@ -2862,7 +2886,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
         _cfg.Profiles.RemoveAt(idx);
         _cfg.SelectedProfile = "default";
 
-        _store.Save(_cfg);
+        _settings.Moved();
 
         _suspendSave = true;
         try
@@ -2902,7 +2926,7 @@ public sealed partial class MainViewModel : ObservableObject, IOutputChosen, IAu
 
         _cfg.SelectedTheme = string.IsNullOrWhiteSpace(SelectedTheme) ? "Dark" : SelectedTheme.Trim();
 
-        _store.Save(_cfg);
+        _settings.Moved();
     }
 
     /// <summary>

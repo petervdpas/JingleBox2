@@ -67,8 +67,20 @@ public sealed class InputPathTests
         /// <inheritdoc/>
         public AudioRoute? GetCurrentRoute() => null;
 
+        /// <summary>How many times the capture was pointed at something.</summary>
+        public int Connected { get; private set; }
+
+        /// <summary>What it was last pointed at.</summary>
+        public AudioRoute? Pointed { get; private set; }
+
         /// <inheritdoc/>
-        public bool Connect(AudioRoute route) => true;
+        public bool Connect(AudioRoute route)
+        {
+            Connected++;
+            Pointed = route;
+
+            return true;
+        }
 
         /// <inheritdoc/>
         public bool CanTakeAside => Can;
@@ -240,7 +252,7 @@ public sealed class InputPathTests
 
         Assert.Equal(0, route.Aside);
         Assert.False(path.CanHear(Speakers, Out));
-        Assert.Equal(JingleBox2.Audio.Routing.Enums.InputAside.Nothing, aside);
+        Assert.Equal(JingleBox2.Audio.Routing.Enums.InputAside.Nothing, aside.Aside);
     }
 
     /// <summary>Cannot tell is read as ours, since the other way round is a room full of it.</summary>
@@ -301,7 +313,7 @@ public sealed class InputPathTests
 
         Assert.Equal(
             JingleBox2.Audio.Routing.Enums.InputAside.Refused,
-            path.Set(Firefox, heard: true, Out));
+            path.Set(Firefox, heard: true, Out).Aside);
     }
 
     /// <summary>The arrangement is held over anything that creeps back.</summary>
@@ -380,6 +392,37 @@ public sealed class InputPathTests
 
         Assert.Equal(aside, route.Aside);
         Assert.Equal(back, route.Back);
+    }
+
+    /// <summary>
+    /// **And it points the capture every single time**, which is the other half of that rule.
+    /// </summary>
+    /// <remarks>
+    /// The two halves are undone by different things. What has crept back onto its own output is
+    /// put off again by <see cref="InputPath.Hold"/> on a clock, so taking it aside afresh would
+    /// be work nobody asked for and a source out of the desk and back while it happened. The
+    /// capture is the half the machine's own session manager re-points, whenever the stream is
+    /// remade, and putting it back where it belongs costs one link.
+    ///
+    /// So a caller who has read the graph, found the capture pointed somewhere nobody here chose,
+    /// and asked for the arrangement again is answered with one. Answered from memory it would be
+    /// told the arrangement already stands, and the capture would be left on whatever the machine
+    /// had wired up.
+    /// </remarks>
+    [Fact]
+    public void The_same_question_twice_still_points_the_capture()
+    {
+        var route = new Route();
+        var path = new InputPath(route);
+
+        path.Set(Firefox, heard: false, Out);
+
+        Assert.Equal(1, route.Connected);
+
+        path.Set(Firefox, heard: false, Out);
+
+        Assert.Equal(2, route.Connected);
+        Assert.Equal(Firefox, route.Pointed);
     }
 
     /// <summary>And it answers the same thing rather than claiming nothing happened.</summary>
@@ -475,7 +518,7 @@ public sealed class InputPathTests
         var route = new Route { Can = false };
         var path = new InputPath(route);
 
-        Assert.Equal(InputAside.Refused, path.Set(Firefox, heard: false, Out));
+        Assert.Equal(InputAside.Refused, path.Set(Firefox, heard: false, Out).Aside);
 
         Assert.True(path.Hold());
         Assert.Equal(1, route.Held);
@@ -492,11 +535,11 @@ public sealed class InputPathTests
         var route = new Route { Can = false };
         var path = new InputPath(route);
 
-        Assert.Equal(InputAside.Refused, path.Set(Firefox, heard: false, Out));
+        Assert.Equal(InputAside.Refused, path.Set(Firefox, heard: false, Out).Aside);
 
         route.Can = true;
 
-        Assert.Equal(InputAside.Moved, path.Set(Firefox, heard: true, Out));
+        Assert.Equal(InputAside.Moved, path.Set(Firefox, heard: true, Out).Aside);
         Assert.Equal(1, route.Aside);
     }
 
@@ -511,7 +554,7 @@ public sealed class InputPathTests
         var route = new Route { Ours = true };
         var path = new InputPath(route);
 
-        Assert.Equal(InputAside.Nothing, path.Set(Speakers, heard: false, Out));
+        Assert.Equal(InputAside.Nothing, path.Set(Speakers, heard: false, Out).Aside);
 
         Assert.False(path.Hold());
         Assert.Equal(0, route.Held);

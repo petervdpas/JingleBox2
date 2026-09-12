@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.Timers;
-using JingleBox2.Audio.Routing.Enums;
 using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Audio.Routing.Records;
 using JingleBox2.Diagnostics;
@@ -49,6 +48,15 @@ public sealed class InputArrangement : IInputArrangement
     /// <summary>What moves the links about and knows what it has moved.</summary>
     private readonly IInputPath _input;
 
+    /// <summary>How a piece of work is got off the thread that asked for it.</summary>
+    /// <remarks>
+    /// Handed in for the reason <c>ControlWrites</c>'s trip to the drawing thread is handed in:
+    /// the application has a thread pool and a test wants the work where it can see it, and the
+    /// whole of what is worth checking here is what the arrangement came to rather than which
+    /// thread it came to it on.
+    /// </remarks>
+    private readonly Action<Action> _away;
+
     /// <summary>The clock, which runs for as long as this does.</summary>
     /// <remarks>
     /// Started once and never stopped short of the way out, rather than turned on and off with
@@ -71,7 +79,10 @@ public sealed class InputArrangement : IInputArrangement
     private readonly Stopwatch _looked = Stopwatch.StartNew();
 
     /// <inheritdoc/>
-    public InputAside Aside { get; private set; }
+    public InputArranged Aside { get; private set; }
+
+    /// <inheritdoc/>
+    public event Action<InputArranged>? Arranged;
 
     /// <inheritdoc/>
     public event Action<AudioRoute>? PutBack;
@@ -79,10 +90,16 @@ public sealed class InputArrangement : IInputArrangement
     /// <summary>Follows a setting, and makes the machine match it from now on.</summary>
     /// <param name="setting">What the pages have asked for.</param>
     /// <param name="input">What moves the links about.</param>
-    public InputArrangement(IInputSetting setting, IInputPath input)
+    /// <param name="away">
+    /// How to get off the thread that wrote the setting. The thread pool unless somebody says
+    /// otherwise, which is what the application wants; a caller that hands in one running the
+    /// work where it stands gets the arrangement made before the call to say so comes back.
+    /// </param>
+    public InputArrangement(IInputSetting setting, IInputPath input, Action<Action>? away = null)
     {
         _setting = setting;
         _input = input;
+        _away = away ?? (work => System.Threading.Tasks.Task.Run(work));
 
         _setting.Changed += Follow;
 
@@ -95,17 +112,23 @@ public sealed class InputArrangement : IInputArrangement
     /// The setting moved, so the machine is made to match it.
     /// </summary>
     /// <remarks>
-    /// On whichever thread said so, which is the drawing thread when somebody picks a source: the
-    /// page reads <see cref="Aside"/> immediately afterwards to say what came of it, and a
-    /// sentence about an arrangement that has not been made yet is worse than none.
+    /// **Off the thread that said so**, because making the machine match runs the graph's own
+    /// command line tools and takes a moment: the page that wrote the setting is the drawing
+    /// thread, and half a second of frozen window is not what a dropdown should cost. What came
+    /// of it is said afterwards through <see cref="Arranged"/>.
     /// </remarks>
-    private void Follow()
+    private void Follow() => _away(Again);
+
+    /// <inheritdoc/>
+    public void Again()
     {
         _since.Restart();
 
         try
         {
             Aside = _input.Set(_setting.Source, _setting.Heard, _setting.PlayingOut);
+
+            Arranged?.Invoke(Aside);
         }
         catch (Exception bad)
         {

@@ -61,6 +61,10 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
     /// What this strip is fed from, where that is a thing anybody can choose. Only the recording
     /// input has one; the pads and a take being auditioned are fed by this program.
     /// </param>
+    /// <param name="reading">
+    /// The word under the fader, which is a level unless somebody says otherwise. See
+    /// <see cref="Reading"/> for the one strip that says otherwise and why.
+    /// </param>
     public SourceStripViewModel(
         string label,
         string tip,
@@ -70,8 +74,11 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
         Action<double> write,
         Audio.Interfaces.IOutputBus? bus = null,
         Action? soloed = null,
-        Interfaces.IInputSource? source = null)
+        Interfaces.IInputSource? source = null,
+        string reading = "Level")
     {
+        Reading = reading;
+
         _bus = bus;
         _soloed = soloed;
 
@@ -88,6 +95,22 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
 
     /// <summary>What the badge says.</summary>
     public string Label { get; }
+
+    /// <summary>
+    /// What the fader is, in the word printed under it.
+    /// </summary>
+    /// <remarks>
+    /// **A level for almost every strip, and a gain for the recording input**, which is not a
+    /// nicety: the recorder's fader is the gain applied to what is coming in before anything is
+    /// written, so it decides what a take holds and not merely what you hear. Two words for two
+    /// things, said where somebody is looking at the fader, since the same strip is drawn for the
+    /// input, the pads and a take being auditioned and only one of the three is a gain.
+    ///
+    /// The word rather than the sentence, because how a reading is worded is whatever draws it:
+    /// the number's format, its sign and its unit belong to the template and are the same for
+    /// all of them.
+    /// </remarks>
+    public string Reading { get; }
 
     /// <summary>The longer version, for resting on it.</summary>
     public string Tip { get; }
@@ -207,6 +230,10 @@ public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.
         set
         {
             if (Math.Abs(_read() - value) < 0.0001) return;
+
+            Diagnostics.Log.Write(
+                Diagnostics.Enums.LogArea.Audio,
+                () => "mixer: " + Label + " was written at " + value.ToString("0.0") + " dB");
 
             _write(value);
 

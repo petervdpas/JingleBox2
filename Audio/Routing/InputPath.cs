@@ -40,7 +40,7 @@ public sealed class InputPath : IInputPath
         return _routing.IsOurOutput(source, playingOut) == false;
     }
 
-    /// <summary>The question this was last asked, so the same one is not answered twice.</summary>
+    /// <summary>The question this was last asked, so the same source is not pulled about twice.</summary>
     /// <remarks>
     /// **Being told the same thing again is the ordinary case rather than a corner.** The graph is
     /// read on a clock, and a reading ends by saying what the input is pointed at, which is almost
@@ -51,12 +51,18 @@ public sealed class InputPath : IInputPath
     /// graph at that rate. A hardware device rewired that often is one that answers busy when it
     /// is asked for.
     ///
-    /// So the arrangement is made where the question changes and held by <see cref="Hold"/>
-    /// otherwise, which is the whole of why holding is a separate call: it takes off only what has
-    /// crept back, where this moves things.
+    /// So the take is made where the question changes and held by <see cref="Hold"/> otherwise,
+    /// which is the whole of why holding is a separate call: it takes off only what has crept
+    /// back, where a take moves things.
     ///
-    /// The answer is kept beside the question, since a caller asking the same thing twice wants
-    /// the same answer and not a claim that nothing happened.
+    /// **This is the aside half alone, and the capture is pointed every time.** Connecting is the
+    /// half the machine keeps undoing, since a session manager re-points a capture whenever the
+    /// stream is remade, and putting it back where it belongs costs a link rather than a source
+    /// out of the desk and back. So a repeat still connects, which is what makes
+    /// <see cref="Interfaces.IInputArrangement.Again"/> mean something.
+    ///
+    /// What the take came to is kept beside the question, since a caller asking the same thing
+    /// twice wants the same answer and not a claim that nothing happened.
     ///
     /// **A refusal is not an arrangement, so it is not one of the questions this holds.** Asked
     /// the same thing again after a take that did not come off, this answers it as though it were
@@ -73,30 +79,50 @@ public sealed class InputPath : IInputPath
     /// </remarks>
     private string _asked = "";
 
-    /// <summary>What the last question came to.</summary>
-    private InputAside _answered = InputAside.Nothing;
+    /// <summary>What the last take came to.</summary>
+    private InputAside _aside;
 
     /// <summary>Whether anything has been asked yet, since the first question is not a repeat.</summary>
     private bool _everAsked;
 
     /// <inheritdoc/>
-    public InputAside Set(AudioRoute? source, bool heard, string? playingOut)
+    /// <remarks>
+    /// **Both moves are here: the source is taken off its own output, and the capture is pointed
+    /// at it.** They were in two places, the connecting on the page and the taking here, and the
+    /// order between them was whatever the call sites happened to be written in. Together they
+    /// are what "the machine matches the setting" means, and either can fail on its own, which is
+    /// why what comes back says both.
+    ///
+    /// The two are asked at different rates on purpose, which is written up on
+    /// <see cref="_asked"/>: the same question again takes nothing aside and still points the
+    /// capture.
+    ///
+    /// Connecting runs the machine's own graph tools and takes a moment, so nothing here may be
+    /// called from the drawing thread: <see cref="Interfaces.IInputArrangement"/> is what calls
+    /// it, and it does that on a thread of its own.
+    /// </remarks>
+    public InputArranged Set(AudioRoute? source, bool heard, string? playingOut)
     {
         Heard = heard;
+        Source = source;
 
         string asking = (source?.Node ?? "") + "\n" + (playingOut ?? "");
 
-        if (_everAsked && asking == _asked && _answered != InputAside.Refused) return _answered;
+        bool afresh = !_everAsked || asking != _asked || _aside == InputAside.Refused;
 
         _everAsked = true;
         _asked = asking;
 
-        Source = source;
-        _meant = false;
+        if (afresh)
+        {
+            _meant = false;
 
-        _routing.GiveBack();
+            _routing.GiveBack();
 
-        return _answered = Take(source, playingOut);
+            _aside = Take(source, playingOut);
+        }
+
+        return new InputArranged(_aside, source != null && _routing.Connect(source));
     }
 
     /// <summary>Takes the source off its own output, and says what came of it.</summary>
@@ -148,6 +174,7 @@ public sealed class InputPath : IInputPath
     {
         _everAsked = false;
         _meant = false;
+        _aside = InputAside.Nothing;
 
         _routing.GiveBack();
     }

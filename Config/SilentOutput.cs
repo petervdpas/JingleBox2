@@ -18,20 +18,15 @@ public sealed class SilentOutput : ISilentOutput
     /// <summary>Where the outputs are read from.</summary>
     private readonly IPlaybackEndpoints _endpoints;
 
-    /// <summary>The settings, holding the choice among everything else.</summary>
-    private readonly AppConfig _cfg;
-
-    /// <summary>What writes them out.</summary>
-    private readonly IConfigStore _store;
+    /// <summary>The settings block, holding the choice among everything else.</summary>
+    private readonly ISettingsBlock _settings;
 
     /// <summary>Takes the settings to keep the choice in, and where the outputs come from.</summary>
-    /// <param name="cfg">The settings this installation is running on.</param>
-    /// <param name="store">What puts them on the disc.</param>
+    /// <param name="settings">The settings block this installation is running on.</param>
     /// <param name="endpoints">Where the outputs are read from, or the machine's own.</param>
-    public SilentOutput(AppConfig cfg, IConfigStore store, IPlaybackEndpoints? endpoints = null)
+    public SilentOutput(ISettingsBlock settings, IPlaybackEndpoints? endpoints = null)
     {
-        _cfg = cfg;
-        _store = store;
+        _settings = settings;
         _endpoints = endpoints ?? new PlaybackEndpoints().Here();
     }
 
@@ -41,15 +36,18 @@ public sealed class SilentOutput : ISilentOutput
     /// <inheritdoc/>
     public string? Chosen
     {
-        get => string.IsNullOrWhiteSpace(_cfg.SilentOutput) ? null : _cfg.SilentOutput;
+        get => string.IsNullOrWhiteSpace(_settings.Config.SilentOutput)
+            ? null
+            : _settings.Config.SilentOutput;
         set
         {
             string chosen = value ?? "";
 
-            if (_cfg.SilentOutput == chosen) return;
+            if (_settings.Config.SilentOutput == chosen) return;
 
-            _cfg.SilentOutput = chosen;
-            _store.Save(_cfg);
+            _settings.Config.SilentOutput = chosen;
+
+            _settings.Moved();
         }
     }
 }
