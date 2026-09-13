@@ -1323,7 +1323,20 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     void ITransportDeck.Record() => IsRecording = !IsRecording;
 
     /// <inheritdoc/>
-    void ITransportDeck.Play() => Play();
+    /// <remarks>
+    /// A play while the song is already playing does nothing. A device with its transport sent
+    /// in two dialects says play twice for one press, a realtime Start and machine control Play
+    /// back to back, and the second one started the song again from the top a few milliseconds
+    /// into the first. Asked of the player rather than of <see cref="Transport"/>, which is
+    /// posted to the drawing thread and has not arrived by the time the second message has.
+    /// The page's own Play button does not come through here and still starts again.
+    /// </remarks>
+    void ITransportDeck.Play()
+    {
+        if (_player.IsPlaying) return;
+
+        Play();
+    }
 
     /// <inheritdoc/>
     void ITransportDeck.Pause() => Pause();

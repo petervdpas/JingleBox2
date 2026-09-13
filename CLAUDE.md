@@ -4000,13 +4000,29 @@ whole exercise and is worth writing down rather than summarising:
   something on a page that is not the mixer. A transport key is `ControlScope.Fixed` and belongs
   to the desk rather than to a song: there is one transport, and a link that travelled in a file
   would arrive on somebody else's machine telling their hardware what to do
-- `Controllers/Profiles/keystep-pro.json` is the one that says a device cannot be described, and why.
-  Its five encoders have no factory controller number: the manual's Controller page marks a
-  default for channel, mode, min and max and marks none for CC, so the omission is deliberate
-  and there is nothing to write down even in principle. Measuring one would report what its
-  owner assigned. Two facts are in the file instead. The Looper strip sends CC 9 with its MIDI
-  send off until a menu is visited, which reads as broken hardware. And its three transport
-  buttons send MIDI Machine Control, which is why that is read here at all
+- `Controllers/Profiles/keystep-pro.json` was read off the device on 2026-09-13 through Arturia's
+  settings protocol and checked page by page against sysex-controls on screen. The five encoders
+  send 74 to 78 in Control mode, on the global channel, absolute over 0 to 127, and they are
+  endless, so they are followed as movement. It is written in the file's note with everything
+  else the device answered, the tracks, the drum map, sync, the metronome and the CV outputs
+  included
+- **A setting a device can be asked for is asked for**, and a manual's silence on one page is not
+  a fact about the hardware. The KeyStep Pro manual's Controller page marks a default for every
+  encoder field but the CC; the numbers are printed on pages 124 and 153, and the device answers
+  them in a second
+- Its Mode row is commented out of sysex-controls' Knobs page as not working, and the device
+  answers it anyway: nought, Absolute, for all five. What an application chooses to show is not
+  what a device will say
+- Transport send reads Both, so a press sends MIDI Machine Control and a realtime byte together,
+  and the Looper strip sends CC 9 with its MIDI send off until a menu is visited, which reads as
+  broken hardware
+- **So one press is two plays, and a play while the tracker is playing does nothing.** The
+  tracker's `ITransportDeck.Play` asks the player rather than `Transport`, since `Transport` is
+  posted to the drawing thread and the second message arrives before it does; read the other
+  way, the second play started the song again from line 0. Only the transport's door has the
+  guard: the page's own Play button still starts again. RECORD needed nothing, since its
+  `CanPlay` is false while a take is playing and that is set on the calling thread.
+  `Tests/DoublePlayTests.cs` drives the pair through the router over a real tracker
 - `Controllers/Profiles/keylab-mkii.json` is the first file here filled in without anybody
   touching the hardware. A KeyLab mkII 49 arrived on 2026-08-29 and answered Arturia's own
   settings protocol for every field of every control, so the whole of User mode came back over
@@ -4524,8 +4540,8 @@ whole exercise and is worth writing down rather than summarising:
 - **It was measured before it was argued about.** 32 synth voices through `TrackMixer.Render`, in
   Debug, on Linux: mean 15 to 16% of each block's own time at 128, 256, 512 and 1024 frames, and
   nothing collected over thousands of blocks. Flat regardless of block size, so there is no fixed
-  per-block overhead worth naming, and allocation-free on the render path. Whatever is forcing a
-  bigger buffer on Windows than another host needs, the mixer's own arithmetic is not it, and
+  per-block overhead worth naming, and allocation-free on the render path. Whatever made this Linux
+  machine need a 2048 frame buffer where Bitwig ran at 1024, the mixer's own arithmetic is not it, and
   rewriting that arithmetic in another language would buy the sixth of a block it already uses
 - **The pads reach the driver too, and they do it through the output bus.** This paragraph said
   for a long time that they did not, that ASIO was the tracker's alone and that picking a driver

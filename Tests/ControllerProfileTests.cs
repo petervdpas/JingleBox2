@@ -394,32 +394,53 @@ public class ControllerProfileTests
     }
 
     /// <summary>
-    /// The file that says a device cannot be described: named, with none of its encoders
-    /// claimed.
+    /// A KeyStep Pro's Control mode, which the device was asked for rather than guessed at.
     /// </summary>
     /// <remarks>
-    /// The KeyStep Pro's five encoders have no factory controller number at all: its manual
-    /// marks a default for every neighbouring parameter and none for these. So there is
-    /// nothing to write down even in principle, and they are learned by touch like any
-    /// control on a device nobody has described. Measuring one would report what its owner
-    /// assigned rather than a fact about the hardware.
+    /// Read on 2026-09-13 through Arturia's own settings protocol and checked page by page
+    /// against sysex-controls. The five encoders send 74 to 78 on the global channel, absolute,
+    /// over the full range, and they are endless, so a position from one is followed as
+    /// movement. Channel is not claimed, since Global follows a setting the owner can change.
     /// <para>
-    /// The one control the manual does fix is the Looper strip, which is picked up rather than
-    /// followed. It sends CC 9 with its MIDI send off until a menu is visited, which reads as
-    /// broken hardware.
+    /// The Looper strip is picked up rather than followed. It sends CC 9 with its MIDI send off
+    /// until a menu is visited, which reads as broken hardware.
     /// </para>
     /// </remarks>
     [Fact]
-    public void A_device_with_no_factory_numbers_has_none_written_down()
+    public void A_keystep_pros_control_mode_was_read_off_the_device()
     {
         const string Ksp = "KeyStep Pro MIDI 1";
 
         Assert.Equal("KeyStep Pro", _profiles.Called(Ksp));
-        Assert.Equal("", _profiles.Named(Ksp, 1, 74));
-        Assert.Null(_profiles.Pickup(Ksp, 1, 74));
+
+        Assert.Equal("Pitch", _profiles.Named(Ksp, 1, 74));
+        Assert.Equal("Gate", _profiles.Named(Ksp, 1, 75));
+        Assert.Equal("Velocity", _profiles.Named(Ksp, 1, 76));
+        Assert.Equal("Time Shift", _profiles.Named(Ksp, 1, 77));
+        Assert.Equal("Randomness", _profiles.Named(Ksp, 16, 78));
+
+        Assert.Equal(ControlPickup.Endless, _profiles.Pickup(Ksp, 1, 74));
+        Assert.Equal(ControlPickup.Endless, _profiles.Pickup(Ksp, 16, 78));
 
         Assert.Equal("Looper strip", _profiles.Named(Ksp, 1, 9));
         Assert.Equal(ControlPickup.Takeover, _profiles.Pickup(Ksp, 1, 9));
+    }
+
+    /// <summary>
+    /// What the KeyStep Pro does not send is not named: the numbers either side of its encoders,
+    /// and a port that only looks like it.
+    /// </summary>
+    [Fact]
+    public void A_keystep_pro_names_nothing_it_does_not_send()
+    {
+        const string Ksp = "KeyStep Pro MIDI 1";
+
+        Assert.Equal("", _profiles.Named(Ksp, 1, 73));
+        Assert.Null(_profiles.Pickup(Ksp, 1, 73));
+        Assert.Equal("", _profiles.Named(Ksp, 1, 79));
+        Assert.Null(_profiles.Pickup(Ksp, 1, 79));
+
+        Assert.Equal("", _profiles.Named("KeyStep 37 MIDI 1", 1, 74));
     }
 
     /// <summary>

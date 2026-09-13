@@ -1,28 +1,72 @@
 {
   "name": "KeyStep Pro",
-  "//": "From the manual only. The five encoders are deliberately absent: this device has no factory controller numbers for them.",
+  "//": "Read off the device on 2026-09-13 through Arturia's own settings protocol, the one sysex-controls speaks, and checked page by page against that application on screen. Every value below is the device's answer; the only lines taken from the manual are marked as such.",
   "matches": [
     "KeyStep Pro*",
     "*KeyStep Pro*",
     "*KeyStepPro*",
     "*KeyStep-Pro*"
   ],
-  "identity": null,
+  "//identity": "Universal identity request: F0 7E 7F 06 02 00 20 6B 02 00 09 00 25 14 05 02 F7. Firmware 2.5.20, which sysex-controls shows on its Controller page.",
+  "identity": {
+    "manufacturer": "00 20 6B",
+    "family": "0002",
+    "member": "0009"
+  },
+  "//ports": "One, seen on this machine as KeyStep Pro MIDI 1 (ALSA client 20). The two MIDI outs, the MIDI in and the clock out are on the back of the device and are not ports to the computer.",
   "ports": [
     {
       "match": "*",
       "role": "controls",
-      "note": "one port as far as the computer is concerned; the two MIDI outs, the MIDI in and the clock out are not on the USB side"
+      "note": "one port, and everything comes out of it: the keys and the four tracks as notes, the five encoders in Control mode as controllers, the transport as machine control and realtime bytes, and the clock"
     }
   ],
+  "//controls": "What sends the same thing whatever the device is doing. The Looper strip was read: CC 9, strip enabled, MIDI send/receive Off. The settings protocol has no field for the modulation strip; it was measured on the wire instead, the same day: CC 1, 0 up to 127 and back, sent on channel 10 in that run, which is track 1's drum output rather than the global channel 1 the encoders use, so no channel is claimed for it.",
   "controls": [
     {
       "name": "Looper strip",
       "cc": 9,
-      "channel": 0,
+      "kind": "strip"
+    },
+    {
+      "name": "Mod strip",
+      "cc": 1,
       "kind": "strip"
     }
   ],
-  "programs": [],
-  "note": "A sequencer that is also a controller, and the second of those is the part with almost nothing in it that can be written down.\n\nIts five encoders have no factory controller number. The manual's Controller page gives each one CC [0-127] and marks no default, while every other parameter on that same page marks one: channel [1(d)-16], mode [Absolute(d), Relative1, Relative2, Relative3], min [0(d)-127], max [0-127(d)]. The omission is deliberate, so there is no map for this device even in principle, and measuring one would only report what its owner assigned. Each encoder is separately absolute or relative as well, so two of these need not agree even after both are set up. They are learned by touching them, which is what happens for a device with no file at all.\n\nWhat the manual does fix is the Looper touch strip, and it is worth knowing precisely because of how it fails: it sends CC 9, and its MIDI send is off until somebody turns it on in UTIL > Touch Strip > MIDI Send/Receive. A control that sends nothing until a menu is visited reads as broken hardware.\n\nThe transport is the thing to know about this device. Its three buttons send MIDI Machine Control, which is system exclusive, and this device is the reason that is read here at all. Both dialects work: MMC as it ships, and realtime start, continue and stop if it is switched over in UTIL (Transport send [OFF, MMC, Realtime, Both]). Either way the port needs the transport job ticked in SETTINGS, since on a port carrying the transport a message means the transport and not a note.\n\nThe ports have not been seen from this application, so the one port entry below matches anything. The device has a USB port, two MIDI outs, one MIDI in and a clock out, and MIDI Out 2 can be switched to Thru, none of which the computer sees.\n\nSource: docs/keystep-pro_Manual_2_5_2_EN.pdf, the Controller and Transport configuration pages. Nothing here was measured."
+  "//programs": "Control is the mode in which the five encoders send controllers. Out of it they edit the sequencer on the device and send nothing. Every encoder read: port All, channel Global, min 0, max 127, mode Absolute. The mode row is left off sysex-controls' Knobs page, commented out by its author as not working, and the device answered it all the same: 0 for all five, which is Absolute and is the manual's default.",
+  "programs": [
+    {
+      "name": "Control",
+      "sends": "absolute",
+      "controls": [
+        {
+          "name": "Pitch",
+          "cc": 74,
+          "kind": "encoder"
+        },
+        {
+          "name": "Gate",
+          "cc": 75,
+          "kind": "encoder"
+        },
+        {
+          "name": "Velocity",
+          "cc": 76,
+          "kind": "encoder"
+        },
+        {
+          "name": "Time Shift",
+          "cc": 77,
+          "kind": "encoder"
+        },
+        {
+          "name": "Randomness",
+          "cc": 78,
+          "kind": "encoder"
+        }
+      ]
+    }
+  ],
+  "note": "A sequencer that is also a controller. Everything below is what the device answered on 2026-09-13, grouped the way sysex-controls shows it.\n\nController: firmware 2.5.20. Vegas mode 5 min, screen saver 2 min. Knob acceleration Medium, aftertouch curve Linear, velocity curve Linear. Transport send Both and transport receive Both, so every press of a transport button sends MIDI Machine Control and a realtime start, continue or stop together. Clock send On and clock receive On. MIDI Out 2 is Out rather than Thru.\n\nKnobs: global channel 1. Pitch CC 74, Gate 75, Velocity 76, Time Shift 77, Randomness 78, each on port All (USB, MIDI 1 and MIDI 2), channel Global, min 0, max 127, mode Absolute. The encoders are endless, so an absolute one walks through its range and is followed as movement rather than picked up. The channel is left out of every control here because Global follows the global channel, which the owner can change.\n\nTouch Strip: enabled On, MIDI send/receive Off, CC 9. A strip whose send is off sends nothing, which reads as broken hardware; it is turned on in UTIL > Touch Strip.\n\nTrack Channels: track 1 input 1 and output 1, drum input 10 and drum output 10; track 2 input 2, output 2; track 3 input 3, output 3; track 4 input 4, output 4.\n\nDrum Map: mode Chromatic, low note 36 (C1). The custom map, unused in Chromatic mode, reads 36 to 59 in order.\n\nSync: input Auto, clock rate 24 PPQ, output 24 PPQ.\n\nMetronome: count in 1 bar, time division 1/4, time signature 4.\n\nLaunch Quantize: wait to load project 1 bar, wait to load scene 1 bar, wait to load pattern At end.\n\nCV/Gate: all four voices have pitch CV output 1 V/Oct, base note 36 (C1), gate CV output V-Trig 5 V, mod CV source Velocity, mod CV max voltage 5 V, pitch bend range 2 semitones. Drum gates 1 to 8 are all V-Trig 5 V.\n\nMeasured on the wire the same day, with Control pressed and the owner's hand on the device. Pitch sent CC 74 on channel 1, walking 1 to 127 and 127 to 0 with steps of up to six as it was turned faster, and it stops at both ends rather than coming round: turned past the top it sent 127 sixteen times in a row, and past the bottom 0 over and over. The Mod strip sent CC 1 on channel 10, track 1's drum output. Play sent a realtime Start and machine control F0 7F 7F 06 02 F7 together, and Stop sent a realtime Stop and F0 7F 7F 06 01 F7 together, which is Transport send reading Both; clock ran only while the sequencer played, and the sequencer's own notes came out on channels 10 and 2.\n\nThe settings protocol is Arturia's read request F0 00 20 6B 7F 42 01 <preset> <param> <control> F7, answered by 42 02 with the value and then an acknowledgement 42 1C 00. Everything here is preset 00, param 41; the CV pitch bend ranges, drum gates and MIDI Out 2 are under the 42 31 variant of the request. Source for the addresses: sysex-controls, src/keysteppro/.\n\nSource for the manual lines: docs/keystep-pro_Manual_2_5_2_EN.pdf, pages 124 and 153."
 }
