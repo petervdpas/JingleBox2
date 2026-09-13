@@ -33,15 +33,18 @@ public interface IOverlappable
     /// Starts the work and comes back without waiting for it.
     /// </summary>
     /// <remarks>
-    /// Anything that needs no waiting is simply done here, which is what an effect of ours in a
-    /// chain is: it runs in this process and there is nothing to be in flight.
+    /// Anything that needs no waiting is simply done here once the work has begun, which is what
+    /// an effect of ours in a chain is: it runs in this process and there is nothing to be in
+    /// flight. **False and work done are never both true**, since a caller answered false does the
+    /// work itself, and whatever was done here would then be done twice.
     /// </remarks>
     /// <param name="buffer">The audio, which must not be touched again until this run is done.</param>
     /// <param name="frames">How many frames are in it.</param>
     /// <returns>
-    /// Whether something is now in flight. False means the work is finished and
-    /// <see cref="Advance"/> must not be called, which is also the answer when this cannot be
-    /// done in parts at all: the caller does the ordinary blocking thing instead.
+    /// Whether the work has begun. False means nothing has been touched and <see cref="Advance"/>
+    /// must not be called: the caller does the ordinary blocking thing instead. True means
+    /// <see cref="Advance"/> is called until it answers false, which may be the first time, when
+    /// everything was finished here.
     /// </returns>
     bool Begin(float[] buffer, int frames);
 

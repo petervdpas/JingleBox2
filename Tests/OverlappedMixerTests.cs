@@ -195,6 +195,111 @@ public class OverlappedMixerTests : IDisposable
         foreach (float sample in buffer) Assert.Equal(0f, sample);
     }
 
+    /// <summary>
+    /// A chain holding only effects of ours is run once a block with the switch on, not twice.
+    /// </summary>
+    /// <remarks>
+    /// Such a chain finishes its whole run inside its beginning, so answering that nothing had
+    /// begun would have the mixer run it again over its own output. A phaser restarted at the top
+    /// of every block from where it had ended is a jump eighty six times a second, which sounds
+    /// like a mobile phone held beside the speaker: measured on a real song at 115 times the
+    /// average step at the start of each block. Scaled rather than silenced, since silencing twice
+    /// is silencing once and would pass either way.
+    /// </remarks>
+    [Fact]
+    public void A_chain_of_our_own_effects_is_run_once_a_block()
+    {
+        foreach (bool overlap in new[] { false, true })
+        {
+            OverlapSwitch.Wants(overlap);
+
+            var mixer = new TrackMixer(44100);
+            var counted = new Counted(0.5f);
+            var chain = new PluginChain();
+
+            chain.Add(counted);
+            mixer.SetInsert(0, chain);
+            mixer.NoteOn(0, 0, Patch(), new Note(48), 0.8f, 0f, VoiceEnding.Sustain);
+
+            for (int at = 0; at < 20; at++) mixer.Render(new float[441 * 2], 441);
+
+            Assert.True(counted.Runs == 20, "overlap " + overlap + ": run " + counted.Runs + " times in 20 blocks");
+        }
+    }
+
+    /// <summary>
+    /// A chain mixing a plugin that waits with effects of ours around it runs each once, and leaves the block it would have without the switch.
+    /// </summary>
+    [Fact]
+    public void A_mixed_chain_runs_everything_once_and_changes_no_sample()
+    {
+        float[] Render(bool overlap, out int before, out int after)
+        {
+            OverlapSwitch.Wants(overlap);
+
+            var mixer = new TrackMixer(44100);
+            var first = new Counted(0.5f);
+            var last = new Counted(1.25f);
+            var chain = new PluginChain();
+
+            chain.Add(first);
+            chain.Add(new Deferred(1.5f));
+            chain.Add(last);
+
+            mixer.SetInsert(0, chain);
+            mixer.NoteOn(0, 0, Patch(), new Note(48), 0.8f, 0f, VoiceEnding.Sustain);
+
+            var buffer = new float[441 * 2];
+
+            for (int at = 0; at < 20; at++) mixer.Render(buffer, 441);
+
+            before = first.Runs;
+            after = last.Runs;
+
+            return buffer;
+        }
+
+        float[] straight = Render(false, out _, out _);
+        float[] overlapped = Render(true, out int before, out int after);
+
+        Assert.Equal(20, before);
+        Assert.Equal(20, after);
+        Assert.Equal(straight, overlapped);
+    }
+
+    /// <summary>
+    /// A chain with nothing on it that could wait does nothing in its beginning, and says so, so the ordinary run is left to do the work.
+    /// </summary>
+    [Fact]
+    public void A_chain_with_nothing_to_wait_for_leaves_the_work_to_the_ordinary_run()
+    {
+        var counted = new Counted(0.5f);
+        var chain = new PluginChain();
+        chain.Add(counted);
+
+        var buffer = new float[16];
+        Array.Fill(buffer, 1f);
+
+        Assert.False(chain.Begin(buffer, 8));
+        Assert.Equal(0, counted.Runs);
+        Assert.All(buffer, sample => Assert.Equal(1f, sample));
+
+        Assert.False(new PluginChain().Begin(buffer, 8));
+    }
+
+    /// <summary>An effect of ours that scales its block and counts how often it was asked, which silencing could not show.</summary>
+    private sealed class Counted(float by) : IAudioInsert
+    {
+        public int Runs;
+
+        public void Process(float[] buffer, int frames)
+        {
+            Runs++;
+
+            for (int at = 0; at < frames * 2; at++) buffer[at] *= by;
+        }
+    }
+
     /// <summary>An ordinary insert of ours: it works where it stands and is never in flight.</summary>
     private sealed class Silencer : IAudioInsert
     {

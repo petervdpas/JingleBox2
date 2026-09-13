@@ -185,16 +185,23 @@ public sealed class PluginChain : IAudioInsert, IOverlappable
     /// certain: a device left holding an answer nobody collected would refuse every block after
     /// it, for the rest of the session, and the symptom would be one plugin going silent for no
     /// reason anybody could see.
+    ///
+    /// **A chain with nothing on it that could be left waiting touches nothing and answers false**,
+    /// so the ordinary run does the work, once. Anything else answers true once it has started,
+    /// even where the whole run finished here, and the first <see cref="Advance"/> then says there
+    /// is nothing left. False after doing the work would be read as not begun, and the chain run a
+    /// second time over its own output, an effect of ours restarting every block from where it
+    /// ended, which is a jump at every block edge.
     /// </remarks>
     public bool Begin(float[] buffer, int frames)
     {
-        Settle(buffer, frames);
+        bool settled = Settle(buffer, frames);
 
         Slot[] chain;
 
         lock (_lock)
         {
-            if (_devices.Count == 0) return false;
+            if (_devices.Count == 0) return settled;
 
             if (_stale)
             {
@@ -205,10 +212,14 @@ public sealed class PluginChain : IAudioInsert, IOverlappable
             chain = _snapshot;
         }
 
+        if (!settled && !Array.Exists(chain, one => !one.Bypassed && one.Insert is IOverlappable)) return false;
+
         _run = chain;
         _at = 0;
 
-        return Push(buffer, frames);
+        Push(buffer, frames);
+
+        return true;
     }
 
     /// <inheritdoc/>
@@ -222,13 +233,14 @@ public sealed class PluginChain : IAudioInsert, IOverlappable
     /// <summary>Collects whatever is in flight, whatever happened to it.</summary>
     /// <param name="buffer">The audio the run is on.</param>
     /// <param name="frames">How many frames are in it.</param>
-    private void Settle(float[] buffer, int frames)
+    /// <returns>Whether anything was in flight to collect.</returns>
+    private bool Settle(float[] buffer, int frames)
     {
         var flying = _flying;
 
         _flying = null;
 
-        if (flying == null) return;
+        if (flying == null) return false;
 
         try
         {
@@ -237,6 +249,8 @@ public sealed class PluginChain : IAudioInsert, IOverlappable
         catch (Exception)
         {
         }
+
+        return true;
     }
 
     /// <summary>

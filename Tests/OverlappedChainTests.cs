@@ -167,13 +167,14 @@ public class OverlappedChainTests
         Assert.Equal(2f, two[0]);
     }
 
-    /// <summary>A chain of our own effects reports nothing in flight and still does the work.</summary>
+    /// <summary>A chain of our own effects is not begun at all, and the ordinary run does the work, once.</summary>
     /// <remarks>
-    /// Which is what makes the switch free where there are no plugins: the first pass does the
-    /// whole chain where it stands and no round ever runs.
+    /// Which is what makes the switch free where there are no plugins: nothing is begun, no round
+    /// ever runs, and the chain is processed exactly as it is with the switch off. A false from
+    /// the beginning means nothing was touched, since the caller then does the work itself.
     /// </remarks>
     [Fact]
-    public void A_chain_with_nothing_to_wait_for_is_done_at_once()
+    public void A_chain_with_nothing_to_wait_for_is_left_to_the_ordinary_run()
     {
         var said = new List<string>();
 
@@ -184,6 +185,11 @@ public class OverlappedChainTests
         var buffer = Ones(8);
 
         Assert.False(chain.Begin(buffer, 8));
+        Assert.Equal(1f, buffer[0]);
+        Assert.Empty(said);
+
+        chain.Process(buffer, 8);
+
         Assert.Equal(6f, buffer[0]);
         Assert.Equal(new[] { "one straight", "two straight" }, said);
     }

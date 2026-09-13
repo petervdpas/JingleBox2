@@ -1249,6 +1249,17 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   platform is the smaller term. **And it reopens the buffer question**: three plugins at 0.10 ms
   apiece is under three per cent of a 512 frame block, and no buffer was ever doubled for that.
   Whatever forces the bigger buffer is still unfound
+- **A false from `IOverlappable.Begin` means nothing was touched, and nothing else.** A chain
+  holding only effects of ours finishes inside its beginning, and answering false after doing so
+  had the mixer run it again over its own output: 688 runs in 344 blocks, each block starting from
+  where the last had ended. Measured on 2026-09-13 from what left the speakers, Operetta through
+  the phaser with overlapping on: 30 dB more high-frequency hash than the same pattern rendered
+  offline, repeating every 11.6 ms, which is one 512 frame block and sounds like a mobile phone
+  beside the speaker. Every render of the phaser alone was clean, because every render had the
+  switch off. `PluginChain.Begin` answers false only for a chain with nothing on it that could
+  wait, and otherwise true, with the first `Advance` saying nothing is left.
+  `Tests/OverlappedMixerTests.cs` scales rather than silences, since silencing twice is silencing
+  once and is exactly how the doubled run passed the test beside it
 - **Overlapping stays off by default, and the Windows run is not the argument for changing it.**
   The mean came down 33.6% to 30.4%, the same three or four points and the same reason: one plugin
   is the critical path, Serum 2 at 2.33 ms of round trip against Serum 2 FX's 0.47, and
