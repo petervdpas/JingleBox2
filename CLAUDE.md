@@ -383,6 +383,23 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   engine out loud now, every one of them, and `Tests/ShippedEngineTests.cs` holds them to it, including that
   the engine each names is the one its id used to imply: a shipped device that quietly moved
   engines would open every song that plays it and sound like something else
+- **Lighttower E=mc² is the Fairlight CMI's drawn waves, and it is engine 7, `Segments`.** You draw
+  the first wave and the last, 128 points each, and the thirty between are merged point by point in
+  a straight line, which is what the CMI's MERGE did; a note goes through all thirty two over its
+  sweep, once, looping or bouncing. `IWaveSegments` is that merge and how a line is written down,
+  in the published assembly, because the panel's stack and `SegmentVoice` both work the waves out
+  and a picture worked out one way beside a sound worked out another is a picture of nothing
+  anybody hears. Grit is the CMI's sound: eight bit points read without smoothing, and the wave
+  only moves on when it comes round to its start. What is heard has each wave's average taken off,
+  since a line drawn by hand is never balanced and whatever it is off by is a direct voltage
+- **A drawn line is a text setting, and that is what made the part cheap.** `SegmentValues` keeps
+  `begin` and `end` as the words `IWaveSegments.Spell` writes, whole numbers from -127 to 127, so
+  presets, the song, the instrument's undo and the designer's bench carry a drawing with no new
+  plumbing. The one thing that had to learn was the preset file: `Words` reads the keys a
+  `Segments` part names, and a machine with no pads or zones writes its words as well as its
+  numbers. A stroke is written when the pointer comes up, so one stroke is one undo step, and the
+  stack follows the hand before that. `Tests/SegmentTests.cs` was checked by putting three faults
+  back: the level stepping mid cycle, the average left on, and samples between the eight bit steps
 - **An effect's engine is resolved from the id the chain wrote down**, since a chain writes an
   id and never an engine and that is still right. `SoundEffectEngines` takes the registered list
   to look it up in, so `PluginChainState`, `TrackerPlayer`, `PadViewModel` and

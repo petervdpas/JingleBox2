@@ -161,6 +161,18 @@ public sealed class TrackerInstrument
     public Synth.FmPatch? Fm { get; set; }
 
     /// <summary>
+    /// What Lighttower plays from: the two drawn waves and how a note goes through the ones
+    /// between them. Null on every other machine, and left out of the file there.
+    /// </summary>
+    /// <remarks>
+    /// Its own field for the reason Operetta has one, and written under the machine's name for the
+    /// same reason: that is what a file calls it.
+    /// </remarks>
+    [JsonPropertyName("Lighttower")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Synth.SegmentPatch? Segments { get; set; }
+
+    /// <summary>
     /// What BongaBong plays: sixteen pads, each with a recording and a key of its own.
     /// </summary>
     /// <remarks>
@@ -207,6 +219,10 @@ public sealed class TrackerInstrument
     /// <summary>On Operetta: four sine operators bending each other's frequency.</summary>
     [JsonIgnore]
     public bool IsFm => Kind == TrackerInstrumentKind.Fm;
+
+    /// <summary>On Lighttower: two drawn waves and the ones between them, played in turn.</summary>
+    [JsonIgnore]
+    public bool IsSegments => Kind == TrackerInstrumentKind.Segments;
 
     /// <summary>
     /// The id of the machine this instrument came off, or nothing where it was never said.
@@ -258,6 +274,7 @@ public sealed class TrackerInstrument
                 TrackerInstrumentKind.Synth => machine + ", " + Patch.Wave.ToString().ToLowerInvariant(),
                 TrackerInstrumentKind.MonoSynth => machine + ", " + (MonoSynth?.Wave.ToString().ToLowerInvariant() ?? "saw"),
                 TrackerInstrumentKind.Fm => machine + ", algorithm " + (Fm?.Algorithm ?? 1),
+                TrackerInstrumentKind.Segments => machine + ", " + (Segments?.Motion ?? Synth.Enums.SegmentMotion.Once).ToString().ToLowerInvariant(),
                 _ => machine + ", " + BaseNote
             };
         }
@@ -382,6 +399,20 @@ public sealed class TrackerInstrument
         return instrument;
     }
 
+    /// <summary>A new instrument on Lighttower, going from a sine to a saw.</summary>
+    public static TrackerInstrument CreateSegments(string name)
+    {
+        var instrument = new TrackerInstrument
+        {
+            Name = name,
+            Kind = TrackerInstrumentKind.Segments,
+            Segments = new Synth.SegmentPatch()
+        };
+
+        instrument.EnsureId();
+        return instrument;
+    }
+
     /// <summary>A new instrument on whichever machine was asked for.</summary>
     /// <remarks>
     /// The Recording machine has to be named here even though what it makes is an instrument
@@ -395,6 +426,7 @@ public sealed class TrackerInstrument
         {
             TrackerInstrumentKind.MonoSynth => CreateMonoSynth(name),
             TrackerInstrumentKind.Fm => CreateFm(name),
+            TrackerInstrumentKind.Segments => CreateSegments(name),
             TrackerInstrumentKind.Kit => CreateKit(name),
             TrackerInstrumentKind.Sampler => CreateSampler(name),
             TrackerInstrumentKind.Sample => CreateSample(name, "", new Note(48)),
@@ -489,6 +521,7 @@ public sealed class TrackerInstrument
         Patch = other.Patch.Clone();
         MonoSynth = other.MonoSynth?.Clone();
         Fm = other.Fm?.Clone();
+        Segments = other.Segments?.Clone();
         Kit = other.Kit?.Clone();
         Zones = other.Zones?.Clone();
         Sampler = other.Sampler?.Clone();
@@ -548,6 +581,11 @@ public sealed class TrackerInstrument
                 Fm.CopyFrom(other.Fm ?? new Synth.FmPatch());
                 break;
 
+            case TrackerInstrumentKind.Segments:
+                Segments ??= new Synth.SegmentPatch();
+                Segments.CopyFrom(other.Segments ?? new Synth.SegmentPatch());
+                break;
+
             case TrackerInstrumentKind.Sampler:
                 Zones ??= ZoneMap.Empty();
                 Zones.CopyFrom(other.Zones ?? ZoneMap.Empty());
@@ -597,6 +635,7 @@ public sealed class TrackerInstrument
         Patch = Patch.Clone(),
         MonoSynth = MonoSynth?.Clone(),
         Fm = Fm?.Clone(),
+        Segments = Segments?.Clone(),
         Kit = Kit?.Clone(),
         Zones = Zones?.Clone(),
         Sampler = Sampler?.Clone(),

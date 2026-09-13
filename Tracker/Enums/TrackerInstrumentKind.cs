@@ -36,5 +36,8 @@ public enum TrackerInstrumentKind
     Sampler = 5,
 
     /// <summary>Operetta: four sine operators modulating each other's frequency.</summary>
-    Fm = 6
+    Fm = 6,
+
+    /// <summary>Lighttower: two waves drawn by hand and the ones between them worked out, played in turn.</summary>
+    Segments = 7
 }

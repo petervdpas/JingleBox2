@@ -82,6 +82,9 @@ public sealed class PresetLoudness : IPresetLoudness
         TrackerInstrumentKind.Fm when sound.Fm is not null =>
             new FmVoice(sound.Fm, note, FmVoice.NoTrack, (float)sound.Volume, 0f, Rate),
 
+        TrackerInstrumentKind.Segments when sound.Segments is not null =>
+            new SegmentVoice(sound.Segments, note, SegmentVoice.NoTrack, (float)sound.Volume, 0f, Rate),
+
         _ => null,
     };
 

@@ -37,6 +37,11 @@ public sealed class SoundMachineValuesFor : ISoundMachineValuesFor
 
                 return new FmValues(instrument.Fm, instrument);
 
+            case TrackerInstrumentKind.Segments:
+                instrument.Segments ??= new SegmentPatch();
+
+                return new SegmentValues(instrument.Segments, instrument);
+
             case TrackerInstrumentKind.Kit:
                 instrument.Kit ??= DrumKit.Empty(1);
 

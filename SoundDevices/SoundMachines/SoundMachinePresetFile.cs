@@ -155,6 +155,8 @@ public sealed class SoundMachinePresetFile(ISoundMachinePaths? paths = null) : I
                     wide = new MonoSynthValues(Mono(sound), sound);
                 else if (kind == TrackerInstrumentKind.Fm)
                     wide = new FmValues(sound.Fm ??= new FmPatch(), sound);
+                else if (kind == TrackerInstrumentKind.Segments)
+                    wide = new SegmentValues(sound.Segments ??= new SegmentPatch(), sound);
                 else
                     loose = new RecordingValues(sound);
             }
@@ -258,11 +260,15 @@ public sealed class SoundMachinePresetFile(ISoundMachinePaths? paths = null) : I
                 new SynthValues(new ViewModels.SynthPatchViewModel(sound.Patch, () => { }), sound),
             TrackerInstrumentKind.MonoSynth => new MonoSynthValues(Mono(sound), sound),
             TrackerInstrumentKind.Fm => new FmValues(sound.Fm ??= new FmPatch(), sound),
+            TrackerInstrumentKind.Segments => new SegmentValues(sound.Segments ??= new SegmentPatch(), sound),
             _ => new RecordingValues(sound),
         };
 
-        if (Named(machine, ElementKinds.Take) is { Length: > 0 } take)
-            held[take] = Inside(sound.FilePath, home);
+        string? take = Named(machine, ElementKinds.Take);
+
+        if (take is { Length: > 0 }) held[take] = Inside(sound.FilePath, home);
+
+        foreach (string key in owned.OutsideWords.Where(one => one != take)) held[key] = plain.GetText(key);
 
         foreach (string key in owned.Outside) held[key] = JsonValue.Create(plain.Get(key));
 
@@ -445,9 +451,10 @@ public sealed class SoundMachinePresetFile(ISoundMachinePaths? paths = null) : I
     /// The settings a machine holds as words, read off the controls that hold them.
     /// </summary>
     /// <remarks>
-    /// A Take is a recording and a Text is something typed. Both are words, and which key each
-    /// is kept under is the machine's to say, so it is asked rather than assumed. The face is
-    /// walked in reading order and each key is named once.
+    /// A Take is a recording, a Text is something typed, and a Segments part keeps its two drawn
+    /// waves under the keys its <c>begin</c> and <c>end</c> name. All of them are words, and which
+    /// key each is kept under is the machine's to say, so it is asked rather than assumed. The face
+    /// is walked in reading order and each key is named once.
     ///
     /// **A kit's pad recordings are words whether or not the face draws a picker for them.** A
     /// face with no picker fills its pads another way, loading samples or chopping one
@@ -472,6 +479,12 @@ public sealed class SoundMachinePresetFile(ISoundMachinePaths? paths = null) : I
                 && element.Parameter.Length > 0
                 && !found.Contains(element.Parameter))
                 found.Add(element.Parameter);
+
+            if (element.Element == ElementKinds.Segments)
+                foreach (string end in new[] { "begin", "end" })
+                    if (element.Properties.TryGetValue(end, out string? key) && key.Trim() is { Length: > 0 } named
+                        && !found.Contains(named))
+                        found.Add(named);
 
             foreach (var child in element.Children) Walk(child, found);
         }

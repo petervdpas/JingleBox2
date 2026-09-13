@@ -38,6 +38,7 @@ public sealed class PanelParts : IPanelParts
         ElementKinds.Zones,
         ElementKinds.ZonePicker,
         ElementKinds.Slices,
+        ElementKinds.Segments,
         ElementKinds.Menu,
         ElementKinds.InstrumentName,
         ElementKinds.Label,

@@ -1,0 +1,408 @@
+{
+  "Id": "machine.lighttower",
+  "Name": "Lighttower E=mc²",
+  "Summary": "Drawn waves. Draw the first wave and the last, and every note goes through the thirty between, the way the Fairlight CMI did.",
+  "Author": "Peter van de Pas",
+  "Version": "1.0",
+  "Engine": "Segments",
+  "Theme": {
+    "Accent": "#56C96B",
+    "Face": 0.68,
+    "Panel": 0.52,
+    "Edge": 0.1,
+    "Mark": 0.35,
+    "Row": 0.18,
+    "RowOver": 0.3,
+    "RowPicked": 0.58
+  },
+  "StartsFrom": "presets",
+  "Parameters": [
+    {
+      "Key": "sweep",
+      "Name": "Sweep",
+      "Unit": "ms",
+      "Min": 10,
+      "Max": 10000,
+      "Default": 2000,
+      "Step": 1
+    },
+    {
+      "Key": "motion",
+      "Name": "Motion",
+      "Unit": "",
+      "Min": 0,
+      "Max": 2,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "grit",
+      "Name": "Grit",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 1,
+      "Step": 1
+    },
+    {
+      "Key": "tune",
+      "Name": "Frequency",
+      "Unit": "st",
+      "Min": -24,
+      "Max": 24,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "fine",
+      "Name": "Fine",
+      "Unit": "cents",
+      "Min": -100,
+      "Max": 100,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "volume",
+      "Name": "Volume",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0.25,
+      "Step": 0.01
+    },
+    {
+      "Key": "new_note",
+      "Name": "New note",
+      "Unit": "",
+      "Min": 0,
+      "Max": 2,
+      "Default": 0,
+      "Step": 1,
+      "Saved": true
+    },
+    {
+      "Key": "attack",
+      "Name": "Attack",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 5000,
+      "Default": 2,
+      "Step": 1
+    },
+    {
+      "Key": "decay",
+      "Name": "Decay",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 10000,
+      "Default": 400,
+      "Step": 1
+    },
+    {
+      "Key": "sustain",
+      "Name": "Sustain",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0.7,
+      "Step": 0.01
+    },
+    {
+      "Key": "release",
+      "Name": "Release",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 10000,
+      "Default": 300,
+      "Step": 1
+    }
+  ],
+  "Panel": {
+    "Root": {
+      "Element": "Column",
+      "Parameter": "",
+      "Label": "",
+      "Properties": {
+        "gap": "10",
+        "align": "stretch"
+      },
+      "Children": [
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "10"
+          },
+          "Children": [
+            {
+              "Element": "Preset",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "source": "presets",
+                "caption": "Presets",
+                "width": "258"
+              },
+              "Children": []
+            },
+            {
+              "Element": "InstrumentName",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "10",
+            "heights": "own"
+          },
+          "Children": [
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Waves"
+              },
+              "Children": [
+                {
+                  "Element": "Segments",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "begin": "begin",
+                    "end": "end",
+                    "picture": "140",
+                    "tip": "Draw a wave on the pad with the pointer. Begin is where the note starts and End is where it arrives; the thirty waves between are worked out, and the stack beside the pad shows all thirty two, the first at the front."
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "10",
+            "heights": "own"
+          },
+          "Children": [
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Voice"
+              },
+              "Children": [
+                {
+                  "Element": "Strip",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "3 4 4 3 3 3 3"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "sweep",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "lines": "1",
+                        "tip": "How long a note takes to get from the first wave to the last. Short is a sound with a bite at the front; long is one that changes slowly while it is held."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "motion",
+                      "Label": "",
+                      "Properties": {
+                        "span": "4",
+                        "options": "Once,Loop,Bounce",
+                        "tip": "What happens once the note reaches the last wave. Once stays there. Loop goes straight back to the first and round again. Bounce comes back the way it went, over and over."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "grit",
+                      "Label": "",
+                      "Properties": {
+                        "span": "4",
+                        "options": "Smooth,Grit",
+                        "tip": "Grit is the Fairlight: eight bit points read without smoothing, and a note that only moves on to the next wave when the wave comes round, so it steps through the thirty two. Smooth glides between the waves and between the points."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "tune",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "lines": "1",
+                        "tip": "Whole semitones added to every note, two octaves either way."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "fine",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "lines": "1",
+                        "tip": "The last hundredth of a semitone."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "volume",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "lines": "1",
+                        "tip": "How loud the machine comes out, before the track's own level."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "new_note",
+                      "Label": "",
+                      "Properties": {
+                        "options": "Cut,Release,Sustain",
+                        "tip": "What happens to the note this track is still sounding when the next one lands on it. Cut stops it; Release lets it play its own release under the new note; Sustain leaves it holding until an OFF."
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "10",
+            "heights": "own"
+          },
+          "Children": [
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Envelope"
+              },
+              "Children": [
+                {
+                  "Element": "Row",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "gap": "10"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Fader",
+                      "Parameter": "attack",
+                      "Label": "",
+                      "Properties": {
+                        "tip": "How long a note takes to reach full."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "decay",
+                      "Label": "",
+                      "Properties": {
+                        "tip": "How long it takes to fall from full to the sustain."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "sustain",
+                      "Label": "",
+                      "Properties": {
+                        "tip": "Where it holds while the key is down. Nought falls away to silence however long the key is held."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "release",
+                      "Label": "",
+                      "Properties": {
+                        "tip": "How long it takes to fall away once the key comes up."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Envelope",
+                      "Parameter": "",
+                      "Label": "",
+                      "Properties": {
+                        "width": "176",
+                        "height": "60",
+                        "attack": "attack",
+                        "decay": "decay",
+                        "sustain": "sustain",
+                        "release": "release",
+                        "tip": "The envelope, with the dashed line where the key is let go. Play a note and the playhead runs along it."
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Element": "Keys",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down, not for as long as what it started goes on sounding. The arrows and the lamps move the three octaves on show."
+          },
+          "Children": []
+        },
+        {
+          "Element": "Menu",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "corner": "topRight"
+          },
+          "Children": []
+        }
+      ]
+    }
+  }
+}

@@ -87,7 +87,7 @@ public class SoundMachinePartsTests
                 name + " has no InstrumentName on its face");
         }
 
-        Assert.Equal(7, seen);
+        Assert.Equal(8, seen);
     }
 
     /// <summary>Every machine that ships carries a menu, in the corner every program puts one.</summary>

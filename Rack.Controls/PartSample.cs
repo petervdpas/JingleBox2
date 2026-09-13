@@ -100,6 +100,8 @@ public sealed class PartSample : Decorator
     /// <inheritdoc cref="GridKind"/>
     private const string SlicesKind = "Slices";
     /// <inheritdoc cref="GridKind"/>
+    private const string SegmentsKind = "Segments";
+    /// <inheritdoc cref="GridKind"/>
     private const string PadPickerKind = "PadPicker";
     /// <inheritdoc cref="GridKind"/>
     private const string ZonesKind = "Zones";
@@ -224,6 +226,7 @@ public sealed class PartSample : Decorator
         PadsKind => BuildPads(),
         PadKind => new PushButton { CapWidth = 46, CapHeight = 26, FontSize = 9, HasLamp = true, LampBelow = false },
         SlicesKind => new PartSketch(SketchShape.Wave) { Width = 78, Height = 40 },
+        SegmentsKind => BuildSegments(),
         PadPickerKind => BuildSlotPicker("Kick", "Snare"),
         ZonesKind => BuildZones(),
         ZonePickerKind => BuildSlotPicker("Low", "High"),
@@ -232,6 +235,24 @@ public sealed class PartSample : Decorator
         InstrumentNameKind => BuildInstrumentNameBadge(),
         _ => null,
     };
+
+    /// <summary>
+    /// The real stack, going from a sine to a saw, which is the plainest sound that still shows it moving.
+    /// </summary>
+    private static Control BuildSegments()
+    {
+        var pen = new WavePen();
+
+        return new WaveStack
+        {
+            Width = 80,
+            Height = 50,
+            MinWidth = 0,
+            MinHeight = 0,
+            Begin = pen.Shape(WavePen.Sine),
+            End = pen.Shape(WavePen.Saw),
+        };
+    }
 
     /// <summary>
     /// The real curve, drawn from an envelope somebody might plausibly dial in.

@@ -609,6 +609,13 @@ public sealed class TrackerPlayer : ITrackerPlayer
             return holdSeconds;
         }
 
+        if (instrument.IsSegments)
+        {
+            _synth.Mixer.Preview(instrument.Segments ?? new Synth.SegmentPatch(),
+                note, level, holdSeconds, instrument.Id, track, pan);
+            return holdSeconds;
+        }
+
         if (instrument.IsSynth)
         {
             _synth.Mixer.Preview(instrument.Patch, note, level, holdSeconds, instrument.Id, track, pan);
@@ -1590,6 +1597,14 @@ public sealed class TrackerPlayer : ITrackerPlayer
         {
             Where(e.Track, e.Instrument, instrument, song, "played on " + instrument.Machine.Name);
             _synth.Mixer.NoteOn(e.Track, e.Column, instrument.Fm ?? new Synth.FmPatch(),
+                e.Note, mixed, placed ?? 0f, instrument.NewNoteAction);
+            return;
+        }
+
+        if (instrument.IsSegments)
+        {
+            Where(e.Track, e.Instrument, instrument, song, "played on " + instrument.Machine.Name);
+            _synth.Mixer.NoteOn(e.Track, e.Column, instrument.Segments ?? new Synth.SegmentPatch(),
                 e.Note, mixed, placed ?? 0f, instrument.NewNoteAction);
             return;
         }

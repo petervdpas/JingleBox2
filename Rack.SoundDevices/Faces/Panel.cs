@@ -475,6 +475,31 @@ public static class ElementKinds
     public const string Slices = "Slices";
 
     /// <summary>
+    /// Two waves drawn by hand and the ones between them, stacked. Properties: begin, end,
+    /// picture.
+    /// </summary>
+    /// <remarks>
+    /// The Fairlight CMI's page for it: a pad you draw one wave on with the pointer, two caps saying
+    /// whether that is the first wave or the last, and beside it every wave the sound goes through
+    /// from one to the other, stacked back to front, worked out by <see cref="IWaveSegments"/> as the
+    /// engine works them out. Under the pad a row of caps puts a plain shape down to start from,
+    /// smooths what was drawn, or wipes it flat to draw it again.
+    ///
+    /// <c>picture</c> is how tall the drawing pad is, and it is twice as wide as that, since a
+    /// wave is read across; the stack beside it is as wide as the pad and as tall as everything to
+    /// its left.
+    ///
+    /// <c>begin</c> and <c>end</c> name the two text settings the lines are kept in, written the way
+    /// <see cref="IWaveSegments.Spell"/> writes them. The element itself names no parameter: a
+    /// line is not a value a knob could stand for, and as text it travels in a preset and a song
+    /// the way every other word a sound device keeps does.
+    ///
+    /// A stroke is written when the pointer comes up, so one stroke is one step of undo. While it
+    /// is being drawn the stack follows the hand.
+    /// </remarks>
+    public const string Segments = "Segments";
+
+    /// <summary>
     /// The control surfaces there is a layout for on this sound device. Properties: corner,
     /// caption, cap, capHeight.
     /// </summary>

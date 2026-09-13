@@ -905,6 +905,25 @@ public sealed class TrackMixer : ITrackMixer
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>The voice is built outside the lock, since making one is the expensive half.</remarks>
+    public void NoteOn(int track, int column, SegmentPatch patch, Note note, float gain, float pan,
+                       VoiceEnding ending = VoiceEnding.Cut)
+    {
+        if (patch is null || !note.IsPlayable) return;
+
+        var voice = new SegmentVoice(patch, note, track, gain, pan, SampleRate)
+        {
+            Column = column
+        };
+
+        lock (_lock)
+        {
+            MakeWay(track, column, note, ending);
+            Add(voice);
+        }
+    }
+
     /// <summary>
     /// Makes room on a track for the note that is about to start there.
     /// </summary>
@@ -975,6 +994,22 @@ public sealed class TrackMixer : ITrackMixer
         if (patch is null || !note.IsPlayable) return;
 
         var voice = new FmVoice(patch, note, track, gain, pan, SampleRate)
+        {
+            Audition = audition
+        };
+
+        voice.HoldFor(holdSeconds);
+
+        lock (_lock) Add(voice);
+    }
+
+    /// <inheritdoc/>
+    public void Preview(SegmentPatch patch, Note note, float gain, double holdSeconds, string audition,
+                        int track = SegmentVoice.NoTrack, float pan = 0f)
+    {
+        if (patch is null || !note.IsPlayable) return;
+
+        var voice = new SegmentVoice(patch, note, track, gain, pan, SampleRate)
         {
             Audition = audition
         };

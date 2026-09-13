@@ -828,6 +828,7 @@ public class PanelView : Decorator
             ElementKinds.Zones => BuildZones(element),
             ElementKinds.ZonePicker => BuildZonePicker(element),
             ElementKinds.Slices => BuildSlices(element),
+            ElementKinds.Segments => BuildSegments(element),
             ElementKinds.InstrumentName => BuildInstrumentName(element),
             ElementKinds.Spacer => BuildSpacer(element),
             _ => null,
@@ -2999,6 +3000,176 @@ public class PanelView : Decorator
         if (Measurement(element, "picture") is { } tall) chop.PictureHeight = tall;
 
         return chop;
+    }
+
+    /// <summary>The merge and the words a line is written in, shared with the sound.</summary>
+    private static readonly IWaveSegments Waves = new WaveSegments();
+
+    /// <summary>What a hand does to a line.</summary>
+    private static readonly IWavePen Pen = new WavePen();
+
+    /// <summary>The word on the cap that smooths the line in hand.</summary>
+    private const string SmoothWord = "Smooth";
+
+    /// <summary>The word on the cap that wipes the line in hand flat, to draw it again.</summary>
+    private const string ClearWord = "Clear";
+
+    /// <summary>
+    /// The drawing page: a pad, the two caps choosing which end is in hand, the shapes, and the stack.
+    /// </summary>
+    /// <remarks>
+    /// Which end is in hand is the page's own and is kept nowhere: it is where somebody is looking,
+    /// not part of the sound, so it starts on the beginning every time the panel is drawn.
+    ///
+    /// A stroke is written when the hand comes up, and the stack follows the hand before that
+    /// without anything being written, so dragging across the pad is one step of undo and not
+    /// sixty. A shape, a smoothing or a clearing is written at once, since it is one press.
+    ///
+    /// A line that has never been set, on the designer's bench for one, is drawn as a sine going
+    /// to a saw so the page looks like what it is; the first stroke or shape writes it.
+    /// </remarks>
+    private Control BuildSegments(PanelElement element)
+    {
+        string beginKey = Text(element, "begin");
+        string endKey = Text(element, "end");
+        double tall = Measurement(element, "picture") ?? 128;
+
+        bool onEnd = false;
+        double[] begin = Array.Empty<double>();
+        double[] end = Array.Empty<double>();
+
+        var sketch = new WaveSketch { Width = tall * 2, Height = tall, HorizontalAlignment = HorizontalAlignment.Left };
+        var stack = new WaveStack { Width = tall * 2, VerticalAlignment = VerticalAlignment.Stretch };
+
+        var beginCap = SegmentCap("Begin", "Draw the first wave, where the note starts.");
+        var endCap = SegmentCap("End", "Draw the last wave, where the note arrives.");
+
+        double[] Line(string key, string demonstration)
+        {
+            var read = Waves.Read(Setting(key));
+
+            return read.Length > 0 ? read : Pen.Shape(demonstration) ?? read;
+        }
+
+        void Show()
+        {
+            sketch.Line = onEnd ? end : begin;
+            sketch.Ghost = onEnd ? begin : end;
+            stack.Begin = begin;
+            stack.End = end;
+            stack.InHand = onEnd;
+            beginCap.Lit = !onEnd;
+            endCap.Lit = onEnd;
+        }
+
+        void Keep(double[] line)
+        {
+            if (onEnd) end = line;
+            else begin = line;
+
+            Show();
+
+            string key = onEnd ? endKey : beginKey;
+
+            WriteText(key, Waves.Spell(line));
+        }
+
+        Reads(() =>
+        {
+            begin = Line(beginKey, WavePen.Sine);
+            end = Line(endKey, WavePen.Saw);
+
+            Show();
+        });
+
+        beginCap.Pressed += (_, _) =>
+        {
+            onEnd = false;
+            Show();
+        };
+
+        endCap.Pressed += (_, _) =>
+        {
+            onEnd = true;
+            Show();
+        };
+
+        sketch.Drawing += (_, _) =>
+        {
+            if (onEnd) stack.End = sketch.Line;
+            else stack.Begin = sketch.Line;
+        };
+
+        sketch.Drawn += (_, _) => Keep(sketch.Line ?? new double[WaveSegments.Points]);
+
+        var ends = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+
+        ends.Children.Add(beginCap);
+        ends.Children.Add(endCap);
+
+        var shapes = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+
+        foreach (string word in WavePen.Shapes)
+        {
+            var cap = SegmentButton(word, "Put a plain " + word.ToLowerInvariant() + " down on the wave in hand.");
+            string shape = word;
+
+            cap.Pressed += (_, _) =>
+            {
+                if (Pen.Shape(shape) is { } line) Keep(Waves.Read(Waves.Spell(line)));
+            };
+
+            shapes.Children.Add(cap);
+        }
+
+        var smooth = SegmentButton(SmoothWord, "Take the corners off the wave in hand. Press again for smoother.");
+
+        smooth.Pressed += (_, _) => Keep(Waves.Read(Waves.Spell(Pen.Smoothed(onEnd ? end : begin))));
+
+        shapes.Children.Add(smooth);
+
+        var clear = SegmentButton(ClearWord, "Wipe the wave in hand flat, to draw it again from nothing.");
+
+        clear.Pressed += (_, _) => Keep(new double[WaveSegments.Points]);
+
+        shapes.Children.Add(clear);
+
+        var left = new StackPanel { Spacing = 4 };
+
+        left.Children.Add(ends);
+        left.Children.Add(sketch);
+        left.Children.Add(shapes);
+
+        var page = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+
+        page.Children.Add(left);
+        page.Children.Add(stack);
+
+        return page;
+    }
+
+    /// <summary>One of the two caps saying which end of the sound is on the pad, with a lamp for the one that is.</summary>
+    /// <param name="word">What is written on it.</param>
+    /// <param name="tip">What it says when the pointer rests on it.</param>
+    private static PushButton SegmentCap(string word, string tip)
+    {
+        var cap = new PushButton { CapText = word, CapWidth = 58, HasLamp = true, LampBelow = false, Lit = false };
+
+        ToolTip.SetTip(cap, tip);
+
+        return cap;
+    }
+
+    /// <summary>One of the caps under the pad that does something to the wave in hand.</summary>
+    /// <param name="word">What is written on it.</param>
+    /// <param name="tip">What it says when the pointer rests on it.</param>
+    private static PushButton SegmentButton(string word, string tip)
+    {
+        var cap = new PushButton { CapText = word, CapWidth = 52 };
+
+        ToolTip.SetTip(cap, tip);
+
+        return cap;
     }
 
     /// <summary>

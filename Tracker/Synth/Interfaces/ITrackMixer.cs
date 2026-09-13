@@ -257,6 +257,10 @@ public interface ITrackMixer
     void NoteOn(int track, int column, FmPatch patch, Note note, float gain, float pan,
                 VoiceEnding ending = VoiceEnding.Cut);
 
+    /// <summary>Starts a note on Lighttower, making room for it on the track first.</summary>
+    void NoteOn(int track, int column, SegmentPatch patch, Note note, float gain, float pan,
+                VoiceEnding ending = VoiceEnding.Cut);
+
     /// <summary>
     /// Sounds a recording on a track, under the same rules, room being made for it first. The
     /// caller brings the audio, so the mixer never reads a file.
@@ -361,6 +365,17 @@ public interface ITrackMixer
     /// <param name="pan">Where it sits.</param>
     void Preview(FmPatch patch, Note note, float gain, double holdSeconds, string audition,
                  int track = FmVoice.NoTrack, float pan = 0f);
+
+    /// <summary>The same, on Lighttower, for a note played while building the sound.</summary>
+    /// <param name="patch">The sound being built.</param>
+    /// <param name="note">What to play.</param>
+    /// <param name="gain">How loud, before the strip it lands on.</param>
+    /// <param name="holdSeconds">How long before it lets go of itself.</param>
+    /// <param name="audition">Which panel is playing it.</param>
+    /// <param name="track">The strip it sounds on, or nothing for a note that belongs to no track.</param>
+    /// <param name="pan">Where it sits.</param>
+    void Preview(SegmentPatch patch, Note note, float gain, double holdSeconds, string audition,
+                 int track = SegmentVoice.NoTrack, float pan = 0f);
 
     /// <summary>The same, for a zone played on the panel rather than by a pattern.</summary>
     /// <returns>How long the note will sound, or zero if it did not start.</returns>
