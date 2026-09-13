@@ -119,6 +119,17 @@
               "Parameter": "",
               "Label": "",
               "Properties": {
+                "cap": "Chop again",
+                "action": "rechop_drums",
+                "tip": "Chop the recording this kit was chopped from again, without looking for it. After Save as preset that is the copy kept in the preset's own folder."
+              },
+              "Children": []
+            },
+            {
+              "Element": "Button",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
                 "cap": "Clear",
                 "action": "clear_pad",
                 "tip": "Takes the recording off the pad in hand."
@@ -350,6 +361,39 @@
                             "style": "hint"
                           },
                           "Children": []
+                        },
+                        {
+                          "Element": "Wave",
+                          "Parameter": "pad_take",
+                          "Label": "",
+                          "Properties": {
+                            "width": "260",
+                            "height": "100",
+                            "placeholder": "No wave on this pad",
+                            "tip": "The wave on the pad in hand. Edit wave under it trims, fades or normalises it."
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Row",
+                          "Parameter": "",
+                          "Label": "",
+                          "Properties": {
+                            "gap": "8"
+                          },
+                          "Children": [
+                            {
+                              "Element": "Button",
+                              "Parameter": "",
+                              "Label": "",
+                              "Properties": {
+                                "cap": "Edit wave...",
+                                "action": "edit_pad",
+                                "tip": "Open the wave on the pad in hand in the wave editor to trim, fade or normalise it. Only a wave kept in a preset of yours is edited, so save the sound as a preset first."
+                              },
+                              "Children": []
+                            }
+                          ]
                         },
                         {
                           "Element": "Row",

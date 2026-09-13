@@ -62,18 +62,19 @@ public sealed class PresetMenu(IPresetKeeping presets, IPresetQuestions? questio
     }
 
     /// <summary>Asks for a name and keeps the sound under it.</summary>
+    /// <param name="why">Why it is being kept, where somebody pressed something other than Save as preset.</param>
     /// <returns>Whether a preset was kept.</returns>
-    public async Task<bool> Save()
+    public async Task<bool> Save(string why = "")
     {
         if (!presets.CanKeep) return false;
 
-        string? name = await _questions.Name(presets.DeviceName, presets.Suggested);
+        string? name = await _questions.Name(presets.DeviceName, presets.Suggested, why);
 
         if (string.IsNullOrWhiteSpace(name)) return false;
 
-        if (presets.Refusal(name) is { Length: > 0 } why)
+        if (presets.Refusal(name) is { Length: > 0 } refused)
         {
-            await _questions.Refused(why);
+            await _questions.Refused(refused);
 
             return false;
         }

@@ -250,12 +250,16 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets,
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Shown as picked without being put on, since it is exactly what is on already: putting it
-    /// on would only be an undo step that changes nothing.
+    /// The kept preset is put on the instrument straight away, so it plays the copies of its
+    /// recordings in the preset's own folder rather than the ones on the shelf: an edit to a wave
+    /// there is then heard here. Shown as picked without being put on a second time.
     /// </remarks>
     public bool Keep(string name)
     {
         if (!CanKeep || _presets.Keep(_instrument.Machine, _instrument, name) is not { } kept) return false;
+
+        _instrument.TakeSoundFrom(kept.Sound);
+        _applied();
 
         Refresh();
         Quietly(kept.File);

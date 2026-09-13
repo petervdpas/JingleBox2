@@ -2391,6 +2391,9 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         Tracker.RecordingsArrived += (_, _) => Record.Rescan();
 
         Record.RecordingChanged += (_, path) => Tracker.ReloadSample(path);
+
+        Tracker.Waves = Record;
+        Machines.Waves = Record;
         Record.RecordingRenamed += (_, moved) => Tracker.RenameSample(moved.From, moved.To);
 
         Watch(Tracker, "Tracker");

@@ -22,6 +22,14 @@ A whole kit in one recording, a beat or a sample pack of hits played one after a
 
 ## Pad
 
+The wave on the pad in hand is drawn under its name, with buttons beside it to zoom in and out.
+**Edit wave...** under the wave opens it in the same editor RECORD uses, to trim it, fade it,
+reverse it or bring it up to a level, and the pad plays the edit as soon as it is saved. It edits
+the file itself, so the wave it opens is always one kept in a preset of yours: if the kit is not
+kept as one yet, it asks for a name first, keeps the kit as that preset, which copies its waves
+into a folder of the preset's own, and opens the copy. A wave on your recordings shelf or one
+BongaBong ships with is never changed.
+
 - **Level** is that pad's own, nought to one, under the pattern's volume column and before the
   mixer. It is how a kit is balanced: the snare down a little, the kick left alone.
 - **Pan** is where it sits, hard left to hard right. Hats to one side and a tom to the other is

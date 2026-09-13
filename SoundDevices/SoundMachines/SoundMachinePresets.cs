@@ -27,6 +27,9 @@ public sealed class SoundMachinePresets : IPresetLibrary
     /// <summary>How a preset of yours is written whole.</summary>
     private readonly ISafeFile _writer;
 
+    /// <summary>The recordings a preset of yours keeps beside it.</summary>
+    private readonly IPresetRecordings _recordings = new PresetRecordings();
+
     /// <summary>Takes the machines this run has, and how to read a preset off the disc.</summary>
     /// <remarks>
     /// The machines are required rather than defaulted. A fresh <c>SoundMachineProjects</c> holds
@@ -147,6 +150,8 @@ public sealed class SoundMachinePresets : IPresetLibrary
 
         try
         {
+            _recordings.Gather(kept, Path.Combine(Folder(machine), called));
+
             _writer.Write(path, _files.Write(kept, project));
         }
         catch (Exception ex)
@@ -190,6 +195,24 @@ public sealed class SoundMachinePresets : IPresetLibrary
         return true;
     }
 
+    /// <inheritdoc/>
+    public bool Owns(SoundMachine? machine, string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || Folder(machine) is not { Length: > 0 } folder) return false;
+
+        try
+        {
+            return File.Exists(path) && _paths.Under(path, folder) && !_registry.Ships(path);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>How a path is tested for being inside a folder.</summary>
+    private readonly ISoundMachinePaths _paths = new SoundMachinePaths();
+
     /// <summary>Forgets what was read for that machine, so the next look reads its folder again.</summary>
     private void Forget(SoundMachine machine)
     {
@@ -225,6 +248,9 @@ public sealed class SoundMachinePresets : IPresetLibrary
     private void Locate(TrackerInstrument sound, string? folder)
     {
         if (folder == null) return;
+
+        if (sound.Kit is { Source.Length: > 0 } chopped && !Path.IsPathRooted(chopped.Source))
+            chopped.Source = Path.GetFullPath(Path.Combine(folder, chopped.Source));
 
         foreach (var pad in sound.Kit?.Pads ?? Enumerable.Empty<DrumPad>())
         {

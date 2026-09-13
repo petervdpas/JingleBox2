@@ -9,8 +9,9 @@ namespace JingleBox2.ViewModels;
 public sealed class PresetQuestions : IPresetQuestions
 {
     /// <inheritdoc/>
-    public Task<string?> Name(string machine, string suggested) =>
-        NameDialog.AskAsync("Save as preset", "What should this " + machine + " preset be called?", suggested, "Save");
+    public Task<string?> Name(string machine, string suggested, string why = "") =>
+        NameDialog.AskAsync("Save as preset",
+            (why.Length > 0 ? why + "\n\n" : "") + "What should this " + machine + " preset be called?", suggested, "Save");
 
     /// <inheritdoc/>
     public Task<bool> Replace(string name) =>

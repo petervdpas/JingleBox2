@@ -412,7 +412,17 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   a kit or map kept from the Menu names takes on your shelf by full path, so `ISoundMachinePack`
   puts each one into the zip beside its preset, `presets/<preset>/Kick.wav`, which is how a
   shipped preset already keeps its sounds, and rewrites the zipped preset to name it there. Only
-  the zip changes; the folder on disc is left as it was **Yours is answered by
+  the zip changes; the folder on disc is left as it was
+- **A preset of yours owns its waves, and a chopped kit remembers what it was chopped from.**
+  `IPresetRecordings` copies every recording a kept sound names into `presets/<preset>/` and the
+  instrument is given the kept preset back, so it plays the copies; `DrumKit.Source` is the whole
+  recording a chop came from, `chop_source` in a preset, copied beside the pieces, and Chopper's
+  Chop again starts from it. Edit wave... opens RECORD's editor through `IWaveEditing` on the pad's
+  wave, and only where `IPresetLibrary.Owns` says the wave is in a preset of yours; a wave that is
+  not is put there first by keeping the sound as a preset, asked for in the same press, since a
+  refusal there reads as the button not working: the edit is to
+  the file, and a shelf take is shared while a shipped wave comes back on the next update. The
+  editor hides the name and the category for a file off the shelf, since renaming moves the file **Yours is answered by
   `IRackRegistry.Ships`**, the same question a packed song asks: a file with no twin in the shipped
   copy of that machine is yours, so a machine made in DESIGNER is all yours. Yours come after the
   machine's own, starred through `SoundMachinePreset.Shown`, and only yours can be replaced or

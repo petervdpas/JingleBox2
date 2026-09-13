@@ -1958,6 +1958,9 @@ public class PanelView : Decorator
     /// whole recording. The wheel zooms too, but nothing on a panel says so, and a way of working
     /// nobody can see is one nobody uses.
     ///
+    /// The picture is read again whenever the panel reads itself, so a wave naming the recording on
+    /// the pad or zone in hand follows the picking, and one edited on disc is drawn as it now is.
+    ///
     /// **The loop's handles are there only while there is a loop.** Where the element names the
     /// parameter holding the loop's mode, the dashed handles come and go with it: with the loop
     /// off they mark nothing that plays, and drawn beside the handles that do, a drag would take
@@ -1966,7 +1969,6 @@ public class PanelView : Decorator
     private Control BuildWave(PanelElement element, Dictionary<string, Parameter> parameters)
     {
         var placeholder = Text(element, "placeholder");
-        var take = Setting(element.Parameter);
 
         var wave = new WaveformView
         {
@@ -1975,10 +1977,16 @@ public class PanelView : Decorator
             Placeholder = placeholder.Length > 0 ? placeholder : element.Label,
             ShowMarkers = Flag(element, "showMarkers"),
             ShowLoop = Flag(element, "showLoop"),
-            Peaks = take.Length > 0
-                ? Takes?.Peaks(take)
-                : Designing ? Demonstration() : null,
         };
+
+        Reads(() =>
+        {
+            var take = Setting(element.Parameter);
+
+            wave.Peaks = take.Length > 0
+                ? Takes?.Peaks(take)
+                : Designing ? Demonstration() : null;
+        });
 
         wave.Bind(WaveformView.PlayheadProperty, this.GetObservable(PlayheadProperty));
 

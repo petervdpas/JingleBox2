@@ -60,6 +60,13 @@ public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? abo
     /// </remarks>
     public const string TakeKey = "pad_take";
 
+    /// <summary>The whole recording the kit was chopped from, which is the kit's and not any pad's.</summary>
+    /// <remarks>
+    /// Public for the reason <see cref="TakeKey"/> is: a preset carries it whether or not the face
+    /// draws anything for it, since chopping again starts from it.
+    /// </remarks>
+    public const string SourceKey = "chop_source";
+
     /// <summary>What that pad is called, which is yours to type.</summary>
     private const string NameKey = "pad_name";
 
@@ -104,6 +111,7 @@ public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? abo
     public override string GetText(string key) => key switch
     {
         TakeKey => Pad?.Pad.FilePath ?? "",
+        SourceKey => kit.Kit.Source,
         NameKey => Pad?.Name ?? "",
         DetailsKey => Pad?.FileText ?? "",
         _ => "",
@@ -120,6 +128,15 @@ public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? abo
     /// </remarks>
     protected override bool WriteText(string key, string value)
     {
+        if (key == SourceKey)
+        {
+            if (kit.Kit.Source == (value ?? "")) return false;
+
+            kit.Kit.Source = value ?? "";
+
+            return true;
+        }
+
         if (Pad is not { } pad) return false;
 
         switch (key)

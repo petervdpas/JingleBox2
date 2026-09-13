@@ -46,9 +46,11 @@ public sealed class PresetKeepingTests : IDisposable
 
         public List<string> Said { get; } = new();
 
-        public Task<string?> Name(string machine, string suggested)
+        public Task<string?> Name(string machine, string suggested, string why = "")
         {
             Said.Add("name " + suggested);
+
+            if (why.Length > 0) Said.Add("why " + why);
 
             return Task.FromResult(Named);
         }
@@ -322,9 +324,11 @@ public sealed class PresetKeepingTests : IDisposable
     public async Task A_cancelled_name_does_nothing()
     {
         var picker = new InstrumentPresets(Sound(), () => { }, _projects, library: Library());
-        var menu = new PresetMenu(picker, new Answers { Named = null });
+        var answers = new Answers { Named = null };
+        var menu = new PresetMenu(picker, answers);
 
-        Assert.False(await menu.Save());
+        Assert.False(await menu.Save("Edit wave changes the file"));
+        Assert.Contains("why Edit wave changes the file", answers.Said);
         Assert.DoesNotContain(Library().For(Sound().Machine), one => one.Yours);
     }
 
@@ -470,5 +474,116 @@ public sealed class PresetKeepingTests : IDisposable
         Assert.Equal(new byte[] { 4, 5, 6, 7 }, File.ReadAllBytes(pads[1].FilePath));
         Assert.Equal(pads[0].FilePath, pads[3].FilePath);
         Assert.Equal(gone, pads[2].FilePath);
+    }
+
+    /// <summary>
+    /// Saving a chopped kit copies its pieces and the recording it was chopped from beside the preset,
+    /// and the instrument then plays the copies.
+    /// </summary>
+    /// <remarks>
+    /// The shelf keeps its own files. Saving again reuses the copies rather than numbering a second
+    /// set, and a copy edited in the preset's folder is still what the preset plays afterwards.
+    /// </remarks>
+    [Fact]
+    public void Saving_a_chopped_kit_keeps_its_waves_and_its_original_beside_it()
+    {
+        string shipped = Path.Combine(_root, "shipped-keep", "rack", "machines");
+        string app = Path.Combine(_root, "app-keep");
+        string shelf = Path.Combine(_root, "shelf");
+
+        Directory.CreateDirectory(app);
+        Copy(Path.Combine(Path.GetDirectoryName(Real())!, "Chopper"), Path.Combine(shipped, "Chopper"));
+
+        string loop = Path.Combine(shelf, "loop.wav");
+        string kick = Path.Combine(shelf, "chopped", "loop", "Kick.wav");
+        string snare = Path.Combine(shelf, "chopped", "loop", "Snare.wav");
+
+        Directory.CreateDirectory(Path.GetDirectoryName(kick)!);
+        File.WriteAllBytes(loop, new byte[] { 9, 9, 9, 9, 9 });
+        File.WriteAllBytes(kick, new byte[] { 1 });
+        File.WriteAllBytes(snare, new byte[] { 2, 2 });
+
+        var registry = new SoundMachineRegistry(folder: new Somewhere(app), shipped: shipped);
+        var projects = new SoundMachineProjects();
+
+        projects.Keep(registry.Load());
+
+        var kit = TrackerInstrument.CreateKit("Loop Kit");
+
+        kit.MachineId = "machine.chopper";
+        kit.Kit!.Pads[0].FilePath = kick;
+        kit.Kit.Pads[1].FilePath = snare;
+        kit.Kit.Source = loop;
+
+        var picker = new InstrumentPresets(kit, () => { }, projects, library: new SoundMachinePresets(projects, registry: registry));
+
+        Assert.True(picker.Keep("Loops"));
+
+        string beside = Path.Combine(projects.For("machine.chopper")!.Folder, SoundMachineProject.PresetsFolder, "Loops");
+
+        Assert.Equal(Path.Combine(beside, "Kick.wav"), kit.Kit.Pads[0].FilePath);
+        Assert.Equal(Path.Combine(beside, "Snare.wav"), kit.Kit.Pads[1].FilePath);
+        Assert.Equal(Path.Combine(beside, "loop.wav"), kit.Kit.Source);
+        Assert.Equal(new byte[] { 9, 9, 9, 9, 9 }, File.ReadAllBytes(kit.Kit.Source));
+        Assert.True(File.Exists(kick) && File.Exists(snare) && File.Exists(loop));
+
+        string file = picker.Selected!.File;
+
+        Assert.Contains("\"Loops/loop.wav\"", File.ReadAllText(file));
+        Assert.Contains("\"Loops/Kick.wav\"", File.ReadAllText(file));
+
+        File.WriteAllBytes(kit.Kit.Pads[0].FilePath, new byte[] { 7, 7, 7 });
+
+        Assert.True(picker.Keep("Loops"));
+
+        Assert.Equal(Path.Combine(beside, "Kick.wav"), kit.Kit.Pads[0].FilePath);
+        Assert.Equal(new byte[] { 7, 7, 7 }, File.ReadAllBytes(kit.Kit.Pads[0].FilePath));
+        Assert.Equal(3, Directory.GetFiles(beside).Length);
+
+        var library = new SoundMachinePresets(projects, registry: registry);
+        var read = library.For(kit.Machine).Single(one => one.Name == "Loops");
+
+        Assert.Equal(Path.Combine(beside, "loop.wav"), read.Sound.Kit!.Source);
+
+        Assert.True(library.Owns(kit.Machine, kit.Kit.Pads[0].FilePath));
+        Assert.False(library.Owns(kit.Machine, kick));
+        Assert.False(library.Owns(kit.Machine, library.For(kit.Machine).First(one => !one.Yours).Sound.Kit!.Pads[0].FilePath));
+        Assert.False(library.Owns(kit.Machine, Path.Combine(beside, "not there.wav")));
+        Assert.False(library.Owns(null, kit.Kit.Pads[0].FilePath));
+        Assert.False(library.Owns(kit.Machine, ""));
+
+        var copy = kit.Clone();
+
+        Assert.Equal(kit.Kit.Source, copy.Kit!.Source);
+    }
+
+    /// <summary>
+    /// RECORD's editor opens on a pad's wave that is not on the shelf, without the name and category a shelf take has.
+    /// </summary>
+    [Fact]
+    public void The_wave_editor_opens_on_a_file_off_the_shelf()
+    {
+        var bench = new RecorderBench();
+        string wave = Path.Combine(_root, "Kick.wav");
+
+        Directory.CreateDirectory(_root);
+        File.WriteAllBytes(wave, new byte[64]);
+
+        bench.Page.Edit(wave, "Kick");
+
+        Assert.Equal(wave, bench.Page.SelectedRecordingForEdit!.FilePath);
+        Assert.Equal("Kick", bench.Page.EditName);
+        Assert.False(bench.Page.EditsShelf);
+        Assert.False(bench.Page.CanRename);
+        Assert.True(bench.Page.IsEditing);
+        Assert.NotEqual(wave, bench.Page.EditingPath);
+
+        bench.Page.EndEdit();
+
+        Assert.Equal(new byte[64], File.ReadAllBytes(wave));
+
+        bench.Page.Edit("", "Nothing");
+
+        Assert.False(bench.Page.IsEditing);
     }
 }

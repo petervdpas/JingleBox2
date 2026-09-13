@@ -124,6 +124,18 @@ public sealed class DrumKit
     /// <summary>The key the first pad answers to: C-4, the note a fresh pattern starts on.</summary>
     public const int FirstSemitone = 48;
 
+    /// <summary>
+    /// The whole recording this kit was chopped from, or empty for a kit that was not chopped.
+    /// </summary>
+    /// <remarks>
+    /// Kept beside the pads because the pads are only what one chop made of it: chopping again, to
+    /// get a cleaner kick or a hat that was missed, has to start from the full recording and not
+    /// from the pieces. So it is saved with the kit in a song and in a preset, and a preset of yours
+    /// keeps a copy of it in its own folder with the pieces. Laying pads by hand leaves it alone,
+    /// since the recording is still where the chop came from.
+    /// </remarks>
+    public string Source { get; set; } = "";
+
     /// <summary>The pads, in order. A chop fills them from the first, which is what
     /// <see cref="SlicePoints"/> reads back off them.</summary>
     public List<DrumPad> Pads { get; set; } = new();
@@ -297,7 +309,7 @@ public sealed class DrumKit
     /// </summary>
     public DrumKit Clone()
     {
-        var kit = new DrumKit { Sliced = Sliced };
+        var kit = new DrumKit { Sliced = Sliced, Source = Source };
 
         foreach (var pad in Pads) kit.Pads.Add(pad.Clone());
 
@@ -317,6 +329,7 @@ public sealed class DrumKit
         foreach (var pad in other.Pads) Pads.Add(pad.Clone());
 
         Sliced = other.Sliced;
+        Source = other.Source ?? "";
 
         Clamp();
     }
@@ -345,6 +358,7 @@ public sealed class DrumKit
     public void Clamp(int pads = 0)
     {
         Pads ??= new List<DrumPad>();
+        Source ??= "";
 
         foreach (var pad in Pads) pad.Clamp();
 

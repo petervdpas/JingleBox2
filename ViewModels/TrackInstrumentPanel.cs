@@ -175,6 +175,9 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
     public IRelayCommand TestCommand => new RelayCommand(Test);
 
     /// <inheritdoc/>
+    public IWaveEditing? Waves { get; set; }
+
+    /// <inheritdoc/>
     /// <remarks>
     /// Built over the song's own copy of the instrument, so picking one off the shelf lands on
     /// this song and leaves the rack's untouched.

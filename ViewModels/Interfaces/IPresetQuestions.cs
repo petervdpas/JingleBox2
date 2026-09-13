@@ -14,7 +14,11 @@ public interface IPresetQuestions
     /// <summary>What to call the preset, or nothing when it was cancelled.</summary>
     /// <param name="machine">The machine it is a preset of.</param>
     /// <param name="suggested">The name the box opens with.</param>
-    Task<string?> Name(string machine, string suggested);
+    /// <param name="why">
+    /// Why a preset is being kept, said above the question, where keeping one was not what was
+    /// pressed. Nothing for Save as preset, which explains itself.
+    /// </param>
+    Task<string?> Name(string machine, string suggested, string why = "");
 
     /// <summary>Whether to replace a preset of yours already called that.</summary>
     /// <param name="name">The name that is taken.</param>

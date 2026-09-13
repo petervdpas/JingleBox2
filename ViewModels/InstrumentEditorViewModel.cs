@@ -813,6 +813,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// </remarks>
     public string MachineId => _instrument.Machine.SlotId;
 
+    /// <summary>Whether that wave is kept in a preset of yours on this machine, and so can be edited in place.</summary>
+    /// <param name="path">The wave.</param>
+    public bool OwnsWave(string path) => new SoundMachinePresets(_machines).Owns(_instrument.Machine, path);
+
     /// <summary>
     /// The device this is editing, as anything outside it needs it.
     /// </summary>

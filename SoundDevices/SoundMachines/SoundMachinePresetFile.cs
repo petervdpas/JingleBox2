@@ -165,6 +165,14 @@ public sealed class SoundMachinePresetFile(ISoundMachinePaths? paths = null) : I
             {
                 if (key is NameKey or MachineKey or BrowseKey) continue;
 
+                if (key == KitValues.SourceKey && sound.Kit is { } chopped)
+                {
+                    if (node is JsonValue said && said.TryGetValue(out string? spoken) && spoken.Length > 0)
+                        chopped.Source = spoken.Contains('/') ? Outside(spoken, home) : spoken;
+
+                    continue;
+                }
+
                 if (node is JsonObject block)
                 {
                     if (inside is null || which is null) continue;
@@ -222,6 +230,8 @@ public sealed class SoundMachinePresetFile(ISoundMachinePaths? paths = null) : I
 
                 held[named] = Block(new KitValues(kit, () => one), owned, home);
             }
+
+            if (sound.Kit.Source is { Length: > 0 } source) held[KitValues.SourceKey] = Inside(source, home);
 
             return held.ToJsonString(Layout);
         }

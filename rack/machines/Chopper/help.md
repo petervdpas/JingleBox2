@@ -35,7 +35,25 @@ carries them.
 
 It is rules, not a model: it listens the way you would, and it is right about drums that sound like
 drums. Something built to sound strange can be heard as the wrong drum. **Clear** takes a pad's
-sample off, and chopping again starts over.
+sample off.
+
+**Chop again** chops the recording this kit was chopped from once more, without asking which one.
+The kit remembers it, in the song and in a preset, so a cut that went wrong can be done over from
+the whole recording rather than from the pieces.
+
+## Keeping a kit, and editing its waves
+
+**Save as preset...** in the Menu keeps the kit as a preset of yours, and it keeps the sounds with
+it: every chopped wave and the whole recording it was chopped from are copied into a folder of the
+preset's own, inside Chopper's presets folder, and the kit then plays those copies. Your recordings
+on RECORD are left as they were. Saving the same preset again keeps the copies it already has.
+
+**Edit wave...** opens the wave on the pad in hand in the same editor RECORD uses, to trim it, fade
+it, reverse it or bring it up to a level. It edits the file itself, so the wave it opens is always one
+kept in a preset of yours: if the kit is not kept as one yet, it asks for a name first, keeps the
+kit as that preset, and opens the copy. The pad plays the edit as soon as it is saved. A wave
+Chopper ships with, or one still on your recordings shelf, is never changed, since the first would
+come back with the next update and the second is shared by everything that uses it.
 
 ## What ships with it
 

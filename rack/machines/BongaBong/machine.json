@@ -392,6 +392,39 @@
                           "Children": []
                         },
                         {
+                          "Element": "Wave",
+                          "Parameter": "pad_take",
+                          "Label": "",
+                          "Properties": {
+                            "width": "260",
+                            "height": "100",
+                            "placeholder": "No wave on this pad",
+                            "tip": "The wave on the pad in hand. Edit wave under it trims, fades or normalises it."
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Row",
+                          "Parameter": "",
+                          "Label": "",
+                          "Properties": {
+                            "gap": "8"
+                          },
+                          "Children": [
+                            {
+                              "Element": "Button",
+                              "Parameter": "",
+                              "Label": "",
+                              "Properties": {
+                                "cap": "Edit wave...",
+                                "action": "edit_pad",
+                                "tip": "Open the wave on the pad in hand in the wave editor to trim, fade or normalise it. Only a wave kept in a preset of yours is edited, so save the sound as a preset first."
+                              },
+                              "Children": []
+                            }
+                          ]
+                        },
+                        {
                           "Element": "Row",
                           "Parameter": "",
                           "Label": "",

@@ -221,6 +221,9 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     /// <remarks>Always enabled; with nothing open it says so in the status line.</remarks>
     public IRelayCommand TestCommand => new RelayCommand(Test);
 
+    /// <inheritdoc/>
+    public IWaveEditing? Waves { get; set; }
+
     /// <summary>
     /// Nothing is playing this instrument here, so the lamps are shown but have nothing to say.
     /// </summary>

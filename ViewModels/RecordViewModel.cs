@@ -39,7 +39,7 @@ namespace JingleBox2.ViewModels;
 /// anybody wanted it. Only this session's deletions are offered back: putting back a take from
 /// last week is a filing cabinet, not undo.
 /// </remarks>
-public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, IInputWatch, IInputSource, Shortcuts.Interfaces.IShortcutContext
+public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, IInputWatch, IInputSource, Shortcuts.Interfaces.IShortcutContext, IWaveEditing
 {
     /// <summary>The one door recordings come in through. Holds nothing, so one is enough.</summary>
     private readonly IRecordingImport _import = new RecordingImport();
@@ -626,7 +626,29 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     [ObservableProperty] private Recording? selectedRecording;
 
     /// <summary>The take whose name is being typed over, or null when none is being renamed.</summary>
-    [ObservableProperty] private Recording? selectedRecordingForEdit;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EditsShelf))]
+    [NotifyPropertyChangedFor(nameof(CanRename))]
+    private Recording? selectedRecordingForEdit;
+
+    /// <summary>
+    /// True while the file in the editor is a take on the shelf, which is what can be renamed and filed.
+    /// </summary>
+    /// <remarks>
+    /// A pad's wave kept in a preset of yours is edited here too, and its name is the file its preset
+    /// names, so the name and the category are hidden for it rather than offered and refused.
+    /// </remarks>
+    public bool EditsShelf => SelectedRecordingForEdit is { } open && Recordings.Contains(open);
+
+    /// <inheritdoc/>
+    public Task Edit(string path, string name)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return Task.CompletedTask;
+
+        var shelved = Recordings.FirstOrDefault(one => string.Equals(one.FilePath, path, StringComparison.Ordinal));
+
+        return Opened(shelved ?? new Recording { Id = path, FilePath = path, Name = name ?? "" });
+    }
 
     /// <summary>How much the input is turned up, in decibels, before anything is written.</summary>
     /// <remarks>
@@ -914,7 +936,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     }
 
     /// <summary>Whether the dialog's Rename button does anything: a take open and a usable name.</summary>
-    public bool CanRename => RenameError == null && SelectedRecordingForEdit != null;
+    public bool CanRename => RenameError == null && SelectedRecordingForEdit != null && EditsShelf;
 
     /// <summary>
     /// Gives the recording another name, which for a recording means another file name.
@@ -1211,9 +1233,13 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// The audition is stopped first, because the dialog has a player of its own and the page's
     /// would go on sounding underneath it.
     /// </remarks>
-    private void EditRecording(Recording? recording)
+    private void EditRecording(Recording? recording) => _ = Opened(recording);
+
+    /// <summary>The same, done when the editor window is closed.</summary>
+    /// <param name="recording">The take, or nothing.</param>
+    private Task Opened(Recording? recording)
     {
-        if (recording == null) return;
+        if (recording == null) return Task.CompletedTask;
 
         StopPreview();
 
@@ -1235,14 +1261,14 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             dialog.DataContext = this;
 
             if (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop && desktop.MainWindow is not null)
-            {
-                _ = dialog.ShowDialog(desktop.MainWindow);
-            }
+                return dialog.ShowDialog(desktop.MainWindow);
         }
         catch (Exception ex)
         {
             Status = $"Failed to load recording: {ex.Message}";
         }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>

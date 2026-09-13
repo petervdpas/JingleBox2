@@ -153,6 +153,16 @@ public partial class SoundDevicePanel : UserControl
 
                 break;
 
+            case Rack.SoundDevices.Faces.PanelActions.RechopDrums:
+                ChopAgain();
+
+                break;
+
+            case Rack.SoundDevices.Faces.PanelActions.EditPad:
+                EditWave();
+
+                break;
+
             case Rack.SoundDevices.Faces.PanelActions.ClearZone:
                 ClearZoneSample_Click(this, new RoutedEventArgs());
 
@@ -416,8 +426,89 @@ public partial class SoundDevicePanel : UserControl
 
         if (take is null || take.FilePath.Length == 0) return;
 
+        await Chop(take.FilePath);
+    }
+
+    /// <summary>
+    /// Chops the recording the kit was chopped from again, which is the way to a better cut without hunting for the file.
+    /// </summary>
+    /// <remarks>
+    /// The recording is the one the kit remembers, which after Save as preset is the copy kept in
+    /// the preset's own folder. A kit that remembers none, or one whose recording has gone, says so.
+    /// </remarks>
+    private async void ChopAgain()
+    {
+        if (Designer?.Editor?.Kit is not { } kit) return;
+
+        string source = kit.Kit.Source;
+
+        if (source.Length == 0 || !System.IO.File.Exists(source))
+        {
+            await ConfirmDialog.NoteAsync("Chop again", source.Length == 0
+                ? "This kit does not remember a recording it was chopped from. Use Chop a recording... first."
+                : "The recording this kit was chopped from is not there any more: " + source);
+
+            return;
+        }
+
+        await Chop(source);
+    }
+
+    /// <summary>
+    /// Opens the wave on the pad in hand in RECORD's editor, where it is yours to change.
+    /// </summary>
+    /// <remarks>
+    /// Only a wave kept in a preset of yours is edited, since the edit changes the file itself:
+    /// one on your recordings shelf is shared by every song and preset that names it, and one the
+    /// machine ships would come back with the next update. So a wave that is not there yet is put
+    /// there first, by keeping the sound as a preset of yours, asked for in the same breath with
+    /// the reason above the name box; the pad is then read again, since it plays the copy now, and
+    /// the copy is what opens. Cancelling the name edits nothing.
+    /// </remarks>
+    private async void EditWave()
+    {
+        var editor = Designer?.Editor;
+
+        if (editor?.Kit?.Selected is not { } pad || !pad.Pad.HasSound)
+        {
+            await ConfirmDialog.NoteAsync("Edit wave", "Pick a pad with a wave on it first.");
+
+            return;
+        }
+
+        string path = pad.Pad.FilePath;
+
+        if (!editor.OwnsWave(path))
+        {
+            if (editor.PresetLines is not ViewModels.PresetMenu keeping
+                || !await keeping.Save("Edit wave changes the file, so this sound is kept as a preset of yours first: " +
+                                       "its waves are copied into the preset's own folder and the copy is what you edit. " +
+                                       "Your recordings are left as they are."))
+                return;
+
+            if (editor.Kit?.Selected is not { } moved || !editor.OwnsWave(moved.Pad.FilePath)) return;
+
+            pad = moved;
+            path = moved.Pad.FilePath;
+        }
+
+        if (Designer?.Waves is not { } waves) return;
+
+        await waves.Edit(path, pad.Name.Length > 0 ? pad.Name : System.IO.Path.GetFileNameWithoutExtension(path));
+
+        editor.SaidAgain();
+    }
+
+    /// <summary>Chops that recording and lays what came out over the pads, remembering it as the kit's source.</summary>
+    /// <param name="recording">The whole recording.</param>
+    private async System.Threading.Tasks.Task Chop(string recording)
+    {
+        var editor = Designer?.Editor;
+        var kit = editor?.Kit;
+
+        if (editor is null || kit is null) return;
+
         int pads = kit.Pads.Count;
-        string recording = take.FilePath;
 
         var chopped = await System.Threading.Tasks.Task.Run(() =>
         {
@@ -433,6 +524,7 @@ public partial class SoundDevicePanel : UserControl
             return;
         }
 
+        kit.Kit.Source = recording;
         kit.Lay(chopped.Select(drum => (drum.FilePath, drum.Name)).ToList());
 
         editor.SaidAgain();

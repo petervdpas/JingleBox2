@@ -34,6 +34,9 @@ public interface ISoundDevicePanel
     /// <summary>How long a test note is held, so the envelope scope draws the right sustain.</summary>
     double HoldSeconds { get; }
 
+    /// <summary>RECORD's wave editor, for a pad's wave, or nothing where there is no RECORD page to open it.</summary>
+    IWaveEditing? Waves => null;
+
     /// <summary>Plays the instrument, so what has just been changed can be heard.</summary>
     IRelayCommand TestCommand { get; }
 

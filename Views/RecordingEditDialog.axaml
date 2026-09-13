@@ -306,7 +306,7 @@
            rather than in the tool box: what a take is called is not a tool. Renaming moves the
            file, and every instrument playing it is repointed at the same moment, on the shelf
            and in the song that is open, which is why it can be an ordinary box. -->
-      <Grid DockPanel.Dock="Top" Margin="0,0,0,10"
+      <Grid DockPanel.Dock="Top" Margin="0,0,0,10" IsVisible="{Binding EditsShelf}"
             ColumnDefinitions="Auto,*,Auto,Auto,220" ColumnSpacing="8">
         <TextBlock Grid.Column="0" Text="Name" FontWeight="SemiBold" VerticalAlignment="Center" />
         <TextBox Grid.Column="1" Name="NameBox" FontSize="14"

@@ -702,7 +702,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             () => _player.EnsurePlayerOn(track, instrument),
             _machines,
             InstrumentEdited,
-            () => new TrackInstrumentPanel(track, instrument, _machines, this, InstrumentEdited, _waveforms, this, _rack, _recordings, MidiKeys),
+            () => new TrackInstrumentPanel(track, instrument, _machines, this, InstrumentEdited, _waveforms, this, _rack, _recordings, MidiKeys)
+            {
+                Waves = Waves
+            },
             () => ClearTrackInstrument(track));
 
         _instrumentBoxes[track] = box;
@@ -1322,6 +1325,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// instrument's window is built by this and there is nowhere else for it to come from.
     /// </remarks>
     public Midi.Interfaces.IMidiMonitor? MidiKeys { get; set; }
+
+    /// <summary>RECORD's wave editor, handed to every instrument window this opens, for a pad's wave.</summary>
+    public IWaveEditing? Waves { get; set; }
 
     /// <summary>The clock is running and the pattern is moving under the cursor.</summary>
     public bool IsPlaying => Transport == TrackerTransportState.Playing;

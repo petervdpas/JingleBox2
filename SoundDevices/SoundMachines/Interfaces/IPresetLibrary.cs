@@ -68,8 +68,10 @@ public interface IPresetLibrary
     /// </summary>
     /// <remarks>
     /// Written in the shape the machine's own presets are, through the same writer, so a preset
-    /// you keep reads back exactly as one that shipped does. The sound is copied and renamed and
-    /// the instrument it came from is left alone.
+    /// you keep reads back exactly as one that shipped does. The sound is copied and renamed, the
+    /// recordings it names are copied into a folder beside it named after it (see
+    /// <see cref="IPresetRecordings"/>), and the instrument it came from is left alone: whoever
+    /// asked puts the kept preset on it afterwards if it should play the copies.
     /// </remarks>
     /// <param name="machine">The machine it is a preset of.</param>
     /// <param name="sound">What it sounds like now.</param>
@@ -84,4 +86,16 @@ public interface IPresetLibrary
     /// <param name="preset">The preset, as this library listed it.</param>
     /// <returns>Whether it was taken off.</returns>
     bool Remove(SoundMachine? machine, SoundMachinePreset? preset);
+
+    /// <summary>
+    /// Whether that recording is kept in the folder of a preset of yours on that machine, and so is yours to edit.
+    /// </summary>
+    /// <remarks>
+    /// A wave the machine ships would come back the next time the machine is brought up to date,
+    /// and one on your recordings shelf is shared by every song and preset that names it, so only a
+    /// wave inside the machine's presets folder that does not ship is edited in place.
+    /// </remarks>
+    /// <param name="machine">The machine the wave is played on.</param>
+    /// <param name="path">The wave.</param>
+    bool Owns(SoundMachine? machine, string path);
 }

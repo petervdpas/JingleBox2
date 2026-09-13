@@ -27,6 +27,14 @@ public static class PanelActions
     /// </summary>
     public const string ChopDrums = "chop_drums";
 
+    /// <summary>
+    /// Chops the recording the kit was chopped from again, without asking for one.
+    /// </summary>
+    public const string RechopDrums = "rechop_drums";
+
+    /// <summary>Opens the wave on the pad in hand in the wave editor.</summary>
+    public const string EditPad = "edit_pad";
+
     /// <summary>Takes the recording off the zone in hand.</summary>
     public const string ClearZone = "clear_zone";
 
