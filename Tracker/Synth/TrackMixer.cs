@@ -994,7 +994,8 @@ public sealed class TrackMixer : ITrackMixer
             sample, instrument.Patch, instrument.Shape, note, instrument.BaseNote,
             track, gain, pan, SampleRate)
         {
-            Column = column
+            Column = column,
+            Gate = instrument.Gate
         };
 
         lock (_lock)
@@ -1127,7 +1128,8 @@ public sealed class TrackMixer : ITrackMixer
             sample, instrument.Patch, instrument.Shape, note, instrument.BaseNote,
             track, gain, pan, SampleRate)
         {
-            Audition = audition
+            Audition = audition,
+            Gate = instrument.Gate
         };
 
         double held = Held(voice, holdSeconds);
@@ -1145,10 +1147,11 @@ public sealed class TrackMixer : ITrackMixer
     /// <remarks>
     /// The fixed hold is what a generated sound needs, since it would otherwise never stop. A
     /// recording has an end of its own, and stopping short of it plays a different sound from
-    /// the one the instrument makes. A looping window has no end, so it keeps the fixed hold.
+    /// the one the instrument makes. A looping window has no end, so it keeps the fixed hold, and
+    /// neither does a gated one, which is let go of when the key comes up.
     /// </remarks>
     private static double Held(SampleVoice voice, double asked) =>
-        voice.WindowSeconds > 0 ? Math.Max(asked, voice.WindowSeconds) : asked;
+        voice.OneShot ? Math.Max(asked, voice.WindowSeconds) : asked;
 
     /// <inheritdoc/>
     /// <remarks>

@@ -62,6 +62,19 @@ public sealed class TrackerInstrument
     public bool OneVoice { get; set; }
 
     /// <summary>
+    /// Whether a recording played by hand stops when its key comes up, rather than playing on to
+    /// its end.
+    /// </summary>
+    /// <remarks>
+    /// Off is a one-shot, which is what a recording that does not loop has always been: a hit
+    /// sounds right through however briefly the key was down, and a click on a drawn key is not a
+    /// tick. On is a gate, which is what a long take played from a keyboard wants: the key comes
+    /// up and the recording goes into its release. A pattern's OFF cuts a note either way, so
+    /// this only decides what a hand letting go does. A looping window already follows the key.
+    /// </remarks>
+    public bool Gate { get; set; }
+
+    /// <summary>
     /// What happens to the note a track is still sounding when the next one lands on it.
     /// </summary>
     /// <remarks>
@@ -456,6 +469,7 @@ public sealed class TrackerInstrument
         Volume = other.Volume;
         Loop = other.Loop;
         OneVoice = other.OneVoice;
+        Gate = other.Gate;
         NewNoteAction = other.NewNoteAction;
         Shape = other.Shape?.Clone();
 
@@ -525,6 +539,7 @@ public sealed class TrackerInstrument
                 BaseNoteSemitone = other.BaseNoteSemitone;
                 Loop = other.Loop;
                 OneVoice = other.OneVoice;
+                Gate = other.Gate;
                 Shape = other.Shape?.Clone();
                 Patch.CopyFrom(other.Patch);
                 break;
@@ -561,6 +576,7 @@ public sealed class TrackerInstrument
         Volume = Volume,
         Loop = Loop,
         OneVoice = OneVoice,
+        Gate = Gate,
         NewNoteAction = NewNoteAction,
         Shape = Shape?.Clone(),
         PluginPath = PluginPath,

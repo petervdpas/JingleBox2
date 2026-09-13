@@ -26,6 +26,11 @@ transposing, that is BongaBong.
 - **Voices** decides whether it piles up or not. Many is an instrument; one cuts what it was
   sounding before it starts the next note, which is right for a long take that would otherwise be
   four copies of itself playing at once.
+- **Key up** decides what letting go of a key does. **Plays on** is a one-shot: the recording
+  plays to its end however briefly the key was down, which is right for a hit and is where a fresh
+  one starts. **Stops** is a gate: letting go stops it, through its release, which is right for a
+  long take played from a keyboard. A pattern's OFF stops it either way, and a loop already
+  follows the key.
 - **New note** says what happens to a note still sounding when the same column plays another:
   **Cut**, **Release** or **Sustain**.
 

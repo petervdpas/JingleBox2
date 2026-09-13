@@ -98,6 +98,16 @@
       "Saved": true
     },
     {
+      "Key": "gate",
+      "Name": "Key up",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1,
+      "Saved": true
+    },
+    {
       "Key": "new_note",
       "Name": "New note",
       "Unit": "",
@@ -452,6 +462,17 @@
                             "on": "One",
                             "off": "Many",
                             "tip": "One: a key played by hand stops the note before it. Many: they sound over each other, as a keyboard does. This is about the panel's own keys; what a track does is New note, beside it."
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Switch",
+                          "Parameter": "gate",
+                          "Label": "",
+                          "Properties": {
+                            "on": "Stops",
+                            "off": "Plays on",
+                            "tip": "Stops: letting go of a key stops the recording, through its release. Plays on: it plays to its end however briefly the key was down, which is a one-shot. A pattern's OFF stops it either way."
                           },
                           "Children": []
                         },

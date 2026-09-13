@@ -319,12 +319,17 @@ public sealed class SampleVoice : IVoice
     /// </remarks>
     public double WindowSeconds { get; }
 
+    /// <summary>Whether a key coming up lets go of it even though it has an end of its own.</summary>
+    /// <remarks>What the instrument's <see cref="TrackerInstrument.Gate"/> says, told when the note starts.</remarks>
+    public bool Gate { get; init; }
+
     /// <inheritdoc/>
     /// <remarks>
     /// The same fact <see cref="WindowSeconds"/> holds, asked as the question a hand letting go
-    /// needs answered. A looping window has no end and answers no.
+    /// needs answered. A looping window has no end and answers no, and so does a gated one, which
+    /// has an end and has been told to follow the key anyway.
     /// </remarks>
-    public bool OneShot => WindowSeconds > 0;
+    public bool OneShot => WindowSeconds > 0 && !Gate;
 
     /// <inheritdoc/>
     public string Audition { get; init; } = "";
