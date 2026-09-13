@@ -165,6 +165,12 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// <inheritdoc/>
     public IMidiClockDeck? ClockDeck { get; set; }
 
+    /// <inheritdoc/>
+    public ITrackMidiOut? MidiOut { get; set; }
+
+    /// <summary>How a volume column becomes a velocity on the way out.</summary>
+    private readonly Music.Interfaces.IMidiNoteInput _wire = new Music.MidiNoteInput();
+
     /// <summary>How a line and a tick are related, which is arithmetic and holds nothing.</summary>
     private readonly IMidiClockGrid _grid = new MidiClockGrid();
 
@@ -217,6 +223,31 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// <inheritdoc/>
     public TrackerPosition Position { get; private set; } = TrackerPosition.Start;
 
+    /// <summary>A line as the clock thread played it: where, when it began, and how long a line is, in stopwatch ticks.</summary>
+    private sealed record LineMark(TrackerPosition Position, long Began, long Length);
+
+    /// <summary>The line last played, swapped whole on the clock thread and read from anywhere.</summary>
+    private volatile LineMark? _mark;
+
+    /// <inheritdoc/>
+    public TrackerPosition NearestLine(long timestamp)
+    {
+        var mark = _mark;
+
+        if (mark is null || State != TrackerTransportState.Playing || mark.Length <= 0) return Position;
+        if (timestamp - mark.Began < mark.Length / 2) return mark.Position;
+
+        Song? song;
+        lock (_lock) song = _song;
+        if (song is null) return mark.Position;
+
+        var next = Mode == TrackerPlayMode.Pattern
+            ? TrackerSequencer.AdvanceWithinPattern(song, mark.Position, Loop)
+            : TrackerSequencer.Advance(song, mark.Position, Loop);
+
+        return next ?? mark.Position;
+    }
+
     /// <inheritdoc/>
     /// <remarks>
     /// Volatile, since the clock thread reads it on every line and the drawing thread writes it
@@ -267,6 +298,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         Teardown();
         _audio.EnsureInitialized();
+
+        MidiOut?.Prepare(song.Mix);
 
         lock (_lock)
         {
@@ -427,6 +460,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
             clock.Join(TimeSpan.FromSeconds(1));
 
         if (_synth.HasMixer) _synth.Mixer.AllPluginNotesOff();
+
+        MidiOut?.AllOff();
 
         cancel?.Dispose();
         StopAllVoices();
@@ -1266,6 +1301,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             ApplyEvents(sequencer.EventsFor(song, position), song);
             Position = position;
+            _mark = new LineMark(position, Stopwatch.GetTimestamp(),
+                (long)(song.Timing.SecondsPerLine * Stopwatch.Frequency));
             PositionChanged?.Invoke(this, position);
 
             var next = Mode == TrackerPlayMode.Pattern
@@ -1293,6 +1330,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
         if (!token.IsCancellationRequested && generation == Volatile.Read(ref _generation))
         {
             Hushed();
+            MidiOut?.AllOff();
             StopAllVoices();
             Position = TrackerPosition.Start;
             SetState(TrackerTransportState.Stopped);
@@ -1398,6 +1436,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
                 case TrackerEventKind.Stop:
                     _synth.Mixer.NoteOff(e.Track, e.Column);
                     _synth.Mixer.PluginNoteOff(e.Track, e.Column);
+                    MidiOut?.NoteOff(e.Track, e.Column);
 
                     NotePlayed?.Invoke(this, (e.Track, Note.Off, 0d));
                     break;
@@ -1432,9 +1471,15 @@ public sealed class TrackerPlayer : ITrackerPlayer
     ///
     /// Every way of failing writes a line saying which, because from outside they are all the
     /// same thing: a track that did not sound.
+    ///
+    /// The note goes out of the track's MIDI out before any of that, so a track with no
+    /// instrument, or one whose instrument cannot sound here, still plays whatever it sends to.
     /// </remarks>
     private void Trigger(TrackerEvent e, Song song)
     {
+        MidiOut?.NoteOn(song.Mix, e.Track, e.Column, e.Note, _wire.VelocityFor(
+            e.Gain is { } level ? (int)Math.Round(level * TrackerCell.MaxVolume) : TrackerCell.NoVolume));
+
         var instrument = song.InstrumentAt(e.Instrument);
 
         if (instrument == null)

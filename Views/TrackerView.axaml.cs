@@ -265,6 +265,11 @@ public partial class TrackerView : UserControl
         OrderList.AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
         OrderList.AddHandler(DragDrop.DropEvent, OnOrderDrop);
 
+        DragDrop.SetAllowDrop(TrackChain, true);
+        TrackChain.AddHandler(DragDrop.DragOverEvent, OnChainDragOver, RoutingStrategies.Bubble, handledEventsToo: true);
+        TrackChain.AddHandler(DragDrop.DragLeaveEvent, OnDragLeave, RoutingStrategies.Bubble, handledEventsToo: true);
+        TrackChain.AddHandler(DragDrop.DropEvent, OnChainDrop, RoutingStrategies.Bubble, handledEventsToo: true);
+
         DragDrop.SetAllowDrop(this, true);
         AddHandler(DragDrop.DragOverEvent, OnPageDragOver);
     }
@@ -684,6 +689,32 @@ public partial class TrackerView : UserControl
         row.Children.Add(lines);
 
         return row;
+    }
+
+    /// <summary>
+    /// The hand is over the chain under the pattern, which is about the track the cursor is on.
+    /// </summary>
+    /// <remarks>
+    /// An instrument only. The chain's own row answers a device being dragged along it and marks
+    /// everything else refused, which is why these are heard with handled events too: a song
+    /// instrument dropped on a track's chain means that track plays it, the same as dropping it
+    /// on the track's column. Its column lights while the hand is over the chain, so where it is
+    /// going is said on the pattern as well.
+    /// </remarks>
+    private void OnChainDragOver(object? sender, DragEventArgs e)
+    {
+        if (DraggedInstrument.IndexFrom(e.DataTransfer) < 0) return;
+
+        Carry(e);
+        HandleDragOver(e, ViewModel?.Cursor.Track ?? -1);
+    }
+
+    /// <summary>Let go over the chain, onto the track the cursor is on.</summary>
+    private void OnChainDrop(object? sender, DragEventArgs e)
+    {
+        if (DraggedInstrument.IndexFrom(e.DataTransfer) < 0) return;
+
+        HandleDrop(e, ViewModel?.Cursor.Track ?? -1);
     }
 
     /// <summary>Let go over the header, onto the track that column names.</summary>

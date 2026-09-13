@@ -505,7 +505,7 @@
             <views:FoldStrip Grid.Row="1" Title="chain" Margin="0,10,0,0"
                              IsOpen="{Binding ShowsChain, Mode=TwoWay}"
                              StripHeight="{Binding ChainHeight, Mode=TwoWay}">
-              <views:PluginStrip DataContext="{Binding TrackEffect}" />
+              <views:PluginStrip x:Name="TrackChain" DataContext="{Binding TrackEffect}" />
             </views:FoldStrip>
 
             <views:FoldStrip Grid.Row="2" Title="automation"

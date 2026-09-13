@@ -435,6 +435,10 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     /// back through the same grid the sending half uses so the two ends cannot disagree about
     /// what a sixteenth is. Stopping goes through the ordinary stop, so everything that hangs off
     /// the transport stopping happens exactly as it does when somebody presses the button.
+    ///
+    /// The master's tempo goes into the song's, so the tempo field says what is really playing and
+    /// a tempo turned on the master shows here. It is an ordinary change to the song, with an undo
+    /// step and a save to be had, since the song does now run at that tempo.
     /// </remarks>
     private void WhenTheMasterSays()
     {
@@ -449,6 +453,11 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         });
 
         _clockFollow.Ended += () => Avalonia.Threading.Dispatcher.UIThread.Post(Tracker.StopTransport);
+
+        _clockFollow.TempoHeard += bpm => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (_clockFollow.IsFollowing) Tracker.Bpm = bpm;
+        });
     }
 
     /// <summary>
@@ -2343,6 +2352,16 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         Tracker.Player.ClockDeck = _clockDeck;
         Tracker.Player.ClockFollow = _clockFollow;
 
+        Tracker.Player.MidiOut = new TrackMidiOut(midiService);
+        Tracker.MidiInputs = () => Midi.Devices.Select(port => port.Name).ToList();
+        Tracker.MidiOutputs = () => Midi.ClockOutputs.Select(port => port.Name).ToList();
+        Tracker.MidiPortsMoved = Midi.Listen;
+        Tracker.ListMidiPorts();
+        Midi.Devices.CollectionChanged += (_, _) => Tracker.ListMidiPorts();
+        Midi.ClockOutputs.CollectionChanged += (_, _) => Tracker.ListMidiPorts();
+        Midi.SongPorts = () => new TrackMidiRoutes().InputPorts(Tracker.Song.Mix);
+        Midi.Listen();
+
         WhenTheMasterSays();
 
         Midi.ClockChanged = DriveTheClock;
@@ -2536,6 +2555,8 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
         Tracker.MixShown = surface.Draw;
 
+        var trackNotes = new MidiTrackRouter(Tracker, () => Tracker.Song.Mix);
+
         var dispatcher = new MidiDispatcher(
             _cfg.Midi,
             msg =>
@@ -2558,7 +2579,8 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
                 mackie.Handle(msg);
             },
             follow: _clockFollow,
-            deck: _clockDeck);
+            deck: _clockDeck,
+            tracks: trackNotes.Handle);
 
         var screen = new ControllerScreens(
             () => new MidiPortBindings().DevicesWith(_cfg.Midi.Devices, MidiPortBindings.EveryRole),

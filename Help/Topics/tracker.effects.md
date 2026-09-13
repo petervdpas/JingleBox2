@@ -9,6 +9,27 @@ When the track plays a plugin instrument, that plugin is the first block in the 
 because that is where it is in the audio: it makes the sound and everything after
 works on what it made. Opening it gives you its own interface, and what you turn
 there is what the pattern plays. Its sound is written into the song when you save.
+Dragging an instrument from the song's list onto this row puts it on the track, the same
+as dropping it on the track's column.
+
+**The MIDI block in front of the chain is where the track's notes come from and go to.**
+It has two rows, each a port and a channel.
+
+- **In**: notes arriving on that channel play this track's instrument, wherever the
+  cursor is, and are written into this track while record is armed: on the line that
+  is playing while the transport runs, and on the cursor's line while it is stopped.
+  Keys held together go into the track's columns side by side. *Any port* listens on
+  every port that is open. A port named here is opened for the song even when it has
+  no job in SETTINGS, and a note this track takes does not also go to the cursor's
+  track. Off is no channel at all.
+- **Out**: the notes this track plays, from the pattern and from its MIDI in, are sent
+  to that port and channel. The track's own instrument still sounds, so a track with
+  no instrument only sends. Every note still held is let go of when the transport
+  stops.
+
+Both are saved with the song, so each song can be wired its own way. A sequencer such
+as a KeyStep Pro sends each of its tracks on a channel of its own, so four tracks here
+can each listen to one of them.
 
 The plus adds an effect to the end of the chain, and it offers two kinds. The
 effects this application ships come first, since that list is short and known and a

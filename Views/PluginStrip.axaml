@@ -113,6 +113,17 @@
       <Setter Property="Opacity" Value="0.7" />
     </Style>
 
+    <!-- The pickers on the MIDI block, small enough that two rows of them fit the block's own
+         height, which is the chain's: a full size picker is taller than a reading and two of
+         them would push the strip past the room it is given under the pattern. -->
+    <Style Selector="Border.midi ComboBox">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="MinHeight" Value="22" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Padding" Value="6,0,0,0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
     <Style Selector="Border.device.open">
       <Setter Property="BorderBrush">
         <SolidColorBrush Color="{DynamicResource Color.Accent}" />
@@ -267,6 +278,37 @@
     <StackPanel Spacing="6" VerticalAlignment="Center">
 
       <StackPanel x:Name="Row" Orientation="Horizontal" Spacing="6">
+        <!-- A track's MIDI, in front of everything: where its notes come in from and where they
+             go out to. Only a track has one, so the master, a pad and the recording input draw
+             nothing here. Not a device in the chain and never dragged: the notes are not audio
+             passing through it, they are what the instrument after it is played with. -->
+        <Border Classes="device midi" IsVisible="{Binding HasMidi}" MinWidth="0"
+                ToolTip.Tip="Which MIDI port and channel this track plays from, and sends its notes to.">
+          <Grid Margin="8,6,8,6" RowDefinitions="Auto,*,Auto,Auto" ColumnDefinitions="Auto,Auto,Auto"
+                ColumnSpacing="6" RowSpacing="4">
+            <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Classes="deviceName" Text="MIDI" />
+
+            <TextBlock Grid.Row="1" Grid.Column="1" Classes="deviceKey" Text="Port" VerticalAlignment="Bottom" />
+            <TextBlock Grid.Row="1" Grid.Column="2" Classes="deviceKey" Text="Channel" VerticalAlignment="Bottom" />
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Classes="deviceKey" Text="In" VerticalAlignment="Center" />
+            <ComboBox Grid.Row="2" Grid.Column="1" Width="190"
+                      ItemsSource="{Binding Midi.InPorts}" SelectedItem="{Binding Midi.InPort}"
+                      ToolTip.Tip="The port this track listens to. Any port hears every port that is open." />
+            <ComboBox Grid.Row="2" Grid.Column="2" Width="72"
+                      ItemsSource="{Binding Midi.Channels}" SelectedIndex="{Binding Midi.InChannel}"
+                      ToolTip.Tip="The channel this track listens to. Notes on it play this track and are recorded into it when armed." />
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Classes="deviceKey" Text="Out" VerticalAlignment="Center" />
+            <ComboBox Grid.Row="3" Grid.Column="1" Width="190"
+                      ItemsSource="{Binding Midi.OutPorts}" SelectedItem="{Binding Midi.OutPort}"
+                      ToolTip.Tip="The port this track sends its notes to. The instrument still sounds." />
+            <ComboBox Grid.Row="3" Grid.Column="2" Width="72"
+                      ItemsSource="{Binding Midi.Channels}" SelectedIndex="{Binding Midi.OutChannel}"
+                      ToolTip.Tip="The channel this track sends on." />
+          </Grid>
+        </Border>
+
         <!-- The instrument the track plays, at the head of the row because that is where it is
              in the audio: it makes the sound and everything after works on what it made. Ours
              or a plugin's, it is the same box; only what opens differs.

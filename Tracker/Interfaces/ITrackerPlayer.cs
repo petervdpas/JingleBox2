@@ -84,6 +84,24 @@ public interface ITrackerPlayer : IDisposable
     /// <summary>The step last played, which is what a playhead follows.</summary>
     TrackerPosition Position { get; }
 
+    /// <summary>
+    /// The line nearest a moment, while playing: the one being played, or the next once the
+    /// moment is past half of it.
+    /// </summary>
+    /// <remarks>
+    /// For putting a note that arrived from outside where it belongs. A sequencer on another
+    /// clock sends each note a hair before or after the line it means, and the line last drawn
+    /// is later still, since the picture is told on another thread: read that way, a note sent
+    /// just ahead of its line lands on the one before. Nearest is what a hand or a device means
+    /// wherever the two clocks sit relative to each other, up to half a line either way.
+    ///
+    /// Asked of the clock thread's own record of when the line began, kept as one object so the
+    /// line and its start can never be read from two different lines. Stopped or paused, or at a
+    /// moment before the line began, the answer is the line being played.
+    /// </remarks>
+    /// <param name="timestamp">The moment, as <c>Stopwatch.GetTimestamp</c> gives it.</param>
+    TrackerPosition NearestLine(long timestamp);
+
     /// <summary>Whether it is walking the order list or staying on one pattern.</summary>
     /// <remarks>
     /// Settable while a pass is running, and answered on the next line rather than on the next
@@ -139,6 +157,17 @@ public interface ITrackerPlayer : IDisposable
     /// to prevent.
     /// </remarks>
     Midi.Interfaces.IMidiClockDeck? ClockDeck { get; set; }
+
+    /// <summary>
+    /// Where tracks with a MIDI out send their notes, or nothing.
+    /// </summary>
+    /// <remarks>
+    /// Told every note the pattern starts and every stop, on the clock thread, beside the sound
+    /// rather than instead of it: a track with an instrument plays it and sends as well. Every
+    /// held note is let go of when the transport stops, pauses or runs off the end, since a synth
+    /// on the other end of a cable has no other way to find out.
+    /// </remarks>
+    Midi.Interfaces.ITrackMidiOut? MidiOut { get; set; }
 
     /// <summary>
     /// Somebody else's clock, when the transport is running on one, or nothing.

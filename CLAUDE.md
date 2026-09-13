@@ -4023,6 +4023,45 @@ whole exercise and is worth writing down rather than summarising:
   guard: the page's own Play button still starts again. RECORD needed nothing, since its
   `CanPlay` is false while a take is playing and that is set on the calling thread.
   `Tests/DoublePlayTests.cs` drives the pair through the router over a real tracker
+- **A track has a MIDI in and a MIDI out, each a port and a channel, saved on its strip.**
+  `TrackMix.MidiIn` and `MidiOut` are `TrackMidiRoute`, channel nought for off, an empty port
+  meaning any open port on the way in and nowhere on the way out. In the song rather than the
+  settings because that is where Renoise (`RenoiseInstrument34.xsd`: `MidiInputProperties` and
+  `MidiGenerator`, each a device and a channel) and every DAW keep it; SETTINGS still decides
+  which ports have jobs. Drawn as the block in front of a track's chain, `TrackMidiViewModel` on
+  `PluginChainViewModel.Midi`, which is null for the master, a pad and the recording input
+- **In** is `MidiTrackRouter`, asked by `MidiDispatcher` before any job: a note a track claims
+  plays on that track and is written into it while armed (`TrackerViewModel.EnterTrackNote`),
+  and does not also reach the cursor's track. A port named by a track is opened through
+  `IMidiPortBindings.Listening`'s third reason with its role left None, the way a followed
+  clock's port is. `ITrackMidiRoutes` is the rule for which tracks, which ports and where out
+- **Out** is `ITrackMidiOut`, told by `TrackerPlayer` beside the sound rather than instead of
+  it, before the instrument is even looked for so a track with none still sends. A voice is a
+  track and a note column, live notes numbered past the columns from `TrackMidiOut.LiveVoices`,
+  and a note is let go of where it was sent, so a route changed under a held note still
+  releases it. Ports are opened on play rather than on the first note, since opening one on
+  the clock thread is a late first note. `Tests/TrackMidiTests.cs`, `TrackMidiPlayTests.cs` and
+  `TrackMidiBlockTests.cs`
+- **A note from outside is written on the line nearest the moment it arrived**, which is
+  `ITrackerPlayer.NearestLine`, and never on `PlayingLine`. Measured on 2026-09-13 with a KeyStep
+  Pro at 108 to the minute: both clocks stepped a line every 138.9 ms, so nothing drifted, but its
+  Start reached the player about twenty milliseconds before the clock got going, so every note it
+  sent arrived just ahead of its line, and `PlayingLine` is the line last drawn, told on another
+  thread and later still. Recorded and played back, the part sat a line early. The moment is taken
+  on the MIDI thread as the note arrives, and the clock thread keeps the line, when it began and
+  how long a line is as one object swapped whole. Following the device's clock in SETTINGS stops
+  two tempos drifting and does not make this unnecessary: the tick that starts a line and the note
+  on it arrive together and are told to the drawing thread separately. A key played on the
+  cursor's track goes the same way, so `EnterNote` takes the moment from `PlayMidiNote` too, and
+  a chord remembers the pattern it began in, since the nearest line can be the next pattern's
+- **Following a clock sets the song's tempo from it.** The transport already stepped on the
+  master's ticks, and nothing measured how fast they came, so the tempo field went on saying the
+  song's own number and everything worked out from a tempo was worked out from the wrong one.
+  `IClockTempo` fits a least squares line through the last 48 ticks rather than subtracting the
+  ends, since a USB port puts a millisecond either side of every tick and two ends carry it whole;
+  said to a tenth and only when it moves by 0.15, so a device at 108 is heard once as 108.0.
+  `IMidiClockFollow.TempoHeard` carries it and `MainViewModel` writes it into `Tracker.Bpm`, an
+  ordinary edit with an undo step, since the song really does run at that tempo now
 - `Controllers/Profiles/keylab-mkii.json` is the first file here filled in without anybody
   touching the hardware. A KeyLab mkII 49 arrived on 2026-08-29 and answered Arturia's own
   settings protocol for every field of every control, so the whole of User mode came back over

@@ -5,6 +5,7 @@ using JingleBox2.Config;
 using JingleBox2.Controllers;
 using JingleBox2.Midi;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using JingleBox2.Midi.Enums;
@@ -205,7 +206,7 @@ public sealed partial class MidiViewModel : ObservableObject
     /// </remarks>
     private void ApplyBindings()
     {
-        var wanted = _bindings.Listening(_cfg.Midi);
+        var wanted = _bindings.Listening(_cfg.Midi, SongPorts?.Invoke());
 
         foreach (var open in _midi.OpenDevices)
         {
@@ -216,6 +217,17 @@ public sealed partial class MidiViewModel : ObservableObject
         foreach (var device in wanted)
             _midi.Open(device);
     }
+
+    /// <summary>
+    /// The ports the open song's tracks listen to by name, opened beside the ones with a job.
+    /// </summary>
+    /// <remarks>Null, which is what a page with no tracker has, opens nothing more.</remarks>
+    public Func<IEnumerable<string>>? SongPorts { get; set; }
+
+    /// <summary>
+    /// Opens and closes ports again, for the moment what the song's tracks listen to has moved.
+    /// </summary>
+    public void Listen() => ApplyBindings();
 
     /// <summary>
     /// The status line for the list as a whole.

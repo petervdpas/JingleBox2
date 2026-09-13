@@ -44,11 +44,16 @@ public sealed class MidiDispatcher
     /// What this machine drives, so a followed clock can be passed on to it. Left out, nothing is
     /// passed anywhere.
     /// </param>
+    /// <param name="tracks">
+    /// Asked first about every note, from any open port: true when a track's MIDI in took it, in
+    /// which case the tracker job does not also get it. Left out, no track listens to anything.
+    /// </param>
     public MidiDispatcher(MidiConfig cfg, Action<MidiMessage>? pads, Action<MidiMessage>? tracker,
                           Action<MidiMessage>? controls = null, Action<MidiMessage>? transport = null,
                           IMidiPortBindings? bindings = null, IMidiClockFollow? follow = null,
-                          IMidiClockDeck? deck = null)
+                          IMidiClockDeck? deck = null, Func<MidiMessage, bool>? tracks = null)
     {
+        _tracks = tracks;
         _bindings = bindings ?? new MidiPortBindings();
         _cfg = cfg;
         _pads = pads;
@@ -84,6 +89,17 @@ public sealed class MidiDispatcher
     private readonly IMidiPortBindings _bindings;
 
     /// <summary>
+    /// The open song's tracks, asked whether a note is theirs before any job is.
+    /// </summary>
+    /// <remarks>
+    /// Before the jobs and regardless of them, because a port is opened for a track that listens
+    /// to it whether or not SETTINGS gave it a job, and a note one track claims going on to the
+    /// cursor's track as well would be every note played twice. The pads, the knobs and the
+    /// transport are left alone: those are jobs somebody gave the port on purpose.
+    /// </remarks>
+    private readonly Func<MidiMessage, bool>? _tracks;
+
+    /// <summary>
     /// Hands the message to each half its device has been pointed at.
     /// </summary>
     /// <remarks>
@@ -98,9 +114,13 @@ public sealed class MidiDispatcher
 
         if (Followed(msg)) return;
 
+        bool claimed = msg.Type == MidiMessageType.Note && _tracks?.Invoke(msg) == true;
+
         var role = _bindings.RoleFor(_cfg.Devices, msg.Device);
 
-        if (role == MidiPortRole.None)
+        if (claimed) role &= ~MidiPortRole.Tracker;
+
+        if (role == MidiPortRole.None && !claimed)
             Log.Write(LogArea.Midi, () =>
                 "dispatch " + msg.Type + " ch" + msg.Channel + " val=" + msg.Value
                 + " from '" + msg.Device + "' DRIVES NOTHING: it has been given no job in SETTINGS");

@@ -40,7 +40,7 @@ namespace JingleBox2.ViewModels;
 /// (<see cref="Midi.Interfaces.IPlaysNotes"/>). Each of those says what it is for on itself; what is here
 /// is how this one implementation does it.
 /// </remarks>
-public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Midi.Interfaces.IPlaysNotes, Shortcuts.Interfaces.IShortcutContext
+public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Midi.Interfaces.IPlaysNotes, Midi.Interfaces.ITrackNotes, Shortcuts.Interfaces.IShortcutContext
 {
     /// <summary>What effects of ours this installation has, for the chains under the pattern.</summary>
     /// <remarks>
@@ -566,6 +566,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         TrackEffect.Target = new TrackPluginTarget(_player, track);
         TrackEffect.Instrument = InstrumentBoxFor(track);
+        TrackEffect.Midi = MidiBlockFor(track);
 
         foreach (var strip in Strips) strip.IsSelected = strip.Track == track;
 
@@ -604,6 +605,58 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         _effectTrack = -1;
         FollowCursorTrack();
+
+        MidiPortsMoved?.Invoke();
+    }
+
+    /// <summary>The input ports a track's MIDI block offers, asked for each time the block is made.</summary>
+    /// <remarks>Set by whoever knows the machine's ports; left alone, a block offers any port and nothing else.</remarks>
+    public Func<IEnumerable<string>> MidiInputs { get; set; } = Array.Empty<string>;
+
+    /// <summary>The output ports a track's MIDI block offers, the same way.</summary>
+    public Func<IEnumerable<string>> MidiOutputs { get; set; } = Array.Empty<string>;
+
+    /// <summary>
+    /// Told when which ports the song's tracks listen to may have moved, so they can be opened or closed.
+    /// </summary>
+    /// <remarks>
+    /// After a pick in a track's block, and whenever the strip is pointed again, which is after a
+    /// song is opened and after an undo: both can change what the tracks listen to without anybody
+    /// touching a block.
+    /// </remarks>
+    public Action? MidiPortsMoved { get; set; }
+
+    /// <summary>
+    /// Builds the MIDI block again for the track the cursor is on, so it offers the ports there are now.
+    /// </summary>
+    /// <remarks>
+    /// For whoever knows the ports to call once it has said what they are and whenever the list
+    /// moves. The strip is pointed at the first track while this is being built, before anybody
+    /// has said, and pointing it again only happens when the cursor changes track.
+    /// </remarks>
+    public void ListMidiPorts()
+    {
+        if (TrackEffect.Target is null) return;
+
+        TrackEffect.Midi = MidiBlockFor(Cursor.Track);
+    }
+
+    /// <summary>
+    /// The MIDI block for a track, over that track's strip, or null past the end.
+    /// </summary>
+    /// <remarks>
+    /// Made fresh each time, since it holds nothing of its own: everything it shows is on the
+    /// strip, which is what undo puts back.
+    /// </remarks>
+    private TrackMidiViewModel? MidiBlockFor(int track)
+    {
+        if (track < 0 || track >= Song.Mix.Count) return null;
+
+        return new TrackMidiViewModel(Song.Mix[track], MidiInputs(), MidiOutputs(), Changing, () =>
+        {
+            MarkDirty(TrackMidiViewModel.Edit);
+            MidiPortsMoved?.Invoke();
+        });
     }
 
     /// <summary>
@@ -2900,8 +2953,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// in, so a part comes out even and the instrument's own level is the only thing deciding
     /// how loud it is.
     ///
-    /// While the song is playing a note lands on the line you can hear rather than the line you
-    /// left the cursor on, and the cursor is not stepped down: the music is already moving.
+    /// While the song is playing a note lands on the line nearest the moment it was played, in
+    /// whichever pattern that line is in, rather than the line you left the cursor on, and the
+    /// cursor is not stepped down: the music is already moving. Nearest rather than the line last
+    /// drawn, since that is told to this thread after the line has begun, so a key struck just
+    /// ahead of the beat it meant landed a line early. See <see cref="ITrackerPlayer.NearestLine"/>.
     ///
     /// A key already down arriving again is the letter row repeating, which is how a column is
     /// filled quickly and stays. It is dropped while another key is down, because there it is
@@ -2926,7 +2982,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// window with blocks hitting 182% of the time they had. The machine was not struggling: the
     /// quiet windows either side of it read 2% and nothing collected.
     /// </remarks>
-    public void EnterNote(Note note, int volume)
+    /// <param name="note">The note.</param>
+    /// <param name="volume">The velocity, as the volume column holds it.</param>
+    /// <param name="arrived">When it was played, as <c>Stopwatch.GetTimestamp</c> gives it; nought for now.</param>
+    public void EnterNote(Note note, int volume, long arrived = 0)
     {
         if (IgnoreVelocity) volume = TrackerCell.NoVolume;
 
@@ -2946,27 +3005,44 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         if (chord)
         {
+            var chordPattern = _chordPattern ?? CurrentPattern;
+
             MakeRoom(Cursor.Track, _chordStart + _chordFilled);
 
             var into = Cursor with { Line = _chordLine, NoteColumn = _chordStart };
 
+            if (into.Line >= chordPattern.Lines) return;
+
             Edits.EnterChordNote(
-                CurrentPattern, into, _chordFilled, note, InstrumentForTrack(into.Track), volume);
+                chordPattern, into, _chordFilled, note, InstrumentForTrack(into.Track), volume);
 
             _chordFilled++;
 
             return;
         }
 
-        var target = IsPlaying && PlayingLine >= 0 ? Cursor with { Line = PlayingLine } : Cursor;
+        bool running = _player.IsPlaying;
+        var pattern = CurrentPattern;
+        var target = Cursor;
 
-        Edits.EnterNote(CurrentPattern, target, note, InstrumentForTrack(target.Track), volume);
+        if (running)
+        {
+            var nearest = _player.NearestLine(arrived == 0 ? System.Diagnostics.Stopwatch.GetTimestamp() : arrived);
 
+            pattern = Song.PatternAt(nearest.OrderIndex) ?? CurrentPattern;
+            target = Cursor with { Line = nearest.Line };
+        }
+
+        if (target.Line >= pattern.Lines) return;
+
+        Edits.EnterNote(pattern, target, note, InstrumentForTrack(target.Track), volume);
+
+        _chordPattern = pattern;
         _chordLine = target.Line;
         _chordStart = target.NoteColumn;
         _chordFilled = 1;
 
-        if (!IsPlaying) StepDown();
+        if (!running) StepDown();
     }
 
     /// <summary>
@@ -3013,6 +3089,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>Which line the chord being played is being written on, or -1 when none is.</summary>
     private int _chordLine = -1;
 
+    /// <summary>
+    /// Which pattern that line is in, which is not always the one on the screen: a chord struck
+    /// just before the end of a pattern belongs to the first line of the next.
+    /// </summary>
+    private Pattern? _chordPattern;
+
     /// <summary>Which note column it began in, which is the one the cursor was on.</summary>
     private int _chordStart;
 
@@ -3049,6 +3131,157 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (_sounding.Remove(note.Semitone, out var instrument)) _player.LetPreview(instrument, note);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// It arrives on the MIDI thread, and the pattern and the cursor belong to the drawing thread.
+    /// The moment is taken here as it arrives rather than when the drawing thread gets round to
+    /// it, since that is the moment the note belongs to.
+    /// </remarks>
+    public void PressOnTrack(int track, Note note, int volume)
+    {
+        long arrived = System.Diagnostics.Stopwatch.GetTimestamp();
+
+        Dispatcher.UIThread.Post(() => EnterTrackNote(track, note, volume, arrived));
+    }
+
+    /// <inheritdoc/>
+    public void ReleaseOnTrack(int track, Note note)
+    {
+        long arrived = System.Diagnostics.Stopwatch.GetTimestamp();
+
+        Dispatcher.UIThread.Post(() => LetTrackNote(track, note, arrived));
+    }
+
+    /// <summary>
+    /// Every key held on a track through its MIDI in: the instrument it sounded on, the column it
+    /// went into, and the line and place in the order it was written on.
+    /// </summary>
+    /// <remarks>
+    /// Apart from the keyboard's own held keys, because these are about a track and not about
+    /// the cursor, and the two can be playing at once.
+    /// </remarks>
+    private readonly Dictionary<(int Track, int Semitone), (TrackerInstrument? Instrument, int Column, int Line, int Order)> _trackHeld = new();
+
+    /// <summary>How a volume becomes a velocity for a track's MIDI out.</summary>
+    private readonly Music.Interfaces.IMidiNoteInput _wire = new Music.MidiNoteInput();
+
+    /// <summary>
+    /// Plays a note on a track that claimed it by its MIDI in, sends it on through the track's
+    /// MIDI out, and writes it into that track while record is armed.
+    /// </summary>
+    /// <remarks>
+    /// The cursor is not moved to the track: a sequencer playing four tracks into four tracks
+    /// here would otherwise drag it about four times a beat.
+    ///
+    /// Where it is written is the line nearest the moment it arrived while the transport runs,
+    /// in whichever pattern that line is in, and the cursor's line while it does not, stepping
+    /// down the way typing does. Keys held together on one track are
+    /// a chord and go on the line the first of them went on, one column each, the track widening
+    /// to fit; a chord wider than a track can be keeps the notes it has room for.
+    ///
+    /// A key already down is not struck again, since a device does not send a second press
+    /// without a release and a repeat here would stack a voice for nothing.
+    /// </remarks>
+    /// <param name="track">The track, counted from nought.</param>
+    /// <param name="note">The note.</param>
+    /// <param name="volume">The velocity, as the volume column holds it.</param>
+    /// <param name="arrived">When the note arrived, as <c>Stopwatch.GetTimestamp</c> gives it; nought for now.</param>
+    internal void EnterTrackNote(int track, Note note, int volume, long arrived = 0)
+    {
+        if (track < 0 || track >= Song.TrackCount || !note.IsPlayable) return;
+        if (_trackHeld.ContainsKey((track, note.Semitone))) return;
+
+        if (IgnoreVelocity) volume = TrackerCell.NoVolume;
+
+        int held = 0;
+        int line = -1;
+        int order = OrderIndex;
+
+        foreach (var ((onTrack, _), was) in _trackHeld)
+        {
+            if (onTrack != track) continue;
+
+            held++;
+            line = was.Line;
+            order = was.Order;
+        }
+
+        var instrument = Song.InstrumentAt(InstrumentForTrack(track));
+
+        if (instrument != null)
+            _player.Preview(instrument, note, GainFor(volume), track, TrackerPlayer.HeldNoteSeconds);
+
+        _player.MidiOut?.NoteOn(Song.Mix, track, Midi.TrackMidiOut.LiveVoices + note.Semitone, note,
+            _wire.VelocityFor(volume));
+
+        bool chord = held > 0;
+
+        bool running = _player.IsPlaying;
+
+        if (!chord)
+        {
+            if (running)
+            {
+                var nearest = _player.NearestLine(arrived == 0 ? System.Diagnostics.Stopwatch.GetTimestamp() : arrived);
+                line = nearest.Line;
+                order = nearest.OrderIndex;
+            }
+            else
+            {
+                line = Cursor.Line;
+                order = OrderIndex;
+            }
+        }
+
+        _trackHeld[(track, note.Semitone)] = (instrument, held, line, order);
+
+        Meters();
+        Played(track, note, 0d);
+
+        var pattern = running ? Song.PatternAt(order) : CurrentPattern;
+
+        if (pattern == null || !IsRecording) return;
+        if (line < 0 || line >= pattern.Lines) return;
+
+        MakeRoom(track, held);
+
+        if (held >= Song.ColumnsOn(track)) return;
+
+        Edits.EnterNote(pattern, new PatternCursor(line, track, CellColumn.Note, held), note,
+            InstrumentForTrack(track), volume);
+
+        if (!chord && !running) StepDown();
+    }
+
+    /// <summary>
+    /// Lets go of a note a track's MIDI in played, where it was sounded and where it was sent.
+    /// </summary>
+    /// <remarks>
+    /// A note-off is written into the column it went into, on the line nearest the moment it
+    /// arrived, only while the transport runs and <see cref="RecordNoteOffs"/> has asked for it: a
+    /// release with the transport stopped has no line of its own to land on.
+    /// </remarks>
+    /// <param name="track">The track, counted from nought.</param>
+    /// <param name="note">The note.</param>
+    /// <param name="arrived">When the release arrived, as <c>Stopwatch.GetTimestamp</c> gives it; nought for now.</param>
+    internal void LetTrackNote(int track, Note note, long arrived = 0)
+    {
+        if (!_trackHeld.Remove((track, note.Semitone), out var was)) return;
+
+        if (was.Instrument != null) _player.LetPreview(was.Instrument, note);
+
+        _player.MidiOut?.NoteOff(track, Midi.TrackMidiOut.LiveVoices + note.Semitone);
+
+        if (!RecordNoteOffs || !IsRecording || !_player.IsPlaying) return;
+
+        var nearest = _player.NearestLine(arrived == 0 ? System.Diagnostics.Stopwatch.GetTimestamp() : arrived);
+
+        if (Song.PatternAt(nearest.OrderIndex) is not { } pattern || nearest.Line >= pattern.Lines) return;
+        if (was.Column >= Song.ColumnsOn(track)) return;
+
+        Edits.EnterNoteOff(pattern, new PatternCursor(nearest.Line, track, CellColumn.Note, was.Column));
+    }
+
     /// <summary>Forgets every held key, for the moment the keyboard goes somewhere else.</summary>
     /// <remarks>
     /// The release will be delivered wherever the keys went instead and this will never hear
@@ -3071,8 +3304,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// It arrives on the MIDI thread, and everything it touches from there, the cursor, the
     /// pattern and the grid's redraw, belongs to the drawing thread.
     /// </remarks>
-    public void PlayMidiNote(Note note, int volume) =>
-        Dispatcher.UIThread.Post(() => EnterNote(note, volume));
+    public void PlayMidiNote(Note note, int volume)
+    {
+        long arrived = System.Diagnostics.Stopwatch.GetTimestamp();
+
+        Dispatcher.UIThread.Post(() => EnterNote(note, volume, arrived));
+    }
 
     /// <inheritdoc/>
     /// <remarks>

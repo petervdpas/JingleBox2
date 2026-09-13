@@ -403,6 +403,21 @@ public sealed partial class PluginChainViewModel : ObservableObject
     public bool HasInstrument => Instrument != null;
 
     /// <summary>
+    /// The MIDI block in front of the chain: the port and channel the track listens to and sends on.
+    /// </summary>
+    /// <remarks>
+    /// A track's alone, and null for the master, a pad and the recording input, which have no
+    /// notes to take in or send. In front of the chain rather than in it, since it is where the
+    /// notes come from and go to rather than a device the audio passes through.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMidi))]
+    private TrackMidiViewModel? midi;
+
+    /// <summary>True when this strip is a track's and draws its MIDI block.</summary>
+    public bool HasMidi => Midi != null;
+
+    /// <summary>
     /// What to say when the strip is empty, since not every strip could hold an instrument.
     /// </summary>
     /// <remarks>

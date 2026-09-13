@@ -100,4 +100,15 @@ public interface IMidiClockFollow
     /// <summary>And when a stop does.</summary>
     /// <inheritdoc cref="Began" path="/remarks"/>
     event System.Action? Ended;
+
+    /// <summary>
+    /// Raised with the master's tempo, worked out from its ticks, whenever it says a new one.
+    /// </summary>
+    /// <remarks>
+    /// The transport already runs on the ticks, so this changes nothing about when a line plays.
+    /// It is so the song's tempo can say what the master is doing, which is what a tempo field is
+    /// read for and what everything worked out from a tempo, a held note's length and where a note
+    /// from outside lands, is worked out from. Raised on the port's thread, like the other two.
+    /// </remarks>
+    event System.Action<double>? TempoHeard;
 }

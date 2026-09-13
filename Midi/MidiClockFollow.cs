@@ -7,8 +7,14 @@ using JingleBox2.Midi.Interfaces;
 namespace JingleBox2.Midi;
 
 /// <inheritdoc/>
-public sealed class MidiClockFollow : IMidiClockFollow
+public sealed class MidiClockFollow(IClockTempo? tempo = null) : IMidiClockFollow
 {
+    /// <summary>What the master's tempo is, from when its ticks arrive.</summary>
+    private readonly IClockTempo _tempo = tempo ?? new ClockTempo();
+
+    /// <inheritdoc/>
+    public event Action<double>? TempoHeard;
+
     /// <summary>
     /// How long a waiting thread sleeps before looking again of its own accord.
     /// </summary>
@@ -80,6 +86,7 @@ public sealed class MidiClockFollow : IMidiClockFollow
 
             _following = following;
             _ticks = 0;
+            _tempo.Forget();
             _pointer = 0;
             _going = false;
 
@@ -96,16 +103,29 @@ public sealed class MidiClockFollow : IMidiClockFollow
     /// continuously and starts and stops on top of it, and a tick dropped because no start had
     /// arrived would put the whole pass one tick behind for its length.
     /// </remarks>
+    /// <remarks>
+    /// The moment is taken as the tick is counted, and a tempo worth saying is said after the gate
+    /// is let go of, so whoever listens cannot hold up the transport waiting on the next tick.
+    /// </remarks>
     public void Tick()
     {
+        double? heard;
+
         lock (_gate)
         {
             if (!_following) return;
 
             _ticks++;
+            heard = _tempo.Heard(System.Diagnostics.Stopwatch.GetTimestamp());
 
             Monitor.PulseAll(_gate);
         }
+
+        if (heard is not { } bpm) return;
+
+        Log.Write(LogArea.Midi, () => "clock: the master is at " + bpm.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " to the minute");
+
+        TempoHeard?.Invoke(bpm);
     }
 
     /// <inheritdoc/>
@@ -116,6 +136,7 @@ public sealed class MidiClockFollow : IMidiClockFollow
             if (!_following) return;
 
             _ticks = 0;
+            _tempo.Forget();
             _pointer = 0;
             _going = true;
 
@@ -142,6 +163,7 @@ public sealed class MidiClockFollow : IMidiClockFollow
             if (!_following) return;
 
             _ticks = 0;
+            _tempo.Forget();
             _going = true;
             at = _pointer;
 

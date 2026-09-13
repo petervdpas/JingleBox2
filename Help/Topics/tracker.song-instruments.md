@@ -2,7 +2,8 @@
 
 The sounds this song uses, and which track each is on.
 
-Drag one onto a track, anywhere in its column, to put it there. An instrument sits on
+Drag one onto a track, anywhere in its column, to put it there, or onto the chain under
+the pattern to put it on the track the cursor is in. An instrument sits on
 one track only: to use the same sound twice, add it twice.
 
 A song holds a copy of every instrument it uses, so it does not need your library to

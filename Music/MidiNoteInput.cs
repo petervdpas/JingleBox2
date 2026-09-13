@@ -46,4 +46,21 @@ public sealed class MidiNoteInput : IMidiNoteInput
 
     /// <inheritdoc/>
     public int VolumeFor(int velocity) => Math.Clamp(velocity, 0, MaxVelocity);
+
+    /// <inheritdoc/>
+    public bool TryMidi(Note note, out int midiNote)
+    {
+        midiNote = 0;
+        if (!note.IsPlayable) return false;
+
+        int number = note.Semitone - SemitoneOffset;
+        if (number < MinMidiNote || number > MaxMidiNote) return false;
+
+        midiNote = number;
+        return true;
+    }
+
+    /// <inheritdoc/>
+    public int VelocityFor(int volume) =>
+        volume == TrackerCell.NoVolume ? MaxVelocity : Math.Clamp(volume, 1, MaxVelocity);
 }

@@ -46,4 +46,27 @@ public interface IMidiNoteInput
     /// </remarks>
     /// <param name="velocity">How hard the key was struck, 0 to 127.</param>
     int VolumeFor(int velocity);
+
+    /// <summary>
+    /// The MIDI note number a tracker note is, or false for a note that has none.
+    /// </summary>
+    /// <remarks>
+    /// The other way round from <see cref="TryNote"/>, and the same offset, so a note that came
+    /// in as 60 goes out as 60. An off, an empty cell and a note past MIDI's range have no number.
+    /// </remarks>
+    /// <param name="note">The tracker note.</param>
+    /// <param name="midiNote">Its number on the wire, or nought when there is none.</param>
+    bool TryMidi(Note note, out int midiNote);
+
+    /// <summary>
+    /// The velocity a volume column sends: its own number, full where it is blank, never nought.
+    /// </summary>
+    /// <remarks>
+    /// Blank is full because a blank column plays the instrument at its own level here, which is
+    /// the loudest a key can ask for. Nought is lifted to one, since a note on at velocity nought
+    /// is how MIDI spells a release, and 0x80, the level typed above anything a key can produce,
+    /// comes down to 127.
+    /// </remarks>
+    /// <param name="volume">The volume column, or <see cref="TrackerCell.NoVolume"/>.</param>
+    int VelocityFor(int volume);
 }

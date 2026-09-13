@@ -27,6 +27,12 @@ line at the foot of the card says which of the two is actually happening.
 The port is remembered when you turn following off, so turning it back on does not make you find
 it again.
 
+While the master's clock is running, its tempo is worked out from the ticks and put in the song's
+tempo, so the BPM field says what is really playing and turning the tempo on the master moves it
+here within a couple of seconds. It changes the song like typing a tempo would, so it can be undone
+and is saved with the song. A master that sends clock only while it plays, as a KeyStep Pro does,
+leaves the field on its last number while it is stopped.
+
 ## Sending clock
 
 Tick any output to send it this machine's clock. Nothing is sent until you do: clock arriving at a

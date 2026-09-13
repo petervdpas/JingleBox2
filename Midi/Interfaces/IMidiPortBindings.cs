@@ -66,9 +66,13 @@ public interface IMidiPortBindings
     ///
     /// Nothing is listened to for a clock while the transport is on its own, and nothing where
     /// no port was chosen, which is every installation that has not asked to follow anything.
+    ///
+    /// The open song's tracks are the third reason: a port a track listens to by name is opened
+    /// beside the rest, after them, with its role left None for the reason the clock's is.
     /// </remarks>
     /// <param name="cfg">The MIDI settings as they stand, or null.</param>
-    IReadOnlyList<string> Listening(MidiConfig? cfg);
+    /// <param name="more">Ports the open song's tracks listen to, or null.</param>
+    IReadOnlyList<string> Listening(MidiConfig? cfg, IEnumerable<string>? more = null);
 
     /// <summary>
     /// The list the settings page shows: everything connected, then anything bound that is not

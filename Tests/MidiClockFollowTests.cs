@@ -30,6 +30,51 @@ public class MidiClockFollowTests
         return follow;
     }
 
+    /// <summary>
+    /// The master's tempo is said from its ticks while following, and a clock starting again is measured afresh.
+    /// </summary>
+    [Fact]
+    public void The_masters_tempo_is_said_while_following()
+    {
+        var tempo = new SaysTempo();
+        var follow = new MidiClockFollow(tempo);
+        var heard = new System.Collections.Generic.List<double>();
+        follow.TempoHeard += bpm => heard.Add(bpm);
+
+        follow.Tick();
+        Assert.Equal(0, tempo.Ticks);
+
+        follow.Follow(true);
+        follow.Tick();
+        follow.Tick();
+
+        Assert.Equal(2, tempo.Ticks);
+        Assert.Equal(new[] { 108.0, 108.0 }, heard);
+
+        follow.Start();
+        follow.Resume();
+
+        Assert.Equal(3, tempo.Forgotten);
+    }
+
+    /// <summary>A tempo rule that says 108 for every tick, and counts what it was asked.</summary>
+    private sealed class SaysTempo : Midi.Interfaces.IClockTempo
+    {
+        public int Ticks;
+
+        public int Forgotten;
+
+        /// <inheritdoc/>
+        public double? Heard(long timestamp)
+        {
+            Ticks++;
+            return 108.0;
+        }
+
+        /// <inheritdoc/>
+        public void Forget() => Forgotten++;
+    }
+
     /// <summary>Nothing is counted until it is told to follow.</summary>
     /// <remarks>
     /// A machine on its own clock has ports that may be ticking away at it, and none of it is

@@ -71,6 +71,23 @@ public sealed class TrackMix
     public Audio.Plugins.PluginChainConfig? Plugins { get; set; }
 
     /// <summary>
+    /// Where notes this track plays live come from: a port and a channel, or off.
+    /// </summary>
+    /// <remarks>
+    /// A note arriving on this channel is played on this track's instrument and written into
+    /// its columns while record is armed, wherever the cursor is.
+    /// </remarks>
+    public Records.TrackMidiRoute MidiIn { get; set; } = new();
+
+    /// <summary>
+    /// Where this track's notes are sent: a port and a channel, or off.
+    /// </summary>
+    /// <remarks>
+    /// The track's own instrument still sounds; a track with no instrument only sends.
+    /// </remarks>
+    public Records.TrackMidiRoute MidiOut { get; set; } = new();
+
+    /// <summary>
     /// A strip of its own with the same settings, chain included.
     /// </summary>
     /// <remarks>
@@ -86,7 +103,9 @@ public sealed class TrackMix
         Duck = Duck,
         DuckFrom = DuckFrom,
         DuckReleaseMs = DuckReleaseMs,
-        Plugins = Plugins?.Clone()
+        Plugins = Plugins?.Clone(),
+        MidiIn = MidiIn,
+        MidiOut = MidiOut
     };
 
     /// <summary>
@@ -107,6 +126,23 @@ public sealed class TrackMix
         DuckReleaseMs = double.IsNaN(DuckReleaseMs)
             ? DefaultDuckReleaseMs
             : Math.Clamp(DuckReleaseMs, MinDuckReleaseMs, MaxDuckReleaseMs);
+
+        MidiIn = Checked(MidiIn);
+        MidiOut = Checked(MidiOut);
+    }
+
+    /// <summary>
+    /// A route with a channel past either end turned off, and a missing one made empty.
+    /// </summary>
+    /// <remarks>
+    /// The port is kept as it was: a port that is not plugged in today is still the one this
+    /// song means. The routes are records and compare by value, so a copy shares nothing.
+    /// </remarks>
+    private static Records.TrackMidiRoute Checked(Records.TrackMidiRoute? route)
+    {
+        if (route is null) return new Records.TrackMidiRoute();
+
+        return route.IsOn || route.Channel == 0 ? route : route with { Channel = 0 };
     }
 }
 
