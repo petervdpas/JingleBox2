@@ -25,7 +25,7 @@ namespace JingleBox2.ViewModels;
 /// the id and the level stay, because this is still the same instrument standing in the same
 /// track; it has just been given a different sound to make.
 /// </remarks>
-public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
+public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets, Interfaces.IPresetKeeping
 {
     /// <summary>The machines this run has.</summary>
     private readonly ISoundMachineProjects _machines;
@@ -219,9 +219,7 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
     /// </remarks>
     IReadOnlyList<string> IPanelPresets.Names => Items.Select(one => one.Shown).ToList();
 
-    /// <summary>
-    /// Whether what this instrument sounds like can be kept as a preset of yours.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// Not on the machine whose starting points are your recordings, since what it would keep is
     /// a take that is already on your shelf; and not on a machine that is not installed here,
@@ -229,12 +227,10 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
     /// </remarks>
     public bool CanKeep => !PicksTakes && _machines.For(_instrument.Machine.SlotId) is not null;
 
-    /// <summary>What the machine is called, for the words around keeping a preset.</summary>
-    public string MachineName => _instrument.Machine.Name;
+    /// <inheritdoc/>
+    public string DeviceName => _instrument.Machine.Name;
 
-    /// <summary>
-    /// The name a preset kept now would start with: the preset of yours showing, or the instrument's own.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// One of yours offers its own name, so keeping again is saving over it, which is the ordinary
     /// thing after a tweak. One the machine ships with cannot be kept under, so the instrument's
@@ -242,27 +238,21 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
     /// </remarks>
     public string Suggested => Selected is { Yours: true } yours ? yours.Name : _instrument.Name;
 
-    /// <summary>The preset of yours that is showing, or nothing when what is showing is not yours.</summary>
-    public SoundMachinePreset? PickedYours => Selected is { Yours: true } yours ? yours : null;
+    /// <inheritdoc/>
+    public string? PickedYours => Selected is { Yours: true } yours ? yours.Name : null;
 
-    /// <summary>Why that name cannot be kept under, or nothing when it can.</summary>
-    /// <param name="name">What somebody typed.</param>
+    /// <inheritdoc/>
     public string Refusal(string name) =>
         CanKeep ? _presets.Refusal(_instrument.Machine, name) : "This machine has no presets of its own to keep one beside.";
 
-    /// <summary>Whether keeping under that name would replace a preset of yours.</summary>
-    /// <param name="name">What somebody typed.</param>
+    /// <inheritdoc/>
     public bool Replaces(string name) => _presets.Yours(_instrument.Machine, name) is not null;
 
-    /// <summary>
-    /// Keeps what the instrument sounds like now as a preset of yours, and shows it as the one picked.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// Shown as picked without being put on, since it is exactly what is on already: putting it
     /// on would only be an undo step that changes nothing.
     /// </remarks>
-    /// <param name="name">What to call it.</param>
-    /// <returns>Whether it was kept.</returns>
     public bool Keep(string name)
     {
         if (!CanKeep || _presets.Keep(_instrument.Machine, _instrument, name) is not { } kept) return false;
@@ -273,11 +263,10 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
         return true;
     }
 
-    /// <summary>Takes the preset of yours that is showing off the machine.</summary>
-    /// <returns>Whether it was taken off.</returns>
+    /// <inheritdoc/>
     public bool RemovePicked()
     {
-        if (PickedYours is not { } yours || !_presets.Remove(_instrument.Machine, yours)) return false;
+        if (Selected is not { Yours: true } yours || !_presets.Remove(_instrument.Machine, yours)) return false;
 
         Refresh();
 

@@ -101,10 +101,7 @@ public sealed class SoundMachinePresets : IPresetLibrary
                     presets.Add(new SoundMachinePreset(sound.Name, sound) { File = path, Yours = !_registry.Ships(path) });
             }
 
-            return presets
-                .OrderBy(one => one.Yours)
-                .ThenBy(one => one.Yours ? one.Name : "", StringComparer.CurrentCultureIgnoreCase)
-                .ToList();
+            return presets.OrderBy(one => one.Yours).ToList();
         }
         catch (Exception)
         {
@@ -112,27 +109,15 @@ public sealed class SoundMachinePresets : IPresetLibrary
         }
     }
 
-    /// <summary>The characters no preset name may hold, since the name is the file's name on every system.</summary>
-    private static readonly char[] Unfiled = { '/', '\\', ':', '*', '?', '"', '<', '>', '|' };
+    /// <summary>Which names a preset of yours may have, the rule both worlds keep.</summary>
+    private static readonly IPresetNames Names = new PresetNames();
 
     /// <inheritdoc/>
     public string Refusal(SoundMachine? machine, string name)
     {
-        string called = (name ?? "").Trim();
-
         if (Folder(machine) is not { Length: > 0 }) return "This machine is not installed here, so it has nowhere to keep a preset.";
 
-        if (called.Length == 0) return "A preset needs a name.";
-
-        if (called.IndexOfAny(Unfiled) >= 0 || called.Any(char.IsControl) || called.StartsWith('.'))
-            return "A preset name cannot hold / \\ : * ? \" < > | or start with a dot.";
-
-        foreach (var one in For(machine))
-            if (!one.Yours && (string.Equals(one.Name, called, StringComparison.OrdinalIgnoreCase)
-                               || string.Equals(Path.GetFileNameWithoutExtension(one.File), called, StringComparison.OrdinalIgnoreCase)))
-                return "'" + one.Name + "' is one of " + machine!.Name + "'s own presets. Give yours another name.";
-
-        return "";
+        return Names.Refusal(name, machine!.Name, For(machine).Where(one => !one.Yours).Select(one => (one.Name, one.File)));
     }
 
     /// <inheritdoc/>
@@ -154,7 +139,7 @@ public sealed class SoundMachinePresets : IPresetLibrary
         string called = name.Trim();
         string path = Yours(machine, called)?.File is { Length: > 0 } already
             ? already
-            : Path.Combine(Folder(machine), called + SoundMachineRack.Extension);
+            : Path.Combine(Folder(machine), Names.FileFor(called));
 
         var kept = sound.Clone();
 

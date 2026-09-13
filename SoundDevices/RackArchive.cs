@@ -81,8 +81,18 @@ public abstract class RackArchive<T> : IRackArchive<T> where T : class, IRackPro
 
         if (File.Exists(full)) File.Delete(full);
 
-        ZipFile.CreateFromDirectory(project.Folder, full, CompressionLevel.Optimal, includeBaseDirectory: false);
+        Pack(project, full);
     }
+
+    /// <summary>Writes the device's folder into a zip that does not exist yet.</summary>
+    /// <remarks>
+    /// The folder as it is, by default. A soundmachine carries the recordings its presets name as
+    /// well, which is the one thing that differs between the two worlds here.
+    /// </remarks>
+    /// <param name="project">The device, already known to be saved and on disc.</param>
+    /// <param name="zipPath">The whole path of the zip to write.</param>
+    protected virtual void Pack(T project, string zipPath) =>
+        ZipFile.CreateFromDirectory(project.Folder, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
 
     /// <inheritdoc/>
     /// <remarks>

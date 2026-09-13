@@ -419,7 +419,8 @@ public class SoundEffectRackTests : IDisposable
     ///
     /// What is left is the effect's own page, which is about the box rather than about anybody's
     /// desk and is therefore there whatever is plugged in. Greyed here, since this effect was
-    /// made in a test and its author wrote none.
+    /// made in a test and its author wrote none. Under it are the two lines that keep a preset of
+    /// your own, greyed as well, since an effect that is not on disc has nowhere to keep one.
     /// </remarks>
     [Fact]
     public void A_row_carries_a_menu_of_its_own()
@@ -428,10 +429,14 @@ public class SoundEffectRackTests : IDisposable
 
         Assert.NotNull(row.Menu);
 
-        var line = Assert.Single(row.Menu.Read());
+        var lines = row.Menu.Read();
 
-        Assert.Equal(Rack.SoundDevices.Faces.MenuOptionWords.Help, line.Option);
-        Assert.False(line.Live);
+        Assert.Equal(3, lines.Count);
+        Assert.Equal(Rack.SoundDevices.Faces.MenuOptionWords.Help, lines[0].Option);
+        Assert.All(lines, line => Assert.False(line.Live));
+        Assert.Equal(Rack.SoundDevices.Faces.MenuOptionWords.Presets, lines[1].Option);
+        Assert.Equal(ViewModels.PresetMenu.SaveLine, lines[1].Said);
+        Assert.Equal(ViewModels.PresetMenu.DeleteLine, lines[2].Said);
     }
 
     /// <summary>The list is what was last read, not everything ever read.</summary>

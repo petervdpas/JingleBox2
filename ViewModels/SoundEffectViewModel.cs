@@ -196,14 +196,24 @@ public sealed partial class SoundEffectViewModel : ObservableObject, IChainSlot,
     public IPanelValues Values => _values ??= Watched(new SoundEffectValues(Engine));
 
     /// <summary>
-    /// The presets this effect ships, behind the picker on its face.
+    /// The presets this effect ships and yours, behind the picker on its face.
     /// </summary>
     /// <remarks>
-    /// A fresh one each time the panel asks, so a preset saved in the designer turns up here
-    /// without the two being wired together. Picking one writes through <see cref="Values"/>,
-    /// which is what moves the sound and redraws the face in one act.
+    /// One picker for the face and the Menu, which reads the folder each time the face asks for
+    /// the names, so a preset saved in the designer turns up here without the two being wired
+    /// together. Picking one writes through <see cref="Values"/>, which is what moves the sound
+    /// and redraws the face in one act.
     /// </remarks>
-    public IPanelPresets Presets => new SoundEffectPresetNames(Effect, Values);
+    public IPanelPresets Presets => Picker;
+
+    /// <summary>The picker behind <see cref="Presets"/>, made once so the face and the Menu work on the same one.</summary>
+    private SoundEffectPresetNames Picker => _presets ??= new SoundEffectPresetNames(Effect, Values);
+
+    /// <inheritdoc cref="Picker"/>
+    private SoundEffectPresetNames? _presets;
+
+    /// <summary>The Menu's lines that keep a preset of your own, working on the same picker the face holds.</summary>
+    private IPanelMenu? _presetLines;
 
     /// <inheritdoc cref="Values"/>
     private IPanelValues? _values;
@@ -223,11 +233,12 @@ public sealed partial class SoundEffectViewModel : ObservableObject, IChainSlot,
     }
 
     /// <summary>
-    /// What its own Menu drops down: this effect's own page, the surfaces pointed at it, and
-    /// learning.
+    /// What its own Menu drops down: this effect's own page, keeping a preset of your own, the
+    /// surfaces pointed at it, and learning.
     /// </summary>
     public IPanelMenu Menu => _menu ??=
-        new SoundDeviceMenu(new Midi.ControlMenu(() => Effect.Id, () => Name), () => Effect);
+        new SoundDeviceMenu(new Midi.ControlMenu(() => Effect.Id, () => Name), () => Effect,
+            presets: () => _presetLines ??= new PresetMenu(Picker));
 
     /// <inheritdoc cref="Menu"/>
     private IPanelMenu? _menu;

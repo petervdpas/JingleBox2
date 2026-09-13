@@ -257,7 +257,7 @@ public sealed class PresetKeepingTests : IDisposable
         answers.Named = "Mine Now";
 
         Assert.True(await menu.Save());
-        Assert.Equal("Mine Now", picker.PickedYours?.Name);
+        Assert.Equal("Mine Now", picker.PickedYours);
         Assert.True(menu.Read()[1].Live);
         Assert.Equal(SoundMachinePreset.YoursMark + "Mine Now",
             ((Rack.SoundDevices.Faces.Interfaces.IPanelPresets)picker).Names[^1]);
@@ -300,7 +300,7 @@ public sealed class PresetKeepingTests : IDisposable
 
         await menu.Save();
 
-        string file = picker.PickedYours!.File;
+        string file = picker.Selected!.File;
 
         answers.Deleting = false;
 
@@ -326,5 +326,149 @@ public sealed class PresetKeepingTests : IDisposable
 
         Assert.False(await menu.Save());
         Assert.DoesNotContain(Library().For(Sound().Machine), one => one.Yours);
+    }
+
+    /// <summary>An effect keeps where its controls stand as a preset of yours, from the same Menu lines, and only yours come off.</summary>
+    /// <remarks>
+    /// EchoBox as it ships, copied beside a folder of this test's own and installed by the real
+    /// registry, so its nine are the effect's own and a kept one is yours by the same question a
+    /// soundmachine asks.
+    /// </remarks>
+    [Fact]
+    public async Task An_effect_keeps_presets_of_yours_too()
+    {
+        string shipped = Path.Combine(_root, "shipped-effects", "rack", "effects");
+        string app = Path.Combine(_root, "app-effects");
+
+        Directory.CreateDirectory(app);
+        Copy(Path.Combine(Path.GetDirectoryName(Real())!, "..", "effects", "EchoBox"), Path.Combine(shipped, "EchoBox"));
+
+        var registry = new JingleBox2.SoundDevices.SoundEffects.SoundEffectRegistry(folder: new Somewhere(app), shipped: shipped);
+        var effect = registry.Load().Single(one => one.Name == "EchoBox");
+        var shelf = new JingleBox2.SoundDevices.SoundEffects.SoundEffectPresets(registry: registry);
+
+        var values = new JingleBox2.SoundDevices.SoundEffects.SoundEffectValues(
+            new JingleBox2.SoundDevices.SoundEffects.Delay(48000, effect.Id));
+
+        var picker = new SoundEffectPresetNames(effect, values, shelf);
+        var answers = new Answers { Named = "Slapback" };
+        var menu = new PresetMenu(picker, answers);
+
+        Assert.Equal(9, picker.Names.Count);
+        Assert.All(shelf.For(effect), one => Assert.False(one.Yours));
+
+        Assert.False(await menu.Save());
+        Assert.Contains(answers.Said, one => one.StartsWith("refused", StringComparison.Ordinal));
+
+        picker.Picked = 0;
+        Assert.False(menu.Read()[1].Live);
+        Assert.False(await menu.Delete());
+
+        values.Set("time", 777);
+        answers.Named = "My Echo";
+
+        Assert.True(await menu.Save());
+        Assert.Equal("My Echo", picker.PickedYours);
+        Assert.Equal(10, picker.Names.Count);
+        Assert.Equal(JingleBox2.SoundDevices.SoundEffects.Records.SoundEffectPreset.YoursMark + "My Echo", picker.Names[^1]);
+        Assert.Equal(777, shelf.Yours(effect, "my echo")!.Settings["time"]);
+        Assert.True(menu.Read()[1].Live);
+
+        Assert.True(await menu.Delete());
+        Assert.Null(picker.PickedYours);
+        Assert.Equal(9, picker.Names.Count);
+        Assert.Equal(777, values.Get("time"));
+        Assert.All(shelf.For(effect), one => Assert.True(File.Exists(one.File)));
+    }
+
+    /// <summary>
+    /// A kit preset naming your recordings exports with them, and the machine imported elsewhere plays them.
+    /// </summary>
+    /// <remarks>
+    /// Chopper as it ships, a preset kept on it naming three takes from outside its folder: two
+    /// with the same file name from two chops, and one that is no longer on disc. The zip carries
+    /// the two that exist in a folder named after the preset, one each and the second numbered,
+    /// and names them relative to the presets folder; the missing one is left as written. The installed preset is not touched.
+    /// Imported into another installation, every pad that had a sound resolves to a file that is there.
+    /// </remarks>
+    [Fact]
+    public void Export_carries_the_recordings_a_preset_names()
+    {
+        string shipped = Path.Combine(_root, "shipped-chop", "rack", "machines");
+        string app = Path.Combine(_root, "app-chop");
+        string elsewhere = Path.Combine(_root, "elsewhere");
+        string takes = Path.Combine(_root, "my recordings");
+
+        Directory.CreateDirectory(app);
+        Directory.CreateDirectory(elsewhere);
+        Copy(Path.Combine(Path.GetDirectoryName(Real())!, "Chopper"), Path.Combine(shipped, "Chopper"));
+
+        string first = Path.Combine(takes, "loop one", "Kick.wav");
+        string second = Path.Combine(takes, "loop two", "Kick.wav");
+        string gone = Path.Combine(takes, "gone", "Snare.wav");
+
+        Directory.CreateDirectory(Path.GetDirectoryName(first)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(second)!);
+        File.WriteAllBytes(first, new byte[] { 1, 2, 3 });
+        File.WriteAllBytes(second, new byte[] { 4, 5, 6, 7 });
+
+        var registry = new SoundMachineRegistry(folder: new Somewhere(app), shipped: shipped);
+        var projects = new SoundMachineProjects();
+
+        projects.Keep(registry.Load());
+
+        var chopper = projects.For("machine.chopper")!;
+        var kit = TrackerInstrument.CreateKit("Loops");
+
+        kit.MachineId = chopper.Id;
+        kit.Kit!.Pads[0].FilePath = first;
+        kit.Kit.Pads[1].FilePath = second;
+        kit.Kit.Pads[2].FilePath = gone;
+        kit.Kit.Pads[3].FilePath = first;
+
+        var kept = new SoundMachinePresets(projects, registry: registry).Keep(kit.Machine, kit, "Loops")!;
+        string before = File.ReadAllText(kept.File);
+        string zip = Path.Combine(_root, "chopper.zip");
+
+        new SoundMachineArchive(registry).Export(chopper, zip);
+
+        Assert.Equal(before, File.ReadAllText(kept.File));
+
+        using (var read = System.IO.Compression.ZipFile.OpenRead(zip))
+        {
+            var names = read.Entries.Select(one => one.FullName).ToList();
+
+            Assert.Contains("presets/Loops/Kick.wav", names);
+            Assert.Contains("presets/Loops/Kick 2.wav", names);
+            Assert.Single(names, one => one.StartsWith("presets/Loops/", StringComparison.Ordinal) && one.EndsWith("Kick.wav", StringComparison.Ordinal));
+            Assert.DoesNotContain("presets/Loops/Snare.wav", names);
+            Assert.Contains("presets/Energy Beat/Kick.wav", names);
+
+            using var preset = new StreamReader(read.GetEntry("presets/Loops.json")!.Open());
+            string inside = preset.ReadToEnd();
+
+            Assert.Contains("\"Loops/Kick.wav\"", inside);
+            Assert.Contains("\"Loops/Kick 2.wav\"", inside);
+            Assert.DoesNotContain(first.Replace("\\", "\\\\"), inside);
+            Assert.Contains("Snare.wav", inside);
+        }
+
+        var there = new SoundMachineRegistry(folder: new Somewhere(elsewhere), shipped: Path.Combine(_root, "nothing ships"));
+        var arrived = new SoundMachineArchive(there).Import(zip);
+
+        Assert.NotNull(arrived);
+
+        var thereProjects = new SoundMachineProjects();
+
+        thereProjects.Keep(there.Load());
+
+        var loops = new SoundMachinePresets(thereProjects, registry: there).For(kit.Machine).Single(one => one.Name == "Loops");
+        var pads = loops.Sound.Kit!.Pads;
+
+        Assert.StartsWith(Path.GetFullPath(elsewhere), pads[0].FilePath);
+        Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(pads[0].FilePath));
+        Assert.Equal(new byte[] { 4, 5, 6, 7 }, File.ReadAllBytes(pads[1].FilePath));
+        Assert.Equal(pads[0].FilePath, pads[3].FilePath);
+        Assert.Equal(gone, pads[2].FilePath);
     }
 }

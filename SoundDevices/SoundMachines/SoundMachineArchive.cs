@@ -36,4 +36,11 @@ public sealed class SoundMachineArchive : RackArchive<SoundMachineProject>
 
     /// <inheritdoc/>
     protected override SoundMachineProject? Open(string folder) => SoundMachineProject.Open(folder);
+
+    /// <summary>How a machine goes into a zip with the recordings its presets name.</summary>
+    private static readonly ISoundMachinePack Packing = new SoundMachinePack();
+
+    /// <inheritdoc/>
+    /// <remarks>See <see cref="ISoundMachinePack"/>: the recordings a preset names from outside the folder travel too.</remarks>
+    protected override void Pack(SoundMachineProject project, string zipPath) => Packing.Write(project.Folder, zipPath);
 }

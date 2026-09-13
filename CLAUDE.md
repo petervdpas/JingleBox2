@@ -400,11 +400,19 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   numbers. A stroke is written when the pointer comes up, so one stroke is one undo step, and the
   stack follows the hand before that. `Tests/SegmentTests.cs` was checked by putting three faults
   back: the level stepping mid cycle, the average left on, and samples between the eight bit steps
-- **A soundmachine keeps presets of your own, from its Menu.** Save as preset... and Delete this
-  preset are `PresetMenu`, the `presets` option, put under Help by `SoundDeviceMenu`; the Menu and
-  not a cap beside the picker, which was chosen. They go into the installed machine's own
+- **A device keeps presets of your own, from its Menu, a soundmachine and an effect alike.** Save as
+  preset... and Delete this preset are `PresetMenu`, the `presets` option, put under Help by
+  `SoundDeviceMenu`; the Menu and not a cap beside the picker, which was chosen. `IPresetKeeping`
+  is what the lines ask of a picker, and `InstrumentPresets` and `SoundEffectPresetNames` both
+  answer it; `IPresetNames` is the one naming rule both shelves keep. An effect's picker is made
+  once per slot so the face and the Menu hold the same one, and reads its folder whenever the
+  names are asked for. They go into the installed machine's own
   `presets` folder, which the registry already keeps file by file and never deletes from, so they
-  survive the machine being updated and travel in its zip. **Yours is answered by
+  survive the device being updated and travel in its zip. **A preset's recordings travel too**:
+  a kit or map kept from the Menu names takes on your shelf by full path, so `ISoundMachinePack`
+  puts each one into the zip beside its preset, `presets/<preset>/Kick.wav`, which is how a
+  shipped preset already keeps its sounds, and rewrites the zipped preset to name it there. Only
+  the zip changes; the folder on disc is left as it was **Yours is answered by
   `IRackRegistry.Ships`**, the same question a packed song asks: a file with no twin in the shipped
   copy of that machine is yours, so a machine made in DESIGNER is all yours. Yours come after the
   machine's own, starred through `SoundMachinePreset.Shown`, and only yours can be replaced or
@@ -691,9 +699,9 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   switches, so all it did was hold the name half an inch above the dial. Ouroboros keeps its
   fifty and should: every strip on it mixes knobs and switches, which is the case the property
   exists for
-- **EchoBox ships with six of them**, in `rack/effects/EchoBox/presets/`, which is beside the
+- **EchoBox ships with nine of them**, in `rack/effects/EchoBox/presets/`, which is beside the
   program and is therefore content this repository is answerable for: Slapback, Doubler, Quarter,
-  Tape Echo, Dub and Wash. `Tests/ShippedPresetTests.cs` walks that folder with the reader the
+  Tape Echo, Dub, Wash, Ping Pong, Worn Tape and Runaway. `Tests/ShippedPresetTests.cs` walks that folder with the reader the
   application uses rather than trusting it, because a shipped preset goes wrong the way content
   goes wrong: a key spelled differently from the one on the face is dropped as the file is read,
   silently and correctly, and what somebody hears is a control that did not move. It also says out

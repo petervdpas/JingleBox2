@@ -18,7 +18,7 @@ public sealed class PresetQuestions : IPresetQuestions
 
     /// <inheritdoc/>
     public Task<bool> Delete(string name) =>
-        ConfirmDialog.AskAsync("Delete preset", "Delete your preset '" + name + "'? The sound on this instrument stays as it is.", "Delete");
+        ConfirmDialog.AskAsync("Delete preset", "Delete your preset '" + name + "'? The sound stays as it is.", "Delete");
 
     /// <inheritdoc/>
     public Task Refused(string why) => ConfirmDialog.NoteAsync("Save as preset", why);

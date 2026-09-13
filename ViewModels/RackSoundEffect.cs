@@ -86,14 +86,23 @@ public sealed partial class RackSoundEffect : ObservableObject, IRackRow
     public IPanelValues Values => _values ??= new PreviewValues(Knobs);
 
     /// <summary>
-    /// The presets this effect ships, behind the picker on the face drawn beside the list.
+    /// The presets this effect ships and yours, behind the picker on the face drawn beside the list.
     /// </summary>
     /// <remarks>
     /// It applies, unlike a soundmachine's picker on the designer's bench. What an effect's knobs
     /// stand at on the rack is a bench kept nowhere, so putting a preset on it costs nothing and
     /// is the only way to hear what the preset is without putting the effect on a chain first.
     /// </remarks>
-    public IPanelPresets Presets => new SoundEffectPresetNames(Effect, Values);
+    public IPanelPresets Presets => Picker;
+
+    /// <summary>The picker behind <see cref="Presets"/>, made once so the face and the Menu work on the same one.</summary>
+    private SoundEffectPresetNames Picker => _presets ??= new SoundEffectPresetNames(Effect, Values);
+
+    /// <inheritdoc cref="Picker"/>
+    private SoundEffectPresetNames? _presets;
+
+    /// <summary>The Menu's lines that keep a preset of your own, working on the same picker the face holds.</summary>
+    private IPanelMenu? _presetLines;
 
     /// <inheritdoc cref="Values"/>
     private IPanelValues? _values;
@@ -117,7 +126,8 @@ public sealed partial class RackSoundEffect : ObservableObject, IRackRow
     private ObservableCollection<ParameterViewModel>? _knobs;
 
     /// <summary>
-    /// What its own Menu drops down: this effect's page, the surfaces pointed at it, and learning.
+    /// What its own Menu drops down: this effect's page, keeping a preset of your own, the surfaces
+    /// pointed at it, and learning.
     /// </summary>
     /// <remarks>
     /// The same menu a machine's face carries and the same code behind it, keyed by this effect's
@@ -125,7 +135,8 @@ public sealed partial class RackSoundEffect : ObservableObject, IRackRow
     /// MIDI CC page cuts its cards by the same rule.
     /// </remarks>
     public IPanelMenu Menu => _menu ??=
-        new SoundDeviceMenu(new Midi.ControlMenu(() => Id, () => Name), () => Effect);
+        new SoundDeviceMenu(new Midi.ControlMenu(() => Id, () => Name), () => Effect,
+            presets: () => _presetLines ??= new PresetMenu(Picker));
 
     /// <inheritdoc cref="Menu"/>
     private IPanelMenu? _menu;

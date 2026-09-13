@@ -37,6 +37,9 @@ public interface IRackArchive<T> where T : class, IRackProject
 {
     /// <summary>Zips the project folder, manifest and sounds and all, into that file.</summary>
     /// <remarks>
+    /// A soundmachine's zip also carries the recordings its presets name from outside its folder;
+    /// see <c>JingleBox2.SoundDevices.SoundMachines.Interfaces.ISoundMachinePack</c>.
+    ///
     /// Throws rather than reporting: this is asked for by somebody who has just pressed Export
     /// and is waiting to be told either where the file went or what stopped it.
     ///

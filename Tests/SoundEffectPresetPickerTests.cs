@@ -71,12 +71,13 @@ public class SoundEffectPresetPickerTests : IDisposable
     }
 
     /// <summary>The picker offers what the folder holds, in its order.</summary>
+    /// <remarks>Both are marked as yours, since nothing ships this effect: every preset on it is somebody's own.</remarks>
     [Fact]
     public void The_picker_offers_what_the_folder_holds()
     {
         var picker = new SoundEffectPresetNames(_effect);
 
-        Assert.Equal(new[] { "Short", "Long" }, picker.Names);
+        Assert.Equal(new[] { "\u2605 Short", "\u2605 Long" }, picker.Names);
         Assert.Equal(-1, picker.Picked);
         Assert.Equal("Preset", picker.Caption);
     }

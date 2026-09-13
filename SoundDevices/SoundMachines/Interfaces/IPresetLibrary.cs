@@ -31,7 +31,7 @@ namespace JingleBox2.SoundDevices.SoundMachines.Interfaces;
 public interface IPresetLibrary
 {
     /// <summary>
-    /// What this machine offers: its own presets in filename order, then yours by name.
+    /// What this machine offers: its own presets, then yours, each in filename order.
     /// </summary>
     /// <remarks>
     /// Read once and kept, and read again after a preset of yours is kept or taken off through

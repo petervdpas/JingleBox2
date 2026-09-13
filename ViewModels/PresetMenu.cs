@@ -8,11 +8,11 @@ using JingleBox2.ViewModels.Interfaces;
 namespace JingleBox2.ViewModels;
 
 /// <summary>
-/// The two lines of a soundmachine's Menu that keep a preset of your own and take one off.
+/// The two lines of a device's Menu that keep a preset of your own and take one off.
 /// </summary>
 /// <remarks>
-/// Save as preset is live wherever the machine keeps presets at all, and Delete this preset only
-/// while the preset showing is one of yours, since the machine's own come back whenever it is
+/// Save as preset is live wherever the device keeps presets at all, and Delete this preset only
+/// while the preset showing is one of yours, since the device's own come back whenever it is
 /// brought up to date. Both lines are there either way: a line that goes missing reads as the
 /// feature being gone, where a grey one with a tip says why not now.
 ///
@@ -20,9 +20,9 @@ namespace JingleBox2.ViewModels;
 /// refused is said and nothing is written; a name already used by one of yours is asked about
 /// before it is replaced; a deletion is always asked about, since it is somebody's work.
 /// </remarks>
-/// <param name="presets">The picker whose instrument is kept and whose list changes.</param>
+/// <param name="presets">The picker whose sound is kept and whose list changes.</param>
 /// <param name="questions">What is asked. Left out, the application's dialogs.</param>
-public sealed class PresetMenu(InstrumentPresets presets, IPresetQuestions? questions = null) : IPanelMenu
+public sealed class PresetMenu(IPresetKeeping presets, IPresetQuestions? questions = null) : IPanelMenu
 {
     /// <summary>What is asked.</summary>
     private readonly IPresetQuestions _questions = questions ?? new PresetQuestions();
@@ -43,8 +43,8 @@ public sealed class PresetMenu(InstrumentPresets presets, IPresetQuestions? ques
             new PanelMenuItem(SaveLine)
             {
                 Tip = presets.CanKeep
-                    ? "Keeps what this " + presets.MachineName + " sounds like now as a preset of your own, beside the ones it ships with."
-                    : "This machine starts from your recordings, so there is no preset to keep.",
+                    ? "Keeps what this " + presets.DeviceName + " sounds like now as a preset of your own, beside the ones it ships with."
+                    : "Nothing here has a presets folder to keep one in: a machine that starts from your recordings, or a device that is not installed.",
                 Option = MenuOptionWords.Presets,
                 Live = presets.CanKeep,
                 Chosen = () => _ = Save()
@@ -53,7 +53,7 @@ public sealed class PresetMenu(InstrumentPresets presets, IPresetQuestions? ques
             {
                 Tip = yours is null
                     ? "Only a preset of your own can be deleted. Pick one of yours, marked with a star, first."
-                    : "Deletes your preset '" + yours.Name + "'. The sound on this instrument stays as it is.",
+                    : "Deletes your preset '" + yours + "'. The sound stays as it is.",
                 Option = MenuOptionWords.Presets,
                 Live = yours is not null,
                 Chosen = () => _ = Delete()
@@ -67,7 +67,7 @@ public sealed class PresetMenu(InstrumentPresets presets, IPresetQuestions? ques
     {
         if (!presets.CanKeep) return false;
 
-        string? name = await _questions.Name(presets.MachineName, presets.Suggested);
+        string? name = await _questions.Name(presets.DeviceName, presets.Suggested);
 
         if (string.IsNullOrWhiteSpace(name)) return false;
 
@@ -93,7 +93,7 @@ public sealed class PresetMenu(InstrumentPresets presets, IPresetQuestions? ques
     {
         if (presets.PickedYours is not { } yours) return false;
 
-        if (!await _questions.Delete(yours.Name)) return false;
+        if (!await _questions.Delete(yours)) return false;
 
         return presets.RemovePicked();
     }
