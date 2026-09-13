@@ -1,0 +1,11 @@
+{
+  "Name": "Fuzz",
+  "Effect": "effect.roaster",
+  "amount": 14.0,
+  "shape": 1,
+  "even": 0,
+  "tilt": 0.3,
+  "bias": 0.15,
+  "level": -8.0,
+  "mix": 1.0
+}

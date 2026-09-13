@@ -15,24 +15,36 @@ effects this application ships come first, since that list is short and known an
 plugin list runs to hundreds; ours load in this process with nothing to find on disc.
 After them are the CLAP and VST3 effects this machine has.
 
-Six ship at the moment, each with presets to start from:
+Seven ship at the moment, each with presets to start from, and every one of them has a
+**Level** knob last in line, which sets how loud the track comes back out of it:
 
 - **EchoBox** is a delay. The repeats darken as they go, and the time glides rather
-  than jumping, so moving it sounds like a tape slowing rather than like a click.
+  than jumping, so moving it sounds like a tape slowing rather than like a click. Under
+  Tape it bounces its repeats from side to side, wanders like a worn transport, and
+  bends what goes back in so a long feedback holds instead of running away.
 - **Sweeper** is a filter: four poles, low, band or high, with a drive in front of
   them. The drive is what makes a resonant sweep sound like an instrument instead of
-  a whistle, and the cutoff glides for the same reason the delay's time does.
+  a whistle, and the cutoff glides for the same reason the delay's time does. Under
+  Movement the cutoff can swing on its own or follow how loud the track is, which is
+  an auto-wah.
 - **Roaster** is a drive. The tilt chooses which end gets bitten, up for a desk and
   down for an amplifier; the bias leans the signal off centre, which is the half of a
   valve people actually like; and what the curve costs in level is given back, so you
-  are comparing the sound and not the loudness.
+  are comparing the sound and not the loudness. The curve is Warm, Hard or Fold,
+  which are an amplifier, a fuzz and a wavefolder.
 - **Shifter** moves the pitch without moving the speed: two taps read through a delay
   line at the wrong rate and crossfaded, in whole steps and in cents, with a window
-  that trades the warble against the smearing.
+  that trades the warble against the smearing. Under Double it pulls the two sides
+  apart into a doubler, and feeds what it moved back in, which is shimmer.
 - **Ringer** multiplies the signal by a tone, which is the sound of a machine talking.
-  A sine or a square carrier, a spread between the two channels, and a crush on top.
+  A sine or a square carrier, a spread between the two channels, and a crush on top,
+  with a swing that moves the carrier up and down like a siren.
 - **Widener** puts a mono source across the room instead of in the middle of your head:
-  a width, a slow drift under it, and a Haas delay on whichever side you choose.
+  a width, a slow drift under it, and a Haas delay on whichever side you choose, with
+  the bass kept in the middle below a frequency you set.
+- **Phaser** sweeps notches up and down through the sound: four to twelve stages, a
+  feedback that sharpens them without making anything louder, and a spread that moves
+  them across the room.
 
 A block opens that effect's controls in a window of its own, and its power button
 switches it off without taking it out, so it can be heard in and out. Each block

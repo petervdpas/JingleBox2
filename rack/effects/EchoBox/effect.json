@@ -51,6 +51,42 @@
       "Max": 1,
       "Default": 0.3,
       "Step": 0.01
+    },
+    {
+      "Key": "ping",
+      "Name": "Repeats",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "wow",
+      "Name": "Wow",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "grit",
+      "Name": "Grit",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "level",
+      "Name": "Level",
+      "Unit": "dB",
+      "Min": -24,
+      "Max": 12,
+      "Default": 0,
+      "Step": 0.1
     }
   ],
   "Panel": {
@@ -103,7 +139,7 @@
               "Properties": {
                 "cell": "26",
                 "gap": "6",
-                "columns": "3 3 3 3"
+                "columns": "3 3 3 3 3"
               },
               "Children": [
                 {
@@ -147,6 +183,76 @@
                     "span": "3",
                     "dial": "44",
                     "lines": "1"
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "level",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How loud the effect hands the track back. It is the last thing the sound goes through, so it evens out what the effect did to the level without moving the track's fader."
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Tape"
+          },
+          "Children": [
+            {
+              "Element": "Strip",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "cell": "26",
+                "gap": "6",
+                "columns": "5 3 3"
+              },
+              "Children": [
+                {
+                  "Element": "Choice",
+                  "Parameter": "ping",
+                  "Label": "",
+                  "Properties": {
+                    "span": "5",
+                    "options": "Straight,Ping-pong",
+                    "width": "110",
+                    "tip": "Straight keeps each side's repeats on that side. Ping-pong sends the first repeat to the left and the next to the right, so the echoes bounce across the room."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "wow",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How much the tape wanders. A slow drift and a quick flutter on top, so each repeat comes back a few cents out and moving, like a machine that does not quite hold speed."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "grit",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How hard what goes back in is bent. Quiet repeats are left alone and loud ones are squashed a little more on every pass, which keeps a long feedback from running away and gives it the sound of a worn head."
                   },
                   "Children": []
                 }

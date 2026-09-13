@@ -174,9 +174,9 @@ public sealed class ShiftTests
     {
         var shift = new Shift(48000);
 
-        shift.SetValue("feedback", 0.5);
+        shift.SetValue("resonance", 0.5);
 
-        Assert.Equal(0, shift.ValueOf("feedback"));
+        Assert.Equal(0, shift.ValueOf("resonance"));
         Assert.Equal(0, shift.ValueOf(null));
     }
 

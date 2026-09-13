@@ -51,6 +51,33 @@
       "Max": 1,
       "Default": 1,
       "Step": 0.01
+    },
+    {
+      "Key": "detune",
+      "Name": "Apart",
+      "Unit": "cents",
+      "Min": 0,
+      "Max": 50,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "feedback",
+      "Name": "Feedback",
+      "Unit": "",
+      "Min": 0,
+      "Max": 0.9,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "level",
+      "Name": "Level",
+      "Unit": "dB",
+      "Min": -24,
+      "Max": 12,
+      "Default": 0,
+      "Step": 0.1
     }
   ],
   "Panel": {
@@ -103,7 +130,7 @@
               "Properties": {
                 "cell": "26",
                 "gap": "6",
-                "columns": "3 3 3 3"
+                "columns": "3 3 3 3 3"
               },
               "Children": [
                 {
@@ -151,6 +178,64 @@
                     "dial": "44",
                     "lines": "1",
                     "tip": "How much of what you hear has been moved. Kept back with an interval on it, the original and the shifted copy are a harmony."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "level",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How loud the effect hands the track back. It is the last thing the sound goes through, so it evens out what the effect did to the level without moving the track's fader."
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Double"
+          },
+          "Children": [
+            {
+              "Element": "Strip",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "cell": "26",
+                "gap": "6",
+                "columns": "3 3"
+              },
+              "Children": [
+                {
+                  "Element": "Knob",
+                  "Parameter": "detune",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How far the two sides are pulled apart, in cents: the left down and the right up. With no interval at all it is a doubler, two copies of the sound across the room."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "feedback",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How much of what comes out goes back in, so what was moved is moved again. An octave up with feedback is a note climbing out of the top of itself, which is shimmer."
                   },
                   "Children": []
                 }

@@ -8,6 +8,13 @@ with the level given back afterwards.
 - **Drive** is how hard the signal is pushed into the curve, one to twenty four. One is no drive
   at all. The range goes well past useful on purpose: the top of it is a sound rather than a
   mistake.
+- **Curve** is what the signal is bitten by. **Warm** bends it further the harder it is pushed and
+  never quite reaches the top, which is an amplifier being leant on and is what a fresh one starts
+  as. **Hard** cuts it off flat at full scale, which bites nothing until the top and everything
+  after it: a transistor fuzz. **Fold** sends it back down once it reaches the top, so pushing
+  harder folds it over itself again and again, and every turn of the drive adds a new set of
+  harmonics rather than more of the same. Nothing like an amplifier, and the reason to try it on a
+  bass.
 - **Drive keeps** decides how the curve is paid for. **Peak** holds the height of what comes out,
   which lets the loudness climb with the drive. **Loudness** measures what went past on either
   side of the curve and corrects by that, so what you hear is the tone changing and not the level.
@@ -42,6 +49,7 @@ numbers that are both nearly nought is noise.
 
 ## What ships with it
 
-Six presets: **Warm**, barely there, **Desk**, the sound of something being run a little hot,
+Eight presets: **Warm**, barely there, **Desk**, the sound of something being run a little hot,
 **Valve**, biased so the harmonics are not all odd, **Parallel**, a lot of drive under a low mix,
-**Megaphone**, tilted up and narrow, and **Destroy**, which is what the top of the range is for.
+**Megaphone**, tilted up and narrow, **Destroy**, which is what the top of the range is for,
+**Folded**, the fold curve under a little of the original, and **Fuzz**, hard and leaning.

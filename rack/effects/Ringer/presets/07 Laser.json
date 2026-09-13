@@ -1,0 +1,12 @@
+{
+  "Name": "Laser",
+  "Effect": "effect.ringer",
+  "carrier": 900,
+  "square": 1,
+  "spread": 4,
+  "crush": 0.2,
+  "mix": 0.8,
+  "swing": 2.0,
+  "swing_rate": 6.0,
+  "level": 0
+}

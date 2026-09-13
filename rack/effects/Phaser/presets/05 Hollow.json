@@ -1,0 +1,12 @@
+{
+  "Name": "Hollow",
+  "Effect": "effect.phaser",
+  "rate": 0.15,
+  "depth": 0.5,
+  "centre": 1800,
+  "feedback": -0.7,
+  "stages": 2,
+  "spread": 45,
+  "mix": 0.5,
+  "level": 0.0
+}

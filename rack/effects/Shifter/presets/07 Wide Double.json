@@ -1,0 +1,11 @@
+{
+  "Name": "Wide Double",
+  "Effect": "effect.shifter",
+  "steps": 0,
+  "cents": 0,
+  "window": 40,
+  "mix": 0.5,
+  "detune": 12,
+  "feedback": 0.0,
+  "level": 0
+}

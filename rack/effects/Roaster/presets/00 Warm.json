@@ -2,6 +2,7 @@
   "Name": "Warm",
   "Effect": "effect.roaster",
   "amount": 2.0,
+  "shape": 0,
   "even": 0,
   "tilt": -0.2,
   "bias": 0.0,

@@ -6,5 +6,7 @@
   "rate": 0.2,
   "haas": 14.0,
   "side": 1,
-  "mix": 1.0
+  "mix": 1.0,
+  "bass": 0,
+  "level": 0.0
 }

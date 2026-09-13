@@ -1,0 +1,12 @@
+{
+  "Name": "Warble",
+  "Effect": "effect.phaser",
+  "rate": 6,
+  "depth": 0.25,
+  "centre": 1000,
+  "feedback": 0.4,
+  "stages": 1,
+  "spread": 30,
+  "mix": 0.5,
+  "level": 0.0
+}

@@ -1,0 +1,11 @@
+{
+  "Name": "Falling",
+  "Effect": "effect.shifter",
+  "steps": -5,
+  "cents": 0,
+  "window": 70,
+  "mix": 0.4,
+  "detune": 0,
+  "feedback": 0.7,
+  "level": 0
+}

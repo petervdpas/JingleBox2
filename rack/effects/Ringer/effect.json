@@ -60,6 +60,33 @@
       "Max": 1,
       "Default": 1,
       "Step": 0.01
+    },
+    {
+      "Key": "swing",
+      "Name": "Swing",
+      "Unit": "oct",
+      "Min": 0,
+      "Max": 3,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "swing_rate",
+      "Name": "Speed",
+      "Unit": "Hz",
+      "Min": 0.05,
+      "Max": 8,
+      "Default": 0.5,
+      "Step": 0.01
+    },
+    {
+      "Key": "level",
+      "Name": "Level",
+      "Unit": "dB",
+      "Min": -24,
+      "Max": 12,
+      "Default": 0,
+      "Step": 0.1
     }
   ],
   "Panel": {
@@ -112,7 +139,7 @@
               "Properties": {
                 "cell": "26",
                 "gap": "6",
-                "columns": "3 4 3 3 3"
+                "columns": "3 4 3 3 3 3"
               },
               "Children": [
                 {
@@ -172,6 +199,64 @@
                     "dial": "44",
                     "lines": "1",
                     "tip": "How much of what you hear has been modulated. Kept back, the words come back through the machine."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "level",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How loud the effect hands the track back. It is the last thing the sound goes through, so it evens out what the effect did to the level without moving the track's fader."
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Swing"
+          },
+          "Children": [
+            {
+              "Element": "Strip",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "cell": "26",
+                "gap": "6",
+                "columns": "3 3"
+              },
+              "Children": [
+                {
+                  "Element": "Knob",
+                  "Parameter": "swing",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How many octaves a slow wave moves the carrier up and down by. Slow and deep is a siren; fast and shallow is a machine gargling. Nought holds it still."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "swing_rate",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How fast the swing goes, in turns a second."
                   },
                   "Children": []
                 }

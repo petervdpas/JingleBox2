@@ -26,6 +26,15 @@
       "Step": 0.1
     },
     {
+      "Key": "shape",
+      "Name": "Curve",
+      "Unit": "",
+      "Min": 0,
+      "Max": 2,
+      "Default": 0,
+      "Step": 1
+    },
+    {
       "Key": "even",
       "Name": "Drive keeps",
       "Unit": "",
@@ -121,7 +130,7 @@
               "Properties": {
                 "cell": "26",
                 "gap": "6",
-                "columns": "3 4 3 3 3 3"
+                "columns": "3 4 4 3 3 3 3"
               },
               "Children": [
                 {
@@ -133,6 +142,18 @@
                     "dial": "44",
                     "lines": "1",
                     "tip": "How hard the signal is pushed into the curve. What it costs is given back, so you are comparing the sound rather than the loudness. Which cost is given back is the switch beside it: the height of the wave, or its loudness."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Choice",
+                  "Parameter": "shape",
+                  "Label": "",
+                  "Properties": {
+                    "span": "4",
+                    "options": "Warm,Hard,Fold",
+                    "width": "90",
+                    "tip": "Which curve the signal is bitten by. Warm bends it further the harder it is pushed and never quite reaches the top, which is an amplifier. Hard cuts it off flat at full scale, which is a fuzz. Fold sends it back down once it reaches the top, so pushing harder folds it over again and adds new harmonics rather than more of the same."
                   },
                   "Children": []
                 },

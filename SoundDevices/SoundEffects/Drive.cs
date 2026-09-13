@@ -37,11 +37,31 @@ namespace JingleBox2.SoundDevices.SoundEffects;
 /// It is taken back out afterwards, or the effect would put a step in the output that every
 /// speaker in the building would try to reproduce.
 ///
+/// **The curve is one of three, and each is a different pedal.** Warm is the hyperbolic tangent,
+/// which bends a signal further the harder it is pushed and never quite reaches the top: the sound
+/// of an amplifier being leant on, and what this effect was built as. Hard is the signal cut off
+/// flat at full scale, which bites nothing until it reaches the top and everything after, and is a
+/// transistor fuzz. Fold is a sine, which rises to the top and then comes back down past it, so a
+/// signal pushed hard folds over itself again and again: every push of the knob adds a new set of
+/// harmonics rather than more of the same, which is the West Coast sound and nothing like any
+/// amplifier. Warm is where it starts, so a chain written before the choice existed sounds as it
+/// did.
+///
+/// Neither of the other two needs the level it costs given back by arithmetic, since both answer
+/// full scale at the top whenever they are pushed at all, so what is given back there is nothing;
+/// Drive keeps on Loudness measures whichever curve is in, the same as it does for the first.
+///
 /// Nothing here allocates, takes a lock or blocks, which is what <see cref="ISoundEffectEngine"/>
 /// asks of anything on the audio path.
 /// </remarks>
 public sealed class Drive : ISoundEffectEngine
 {
+    /// <summary>Which curve it is bitten by: nought warm, one hard, two fold.</summary>
+    public const string Shape = "shape";
+
+    /// <summary>The furthest the shape goes, which is fold.</summary>
+    public const double MostShape = 2;
+
     /// <summary>How hard the signal is pushed into the curve.</summary>
     /// <remarks>
     /// Written out rather than built, so the words this effect and its manifest have to agree on
@@ -100,7 +120,7 @@ public sealed class Drive : ISoundEffectEngine
     public string Id { get; }
 
     /// <summary>Every parameter, in the order a face reads them.</summary>
-    private static readonly string[] Words = { Amount, Tilt, Bias, Level, Mix, Even };
+    private static readonly string[] Words = { Amount, Tilt, Bias, Level, Mix, Even, Shape };
 
     /// <inheritdoc/>
     public System.Collections.Generic.IReadOnlyList<string> Keys => Words;
@@ -137,6 +157,9 @@ public sealed class Drive : ISoundEffectEngine
 
     /// <summary>What comes out, in decibels.</summary>
     private volatile float _level;
+
+    /// <summary>Which curve.</summary>
+    private volatile float _shape;
 
     /// <summary>How much of it is the driven signal.</summary>
     private volatile float _mix = 1;
@@ -178,6 +201,7 @@ public sealed class Drive : ISoundEffectEngine
         Level => _level,
         Mix => _mix,
         Even => _even ? 1 : 0,
+        Shape => _shape,
         _ => 0
     };
 
@@ -210,6 +234,10 @@ public sealed class Drive : ISoundEffectEngine
 
             case Even:
                 _even = value >= 0.5;
+                break;
+
+            case Shape:
+                _shape = (float)Math.Clamp(Math.Round(value), 0, MostShape);
                 break;
         }
     }
@@ -244,7 +272,8 @@ public sealed class Drive : ISoundEffectEngine
         double level = Math.Pow(10, _level / 20.0);
 
         bool even = _even;
-        double makeup = even ? 1 : Makeup(amount);
+        int shape = (int)_shape;
+        double makeup = even || shape != 0 ? 1 : Makeup(amount);
         double tilt = _tilt;
         double bias = _bias;
 
@@ -254,8 +283,8 @@ public sealed class Drive : ISoundEffectEngine
 
             if (even) makeup = _loudness.Makeup;
 
-            buffer[at] = (float)One(buffer[at], 0, amount, makeup, tilt, bias, level, mix, even);
-            buffer[at + 1] = (float)One(buffer[at + 1], 1, amount, makeup, tilt, bias, level, mix, even);
+            buffer[at] = (float)One(buffer[at], 0, amount, makeup, tilt, bias, level, mix, even, shape);
+            buffer[at + 1] = (float)One(buffer[at + 1], 1, amount, makeup, tilt, bias, level, mix, even, shape);
         }
     }
 
@@ -292,6 +321,16 @@ public sealed class Drive : ISoundEffectEngine
     /// <param name="amount">How hard it is being pushed.</param>
     public static double Faded(double amount) =>
         Math.Clamp((amount - LeastAmount) / FadeIn, 0, 1);
+
+    /// <summary>That much push, through the curve the shape names.</summary>
+    /// <param name="pushed">The signal already leaned, biased and multiplied by the amount.</param>
+    /// <param name="shape">Nought warm, one hard, two fold.</param>
+    public static double Curve(double pushed, int shape) => shape switch
+    {
+        1 => Math.Clamp(pushed, -1, 1),
+        2 => Math.Sin(pushed),
+        _ => Audio.TangentSwitch.Now.Of(pushed),
+    };
 
     /// <summary>
     /// Takes the offset back out of one side.
@@ -331,8 +370,9 @@ public sealed class Drive : ISoundEffectEngine
     /// <param name="level">What comes out, as a multiplier.</param>
     /// <param name="mix">How much of the result comes out.</param>
     /// <param name="even">Whether the followers are being kept, which only the loudness makeup needs.</param>
+    /// <param name="shape">Which curve: nought warm, one hard, two fold.</param>
     private double One(double sample, int side, double amount, double makeup,
-                       double tilt, double bias, double level, double mix, bool even)
+                       double tilt, double bias, double level, double mix, bool even, int shape)
     {
         _low[side] += (sample - _low[side]) * _lean;
 
@@ -342,7 +382,7 @@ public sealed class Drive : ISoundEffectEngine
             ? _low[side] * (1 - tilt * 0.75) + high * (1 + tilt)
             : _low[side] * (1 - tilt) + high * (1 + tilt * 0.75);
 
-        double bitten = Audio.TangentSwitch.Now.Of((leaned + bias) * amount);
+        double bitten = Curve((leaned + bias) * amount, shape);
 
         double centred = Centre(side, bitten);
 

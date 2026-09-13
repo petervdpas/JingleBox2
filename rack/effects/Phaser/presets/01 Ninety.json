@@ -1,0 +1,12 @@
+{
+  "Name": "Ninety",
+  "Effect": "effect.phaser",
+  "rate": 0.9,
+  "depth": 0.6,
+  "centre": 600,
+  "feedback": 0.15,
+  "stages": 0,
+  "spread": 0,
+  "mix": 0.5,
+  "level": 0.0
+}

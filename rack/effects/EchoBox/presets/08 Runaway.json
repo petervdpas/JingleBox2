@@ -1,0 +1,12 @@
+{
+  "Name": "Runaway",
+  "Effect": "effect.echobox",
+  "time": 430,
+  "feedback": 0.92,
+  "damp": 0.4,
+  "mix": 0.4,
+  "ping": 1,
+  "wow": 0.25,
+  "grit": 1.0,
+  "level": 0
+}

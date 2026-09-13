@@ -4,5 +4,8 @@
   "steps": -5,
   "cents": 0,
   "window": 90,
-  "mix": 1.0
+  "mix": 1.0,
+  "detune": 0,
+  "feedback": 0.0,
+  "level": 0.0
 }

@@ -1,0 +1,15 @@
+{
+  "Name": "Slow Tide",
+  "Effect": "effect.sweeper",
+  "cutoff": 1200,
+  "resonance": 0.35,
+  "drive": 1.0,
+  "even": 0,
+  "filter_first": 0,
+  "mode": 0,
+  "mix": 1.0,
+  "swing": 2.5,
+  "swing_rate": 0.1,
+  "follow": 0.0,
+  "level": 0
+}

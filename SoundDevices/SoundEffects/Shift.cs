@@ -30,6 +30,15 @@ namespace JingleBox2.SoundDevices.SoundEffects;
 /// and is not what anybody means by nought. So nought is passed straight through, with the line
 /// still being written, so moving off it starts from audio that is already there.
 ///
+/// **Two things make it more than an interval, and both are off until they are turned.** Detune
+/// moves the left side down and the right side up by the same few cents, on top of whatever the
+/// interval is, so a sound with no interval at all comes out as two copies pulling apart across
+/// the room: the classic doubler. Feedback sends what comes out back into the line, so what was
+/// moved is moved again, and again: an octave up with feedback is a note climbing out of the top
+/// of itself, which is what everybody calls shimmer. What goes back is bent through the drives'
+/// curve on the way, so a cascade that piles up is held rather than allowed to run away. A sample
+/// that is not a number is not sent round, so it costs a window rather than the rest of the session.
+///
 /// Nothing here allocates, takes a lock or blocks. The line is made once, long enough for the
 /// longest window this effect offers.
 /// </remarks>
@@ -41,6 +50,18 @@ public sealed class Shift : ISoundEffectEngine
     /// can be found by looking for them. They are the same strings <c>effect.json</c> names.
     /// </remarks>
     public const string Steps = "steps";
+
+    /// <summary>How far apart the two sides are pulled, in cents: the left down and the right up by that much.</summary>
+    public const string Detune = "detune";
+
+    /// <summary>How much of what comes out goes back in, so what was moved is moved again.</summary>
+    public const string Feedback = "feedback";
+
+    /// <summary>The furthest the sides can be pulled apart.</summary>
+    public const double MostDetune = 50;
+
+    /// <summary>The most that goes back in.</summary>
+    public const double MostFeedback = 0.9;
 
     /// <summary>And the part of a semitone, in cents.</summary>
     /// <remarks>
@@ -103,6 +124,21 @@ public sealed class Shift : ISoundEffectEngine
     /// <summary>Where the first tap is inside its window, from nought to one.</summary>
     private double _phase;
 
+    /// <summary>The same for the right side, which only parts from the left while there is detune.</summary>
+    private double _phaseRight;
+
+    /// <summary>What came out of each side last, before the mix, for the feedback.</summary>
+    private double _backLeft;
+
+    /// <inheritdoc cref="_backLeft"/>
+    private double _backRight;
+
+    /// <inheritdoc cref="_steps"/>
+    private float _detune;
+
+    /// <inheritdoc cref="_steps"/>
+    private float _feedback;
+
     /// <summary>The knobs, as single words so a thread never reads half of one.</summary>
     private float _steps = (float)StepsThen;
 
@@ -114,6 +150,9 @@ public sealed class Shift : ISoundEffectEngine
 
     /// <inheritdoc cref="_steps"/>
     private float _mix = (float)MixThen;
+
+    /// <summary>The volume the block is handed back at, the last thing it goes through.</summary>
+    private readonly IEffectLevel _level = new EffectLevel();
 
     /// <summary>
     /// Makes the line at the longest window this effect offers.
@@ -138,7 +177,7 @@ public sealed class Shift : ISoundEffectEngine
 
     /// <inheritdoc/>
     public System.Collections.Generic.IReadOnlyList<string> Keys { get; } =
-        new[] { Steps, Cents, Window, Mix };
+        new[] { Steps, Cents, Window, Mix, Detune, Feedback, IEffectLevel.Key };
 
     /// <inheritdoc/>
     public double ValueOf(string? key) => key switch
@@ -147,6 +186,9 @@ public sealed class Shift : ISoundEffectEngine
         Cents => _cents,
         Window => _window,
         Mix => _mix,
+        Detune => _detune,
+        Feedback => _feedback,
+        IEffectLevel.Key => _level.Db,
         _ => 0
     };
 
@@ -169,8 +211,20 @@ public sealed class Shift : ISoundEffectEngine
                 _window = (float)Math.Clamp(value, LeastWindowMs, MostWindowMs);
                 break;
 
+            case IEffectLevel.Key:
+                _level.Set(value);
+                break;
+
             case Mix:
                 _mix = (float)Math.Clamp(value, 0, 1);
+                break;
+
+            case Detune:
+                _detune = (float)Math.Clamp(value, 0, MostDetune);
+                break;
+
+            case Feedback:
+                _feedback = (float)Math.Clamp(value, 0, MostFeedback);
                 break;
         }
     }
@@ -197,6 +251,24 @@ public sealed class Shift : ISoundEffectEngine
         return _line[(first * 2) + side] * (1 - along) + _line[(second * 2) + side] * along;
     }
 
+    /// <summary>One side read through both taps, each under its half of the raised cosine.</summary>
+    /// <param name="phase">Where the first tap is inside its window, from nought to one.</param>
+    /// <param name="window">How long the window is, in frames.</param>
+    /// <param name="side">Nought for the left, one for the right.</param>
+    private double Tapped(double phase, double window, int side)
+    {
+        double gain = 0.5 - (0.5 * Math.Cos(2 * Math.PI * phase));
+
+        double other = phase + 0.5;
+
+        if (other >= 1) other -= 1;
+
+        double near = Behind + (phase * window);
+        double far = Behind + (other * window);
+
+        return (Read(near, side) * gain) + (Read(far, side) * (1 - gain));
+    }
+
     /// <inheritdoc/>
     /// <remarks>
     /// The block is held to what the buffer can really take and rounded down to whole frames,
@@ -214,40 +286,63 @@ public sealed class Shift : ISoundEffectEngine
         double semitones = _steps + (_cents / 100.0);
         double ratio = Ratio(semitones);
         double window = Math.Clamp(_window * 0.001 * _rate, 1, _room - Behind - 2);
+        double detune = _detune / 100.0;
         double step = (1 - ratio) / window;
+        double stepRight = detune == 0 ? step : (1 - Ratio(semitones + detune)) / window;
+        double stepLeft = detune == 0 ? step : (1 - Ratio(semitones - detune)) / window;
         double mix = _mix;
-        bool moving = semitones != 0;
+        double feedback = _feedback;
+        bool moving = semitones != 0 || detune != 0;
 
         for (int at = 0; at < block; at++)
         {
             float wasLeft = buffer[at * 2];
             float wasRight = buffer[(at * 2) + 1];
 
-            _line[_write * 2] = wasLeft;
-            _line[(_write * 2) + 1] = wasRight;
+            if (moving && feedback > 0)
+            {
+                _line[_write * 2] = (float)(wasLeft + Audio.TangentSwitch.Now.Of(_backLeft * feedback));
+                _line[(_write * 2) + 1] = (float)(wasRight + Audio.TangentSwitch.Now.Of(_backRight * feedback));
+            }
+            else
+            {
+                _line[_write * 2] = wasLeft;
+                _line[(_write * 2) + 1] = wasRight;
+            }
 
             if (moving)
             {
-                _phase += step;
+                _phase += stepLeft;
                 _phase -= Math.Floor(_phase);
 
-                double gain = 0.5 - (0.5 * Math.Cos(2 * Math.PI * _phase));
+                if (detune == 0)
+                {
+                    _phaseRight = _phase;
+                }
+                else
+                {
+                    _phaseRight += stepRight;
+                    _phaseRight -= Math.Floor(_phaseRight);
+                }
 
-                double other = _phase + 0.5;
+                double left = Tapped(_phase, window, 0);
+                double right = Tapped(_phaseRight, window, 1);
 
-                if (other >= 1) other -= 1;
-
-                double near = Behind + (_phase * window);
-                double far = Behind + (other * window);
-
-                double left = (Read(near, 0) * gain) + (Read(far, 0) * (1 - gain));
-                double right = (Read(near, 1) * gain) + (Read(far, 1) * (1 - gain));
+                _backLeft = double.IsFinite(left) ? left : 0;
+                _backRight = double.IsFinite(right) ? right : 0;
 
                 buffer[at * 2] = (float)((wasLeft * (1 - mix)) + (left * mix));
                 buffer[(at * 2) + 1] = (float)((wasRight * (1 - mix)) + (right * mix));
             }
+            else
+            {
+                _backLeft = 0;
+                _backRight = 0;
+            }
 
             _write = _write + 1 >= _room ? 0 : _write + 1;
         }
+
+        _level.Apply(buffer, block);
     }
 }

@@ -1,0 +1,11 @@
+{
+  "Name": "Folded",
+  "Effect": "effect.roaster",
+  "amount": 5.0,
+  "shape": 2,
+  "even": 1,
+  "tilt": 0.2,
+  "bias": 0.0,
+  "level": -3.0,
+  "mix": 0.8
+}

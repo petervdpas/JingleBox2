@@ -36,6 +36,17 @@ namespace JingleBox2.SoundDevices.SoundEffects;
 /// a sweep that moves evenly in hertz crawls at the bottom and leaps at the top, and the ear
 /// hears octaves.
 ///
+/// **The cutoff can move on its own, two ways, and both are off until they are turned.** Swing is
+/// a slow sine moving it up and down by as many octaves as the knob says, which is a filter
+/// wobbling in time with nothing but itself. Follow is how loud the track is moving it, which is
+/// the auto-wah: a note hit hard opens the filter and it closes again as the note falls away, and
+/// turned below nought a loud note closes it instead. Both are added in octaves on top of wherever
+/// the cutoff knob has put it, so the knob stays the centre of whatever they do.
+///
+/// Moving, the coefficients are worked out again every <see cref="Chunk"/> frames rather than once
+/// a block, since a sweep that stepped once a block would step audibly at a slow buffer. Still,
+/// they are worked out once a block exactly as they are without either.
+///
 /// Nothing here allocates, takes a lock or blocks, which is what <see cref="ISoundEffectEngine"/>
 /// asks of anything on the audio path.
 /// </remarks>
@@ -65,6 +76,36 @@ public sealed class Sweep : ISoundEffectEngine
 
     /// <summary>Whether the drive is paid for by its peak or by its loudness.</summary>
     public const string Even = "even";
+
+    /// <summary>How many octaves a slow sine moves the cutoff up and down by.</summary>
+    public const string Swing = "swing";
+
+    /// <summary>How fast that sine goes, in turns a second.</summary>
+    public const string SwingRate = "swing_rate";
+
+    /// <summary>How many octaves the track's own loudness moves the cutoff by, minus to plus.</summary>
+    public const string Follow = "follow";
+
+    /// <summary>The furthest the swing reaches either way, in octaves.</summary>
+    public const double MostSwing = 4;
+
+    /// <summary>The slowest swing and the fastest.</summary>
+    public const double LeastSwingRate = 0.05;
+
+    /// <inheritdoc cref="LeastSwingRate"/>
+    public const double MostSwingRate = 10;
+
+    /// <summary>The furthest the loudness moves the cutoff either way, in octaves.</summary>
+    public const double MostFollow = 4;
+
+    /// <summary>How many frames a moving cutoff is held for before it is worked out again.</summary>
+    public const int Chunk = 16;
+
+    /// <summary>How quickly the follower answers a note arriving and a note falling away, in milliseconds.</summary>
+    private const double AttackMs = 5;
+
+    /// <inheritdoc cref="AttackMs"/>
+    private const double ReleaseMs = 150;
 
     /// <summary>The lowest the cutoff goes, which is under everything anybody records.</summary>
     public const double LeastHz = 20;
@@ -98,7 +139,7 @@ public sealed class Sweep : ISoundEffectEngine
     public string Id { get; }
 
     /// <summary>Every parameter, in the order a face reads them.</summary>
-    private static readonly string[] Words = { Cutoff, Resonance, Drive, Mode, Mix, FilterFirst, Even };
+    private static readonly string[] Words = { Cutoff, Resonance, Drive, Mode, Mix, FilterFirst, Even, Swing, SwingRate, Follow, IEffectLevel.Key };
 
     /// <inheritdoc/>
     public System.Collections.Generic.IReadOnlyList<string> Keys => Words;
@@ -154,12 +195,45 @@ public sealed class Sweep : ISoundEffectEngine
     /// <summary>How much of the filtered signal comes out.</summary>
     private volatile float _mix = 1;
 
+    /// <summary>The volume the block is handed back at, the last thing it goes through.</summary>
+    private readonly IEffectLevel _level = new EffectLevel();
+
+    /// <summary>How far a slow sine moves the cutoff, in octaves.</summary>
+    private volatile float _swing;
+
+    /// <summary>How fast it goes.</summary>
+    private volatile float _swingRate = 1;
+
+    /// <summary>How far the loudness moves the cutoff, in octaves.</summary>
+    private volatile float _follow;
+
+    /// <summary>The slow sine the swing reads.</summary>
+    private readonly ISlowOscillator _swinging;
+
+    /// <summary>How loud the track is, followed, nought to about one.</summary>
+    private double _loud;
+
+    /// <summary>How much of the way to a louder and a quieter sample the follower moves each frame.</summary>
+    private readonly double _attack;
+
+    /// <inheritdoc cref="_attack"/>
+    private readonly double _release;
+
+    /// <summary>How many frames of the current chunk have gone.</summary>
+    private int _tick;
+
+    /// <summary>How many octaves the cutoff is moved by right now.</summary>
+    private double _moved;
+
     /// <summary>Builds one at the rate it is about to be handed audio at.</summary>
     /// <param name="sampleRate">What the host is running at.</param>
     /// <param name="id">Which effect this is standing for, or nothing for one built by hand.</param>
     public Sweep(int sampleRate, string? id = null)
     {
         _rate = sampleRate <= 0 ? 44100 : sampleRate;
+        _swinging = new SlowOscillator((int)_rate);
+        _attack = 1.0 / Math.Max(1, AttackMs * 0.001 * _rate);
+        _release = 1.0 / Math.Max(1, ReleaseMs * 0.001 * _rate);
         _loudness = new LoudnessMakeup(sampleRate);
         Id = id ?? "";
     }
@@ -174,6 +248,10 @@ public sealed class Sweep : ISoundEffectEngine
         Even => _even ? 1 : 0,
         Mode => _mode,
         Mix => _mix,
+        Swing => _swing,
+        SwingRate => _swingRate,
+        Follow => _follow,
+        IEffectLevel.Key => _level.Db,
         _ => 0
     };
 
@@ -214,8 +292,24 @@ public sealed class Sweep : ISoundEffectEngine
                 _even = value >= 0.5;
                 break;
 
+            case IEffectLevel.Key:
+                _level.Set(value);
+                break;
+
             case Mix:
                 _mix = (float)Math.Clamp(value, 0, 1);
+                break;
+
+            case Swing:
+                _swing = (float)Math.Clamp(value, 0, MostSwing);
+                break;
+
+            case SwingRate:
+                _swingRate = (float)Math.Clamp(value, LeastSwingRate, MostSwingRate);
+                break;
+
+            case Follow:
+                _follow = (float)Math.Clamp(value, -MostFollow, MostFollow);
                 break;
         }
     }
@@ -258,16 +352,40 @@ public sealed class Sweep : ISoundEffectEngine
         bool first = _filterFirst;
         double makeup = even ? 1 : drive > 1 ? 1.0 / Audio.TangentSwitch.Now.Of(drive) : 1;
         int mode = (int)_mode;
+        double swing = _swing;
+        double speed = _swingRate * Chunk;
+        double follow = _follow;
+        bool moving = swing > 0 || follow != 0;
+
+        if (moving) Tune(_at * Math.Pow(2, _moved));
+        else _moved = 0;
 
         for (int frame = 0; frame < count; frame++)
         {
             int at = frame * 2;
+
+            Heard(buffer[at], buffer[at + 1]);
+
+            if (++_tick >= Chunk)
+            {
+                _tick = 0;
+
+                double swung = _swinging.Step(speed);
+
+                if (moving)
+                {
+                    _moved = (swing * swung) + (follow * _loud);
+                    Tune(_at * Math.Pow(2, _moved));
+                }
+            }
 
             if (even) makeup = _loudness.Makeup;
 
             buffer[at] = (float)One(buffer[at], 0, drive, makeup, mode, mix, first, even);
             buffer[at + 1] = (float)One(buffer[at + 1], 2, drive, makeup, mode, mix, first, even);
         }
+
+        _level.Apply(buffer, count);
     }
 
     /// <summary>
@@ -322,6 +440,23 @@ public sealed class Sweep : ISoundEffectEngine
         return _poles[side + 1].Run(first, _a1, _a2, _a3, _k, mode >= 1);
     }
 
+    /// <summary>Follows how loud the track is, from the louder of its two sides.</summary>
+    /// <remarks>
+    /// Kept whether or not follow is turned, so turning it up starts from how loud the track
+    /// really is rather than from silence. A sample that is not a number is passed over, or one
+    /// would leave the cutoff nowhere for the rest of the session.
+    /// </remarks>
+    /// <param name="left">The left sample as it arrived.</param>
+    /// <param name="right">The right.</param>
+    private void Heard(double left, double right)
+    {
+        double level = Math.Max(Math.Abs(left), Math.Abs(right));
+
+        if (!double.IsFinite(level)) return;
+
+        _loud += (Math.Min(level, 1) - _loud) * (level > _loud ? _attack : _release);
+    }
+
     /// <summary>The curve, and the follower that measures what it cost.</summary>
     /// <remarks>
     /// The follower is fed with the curve's own two ends rather than with the effect's, so it
@@ -365,7 +500,14 @@ public sealed class Sweep : ISoundEffectEngine
         if (Math.Abs(_at - target) <= Close) _at = target;
         else _at *= Math.Pow(ratio, Glide);
 
-        double cutoff = Math.Clamp(_at, LeastHz, Math.Min(MostHz, _rate * 0.49));
+        Tune(_at);
+    }
+
+    /// <summary>Works the coefficients and the damping out for a filter turning over there.</summary>
+    /// <param name="hertz">Where it turns over, held to what the filter and the rate allow.</param>
+    private void Tune(double hertz)
+    {
+        double cutoff = Math.Clamp(hertz, LeastHz, Math.Min(MostHz, _rate * 0.49));
 
         double g = Math.Tan(Math.PI * cutoff / _rate);
 

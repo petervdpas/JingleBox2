@@ -1,0 +1,15 @@
+{
+  "Name": "Wobble",
+  "Effect": "effect.sweeper",
+  "cutoff": 500,
+  "resonance": 0.6,
+  "drive": 2.0,
+  "even": 1,
+  "filter_first": 1,
+  "mode": 0,
+  "mix": 1.0,
+  "swing": 2.0,
+  "swing_rate": 2.0,
+  "follow": 0.0,
+  "level": 0
+}

@@ -4,5 +4,9 @@
   "time": 38,
   "feedback": 0.05,
   "damp": 0.15,
-  "mix": 0.42
+  "mix": 0.42,
+  "ping": 0,
+  "wow": 0.0,
+  "grit": 0.0,
+  "level": 0.0
 }

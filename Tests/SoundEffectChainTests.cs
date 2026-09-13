@@ -158,7 +158,7 @@ public class SoundEffectChainTests
         var engine = new SoundEffectEngines().Make(SoundEffectEngines.EchoBox, Rate, Block)!;
 
         Assert.Equal(
-            new[] { Delay.Damp, Delay.Feedback, Delay.Mix, Delay.Time },
+            new[] { Delay.Damp, Delay.Feedback, Delay.Grit, IEffectLevel.Key, Delay.Mix, Delay.Ping, Delay.Time, Delay.Wow },
             engine.Keys.OrderBy(one => one, System.StringComparer.Ordinal).ToArray());
     }
 }

@@ -29,6 +29,21 @@ synthesiser does to one voice, done to a whole track.
 - **Mix** is how much of what you hear is filtered rather than what went in. Below one you are
   blending the filtered signal with the original, which is a way to take the top off something
   without losing its body.
+- **Level** is how loud the whole thing comes back, in decibels. Taking the top or the bottom off
+  takes level with it, and a resonant peak adds some; this evens that out without touching the
+  fader.
+
+Under **Movement** are three controls that move the cutoff on their own, in octaves either side of
+wherever the cutoff knob has put it. All three start still, so a filter set up before they existed
+sounds exactly as it did.
+
+- **Swing** is how many octaves a slow wave moves the cutoff up and down by, up to four.
+- **Speed** is how fast the swing goes, from once every twenty seconds to ten times a second. Under
+  one is a sweep; a few a second is a wobble.
+- **Follow** is how far the track's own loudness moves the cutoff. Up, a note hit hard opens the
+  filter and it closes again as the note dies, which is an auto-wah and wants Band with the
+  resonance up. Below nought a loud note closes the filter instead, which ducks the top out of
+  every hit.
 
 ## Working with it
 
@@ -41,7 +56,9 @@ rather than set. Ctrl+Shift+M with the pointer on the knob, then touch the contr
 
 ## What ships with it
 
-Six presets: **Open**, which is the effect out of the way, **Telephone**, a narrow band,
+Nine presets: **Open**, which is the effect out of the way, **Telephone**, a narrow band,
 **Under Water**, a low pass with the ring up, **Take The Mud**, a high pass that clears the
-bottom of a part, **Sing**, resonance well up and ready to be swept, and **Nightclub**, which is
-what a track sounds like through a wall.
+bottom of a part, **Sing**, resonance well up and ready to be swept, **Nightclub**, which is
+what a track sounds like through a wall, **Auto Wah**, a band that opens with every hit,
+**Wobble**, a driven low pass swinging twice a second, and **Slow Tide**, a sweep that takes ten
+seconds to go round.

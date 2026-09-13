@@ -1,0 +1,12 @@
+{
+  "Name": "Worn Tape",
+  "Effect": "effect.echobox",
+  "time": 280,
+  "feedback": 0.6,
+  "damp": 0.5,
+  "mix": 0.35,
+  "ping": 0,
+  "wow": 0.6,
+  "grit": 0.5,
+  "level": 0
+}

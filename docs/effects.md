@@ -1,8 +1,10 @@
 # Effects of our own
 
-Decided on 2026-09-02, and built since. Six effects of ours ship: **EchoBox** the delay,
+Decided on 2026-09-02, and built since. Seven effects of ours ship: **EchoBox** the delay,
 **Sweeper** the filter, **Roaster** the drive, **Shifter** the pitch shifter, **Ringer** the
-ring modulator and **Widener** the stereo widener, with six presets apiece and seven on Widener,
+ring modulator, **Widener** the stereo widener and **Phaser** the phaser, with between six and
+nine presets apiece, and a **Level** knob on every one of them that is the same knob on each
+(`IEffectLevel`),
 and each is on the rack's Effects tab, on a track's chain, on the master and on a pad. They are registered, imported and thrown out by the same rules
 a machine is, laid out in the same designer, and pointed at by the same links. The rest of this
 file is the design that got there, and the list at the foot says what is still unwritten.
@@ -311,13 +313,25 @@ bottom of the knob is for.
    shape again: an engine, a face, an id a chain writes down, and nothing anywhere had to be
    widened to take it.
 
-8. **The other three engines.** Reverb, EQ and the compressor.
+8. **And one more. Done.** Phaser, a row of swept all-pass stages added back to the signal.
+   `Tests/PhaseTests.cs` measures the one thing about it that can be worked out on paper: held
+   still, a tone where four stages turn half a turn is cancelled and a tone where they turn a
+   whole turn comes through whole.
+
+9. **Character on the six that were there. Done.** Each got controls that make it more than its
+   plain arithmetic, and every one of them starts at a setting that leaves the effect exactly as it
+   was: EchoBox's ping-pong, wow and grit, Sweeper's swing and follow, Roaster's three curves,
+   Shifter's apart and feedback, Ringer's swing, and Widener's mono bass. A slow sine is written
+   once, `ISlowOscillator`, since four of them move a knob with one. `Tests/EffectCharacterTests.cs`
+   asks each control whether it does the one thing it says.
+
+10. **The other three engines.** Reverb, EQ and the compressor.
 
 ## Still open
 
 - **What they are called.** A machine is not called Sampler, it is called Zampler, and a pedal
-  wants the same treatment. Six are named: EchoBox, Sweeper, Roaster, Shifter, Ringer and
-  Widener. The names are the
+  wants the same treatment. Seven are named: EchoBox, Sweeper, Roaster, Shifter, Ringer,
+  Widener and Phaser. The names are the
   manifest's business and are somebody's to edit; the ids under them are not, since a chain
   writes those down.
 - Nothing about where the designer lives: both worlds are tabs inside DESIGNER, which is the one

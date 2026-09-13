@@ -1419,8 +1419,9 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   holds what was found for the run, and the rack's Effects tab is that list. `ISoundEffectEngines`
   is the gate, and its table was empty for exactly as long as there were no engines: an effect
   that could be had and makes no sound is the device this codebase refuses to put on a rack, so the
-  first entry arrived with the engine that does the work rather than before it. Six are in it now,
-  the delay, the filter, the drive, the pitch shifter, the ring modulator and the widener, keyed
+  first entry arrived with the engine that does the work rather than before it. Seven are in it now,
+  the delay, the filter, the drive, the pitch shifter, the ring modulator, the widener and the
+  phaser, keyed
   by the **engine** rather than by the effect's id, which is what
   lets any number of effects name one. There is deliberately no enum of effect engines with
   numbers in it, unlike `TrackerInstrumentKind`: a song says which engine an instrument is on, and
@@ -1514,9 +1515,9 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   passed over. What the two share is the drawing, which is why the panel types stopped being
   named for machines. An effect in use is a slot on a track's chain and takes no name of its own,
   the way two of the same plugin on one track already read. `docs/effects.md` is the design, the
-  rename, the engines and the order they are built in. Six are written: the delay is EchoBox,
+  rename, the engines and the order they are built in. Seven are written: the delay is EchoBox,
   the filter is Sweeper, the drive is Roaster, the pitch shifter is Shifter, the ring
-  modulator is Ringer and the stereo widener is Widener. Reverb, EQ and the compressor are not. **The list of six that document
+  modulator is Ringer, the stereo widener is Widener and the phaser is Phaser. Reverb, EQ and the compressor are not. **The list of six that document
   opens with was a plan and not a bound**, which the last two say out loud: they were asked for,
   they are an engine and a face like the other three, and nothing anywhere had to be widened to
   take them

@@ -1,0 +1,12 @@
+{
+  "Name": "Jet",
+  "Effect": "effect.phaser",
+  "rate": 0.08,
+  "depth": 1,
+  "centre": 1200,
+  "feedback": 0.8,
+  "stages": 3,
+  "spread": 90,
+  "mix": 0.5,
+  "level": 0.0
+}

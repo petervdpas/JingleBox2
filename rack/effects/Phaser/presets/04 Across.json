@@ -1,0 +1,12 @@
+{
+  "Name": "Across",
+  "Effect": "effect.phaser",
+  "rate": 0.3,
+  "depth": 0.8,
+  "centre": 700,
+  "feedback": 0.5,
+  "stages": 2,
+  "spread": 180,
+  "mix": 0.5,
+  "level": 0.0
+}

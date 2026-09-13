@@ -1,0 +1,248 @@
+{
+  "Id": "effect.phaser",
+  "Name": "Phaser",
+  "Summary": "A phaser. Notches swept up and down through the sound, and across the room.",
+  "Author": "Peter van de Pas",
+  "Version": "1.0",
+  "Engine": "phase",
+  "Theme": {
+    "Accent": "#D4B03A",
+    "Face": 0.68,
+    "Panel": 0.52,
+    "Edge": 0.1,
+    "Mark": 0.35,
+    "Row": 0.18,
+    "RowOver": 0.3,
+    "RowPicked": 0.58
+  },
+  "Parameters": [
+    {
+      "Key": "rate",
+      "Name": "Rate",
+      "Unit": "Hz",
+      "Min": 0.02,
+      "Max": 10,
+      "Default": 0.5,
+      "Step": 0.01
+    },
+    {
+      "Key": "depth",
+      "Name": "Depth",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0.7,
+      "Step": 0.01
+    },
+    {
+      "Key": "centre",
+      "Name": "Centre",
+      "Unit": "Hz",
+      "Min": 100,
+      "Max": 4000,
+      "Default": 800,
+      "Step": 1
+    },
+    {
+      "Key": "feedback",
+      "Name": "Feedback",
+      "Unit": "",
+      "Min": -0.9,
+      "Max": 0.9,
+      "Default": 0.3,
+      "Step": 0.01
+    },
+    {
+      "Key": "stages",
+      "Name": "Stages",
+      "Unit": "",
+      "Min": 0,
+      "Max": 3,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "spread",
+      "Name": "Spread",
+      "Unit": "°",
+      "Min": 0,
+      "Max": 180,
+      "Default": 60,
+      "Step": 1
+    },
+    {
+      "Key": "mix",
+      "Name": "Mix",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0.5,
+      "Step": 0.01
+    },
+    {
+      "Key": "level",
+      "Name": "Level",
+      "Unit": "dB",
+      "Min": -24,
+      "Max": 12,
+      "Default": 0,
+      "Step": 0.1
+    }
+  ],
+  "Panel": {
+    "Root": {
+      "Element": "Column",
+      "Parameter": "",
+      "Label": "",
+      "Properties": {
+        "gap": "10",
+        "align": "stretch"
+      },
+      "Children": [
+        {
+          "Element": "Menu",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "corner": "topRight"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Label",
+          "Parameter": "",
+          "Label": "Phaser",
+          "Properties": {
+            "style": "section"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Preset",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {},
+          "Children": []
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Phase"
+          },
+          "Children": [
+            {
+              "Element": "Strip",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "cell": "26",
+                "gap": "6",
+                "columns": "3 3 3 3 4 3 3 3"
+              },
+              "Children": [
+                {
+                  "Element": "Knob",
+                  "Parameter": "rate",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How fast the notches sweep up and down. Slow is a jet going over; past a few a second it is a warble."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "depth",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How far they sweep, up to two octaves either side of the centre. Nought holds them still, which is a fixed comb on the sound."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "centre",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "Where the sweep is centred. Low works on the body of a sound, high on its air."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "feedback",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How much of what comes out goes back in. Up sharpens the notches and puts peaks between them; below nought puts the peaks where the notches were. It is paid for, so it does not get louder."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Choice",
+                  "Parameter": "stages",
+                  "Label": "",
+                  "Properties": {
+                    "span": "4",
+                    "options": "4 stages,6 stages,8 stages,12 stages",
+                    "width": "100",
+                    "tip": "How many stages the sound goes through. Four makes two notches, which is the classic pedal; twelve makes six, which is thicker and more like a flanger."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "spread",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How far apart the two sides are in the sweep. Nought is mono; a hundred and eighty has the notches going up on one side while they come down on the other."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "mix",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How much of what you hear has been through the stages. A half is where the notches are deepest."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "level",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How loud the effect hands the track back. It is the last thing the sound goes through, so it evens out what the effect did to the level without moving the track's fader."
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -28,6 +28,15 @@ namespace JingleBox2.SoundDevices.SoundEffects;
 /// frame past the end: it took an eight thousand frame block to find, and it is the sort of thing
 /// that shows up as a crash on somebody else's buffer size.
 ///
+/// **Three things make it a machine rather than a line, and each is off until it is turned.**
+/// Ping-pong feeds the two sides into each other, so a repeat lands on one side and the next on
+/// the other. Wow is a tape transport that does not quite hold speed: the read wanders a little
+/// either way, slowly with a faster flutter on top, and a repeat comes back a few cents out and
+/// moving. Grit bends what goes back in through the same curve the drives use, so a loud repeat is
+/// squashed a little more on every pass while a quiet one is left alone, which is what stops a
+/// long feedback running away and gives it the sound of a worn head. At nought, all three leave
+/// the arithmetic exactly as it is without them.
+///
 /// Nothing here allocates, takes a lock or blocks, which is what <see cref="ISoundEffectEngine"/>
 /// asks of anything on the audio path. The line is made once, at the longest time the effect
 /// offers.
@@ -49,6 +58,35 @@ public sealed class Delay : ISoundEffectEngine
 
     /// <summary>How much of the top each repeat loses.</summary>
     public const string Damp = "damp";
+
+    /// <summary>Whether the repeats cross from one side to the other, nought or one.</summary>
+    public const string Ping = "ping";
+
+    /// <summary>How much the tape wanders, nought to one.</summary>
+    public const string Wow = "wow";
+
+    /// <summary>How hard what goes back in is bent, nought to one.</summary>
+    public const string Grit = "grit";
+
+    /// <summary>How far the read wanders either way at full wow, in milliseconds, and how fast.</summary>
+    /// <remarks>
+    /// A slow wander and a quick flutter, which is the pair a real transport has: the capstan is
+    /// slightly out of round and the tape itself shivers. Fixed rather than knobs, since what
+    /// somebody is choosing is how worn the machine is.
+    /// </remarks>
+    public const double WowMs = 3;
+
+    /// <inheritdoc cref="WowMs"/>
+    public const double WowHz = 0.6;
+
+    /// <inheritdoc cref="WowMs"/>
+    public const double FlutterMs = 0.15;
+
+    /// <inheritdoc cref="WowMs"/>
+    public const double FlutterHz = 5.5;
+
+    /// <summary>How much harder than it arrives what goes back in is pushed at full grit.</summary>
+    public const double GritDrive = 4;
 
     /// <summary>The shortest repeat, under which it stops being a delay and starts being a tone.</summary>
     public const double LeastMs = 10;
@@ -122,6 +160,24 @@ public sealed class Delay : ISoundEffectEngine
     /// <inheritdoc cref="_feedback"/>
     private float _damp = (float)DampThen;
 
+    /// <summary>The volume the block is handed back at, the last thing it goes through.</summary>
+    private readonly IEffectLevel _level = new EffectLevel();
+
+    /// <inheritdoc cref="_feedback"/>
+    private float _ping;
+
+    /// <inheritdoc cref="_feedback"/>
+    private float _wow;
+
+    /// <inheritdoc cref="_feedback"/>
+    private float _grit;
+
+    /// <summary>The slow wander of the tape.</summary>
+    private readonly ISlowOscillator _wander;
+
+    /// <summary>And the quick shiver on top of it.</summary>
+    private readonly ISlowOscillator _flutter;
+
     /// <summary>True once a block has been worked on, which is what makes the time glide.</summary>
     private volatile bool _running;
 
@@ -144,6 +200,8 @@ public sealed class Delay : ISoundEffectEngine
         _line = new float[_room * 2];
         _now = Frames(TimeThen);
         _glide = 1.0 / Math.Max(1, GlideMs * 0.001 * _rate);
+        _wander = new SlowOscillator((int)_rate);
+        _flutter = new SlowOscillator((int)_rate);
     }
 
     /// <inheritdoc/>
@@ -151,7 +209,7 @@ public sealed class Delay : ISoundEffectEngine
 
     /// <inheritdoc/>
     public System.Collections.Generic.IReadOnlyList<string> Keys { get; } =
-        new[] { Time, Feedback, Damp, Mix };
+        new[] { Time, Feedback, Damp, Mix, Ping, Wow, Grit, IEffectLevel.Key };
 
     /// <summary>That many milliseconds as frames, held inside the line.</summary>
     /// <param name="ms">The time in milliseconds.</param>
@@ -164,6 +222,10 @@ public sealed class Delay : ISoundEffectEngine
         Feedback => _feedback,
         Mix => _mix,
         Damp => _damp,
+        Ping => _ping,
+        Wow => _wow,
+        Grit => _grit,
+        IEffectLevel.Key => _level.Db,
         _ => 0
     };
 
@@ -187,8 +249,24 @@ public sealed class Delay : ISoundEffectEngine
                 _mix = (float)Math.Clamp(value, 0, 1);
                 break;
 
+            case IEffectLevel.Key:
+                _level.Set(value);
+                break;
+
             case Damp:
                 _damp = (float)Math.Clamp(value, 0, 1);
+                break;
+
+            case Ping:
+                _ping = value >= 0.5 ? 1 : 0;
+                break;
+
+            case Wow:
+                _wow = (float)Math.Clamp(value, 0, 1);
+                break;
+
+            case Grit:
+                _grit = (float)Math.Clamp(value, 0, 1);
                 break;
         }
     }
@@ -198,6 +276,11 @@ public sealed class Delay : ISoundEffectEngine
     /// The block is held to what the buffer can really take and rounded down to whole frames,
     /// because a count that is a promise rather than a measurement is how this application has
     /// crashed on the audio thread before. Nothing is asked of the caller beyond a buffer.
+    ///
+    /// Across the sides, what arrives goes into the left line as one, the left's repeat goes into
+    /// the right line and the right's back into the left: the first repeat is heard on the left
+    /// and the next on the right. The two oscillators under the wow are stepped whether or not it
+    /// is turned, so turning it up starts the wander from where it has got to.
     /// </remarks>
     public void Process(float[] buffer, int frames)
     {
@@ -213,12 +296,21 @@ public sealed class Delay : ISoundEffectEngine
         double feedback = _feedback;
         double mix = _mix;
         double keep = 1 - _damp * 0.9;
+        bool ping = _ping >= 0.5f;
+        double wander = _wow * WowMs * 0.001 * _rate;
+        double flutter = _wow * FlutterMs * 0.001 * _rate;
+        double grit = 1 + (_grit * GritDrive);
 
         for (int at = 0; at < block; at++)
         {
             _now += (target - _now) * _glide;
 
-            double back = Math.Clamp(_now, 1, _room - 2);
+            double wandering = _wander.Step(WowHz);
+            double shivering = _flutter.Step(FlutterHz);
+
+            double back = wander > 0
+                ? Math.Clamp(_now + (wandering * wander) + (shivering * flutter), 1, _room - 2)
+                : Math.Clamp(_now, 1, _room - 2);
             double from = _write - back;
 
             if (from < 0) from += _room;
@@ -238,13 +330,37 @@ public sealed class Delay : ISoundEffectEngine
             float wasLeft = buffer[at * 2];
             float wasRight = buffer[at * 2 + 1];
 
-            _line[_write * 2] = (float)(wasLeft + _dampedLeft * feedback);
-            _line[_write * 2 + 1] = (float)(wasRight + _dampedRight * feedback);
+            double backLeft = Returned(_dampedLeft * feedback, grit);
+            double backRight = Returned(_dampedRight * feedback, grit);
+
+            if (ping)
+            {
+                _line[_write * 2] = (float)(((wasLeft + wasRight) * 0.5) + backRight);
+                _line[_write * 2 + 1] = (float)backLeft;
+            }
+            else
+            {
+                _line[_write * 2] = (float)(wasLeft + backLeft);
+                _line[_write * 2 + 1] = (float)(wasRight + backRight);
+            }
 
             _write = _write + 1 >= _room ? 0 : _write + 1;
 
             buffer[at * 2] = (float)(wasLeft * (1 - mix) + _dampedLeft * mix);
             buffer[at * 2 + 1] = (float)(wasRight * (1 - mix) + _dampedRight * mix);
         }
+
+        _level.Apply(buffer, block);
     }
+
+    /// <summary>What goes back into the line, bent where there is grit and untouched where there is none.</summary>
+    /// <remarks>
+    /// Pushed harder into the curve and brought back down by the same amount, so a quiet repeat
+    /// goes back in at the level it would have without grit and only a loud one is squashed. The
+    /// curve never answers more than it is handed, so grit cannot make a feedback grow.
+    /// </remarks>
+    /// <param name="sample">The repeat, already scaled by the feedback.</param>
+    /// <param name="grit">How much harder it is pushed, one for not at all.</param>
+    private static double Returned(double sample, double grit) =>
+        grit <= 1 ? sample : Audio.TangentSwitch.Now.Of(sample * grit) / grit;
 }

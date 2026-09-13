@@ -30,6 +30,7 @@ public sealed class SoundEffectEngines : ISoundEffectEngines
             [Shifted] = (id, rate, _) => new Shift(rate, id),
             [Ringed] = (id, rate, _) => new Ring(rate, id),
             [Widened] = (id, rate, _) => new Widen(rate, id),
+            [Phased] = (id, rate, _) => new Phase(rate, id),
         };
 
     /// <summary>
@@ -61,6 +62,10 @@ public sealed class SoundEffectEngines : ISoundEffectEngines
     /// <inheritdoc cref="EchoBox"/>
     public const string Widener = "effect.widener";
 
+    /// <summary>Phaser, which sweeps notches through a sound.</summary>
+    /// <remarks><inheritdoc cref="EchoBox" path="/remarks"/></remarks>
+    public const string Phaser = "effect.phaser";
+
     /// <summary>A delay line, which is what EchoBox is a face over.</summary>
     /// <remarks>
     /// An engine name and not an effect id. It is written into the application because the class
@@ -87,6 +92,10 @@ public sealed class SoundEffectEngines : ISoundEffectEngines
 
     /// <inheritdoc cref="Delayed"/>
     public const string Widened = "widen";
+
+    /// <summary>A row of swept all-pass stages, which is what Phaser is a face over.</summary>
+    /// <remarks><inheritdoc cref="Delayed" path="/remarks"/></remarks>
+    public const string Phased = "phase";
 
     /// <summary>What this run has registered, for turning an id into an engine.</summary>
     /// <remarks>

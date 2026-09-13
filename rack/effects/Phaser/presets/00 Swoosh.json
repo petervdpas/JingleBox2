@@ -1,0 +1,12 @@
+{
+  "Name": "Swoosh",
+  "Effect": "effect.phaser",
+  "rate": 0.5,
+  "depth": 0.7,
+  "centre": 800,
+  "feedback": 0.3,
+  "stages": 0,
+  "spread": 60,
+  "mix": 0.5,
+  "level": 0.0
+}

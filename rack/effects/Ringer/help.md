@@ -24,6 +24,17 @@ recognises as a robot.
   it, so what gets stepped is the sound you are keeping.
 - **Mix** is how much of what you hear has been modulated. Kept back, the words come back through
   the machine.
+- **Level** is how loud the whole thing comes back, in decibels. Taking the pitch away takes
+  some of the level with it, and this puts it back without touching the fader.
+- **Swing** moves the carrier up and down on a slow wave, up to three octaves either way. It starts
+  at nought, so a robot set up before it existed sounds exactly as it did. Slow and deep is a
+  siren; fast and shallow is a machine gargling.
+- **Speed** is how fast the swing goes, from once every twenty seconds to eight times a second.
+
+## What ships with it
+
+Eight presets: **Robot**, **Machine**, **Telephone**, **Tremolo**, **Wide** and **Breaking**, then
+**Siren**, a slow deep swing, and **Laser**, a square carrier swinging fast.
 
 ## Not a vocoder
 

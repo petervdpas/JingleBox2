@@ -1,0 +1,12 @@
+{
+  "Name": "Siren",
+  "Effect": "effect.ringer",
+  "carrier": 300,
+  "square": 0,
+  "spread": 0,
+  "crush": 0.0,
+  "mix": 1.0,
+  "swing": 1.5,
+  "swing_rate": 0.4,
+  "level": 0
+}

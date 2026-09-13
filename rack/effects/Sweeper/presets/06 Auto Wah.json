@@ -1,0 +1,15 @@
+{
+  "Name": "Auto Wah",
+  "Effect": "effect.sweeper",
+  "cutoff": 350,
+  "resonance": 0.75,
+  "drive": 1.5,
+  "even": 0,
+  "filter_first": 1,
+  "mode": 1,
+  "mix": 1.0,
+  "swing": 0.0,
+  "swing_rate": 1.0,
+  "follow": 3.0,
+  "level": 0
+}

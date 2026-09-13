@@ -1,0 +1,11 @@
+{
+  "Name": "Shimmer",
+  "Effect": "effect.shifter",
+  "steps": 12,
+  "cents": 0,
+  "window": 80,
+  "mix": 0.35,
+  "detune": 6,
+  "feedback": 0.6,
+  "level": 0
+}

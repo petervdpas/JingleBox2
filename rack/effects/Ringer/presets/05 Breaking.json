@@ -5,5 +5,8 @@
   "square": 1,
   "spread": 8,
   "crush": 0.8,
-  "mix": 1.0
+  "mix": 1.0,
+  "swing": 0.0,
+  "swing_rate": 0.5,
+  "level": 0.0
 }

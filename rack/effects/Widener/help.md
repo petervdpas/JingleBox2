@@ -52,8 +52,18 @@ if you turn it on, listen to the result folded down to mono before you keep it.
 side without the delay is the one the ear hears first, so a delay on the right leans the sound to
 the left.
 
+**Mono bass** puts everything under the frequency it names back in the middle, so a kick and a
+bass line stay dead centre while everything above them opens. Low end spread across two speakers
+disappears on a club system and cannot be cut to vinyl, which is why every mastering widener has
+this. At nought nothing is kept in the middle, which is where a fresh one starts. It is also the one
+control here that narrows: below its frequency it takes out the side that arrived as well as the
+side that was made.
+
 **Mix** is how much of what you hear has been opened. What it puts back is the signal exactly as
 it arrived, so this is the one control here that makes the picture narrower again.
+
+**Level** is how loud the whole thing comes back, in decibels, and it is the answer to the section
+below: opening a sound raises its peak, and this brings it down again without touching the fader.
 
 ## What it costs
 
@@ -66,9 +76,9 @@ knowing before you put one on a master, and it is the reason a fresh one sits at
 
 ## What it will not do
 
-It will not make a stereo recording narrower. Every knob adds difference and the side that arrived
-is carried through untouched, so a signal that already had a picture keeps it and is opened
-further. Narrowing is the same arithmetic with the side scaled down, and it is a different effect.
+It will not make a stereo recording narrower above the mono bass. Every other knob adds difference
+and the side that arrived is carried through untouched, so a signal that already had a picture
+keeps it and is opened further. Narrowing is the same arithmetic with the side scaled down, and it is a different effect.
 
 It will not turn one sound into two. There is nothing here that invents a second performance: what
 comes out is the same sound arriving at two slightly different moments, which is what width

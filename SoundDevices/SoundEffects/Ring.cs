@@ -31,8 +31,14 @@ namespace JingleBox2.SoundDevices.SoundEffects;
 /// does with the bits it has not got. It is after the modulation rather than before it, so what
 /// gets stepped is the sound you are keeping.
 ///
+/// **The carrier can wander, and it is off until it is turned.** Swing moves the carrier up and
+/// down by as many octaves as the knob says, on a slow sine at the rate beside it: slow and deep
+/// is a siren, fast and shallow is a machine gargling. The carrier is added up sample by sample
+/// rather than read off a clock, so a carrier that moves never jumps, it only goes faster or
+/// slower from where it is.
+///
 /// Nothing here allocates, takes a lock or blocks. There is no line and no memory beyond where
-/// the two carriers have got to.
+/// the two carriers and the swing have got to.
 /// </remarks>
 public sealed class Ring : ISoundEffectEngine
 {
@@ -52,6 +58,21 @@ public sealed class Ring : ISoundEffectEngine
     /// middle of the head and one standing across the room. Nought is one carrier and dead centre.
     /// </remarks>
     public const string Spread = "spread";
+
+    /// <summary>How many octaves a slow sine moves the carrier up and down by.</summary>
+    public const string Swing = "swing";
+
+    /// <summary>How fast that sine goes, in turns a second.</summary>
+    public const string SwingRate = "swing_rate";
+
+    /// <summary>The furthest the swing reaches either way, in octaves.</summary>
+    public const double MostSwing = 3;
+
+    /// <summary>The slowest swing and the fastest.</summary>
+    public const double LeastSwingRate = 0.05;
+
+    /// <inheritdoc cref="LeastSwingRate"/>
+    public const double MostSwingRate = 8;
 
     /// <summary>How many bits are taken away afterwards.</summary>
     public const string Crush = "crush";
@@ -115,6 +136,18 @@ public sealed class Ring : ISoundEffectEngine
     /// <inheritdoc cref="_carrier"/>
     private float _mix = (float)MixThen;
 
+    /// <summary>The volume the block is handed back at, the last thing it goes through.</summary>
+    private readonly IEffectLevel _level = new EffectLevel();
+
+    /// <inheritdoc cref="_carrier"/>
+    private float _swing;
+
+    /// <inheritdoc cref="_carrier"/>
+    private float _swingRate = 0.5f;
+
+    /// <summary>The slow sine the swing reads.</summary>
+    private readonly ISlowOscillator _swinging;
+
     /// <summary>Takes the rate the mix runs at.</summary>
     /// <param name="sampleRate">What the mix is running at.</param>
     /// <param name="id">Which effect this one is standing for, or nothing outside the application.</param>
@@ -123,6 +156,7 @@ public sealed class Ring : ISoundEffectEngine
         Id = id ?? "";
 
         _rate = sampleRate > 0 ? sampleRate : 48000;
+        _swinging = new SlowOscillator((int)_rate);
     }
 
     /// <inheritdoc/>
@@ -130,7 +164,7 @@ public sealed class Ring : ISoundEffectEngine
 
     /// <inheritdoc/>
     public System.Collections.Generic.IReadOnlyList<string> Keys { get; } =
-        new[] { Carrier, Square, Spread, Crush, Mix };
+        new[] { Carrier, Square, Spread, Crush, Mix, Swing, SwingRate, IEffectLevel.Key };
 
     /// <inheritdoc/>
     public double ValueOf(string? key) => key switch
@@ -140,6 +174,9 @@ public sealed class Ring : ISoundEffectEngine
         Spread => _spread,
         Crush => _crush,
         Mix => _mix,
+        Swing => _swing,
+        SwingRate => _swingRate,
+        IEffectLevel.Key => _level.Db,
         _ => 0
     };
 
@@ -166,8 +203,20 @@ public sealed class Ring : ISoundEffectEngine
                 _crush = (float)Math.Clamp(value, 0, 1);
                 break;
 
+            case IEffectLevel.Key:
+                _level.Set(value);
+                break;
+
             case Mix:
                 _mix = (float)Math.Clamp(value, 0, 1);
+                break;
+
+            case Swing:
+                _swing = (float)Math.Clamp(value, 0, MostSwing);
+                break;
+
+            case SwingRate:
+                _swingRate = (float)Math.Clamp(value, LeastSwingRate, MostSwingRate);
                 break;
         }
     }
@@ -204,9 +253,22 @@ public sealed class Ring : ISoundEffectEngine
         double stepLeft = 2 * Math.PI * Math.Max(0, _carrier - half) / _rate;
         double stepRight = 2 * Math.PI * Math.Max(0, _carrier + half) / _rate;
         double levels = _crush <= 0 ? 0 : Math.Pow(2, (16 - (Bits * _crush)) - 1);
+        double swing = _swing;
+        double speed = _swingRate;
+        double carrier = _carrier;
 
         for (int at = 0; at < block; at++)
         {
+            double swung = _swinging.Step(speed);
+
+            if (swing > 0)
+            {
+                double moved = carrier * Math.Pow(2, swing * swung);
+
+                stepLeft = 2 * Math.PI * Math.Max(0, moved - half) / _rate;
+                stepRight = 2 * Math.PI * Math.Max(0, moved + half) / _rate;
+            }
+
             _left += stepLeft;
             _right += stepRight;
 
@@ -223,5 +285,7 @@ public sealed class Ring : ISoundEffectEngine
             buffer[at * 2] = (float)((wasLeft * (1 - mix)) + (left * mix));
             buffer[(at * 2) + 1] = (float)((wasRight * (1 - mix)) + (right * mix));
         }
+
+        _level.Apply(buffer, block);
     }
 }

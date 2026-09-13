@@ -7,5 +7,9 @@
   "even": 0,
   "filter_first": 0,
   "mode": 1,
-  "mix": 1.0
+  "mix": 1.0,
+  "swing": 0.0,
+  "swing_rate": 1.0,
+  "follow": 0.0,
+  "level": 0.0
 }

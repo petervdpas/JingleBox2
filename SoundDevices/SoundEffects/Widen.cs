@@ -67,6 +67,13 @@ namespace JingleBox2.SoundDevices.SoundEffects;
 /// effect; this one is about a source with no side signal at all, which is the case this
 /// application actually has.
 ///
+/// **Bass can be kept in the middle, and nothing is kept there until the knob is turned.** Below
+/// the frequency it names, whatever side signal there is on the way out is taken away again, so a
+/// kick and a bass line stay dead centre while everything above them opens. A low end spread
+/// across two speakers is heard as no low end on a club system and cut unevenly by every vinyl
+/// lathe ever made, which is why every mastering widener has this. Two poles, so the handover is
+/// twelve decibels an octave rather than a vague lean.
+///
 /// Nothing here allocates, takes a lock or blocks. The line is made once, at the longest either
 /// delay can be asked for.
 /// </remarks>
@@ -101,6 +108,12 @@ public sealed class Widen : ISoundEffectEngine
 
     /// <summary>How much of what comes out has been opened.</summary>
     public const string Mix = "mix";
+
+    /// <summary>Under what frequency the sound is put back in the middle, in hertz, or nought for nowhere.</summary>
+    public const string Bass = "bass";
+
+    /// <summary>The highest the bass can be kept in the middle up to.</summary>
+    public const double MostBass = 400;
 
     /// <summary>
     /// How much side signal a width of one makes, against the middle.
@@ -206,6 +219,23 @@ public sealed class Widen : ISoundEffectEngine
     /// <inheritdoc cref="_width"/>
     private float _mix = (float)MixThen;
 
+    /// <summary>The volume the block is handed back at, the last thing it goes through.</summary>
+    private readonly IEffectLevel _level = new EffectLevel();
+
+    /// <inheritdoc cref="_width"/>
+    private float _bass;
+
+    /// <summary>What each of the two poles the side is taken through is holding.</summary>
+    /// <remarks>
+    /// Two high passes one after the other, each what is left of its input once its own low pass
+    /// is taken away, which is where the twelve decibels an octave come from. One low pass
+    /// subtracted from the side would leave most of it, since the low pass is late as well as quiet.
+    /// </remarks>
+    private double _lowFirst;
+
+    /// <inheritdoc cref="_lowFirst"/>
+    private double _lowSecond;
+
     /// <summary>
     /// Makes the line at the longest either delay can ask for.
     /// </summary>
@@ -230,7 +260,7 @@ public sealed class Widen : ISoundEffectEngine
 
     /// <inheritdoc/>
     public System.Collections.Generic.IReadOnlyList<string> Keys { get; } =
-        new[] { Width, Depth, Rate, Haas, Side, Mix };
+        new[] { Width, Depth, Rate, Haas, Side, Mix, Bass, IEffectLevel.Key };
 
     /// <inheritdoc/>
     public double ValueOf(string? key) => key switch
@@ -241,6 +271,8 @@ public sealed class Widen : ISoundEffectEngine
         Haas => _haas,
         Side => _side,
         Mix => _mix,
+        Bass => _bass,
+        IEffectLevel.Key => _level.Db,
         _ => 0
     };
 
@@ -271,8 +303,16 @@ public sealed class Widen : ISoundEffectEngine
                 _side = (float)Math.Clamp(value, 0, 1);
                 break;
 
+            case IEffectLevel.Key:
+                _level.Set(value);
+                break;
+
             case Mix:
                 _mix = (float)Math.Clamp(value, 0, 1);
+                break;
+
+            case Bass:
+                _bass = (float)Math.Clamp(value, 0, MostBass);
                 break;
         }
     }
@@ -344,6 +384,14 @@ public sealed class Widen : ISoundEffectEngine
         double haas = Frames(_haas);
         double step = 2 * Math.PI * _sweep / _rate;
         bool onLeft = _side >= 0.5f;
+        double bass = _bass;
+        double low = bass > 0 ? 1 - Math.Exp(-2 * Math.PI * bass / _rate) : 0;
+
+        if (bass <= 0)
+        {
+            _lowFirst = 0;
+            _lowSecond = 0;
+        }
 
         for (int at = 0; at < block; at++)
         {
@@ -368,6 +416,27 @@ public sealed class Widen : ISoundEffectEngine
             double left = (onLeft ? late : middle) + side;
             double right = (onLeft ? middle : late) - side;
 
+            if (bass > 0)
+            {
+                double across = (left - right) * 0.5;
+                double centre = (left + right) * 0.5;
+
+                _lowFirst += (across - _lowFirst) * low;
+                across -= _lowFirst;
+
+                _lowSecond += (across - _lowSecond) * low;
+                across -= _lowSecond;
+
+                if (!double.IsFinite(_lowFirst) || !double.IsFinite(_lowSecond))
+                {
+                    _lowFirst = 0;
+                    _lowSecond = 0;
+                }
+
+                left = centre + across;
+                right = centre - across;
+            }
+
             buffer[at * 2] = (float)((wasLeft * (1 - mix)) + (left * mix));
             buffer[(at * 2) + 1] = (float)((wasRight * (1 - mix)) + (right * mix));
 
@@ -375,5 +444,7 @@ public sealed class Widen : ISoundEffectEngine
 
             if (_write >= _room) _write = 0;
         }
+
+        _level.Apply(buffer, block);
     }
 }

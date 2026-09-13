@@ -2,6 +2,7 @@
   "Name": "Desk",
   "Effect": "effect.roaster",
   "amount": 3.5,
+  "shape": 0,
   "even": 0,
   "tilt": 0.35,
   "bias": 0.08,

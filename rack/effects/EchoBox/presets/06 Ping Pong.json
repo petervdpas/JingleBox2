@@ -1,0 +1,12 @@
+{
+  "Name": "Ping Pong",
+  "Effect": "effect.echobox",
+  "time": 375,
+  "feedback": 0.45,
+  "damp": 0.35,
+  "mix": 0.35,
+  "ping": 1,
+  "wow": 0.0,
+  "grit": 0.0,
+  "level": 0
+}
