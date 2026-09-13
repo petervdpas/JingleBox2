@@ -183,7 +183,8 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
         MachineMenu = new SoundDeviceMenu(
             new Midi.ControlMenu(() => MachineId, () => MachineName),
-            () => _machines.For(MachineId));
+            () => _machines.For(MachineId),
+            presets: () => PresetLines);
 
         Named = new InstrumentName(this);
 
@@ -424,6 +425,15 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// one machine are one answer here, as they are everywhere else.
     /// </remarks>
     public IPanelMenu MachineMenu { get; }
+
+    /// <summary>
+    /// The Menu's lines that keep a preset of your own, or nothing where there is no picker.
+    /// </summary>
+    /// <remarks>
+    /// Set by whoever makes the picker, which is made after the editor: the picker is the page's
+    /// and the Menu is the editor's, and keeping a preset needs both.
+    /// </remarks>
+    public IPanelMenu? PresetLines { get; set; }
 
     /// <summary>
     /// Bumped when everything the described panel shows may have moved.

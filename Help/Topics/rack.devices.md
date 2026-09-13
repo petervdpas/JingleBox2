@@ -64,3 +64,16 @@ A device can ship presets, and the picker on its face is where one is chosen. On
 preset is a whole instrument to start from; on an effect it is where each control stands.
 Choosing one moves the face as well as the sound, so what is on the screen is always what you are
 hearing.
+
+**A soundmachine keeps presets of your own.** Its Menu, the three bars in the corner of its face,
+has **Save as preset...**, which asks for a name and keeps what the machine sounds like now. Yours
+come after the machine's own in the picker, marked with a star. A name the machine already uses
+for one of its own is refused; saving under the name of one of yours asks before replacing it.
+**Delete this preset** takes the preset showing off, and is only live when that preset is yours:
+the machine's own come back whenever it is brought up to date, so they cannot be deleted. The
+sound on the instrument stays as it is either way.
+
+Your presets are kept in the machine's own presets folder, beside the ones it ships with. Nothing
+you keep there is touched when a new version of the machine arrives, and your presets travel in
+the machine's zip when it is exported. The machine that starts from your recordings has no presets
+to keep, so the line is grey there.

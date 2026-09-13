@@ -75,15 +75,17 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
     /// defaulted: a fresh one is empty, so a default would draw blank panels and report every
     /// machine missing, without an error anywhere to say why.
     /// </param>
+    /// <param name="library">Where the presets are read from and kept. Left out, each machine's own folder.</param>
     public InstrumentPresets(
         TrackerInstrument instrument,
         Action applied,
         ISoundMachineProjects machines,
         ObservableCollection<Audio.Records.Recording>? takes = null,
-        TakeFilter? narrowing = null)
+        TakeFilter? narrowing = null,
+        IPresetLibrary? library = null)
     {
         _machines = machines;
-        _presets = new SoundMachinePresets(machines);
+        _presets = library ?? new SoundMachinePresets(machines);
         _instrument = instrument;
         _applied = applied;
         _takes = takes;
@@ -205,16 +207,100 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
             OnPropertyChanged(nameof(PicksTakes));
             OnPropertyChanged(nameof(Hint));
             OnPropertyChanged(nameof(Items));
+            OnPropertyChanged(nameof(IPanelPresets.Names));
         }
     }
 
     /// <summary>What is on offer, by name, for a panel that draws its own picker.</summary>
     /// <remarks>
-    /// The same list the hand written picker shows, said as plain strings, because a machine
-    /// described in a file has no way of knowing what a preset object is. Which one is picked
-    /// travels back as a number for the same reason.
+    /// The same list the hand written picker shows, said as plain strings and with yours marked,
+    /// because a machine described in a file has no way of knowing what a preset object is.
+    /// Which one is picked travels back as a number for the same reason.
     /// </remarks>
-    IReadOnlyList<string> IPanelPresets.Names => Items.Select(one => one.Name).ToList();
+    IReadOnlyList<string> IPanelPresets.Names => Items.Select(one => one.Shown).ToList();
+
+    /// <summary>
+    /// Whether what this instrument sounds like can be kept as a preset of yours.
+    /// </summary>
+    /// <remarks>
+    /// Not on the machine whose starting points are your recordings, since what it would keep is
+    /// a take that is already on your shelf; and not on a machine that is not installed here,
+    /// which has no folder to keep one in.
+    /// </remarks>
+    public bool CanKeep => !PicksTakes && _machines.For(_instrument.Machine.SlotId) is not null;
+
+    /// <summary>What the machine is called, for the words around keeping a preset.</summary>
+    public string MachineName => _instrument.Machine.Name;
+
+    /// <summary>
+    /// The name a preset kept now would start with: the preset of yours showing, or the instrument's own.
+    /// </summary>
+    /// <remarks>
+    /// One of yours offers its own name, so keeping again is saving over it, which is the ordinary
+    /// thing after a tweak. One the machine ships with cannot be kept under, so the instrument's
+    /// name is offered instead.
+    /// </remarks>
+    public string Suggested => Selected is { Yours: true } yours ? yours.Name : _instrument.Name;
+
+    /// <summary>The preset of yours that is showing, or nothing when what is showing is not yours.</summary>
+    public SoundMachinePreset? PickedYours => Selected is { Yours: true } yours ? yours : null;
+
+    /// <summary>Why that name cannot be kept under, or nothing when it can.</summary>
+    /// <param name="name">What somebody typed.</param>
+    public string Refusal(string name) =>
+        CanKeep ? _presets.Refusal(_instrument.Machine, name) : "This machine has no presets of its own to keep one beside.";
+
+    /// <summary>Whether keeping under that name would replace a preset of yours.</summary>
+    /// <param name="name">What somebody typed.</param>
+    public bool Replaces(string name) => _presets.Yours(_instrument.Machine, name) is not null;
+
+    /// <summary>
+    /// Keeps what the instrument sounds like now as a preset of yours, and shows it as the one picked.
+    /// </summary>
+    /// <remarks>
+    /// Shown as picked without being put on, since it is exactly what is on already: putting it
+    /// on would only be an undo step that changes nothing.
+    /// </remarks>
+    /// <param name="name">What to call it.</param>
+    /// <returns>Whether it was kept.</returns>
+    public bool Keep(string name)
+    {
+        if (!CanKeep || _presets.Keep(_instrument.Machine, _instrument, name) is not { } kept) return false;
+
+        Refresh();
+        Quietly(kept.File);
+
+        return true;
+    }
+
+    /// <summary>Takes the preset of yours that is showing off the machine.</summary>
+    /// <returns>Whether it was taken off.</returns>
+    public bool RemovePicked()
+    {
+        if (PickedYours is not { } yours || !_presets.Remove(_instrument.Machine, yours)) return false;
+
+        Refresh();
+
+        return true;
+    }
+
+    /// <summary>Shows the preset read from that file as the one picked, without putting it on.</summary>
+    /// <param name="file">The file it was read from.</param>
+    private void Quietly(string file)
+    {
+        _filling = true;
+
+        try
+        {
+            Selected = Items.FirstOrDefault(one => string.Equals(one.File, file, StringComparison.Ordinal));
+        }
+        finally
+        {
+            _filling = false;
+        }
+
+        OnPropertyChanged(nameof(IPanelPresets.Names));
+    }
 
     /// <summary>Which one is showing, or -1 for none. Setting it loads that one.</summary>
     int IPanelPresets.Picked

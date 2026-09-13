@@ -26,6 +26,12 @@ namespace JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 public interface IPanelPresets
 {
     /// <summary>What is offered, in the order it is offered.</summary>
+    /// <remarks>
+    /// Read when the picker is drawn. A shelf whose list can change while the panel is up, with
+    /// a preset kept or taken off, says so by raising a property change named for this member
+    /// through <see cref="System.ComponentModel.INotifyPropertyChanged"/>, and the picker reads the
+    /// list and <see cref="Picked"/> again.
+    /// </remarks>
     IReadOnlyList<string> Names { get; }
 
     /// <summary>Which one is showing, or -1 for none.</summary>

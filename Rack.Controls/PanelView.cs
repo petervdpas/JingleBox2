@@ -2587,7 +2587,10 @@ public class PanelView : Decorator
     ///
     /// The subscription goes on after the starting one is in, for the same reason it does
     /// everywhere else here: putting a value into a control raises the same notification a hand
-    /// on it raises.
+    /// on it raises. A shelf that says its <see cref="IPanelPresets.Names"/> moved is offered
+    /// again, which is how a preset of yours kept or taken off turns up in the picker at once;
+    /// that is heard only while the picker is on screen, so a panel thrown away is not kept
+    /// alive by the shelf it was showing.
     ///
     /// There is nothing to narrow on a machine that ships five presets and everything to narrow
     /// on a shelf holding every recording you have ever made, so the categories are the shelf's
@@ -2615,11 +2618,35 @@ public class PanelView : Decorator
 
         if (shelf is not null)
         {
+            bool offering = false;
+
             chooser.PropertyChanged += (_, e) =>
             {
-                if (e.Property == Chooser.SelectedItemProperty)
+                if (e.Property == Chooser.SelectedItemProperty && !offering)
                     shelf.Picked = chooser.SelectedItem is PresetOffer one ? one.At : -1;
             };
+
+            if (shelf is System.ComponentModel.INotifyPropertyChanged told)
+            {
+                void Moved(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+                {
+                    if (e.PropertyName != nameof(IPanelPresets.Names)) return;
+
+                    offering = true;
+
+                    try
+                    {
+                        Offer(chooser, shelf.Names, shelf.Picked);
+                    }
+                    finally
+                    {
+                        offering = false;
+                    }
+                }
+
+                chooser.AttachedToVisualTree += (_, _) => told.PropertyChanged += Moved;
+                chooser.DetachedFromVisualTree += (_, _) => told.PropertyChanged -= Moved;
+            }
         }
 
         var narrowing = shelf?.Filters ?? Array.Empty<string>();

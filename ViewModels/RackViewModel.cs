@@ -621,6 +621,8 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
             ? null
             : new InstrumentPresets(value.Instrument, Reloaded, _machines, Editor?.Takes.Shown, Editor?.Takes);
 
+        if (Editor != null && Presets != null) Editor.PresetLines = new PresetMenu(Presets);
+
         Editor?.Kit?.Follow(Sounding);
 
         Reveal();

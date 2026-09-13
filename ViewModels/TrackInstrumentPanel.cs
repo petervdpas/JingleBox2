@@ -88,6 +88,8 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
 
         Presets = new InstrumentPresets(instrument, Reloaded, machines, Editor?.Takes.Shown, Editor?.Takes);
 
+        if (Editor != null && Presets != null) Editor.PresetLines = new PresetMenu(Presets);
+
         Editor?.Kit?.Follow(Sounding);
 
         Sounding.Ticked += MovePlayhead;

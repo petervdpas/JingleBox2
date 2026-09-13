@@ -400,6 +400,19 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   numbers. A stroke is written when the pointer comes up, so one stroke is one undo step, and the
   stack follows the hand before that. `Tests/SegmentTests.cs` was checked by putting three faults
   back: the level stepping mid cycle, the average left on, and samples between the eight bit steps
+- **A soundmachine keeps presets of your own, from its Menu.** Save as preset... and Delete this
+  preset are `PresetMenu`, the `presets` option, put under Help by `SoundDeviceMenu`; the Menu and
+  not a cap beside the picker, which was chosen. They go into the installed machine's own
+  `presets` folder, which the registry already keeps file by file and never deletes from, so they
+  survive the machine being updated and travel in its zip. **Yours is answered by
+  `IRackRegistry.Ships`**, the same question a packed song asks: a file with no twin in the shipped
+  copy of that machine is yours, so a machine made in DESIGNER is all yours. Yours come after the
+  machine's own, starred through `SoundMachinePreset.Shown`, and only yours can be replaced or
+  deleted: one that ships would come back on the next update. A name the machine already uses is
+  refused, since two presets called Init with one of them yours is a picker nobody can trust.
+  The described picker reads its list once, so `InstrumentPresets` raises `Names` and the picker
+  offers again while it is on screen. `IPresetQuestions` is the four dialogs with no window in
+  them, and `Tests/PresetKeepingTests.cs` walks it over Lighttower copied into a folder of its own
 - **An effect's engine is resolved from the id the chain wrote down**, since a chain writes an
   id and never an engine and that is still right. `SoundEffectEngines` takes the registered list
   to look it up in, so `PluginChainState`, `TrackerPlayer`, `PadViewModel` and
@@ -2579,9 +2592,9 @@ whole exercise and is worth writing down rather than summarising:
   way `Keys`, `Take`, `Preset` and `Zones` are already filled. It is not named after what it
   holds, because what it holds is going to grow
 - **Which options it drops down is chosen in the designer**, tick by tick, from
-  `MenuOptionWords.All`. Three today: `help`, the device's own page, `surfaces`, the control
-  surfaces there is a template for on this machine, and `learn`, which turns over the same mode
-  Ctrl+Shift+M turns over. An option
+  `MenuOptionWords.All`. Four today: `help`, the device's own page, `presets`, keeping and
+  deleting a preset of your own, `surfaces`, the control surfaces there is a template for on this
+  machine, and `learn`, which turns over the same mode Ctrl+Shift+M turns over. An option
   added later turns up on the ticks and in every machine that has never been near that page,
   because a Menu naming no options carries all of them. `IMenuOptions` is that rule on its own so
   it can be asked without a window: a machine naming an option this build has never heard of

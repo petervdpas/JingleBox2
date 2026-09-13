@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using JingleBox2.Files;
+using JingleBox2.Files.Interfaces;
+using JingleBox2.SoundDevices.Interfaces;
 using JingleBox2.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.Tracker;
 using JingleBox2.SoundDevices.SoundMachines.Records;
@@ -18,6 +21,12 @@ public sealed class SoundMachinePresets : IPresetLibrary
     /// <summary>How a preset file is read.</summary>
     private readonly ISoundMachinePresetFile _files;
 
+    /// <summary>What ships, so a preset of the machine's own can be told from one of yours.</summary>
+    private readonly IRackRegistry<SoundMachineProject> _registry;
+
+    /// <summary>How a preset of yours is written whole.</summary>
+    private readonly ISafeFile _writer;
+
     /// <summary>Takes the machines this run has, and how to read a preset off the disc.</summary>
     /// <remarks>
     /// The machines are required rather than defaulted. A fresh <c>SoundMachineProjects</c> holds
@@ -26,15 +35,20 @@ public sealed class SoundMachinePresets : IPresetLibrary
     /// </remarks>
     /// <param name="machines">The machines this run has, the one instance everything shares.</param>
     /// <param name="files">How a preset is read. Left out, the ordinary reader.</param>
-    public SoundMachinePresets(ISoundMachineProjects machines, ISoundMachinePresetFile? files = null)
+    /// <param name="registry">What ships. Left out, the folders this installation really has.</param>
+    /// <param name="writer">How a preset of yours is written. Left out, the ordinary one.</param>
+    public SoundMachinePresets(ISoundMachineProjects machines, ISoundMachinePresetFile? files = null,
+                               IRackRegistry<SoundMachineProject>? registry = null, ISafeFile? writer = null)
     {
         _machines = machines;
         _files = files ?? new SoundMachinePresetFile();
+        _registry = registry ?? new SoundMachineRegistry();
+        _writer = writer ?? new SafeFile();
     }
 
     /// <summary>
-    /// What has already been read, by machine name. The folder does not change under us, so a
-    /// machine is walked once per library.
+    /// What has already been read, by machine name. A machine is walked once per library, and
+    /// again after a preset of yours is kept on it or taken off it.
     /// </summary>
     /// <remarks>
     /// One of these per library and not one per program. As a static it was shared by everything
@@ -83,15 +97,118 @@ public sealed class SoundMachinePresets : IPresetLibrary
                          .OrderBy(p => p, StringComparer.Ordinal))
             {
                 var sound = Load(path, machine);
-                if (sound != null) presets.Add(new SoundMachinePreset(sound.Name, sound));
+                if (sound != null)
+                    presets.Add(new SoundMachinePreset(sound.Name, sound) { File = path, Yours = !_registry.Ships(path) });
             }
 
-            return presets;
+            return presets
+                .OrderBy(one => one.Yours)
+                .ThenBy(one => one.Yours ? one.Name : "", StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
         }
         catch (Exception)
         {
             return Array.Empty<SoundMachinePreset>();
         }
+    }
+
+    /// <summary>The characters no preset name may hold, since the name is the file's name on every system.</summary>
+    private static readonly char[] Unfiled = { '/', '\\', ':', '*', '?', '"', '<', '>', '|' };
+
+    /// <inheritdoc/>
+    public string Refusal(SoundMachine? machine, string name)
+    {
+        string called = (name ?? "").Trim();
+
+        if (Folder(machine) is not { Length: > 0 }) return "This machine is not installed here, so it has nowhere to keep a preset.";
+
+        if (called.Length == 0) return "A preset needs a name.";
+
+        if (called.IndexOfAny(Unfiled) >= 0 || called.Any(char.IsControl) || called.StartsWith('.'))
+            return "A preset name cannot hold / \\ : * ? \" < > | or start with a dot.";
+
+        foreach (var one in For(machine))
+            if (!one.Yours && (string.Equals(one.Name, called, StringComparison.OrdinalIgnoreCase)
+                               || string.Equals(Path.GetFileNameWithoutExtension(one.File), called, StringComparison.OrdinalIgnoreCase)))
+                return "'" + one.Name + "' is one of " + machine!.Name + "'s own presets. Give yours another name.";
+
+        return "";
+    }
+
+    /// <inheritdoc/>
+    public SoundMachinePreset? Yours(SoundMachine? machine, string name)
+    {
+        string called = (name ?? "").Trim();
+
+        return For(machine).FirstOrDefault(one =>
+            one.Yours && string.Equals(one.Name, called, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <inheritdoc/>
+    public SoundMachinePreset? Keep(SoundMachine? machine, TrackerInstrument sound, string name)
+    {
+        if (sound is null || Refusal(machine, name).Length > 0) return null;
+
+        if (_machines.For(machine!.SlotId) is not { } project) return null;
+
+        string called = name.Trim();
+        string path = Yours(machine, called)?.File is { Length: > 0 } already
+            ? already
+            : Path.Combine(Folder(machine), called + SoundMachineRack.Extension);
+
+        var kept = sound.Clone();
+
+        kept.Name = called;
+
+        try
+        {
+            _writer.Write(path, _files.Write(kept, project));
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "A preset could not be kept: " + path, ex);
+
+            return null;
+        }
+
+        Forget(machine);
+
+        return For(machine).FirstOrDefault(one => string.Equals(one.File, path, StringComparison.Ordinal));
+    }
+
+    /// <inheritdoc/>
+    public bool Remove(SoundMachine? machine, SoundMachinePreset? preset)
+    {
+        if (machine is null || preset is not { Yours: true, File.Length: > 0 }) return false;
+
+        string folder = Folder(machine);
+
+        if (folder.Length == 0 || !string.Equals(Path.GetDirectoryName(Path.GetFullPath(preset.File)),
+                Path.GetFullPath(folder), StringComparison.Ordinal))
+            return false;
+
+        try
+        {
+            if (!File.Exists(preset.File) || _registry.Ships(preset.File)) return false;
+
+            File.Delete(preset.File);
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "A preset could not be taken off: " + preset.File, ex);
+
+            return false;
+        }
+
+        Forget(machine);
+
+        return true;
+    }
+
+    /// <summary>Forgets what was read for that machine, so the next look reads its folder again.</summary>
+    private void Forget(SoundMachine machine)
+    {
+        lock (_loaded) _loaded.Remove(machine.Name);
     }
 
     /// <summary>
@@ -106,8 +223,8 @@ public sealed class SoundMachinePresets : IPresetLibrary
     /// By id and not by name, because the name is what the machine calls itself and can be
     /// changed by whoever imports a new version of it. The id is what it is.
     /// </remarks>
-    private string Folder(SoundMachine machine) =>
-        _machines.For(machine.SlotId) is { Folder.Length: > 0 } project
+    private string Folder(SoundMachine? machine) =>
+        machine is not null && _machines.For(machine.SlotId) is { Folder.Length: > 0 } project
             ? Path.Combine(project.Folder, SoundDevices.SoundMachines.SoundMachineProject.PresetsFolder)
             : "";
 

@@ -58,5 +58,5 @@ over its life. The picture beside them draws the shape, with a dashed line where
 ## Presets
 
 The presets are starting points, each a pair of drawn waves and a way through them. Pick one and
-draw over it: the waves are saved with the instrument in the song, and **Save** on the preset
-picker keeps your drawing as a preset of your own.
+draw over it: the waves are saved with the instrument in the song, and **Save as preset...** in the
+Menu in the corner keeps your drawing as a preset of your own, marked with a star in the picker.

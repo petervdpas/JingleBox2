@@ -8,7 +8,8 @@ using JingleBox2.SoundDevices.Interfaces;
 namespace JingleBox2.ViewModels;
 
 /// <summary>
-/// What a device's Menu offers: its own page, and then whatever else the host has to say.
+/// What a device's Menu offers: its own page, keeping your own presets, and then whatever else
+/// the host has to say.
 /// </summary>
 /// <remarks>
 /// The links half of a Menu is <see cref="Midi.ControlMenu"/> and is about hardware pointed at
@@ -43,6 +44,9 @@ public sealed class SoundDeviceMenu : IPanelMenu
     /// <summary>What opening the page does.</summary>
     private readonly Action<IRackProject> _open;
 
+    /// <summary>The lines that keep a preset of your own, asked each time, or nothing on a device with none.</summary>
+    private readonly Func<IPanelMenu?> _presets;
+
     /// <summary>Wraps a menu so the device's own page is the first thing on it.</summary>
     /// <param name="inner">What the host was already offering, drawn under the page.</param>
     /// <param name="device">Which device this is about, or nothing where none is open.</param>
@@ -50,10 +54,16 @@ public sealed class SoundDeviceMenu : IPanelMenu
     /// How the page is shown. Left out, a window of the device's own, which is what everything
     /// in the application wants; handed in by a test, which has no windows.
     /// </param>
-    public SoundDeviceMenu(IPanelMenu inner, Func<IRackProject?> device, Action<IRackProject>? open = null)
+    /// <param name="presets">
+    /// The lines that keep and take off a preset of your own, drawn under the page, asked each
+    /// time since the picker they work on is made after this menu. Left out, none.
+    /// </param>
+    public SoundDeviceMenu(IPanelMenu inner, Func<IRackProject?> device, Action<IRackProject>? open = null,
+                           Func<IPanelMenu?>? presets = null)
     {
         _inner = inner;
         _device = device;
+        _presets = presets ?? (() => null);
         _open = open ?? (box => Views.SoundDeviceHelpWindow.Show(box, Views.ActiveWindow.Now));
     }
 
@@ -63,6 +73,8 @@ public sealed class SoundDeviceMenu : IPanelMenu
         var box = _device();
 
         var lines = new List<PanelMenuItem> { Page(box) };
+
+        if (_presets() is { } kept) lines.AddRange(kept.Read());
 
         lines.AddRange(_inner.Read());
 

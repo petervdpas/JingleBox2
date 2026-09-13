@@ -720,6 +720,7 @@ public sealed partial class MenuOptionViewModel : ObservableObject
     private static readonly Dictionary<string, string> Words = new(StringComparer.Ordinal)
     {
         [MenuOptionWords.Help] = "Its own help page",
+        [MenuOptionWords.Presets] = "Save and delete your own presets",
         [MenuOptionWords.Surfaces] = "The control surfaces pointed at this",
         [MenuOptionWords.Learn] = "Learn a control"
     };
