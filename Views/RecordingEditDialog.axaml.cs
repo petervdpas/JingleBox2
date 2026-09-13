@@ -89,8 +89,6 @@ public partial class RecordingEditDialog : Window
     /// <summary>The same, for a rename: the file is moving and cannot move twice.</summary>
     private bool _renaming;
 
-    /// <summary>How much closer the buttons take you. A step you can see in one press.</summary>
-    private const double ButtonZoomStep = 1.5;
 
     /// <summary>Where the region begins, or the start of the take before the picture is up.</summary>
     private double RegionStart => _waveform?.Start ?? 0;
@@ -321,7 +319,7 @@ public partial class RecordingEditDialog : Window
     /// <param name="e">Ignored.</param>
     private void ZoomIn_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (_waveform != null) _waveform.Zoom *= ButtonZoomStep;
+        if (_waveform != null) _waveform.Zoom *= Rack.Controls.WaveformView.ButtonZoomStep;
     }
 
     /// <summary>Further out, by the same step, and stopping at the whole file.</summary>
@@ -330,7 +328,7 @@ public partial class RecordingEditDialog : Window
     /// <param name="e">Ignored.</param>
     private void ZoomOut_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (_waveform != null) _waveform.Zoom /= ButtonZoomStep;
+        if (_waveform != null) _waveform.Zoom /= Rack.Controls.WaveformView.ButtonZoomStep;
     }
 
     /// <summary>

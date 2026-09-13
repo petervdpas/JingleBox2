@@ -1952,6 +1952,15 @@ public class PanelView : Decorator
     ///
     /// The playhead is bound rather than set, because it moves forty times a second and the
     /// panel is built once.
+    ///
+    /// Three small buttons stand beside the picture: in and out about its middle, and back to the
+    /// whole recording. The wheel zooms too, but nothing on a panel says so, and a way of working
+    /// nobody can see is one nobody uses.
+    ///
+    /// **The loop's handles are there only while there is a loop.** Where the element names the
+    /// parameter holding the loop's mode, the dashed handles come and go with it: with the loop
+    /// off they mark nothing that plays, and drawn beside the handles that do, a drag would take
+    /// hold of the one that means nothing as often as the one that does.
     /// </remarks>
     private Control BuildWave(PanelElement element, Dictionary<string, Parameter> parameters)
     {
@@ -1977,7 +1986,64 @@ public class PanelView : Decorator
         Handle(element, "loopStart", parameters, wave, WaveformView.LoopStartProperty);
         Handle(element, "loopEnd", parameters, wave, WaveformView.LoopEndProperty);
 
-        return wave;
+        if (wave.ShowLoop && Text(element, "loopMode") is { Length: > 0 } mode
+            && parameters.TryGetValue(mode, out var looping))
+        {
+            void Follow() => wave.ShowLoop = Start(looping) != 0;
+
+            Reads(Follow);
+            Watch(looping.Key, Follow);
+        }
+
+        var tools = new StackPanel
+        {
+            Spacing = 5,
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+
+        tools.Children.Add(ZoomButton("+", "Zoom in", () => wave.Zoom *= WaveformView.ButtonZoomStep));
+        tools.Children.Add(ZoomButton("−", "Zoom out", () => wave.Zoom /= WaveformView.ButtonZoomStep));
+        tools.Children.Add(ZoomButton("1:1", "Show the whole recording", () =>
+        {
+            wave.Zoom = WaveformViewport.MinZoom;
+            wave.Scroll = 0;
+        }));
+
+        var beside = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 4,
+        };
+
+        beside.Children.Add(wave);
+        beside.Children.Add(tools);
+
+        return beside;
+    }
+
+    /// <summary>One of the two small buttons beside a picture of a recording.</summary>
+    /// <param name="mark">What is written on it.</param>
+    /// <param name="tip">What it says when the pointer rests on it.</param>
+    /// <param name="press">What pressing it does.</param>
+    private static Button ZoomButton(string mark, string tip, Action press)
+    {
+        var button = new Button
+        {
+            Content = mark,
+            Width = 32,
+            Height = 30,
+            Padding = new Thickness(0),
+            FontSize = mark.Length > 1 ? 11 : 17,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Focusable = false,
+        };
+
+        ToolTip.SetTip(button, tip);
+
+        button.Click += (_, _) => press();
+
+        return button;
     }
 
     /// <summary>

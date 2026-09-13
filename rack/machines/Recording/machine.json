@@ -360,8 +360,7 @@
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "caption": "Sample",
-                "height": "284"
+                "caption": "Sample"
               },
               "Children": [
                 {
@@ -387,8 +386,8 @@
                       "Parameter": "take",
                       "Label": "",
                       "Properties": {
-                        "width": "340",
-                        "height": "90",
+                        "width": "380",
+                        "height": "100",
                         "showMarkers": "true",
                         "showLoop": "true",
                         "placeholder": "No recording",
@@ -396,7 +395,8 @@
                         "end": "end",
                         "loopStart": "loop_start",
                         "loopEnd": "loop_end",
-                        "tip": "Drag the solid handles to set what plays, and the dashed ones to set the loop."
+                        "tip": "Drag the solid handles by the top half of the picture to set what plays, and the dashed ones by the bottom half to set the loop. The loop handles are there while Loop is not None.",
+                        "loopMode": "loop_mode"
                       },
                       "Children": []
                     },
@@ -497,8 +497,7 @@
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "caption": "Envelope",
-                "height": "284"
+                "caption": "Envelope"
               },
               "Children": [
                 {

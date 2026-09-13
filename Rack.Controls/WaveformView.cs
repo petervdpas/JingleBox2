@@ -39,8 +39,19 @@ public class WaveformView : ThemedControl
     /// <summary>How much one notch of the wheel changes the zoom by.</summary>
     private const double ZoomStep = 1.25;
 
+    /// <summary>How much one press of a zoom button changes the zoom by.</summary>
+    /// <remarks>
+    /// Bigger than a notch of the wheel, since a wheel is turned several notches in one movement
+    /// and a button is pressed once: a press that moved as little as a notch would read as a
+    /// button that did almost nothing.
+    /// </remarks>
+    public const double ButtonZoomStep = 1.5;
+
     /// <summary>Where a pan started, in pixels, or NaN while nothing is being panned.</summary>
     private double _panFrom = double.NaN;
+
+    /// <summary>Which of the four lines a press takes hold of.</summary>
+    private readonly IWaveformGrab _grab = new WaveformGrab();
 
     /// <summary>Which presses mean the picture is being moved, shared with every other one.</summary>
     private readonly IWaveformPress _press = new WaveformPress();
@@ -633,8 +644,8 @@ public class WaveformView : ThemedControl
                     new Rect(loopStart, 1, loopEnd - loopStart, area.Height - 2));
             }
 
-            DrawHandle(context, palette.Accent, loopStart, area, dashed: true);
-            DrawHandle(context, palette.Accent, loopEnd, area, dashed: true);
+            DrawHandle(context, palette.Accent, loopStart, area, dashed: true, atFoot: true);
+            DrawHandle(context, palette.Accent, loopEnd, area, dashed: true, atFoot: true);
         }
 
         DrawHandle(context, palette.Text, start, area, dashed: false);
@@ -661,10 +672,10 @@ public class WaveformView : ThemedControl
     /// edge. Pinned, it looks like something to take hold of, and taking hold of it would point
     /// at the wrong sample.
     ///
-    /// Where the grip sits is the caller's, through <c>atFoot</c>, and it is at the foot only on
-    /// a sliced picture: there a loop handle and a slice boundary can lie on the same pixel and
-    /// something has to say which of them a click meant. On an unsliced picture there is no such
-    /// pair, so every handle keeps its grip at the head.
+    /// Where the grip sits is the caller's, through <c>atFoot</c>, and a loop's grips are at the
+    /// foot wherever they are drawn: a loop handle lies on the same pixel as a slice boundary on a
+    /// sliced picture and as the window's own end on an unsliced one, and the grip is what says
+    /// which half of the picture takes hold of which. See <see cref="IWaveformGrab"/>.
     /// </remarks>
     private static void DrawHandle(
         DrawingContext context, Color colour, double x, Rect area, bool dashed, bool atFoot = false)
@@ -783,7 +794,7 @@ public class WaveformView : ThemedControl
             return;
         }
 
-        _dragging = Nearest(x);
+        _dragging = Nearest(x, e.GetPosition(this).Y);
 
         if (_dragging == Handle.None)
         {
@@ -964,33 +975,24 @@ public class WaveformView : ThemedControl
     }
 
     /// <summary>The handle a click means, or none when the click is nowhere near one.</summary>
-    private Handle Nearest(double x)
+    /// <param name="x">Where the press landed across the picture.</param>
+    /// <param name="y">And down it, which is what tells the window's lines from the loop's.</param>
+    private Handle Nearest(double x, double y)
     {
         double width = Bounds.Width;
         if (width <= 0) return Handle.None;
 
-        var best = Handle.None;
-        double closest = GrabPixels;
-
-        void Consider(Handle handle, double position)
+        return _grab.Grabbed(
+                x, y, Bounds.Height,
+                X(Start, width), X(End, width), X(LoopStart, width), X(LoopEnd, width),
+                ShowLoop, GrabPixels) switch
         {
-            double distance = Math.Abs(X(position, width) - x);
-            if (distance > closest) return;
-
-            closest = distance;
-            best = handle;
-        }
-
-        Consider(Handle.Start, Start);
-        Consider(Handle.End, End);
-
-        if (ShowLoop)
-        {
-            Consider(Handle.LoopStart, LoopStart);
-            Consider(Handle.LoopEnd, LoopEnd);
-        }
-
-        return best;
+            0 => Handle.Start,
+            1 => Handle.End,
+            2 => Handle.LoopStart,
+            3 => Handle.LoopEnd,
+            _ => Handle.None,
+        };
     }
 
     /// <summary>

@@ -21,6 +21,11 @@ transposing, that is BongaBong.
   gentler of the two on a sustained tone.
 - **Loop start** and **Loop end** are where the loop sits inside the window. A held note plays to
   the loop end and goes back to the loop start for as long as the key is down.
+- **On the picture**, the solid lines are Start and End and the dashed ones are the loop. Take hold
+  of a solid line by the top half of the picture and a dashed one by the bottom half, where its
+  grip is, so the two can be told apart when they lie on top of each other. The dashed lines are
+  only there while Loop is not None. The + and − beside the picture zoom in and out, and so does
+  the wheel, over whatever is under the pointer; 1:1 goes back to the whole recording. Ctrl or Shift with a drag moves along it.
 - **Direction** plays the window backwards. A reversed cymbal into a downbeat is the oldest trick
   there is and it costs nothing here, since the file is not touched.
 - **Voices** decides whether it piles up or not. Many is an instrument; one cuts what it was

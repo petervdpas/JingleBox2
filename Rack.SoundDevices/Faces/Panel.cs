@@ -263,7 +263,8 @@ public static class ElementKinds
     /// The parameter is the text setting holding the take, so the picture is of whatever the
     /// sound device is set to play rather than of nothing. Properties: width, height, placeholder,
     /// showMarkers, showLoop, and start, end, loopStart and loopEnd, each naming a parameter
-    /// holding a fraction of the file. Those four are the only part of this that is a value, and
+    /// holding a fraction of the file; and loopMode, naming the parameter that says whether there
+    /// is a loop, so the loop's handles are only drawn and taken hold of while there is one. Those four are the only part of this that is a value, and
     /// they go both ways: dragging a handle on the picture writes the parameter it names.
     /// </remarks>
     public const string Wave = "Wave";
