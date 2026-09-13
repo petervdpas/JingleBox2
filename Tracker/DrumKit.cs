@@ -191,6 +191,51 @@ public sealed class DrumKit
     }
 
     /// <summary>
+    /// Puts one window of a recording on each pad, from the first, and empties the rest.
+    /// </summary>
+    /// <remarks>
+    /// Windows rather than cuts, so they need not touch: a hit found in a beat is where it is, and
+    /// what lies between two of them belongs to neither. So the kit is not marked as sliced, and a
+    /// picture of the recording shows each pad's own window rather than a row of cuts that would
+    /// have to meet end to end. What was set on a pad by hand, its level, its place and its choke
+    /// group, stays where it was.
+    /// </remarks>
+    /// <param name="filePath">The recording every window is of.</param>
+    /// <param name="pieces">Each window as fractions of it, with the name the pad is given.</param>
+    public void Lay(string filePath, IReadOnlyList<(double Start, double End, string Name)> pieces)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || pieces is null) return;
+
+        Clamp();
+
+        for (int i = 0; i < Pads.Count; i++)
+        {
+            var pad = Pads[i];
+
+            pad.Shape ??= new SampleShape();
+
+            if (i < pieces.Count)
+            {
+                pad.FilePath = filePath;
+                pad.Name = pieces[i].Name;
+                pad.Shape.Start = Math.Clamp(pieces[i].Start, 0, 1);
+                pad.Shape.End = Math.Clamp(Math.Max(pieces[i].End, pieces[i].Start), 0, 1);
+            }
+            else
+            {
+                pad.FilePath = "";
+                pad.Name = "";
+                pad.Shape.Start = 0;
+                pad.Shape.End = 1;
+            }
+        }
+
+        Sliced = false;
+
+        Clamp();
+    }
+
+    /// <summary>
     /// Lays the slices over the pads again after a point has moved, arrived or gone.
     /// </summary>
     /// <remarks>

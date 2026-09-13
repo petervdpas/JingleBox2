@@ -100,6 +100,17 @@
                 "tip": "The one recording the kit is cut from: a beat, or a sheet of hits played one after another. Pick it, then Chop underneath lays its pieces across the pads."
               },
               "Children": []
+            },
+            {
+              "Element": "Button",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "cap": "Find drums",
+                "action": "find_drums",
+                "tip": "Listens to the patch and puts one of each drum it hears on the pads, kick first, named for what it sounds like."
+              },
+              "Children": []
             }
           ]
         },

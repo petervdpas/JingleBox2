@@ -258,6 +258,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
                 (path, points) =>
                 {
                     instrument.Kit.Reslice(path, points);
+                    NameByEar(instrument.Kit, path);
                     Kit.Resliced();
                 },
                 at => instrument.Kit.Pads.ElementAtOrDefault(at)?.Shape,
@@ -648,6 +649,43 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// Both ways about. The map and the picture are two views of the same pieces, and two views
     /// that disagree about which piece is in hand are worse than one view.
     /// </remarks>
+    /// <summary>Listens to recordings and says which drum each piece of one is.</summary>
+    private readonly IDrumListener _listener = new DrumListener();
+
+    /// <summary>Recordings decoded once, since a chop is named again every time a cut is dragged.</summary>
+    private readonly ISampleStore _heardFrom = new SampleStore();
+
+    /// <summary>What was heard in the last recording listened to, kept for the next drag of a cut on it.</summary>
+    private (string Path, IReadOnlyList<DrumHit> Hits)? _heard;
+
+    /// <summary>
+    /// Names each piece of a chopped kit for the drum it starts with, rather than for the file.
+    /// </summary>
+    /// <remarks>
+    /// The recording is listened to once and what was heard is kept, so dragging a cut names the
+    /// pieces again from what is already known rather than listening to the whole recording on
+    /// every movement of the hand. Only the pieces are named: a pad past the last piece is empty
+    /// and keeps no name.
+    /// </remarks>
+    /// <param name="kit">The kit that has just been cut.</param>
+    /// <param name="path">The recording it was cut from.</param>
+    private void NameByEar(DrumKit kit, string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        if (_heard is not { } heard || heard.Path != path)
+        {
+            heard = (path, _listener.Listen(_heardFrom.Load(path)));
+            _heard = heard;
+        }
+
+        var pieces = kit.Pads.Where(pad => pad.FilePath == path && pad.Shape is not null).ToList();
+
+        var names = _listener.Names(heard.Hits, pieces.Select(pad => (pad.Shape!.Start, pad.Shape!.End)).ToList());
+
+        for (int at = 0; at < pieces.Count && at < names.Count; at++) pieces[at].Name = names[at];
+    }
+
     private SliceEditorViewModel Cutting(
         IWaveformService? waveforms,
         int maxSlices,

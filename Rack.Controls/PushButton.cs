@@ -129,6 +129,19 @@ public class PushButton : ThemedControl
         AvaloniaProperty.Register<PushButton, double>(nameof(CapWidth));
 
     /// <summary>
+    /// Backs <see cref="HoldsWidth"/>: whether the cap stays at <see cref="CapWidth"/> however
+    /// long what is written on it is.
+    /// </summary>
+    /// <remarks>
+    /// Off, a cap grows to fit its writing, which is right for a button whose caption is chosen
+    /// by whoever laid the panel out. On, the writing is cut short with an ellipsis instead, which
+    /// is right for a grid of pads named after whatever was put on them: one long file name would
+    /// otherwise widen its whole column and push the grid across the machine.
+    /// </remarks>
+    public static readonly StyledProperty<bool> HoldsWidthProperty =
+        AvaloniaProperty.Register<PushButton, bool>(nameof(HoldsWidth));
+
+    /// <summary>
     /// What the cap is moulded as: an oblong, a disc, or a triangle pointing somewhere.
     /// </summary>
     /// <remarks>
@@ -241,7 +254,7 @@ public class PushButton : ThemedControl
 
         AffectsMeasure<PushButton>(
             LabelProperty, CapTextProperty, HasLampProperty,
-            CapHeightProperty, CapWidthProperty, ShapeProperty, FontSizeProperty, LampSizeProperty,
+            CapHeightProperty, CapWidthProperty, HoldsWidthProperty, ShapeProperty, FontSizeProperty, LampSizeProperty,
             LampBelowProperty);
 
         FocusableProperty.OverrideDefaultValue<PushButton>(true);
@@ -327,6 +340,13 @@ public class PushButton : ThemedControl
     {
         get => GetValue(CapWidthProperty);
         set => SetValue(CapWidthProperty, value);
+    }
+
+    /// <inheritdoc cref="HoldsWidthProperty"/>
+    public bool HoldsWidth
+    {
+        get => GetValue(HoldsWidthProperty);
+        set => SetValue(HoldsWidthProperty, value);
     }
 
     /// <inheritdoc cref="ShapeProperty"/>
@@ -436,7 +456,9 @@ public class PushButton : ThemedControl
 
         double width = Square
             ? CapHeight
-            : Math.Max(CapWidth > 0 ? CapWidth : 30, cap.Width + FontSize * 1.8);
+            : Held
+                ? CapWidth
+                : Math.Max(CapWidth > 0 ? CapWidth : 30, cap.Width + FontSize * 1.8);
 
         width = Math.Max(width, label.Width);
 
@@ -525,6 +547,14 @@ public class PushButton : ThemedControl
         if (!string.IsNullOrEmpty(CapText))
         {
             var text = Text(CapText, new SolidColorBrush(dark ? Colors.Black : Colors.White));
+
+            if (Held)
+            {
+                text.MaxTextWidth = Math.Max(1, capWidth - FontSize * 1.8);
+                text.MaxLineCount = 1;
+                text.Trimming = TextTrimming.CharacterEllipsis;
+            }
+
             context.DrawText(text,
                 new Point(middle - text.Width / 2, cap.Center.Y - text.Height / 2 + (Down ? 0.5 : 0)));
         }
@@ -656,6 +686,9 @@ public class PushButton : ThemedControl
     }
 
     /// <summary>A piece of text laid out at the button's own size, for the cap or for the label.</summary>
+    /// <summary>Whether the cap is holding its width rather than growing to fit, which needs a width to hold.</summary>
+    private bool Held => HoldsWidth && CapWidth > 0 && !Square;
+
     private FormattedText Text(string? text, IBrush brush) =>
         new(text ?? "", CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
             new Typeface(FontFamily.Default), FontSize, brush);

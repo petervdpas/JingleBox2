@@ -263,6 +263,7 @@ public class PadGrid : Decorator
             {
                 CapWidth = CapWidth,
                 CapHeight = CapHeight,
+                HoldsWidth = true,
                 FontSize = 11,
                 Colour = Colour,
                 HasLamp = true,
@@ -347,6 +348,8 @@ public class PadGrid : Decorator
             var cell = Cells is { } cells && at < cells.Count ? cells[at] : null;
 
             cap.CapText = at < kit.Count ? kit.Cap(at) : cell?.Name ?? "";
+
+            ToolTip.SetTip(cap, string.IsNullOrEmpty(cap.CapText) ? null : cap.CapText);
             cap.Label = cell?.Note ?? (at < kit.Count ? kit.Note(at) : "");
 
             if (at >= kit.Count)

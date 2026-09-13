@@ -22,6 +22,9 @@ public static class PanelActions
     /// <summary>Asks for samples from anywhere and puts them on the pads in order.</summary>
     public const string LoadPads = "load_pads";
 
+    /// <summary>Listens to the recording on the kit and puts one of each drum in it on the pads.</summary>
+    public const string FindDrums = "find_drums";
+
     /// <summary>Takes the recording off the zone in hand.</summary>
     public const string ClearZone = "clear_zone";
 

@@ -41,6 +41,9 @@ The same editor Zampler has, and it fills the pads instead of zones. **Pieces** 
 sixteen and laid across the pads is a kit you can play the break back out of in any order, which
 is what this is really for.
 
+Each piece is named for the drum it starts with, heard rather than read off the file: Kick 1,
+Hat closed 1, Snare 1, and so on.
+
 ## What ships with it
 
 Four kits: Live Drums, Tribalcore Kicks, Dirty Old-School and Blue Boat Drums, each with its own

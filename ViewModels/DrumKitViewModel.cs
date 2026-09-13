@@ -164,6 +164,20 @@ public sealed partial class DrumKitViewModel : ObservableObject
         return put;
     }
 
+    /// <summary>Lays windows of one recording over the pads, from the first, and says the kit changed.</summary>
+    /// <param name="filePath">The recording.</param>
+    /// <param name="pieces">Each pad's window and name.</param>
+    public void Lay(string filePath, IReadOnlyList<(double Start, double End, string Name)> pieces)
+    {
+        _kit.Lay(filePath, pieces);
+
+        Resliced();
+
+        Selected = Pads.FirstOrDefault();
+
+        _changed();
+    }
+
     /// <summary>
     /// Reads the kit again, for a preset that has just landed on it or a take that has been cut up.
     /// </summary>

@@ -148,6 +148,11 @@ public partial class SoundDevicePanel : UserControl
 
                 break;
 
+            case Rack.SoundDevices.Faces.PanelActions.FindDrums:
+                FindDrums();
+
+                break;
+
             case Rack.SoundDevices.Faces.PanelActions.ClearZone:
                 ClearZoneSample_Click(this, new RoutedEventArgs());
 
@@ -384,6 +389,54 @@ public partial class SoundDevicePanel : UserControl
         if (found.Count == 0) return;
 
         editor.Kit.Fill(editor.Import(found));
+    }
+
+    /// <summary>
+    /// Listens to the recording on the kit and lays one of each drum it hears across the pads.
+    /// </summary>
+    /// <remarks>
+    /// The recording is the one on the pad in hand, or on the first pad holding one, which on a
+    /// kit cut from one recording is every pad. Reading and listening are done off the drawing
+    /// thread, since a beat of several seconds is a few hundred thousand samples to follow, and
+    /// only the laying out comes back to it. A recording with nothing in it that sounds like a hit
+    /// is said so, rather than leaving a press that did nothing.
+    /// </remarks>
+    private async void FindDrums()
+    {
+        var kit = Designer?.Editor?.Kit;
+
+        if (kit is null) return;
+
+        string path = kit.Selected?.Pad.FilePath is { Length: > 0 } picked
+            ? picked
+            : kit.Kit.Pads.FirstOrDefault(pad => pad.HasSound)?.FilePath ?? "";
+
+        if (path.Length == 0)
+        {
+            await ConfirmDialog.NoteAsync("Find drums", "Pick a patch first: the recording the drums are found in.");
+            return;
+        }
+
+        int pads = kit.Pads.Count;
+
+        var found = await System.Threading.Tasks.Task.Run(() =>
+        {
+            var listener = new Tracker.DrumListener();
+            var sample = new Tracker.SampleStore().Load(path);
+            var chosen = listener.Kit(listener.Listen(sample), pads);
+
+            return chosen.Select((hit, at) => (hit.Start, hit.End, listener.NameOf(chosen, at))).ToList();
+        });
+
+        if (found.Count == 0)
+        {
+            await ConfirmDialog.NoteAsync("Find drums", "Nothing in that recording sounds like a drum being hit.");
+            return;
+        }
+
+        kit.Lay(path, found);
+
+        Designer?.Editor?.SaidAgain();
     }
 
     /// <summary>Brings samples in from the disc and builds the whole map from them.</summary>
