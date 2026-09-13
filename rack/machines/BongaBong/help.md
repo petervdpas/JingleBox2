@@ -12,9 +12,13 @@ on your desk reach the same sounds.
 The grid is the kit. Clicking a pad picks it and the card beside it is about that one. A pad with
 nothing on it is silent and says so.
 
-- **Take** is the recording on the pad. **Pick a recording** puts one there off RECORD's shelf.
 - **Load samples...** asks for files from anywhere and fills the pads in order, which is how a
-  folder of one shot drums becomes a kit in one go.
+  folder of one shot drums becomes a kit in one go. It is the way recordings get onto the pads,
+  along with a preset.
+- **Clear** empties the pad in hand.
+
+A whole kit in one recording, a beat or a sample pack of hits played one after another, is
+**Chopper**'s job rather than this one's.
 
 ## Pad
 

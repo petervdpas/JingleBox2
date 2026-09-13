@@ -52,8 +52,13 @@ public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? abo
     /// <summary>Which choke group it is in, so a hi-hat can cut its own open sound.</summary>
     private const string ChokeKey = "pad_choke";
 
-    /// <summary>The recording on the pad in hand, which the Take control puts there.</summary>
-    private const string TakeKey = "pad_take";
+    /// <summary>The recording on the pad in hand.</summary>
+    /// <remarks>
+    /// Public because it is part of the sound whether or not a face draws a control for it: a
+    /// kit filled by Load samples or by a chop has no picker on it, and its pads still hold
+    /// recordings a preset has to carry.
+    /// </remarks>
+    public const string TakeKey = "pad_take";
 
     /// <summary>What that pad is called, which is yours to type.</summary>
     private const string NameKey = "pad_name";

@@ -273,9 +273,30 @@ public sealed record SoundMachine(
     /// <see cref="JingleBox2.SoundDevices.SoundMachines.Interfaces.ISoundMachineProjects.Has"/>, and an
     /// instrument it says no to is silent.
     /// </remarks>
+    /// <remarks>
+    /// Where more than one machine is registered on the engine, the one whose id the engine has
+    /// always meant is the answer, so an instrument saved before it could say which machine it
+    /// came off opens on the machine it was made on rather than on whichever registered first.
+    /// </remarks>
     public static SoundMachine For(TrackerInstrumentKind kind) =>
-        Registered.FirstOrDefault(one => one.Kind == kind)
+        Registered.FirstOrDefault(one => one.Kind == kind && one.Id == Named(kind))
+        ?? Registered.FirstOrDefault(one => one.Kind == kind)
         ?? new SoundMachine(kind, Named(kind), Engine(kind), "Not installed here.", kind != TrackerInstrumentKind.Plugin, Bare);
+
+    /// <summary>
+    /// The machine with that id on that engine, or the engine's own answer where there is none.
+    /// </summary>
+    /// <remarks>
+    /// The id has to be on the same engine, or an instrument naming a machine that has since been
+    /// made to play something else would wear a face its settings mean nothing to.
+    /// </remarks>
+    /// <param name="kind">The engine the instrument plays.</param>
+    /// <param name="id">The machine it says it came off, or its own slot id.</param>
+    public static SoundMachine For(TrackerInstrumentKind kind, string? id) =>
+        (id is { Length: > 0 }
+            ? Registered.FirstOrDefault(one => one.IsOurs && one.Kind == kind && one.Id == id)
+            : null)
+        ?? For(kind);
 
     /// <summary>The id one of the five original machines has, or nothing for anything else.</summary>
     /// <remarks>

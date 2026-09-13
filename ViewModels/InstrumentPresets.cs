@@ -124,7 +124,7 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
     /// </remarks>
     private bool StartsFromTakes()
     {
-        string id = SoundMachine.For(_instrument.Kind).SlotId;
+        string id = _instrument.Machine.SlotId;
 
         if (_machines.For(id)?.BrowsesTakes() is { } said) return said;
 

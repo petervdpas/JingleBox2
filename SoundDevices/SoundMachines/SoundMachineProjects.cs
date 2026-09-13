@@ -16,8 +16,8 @@ public sealed class SoundMachineProjects : RackSoundDevices<SoundMachineProject>
     /// of the machine rather than of its id, since a plugin now carries an id like anything else
     /// and an empty string is no longer what marks it out.
     ///
-    /// Still asked by engine, which is as far as the question can be taken while a song's
-    /// instrument writes down the engine it plays and not the device it came off. So it asks
+    /// Asked by engine, since this is handed an engine rather than an instrument, and an
+    /// instrument saved before it could name the device it came off names only its engine. So it asks
     /// after **every** device registered on that engine and not the first of them: with one
     /// device to an engine those were the same answer, and they stopped being the same the day a
     /// second kit could exist. An instrument is let through while any device on its engine is on

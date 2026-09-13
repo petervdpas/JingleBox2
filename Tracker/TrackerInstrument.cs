@@ -208,9 +208,29 @@ public sealed class TrackerInstrument
     [JsonIgnore]
     public bool IsFm => Kind == TrackerInstrumentKind.Fm;
 
+    /// <summary>
+    /// The id of the machine this instrument came off, or nothing where it was never said.
+    /// </summary>
+    /// <remarks>
+    /// The engine says what plays the instrument and this says whose face it wears, and the two
+    /// are only the same answer while one machine is on each engine. Two kits are two machines
+    /// on one engine, so an instrument that knew only its engine would open whichever of the two
+    /// happened to register first.
+    ///
+    /// Nothing is what every instrument saved before this says, and it reads back as the machine
+    /// its engine always meant; see <see cref="Machine"/>. Left out of the file while empty.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MachineId { get; set; }
+
     /// <summary>Which machine this instrument is on, by name and description.</summary>
+    /// <remarks>
+    /// The machine it says it came off, where that is registered on its engine; then a machine
+    /// whose own slot this is, which is what an instrument on the rack is; then the machine its
+    /// engine has always meant.
+    /// </remarks>
     [JsonIgnore]
-    public SoundMachine Machine => SoundMachine.For(Kind);
+    public SoundMachine Machine => SoundMachine.For(Kind, MachineId ?? Id);
 
     /// <summary>
     /// One line saying what this instrument is: which machine, and a word about how it is set.
@@ -369,16 +389,23 @@ public sealed class TrackerInstrument
     /// on it. Left out, it fell through to the last arm and came back an OddSkilla wearing the
     /// name you had just typed.
     /// </remarks>
-    public static TrackerInstrument CreateOn(SoundMachine machine, string name) => machine?.Kind switch
+    public static TrackerInstrument CreateOn(SoundMachine machine, string name)
     {
-        TrackerInstrumentKind.MonoSynth => CreateMonoSynth(name),
-        TrackerInstrumentKind.Fm => CreateFm(name),
-        TrackerInstrumentKind.Kit => CreateKit(name),
-        TrackerInstrumentKind.Sampler => CreateSampler(name),
-        TrackerInstrumentKind.Sample => CreateSample(name, "", new Note(48)),
+        var made = machine?.Kind switch
+        {
+            TrackerInstrumentKind.MonoSynth => CreateMonoSynth(name),
+            TrackerInstrumentKind.Fm => CreateFm(name),
+            TrackerInstrumentKind.Kit => CreateKit(name),
+            TrackerInstrumentKind.Sampler => CreateSampler(name),
+            TrackerInstrumentKind.Sample => CreateSample(name, "", new Note(48)),
 
-        _ => CreateSynth(name)
-    };
+            _ => CreateSynth(name)
+        };
+
+        if (machine is { IsOurs: true, Id.Length: > 0 }) made.MachineId = machine.Id;
+
+        return made;
+    }
 
     /// <summary>A synth instrument built from a patch, which is how a preset starts a new one.</summary>
     public static TrackerInstrument CreateSynth(string name, SynthPatch patch)
@@ -458,6 +485,7 @@ public sealed class TrackerInstrument
         Id = other.Id;
         Name = other.Name;
         Kind = other.Kind;
+        MachineId = other.MachineId;
         Patch = other.Patch.Clone();
         MonoSynth = other.MonoSynth?.Clone();
         Fm = other.Fm?.Clone();
@@ -565,6 +593,7 @@ public sealed class TrackerInstrument
         Id = Id,
         Name = Name,
         Kind = Kind,
+        MachineId = MachineId,
         Patch = Patch.Clone(),
         MonoSynth = MonoSynth?.Clone(),
         Fm = Fm?.Clone(),

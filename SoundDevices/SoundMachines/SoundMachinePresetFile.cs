@@ -91,7 +91,7 @@ public sealed class SoundMachinePresetFile(ISoundMachinePaths? paths = null) : I
             var held = (JsonObject)read!;
 
             var kind = SoundMachine.EngineNamed(machine.Engine) ?? SoundMachine.SlotFor(machine.Id)?.Kind ?? TrackerInstrumentKind.Sample;
-            var sound = new TrackerInstrument { Kind = kind, Name = Said(held, NameKey) };
+            var sound = new TrackerInstrument { Kind = kind, Name = Said(held, NameKey), MachineId = machine.Id };
 
             if (sound.Name.Length == 0) sound.Name = Path.GetFileNameWithoutExtension(path);
 
@@ -448,12 +448,21 @@ public sealed class SoundMachinePresetFile(ISoundMachinePaths? paths = null) : I
     /// A Take is a recording and a Text is something typed. Both are words, and which key each
     /// is kept under is the machine's to say, so it is asked rather than assumed. The face is
     /// walked in reading order and each key is named once.
+    ///
+    /// **A kit's pad recordings are words whether or not the face draws a picker for them.** A
+    /// face with no picker fills its pads another way, loading samples or chopping one
+    /// recording, and the recordings are still the kit: read off the face alone, every preset on
+    /// such a machine lands with its names on the pads and nothing to play.
     /// </remarks>
     private static List<string> Words(SoundMachineProject machine)
     {
         var found = new List<string>();
 
         if (machine.Panel.Root is { } root) Walk(root, found);
+
+        if (SoundMachine.EngineNamed(machine.Engine) == TrackerInstrumentKind.Kit
+            && !found.Contains(KitValues.TakeKey))
+            found.Add(KitValues.TakeKey);
 
         return found;
 

@@ -3879,6 +3879,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// you like, set it how you like, and take a second one off the same machine if you want
     /// one. Sharing the rack's id would have meant one Zampler to a song and a name you could
     /// not change, since a machine on the rack keeps the machine's name.
+    ///
+    /// What it does keep is which machine it came off. The rack's id was the one thing saying so,
+    /// and two machines can share an engine.
     /// </remarks>
     private void AddInstrument()
     {
@@ -3896,6 +3899,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         {
             taken = box.Instrument.Clone();
 
+            taken.MachineId ??= box.Instrument.Machine.Id;
             taken.Id = "";
         }
         else if (picked.Plugin is { } plugin)

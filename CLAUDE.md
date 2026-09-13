@@ -4192,7 +4192,7 @@ whole exercise and is worth writing down rather than summarising:
   new one starts) and songs (patterns plus their own copies of the instruments they use). There
   was a third, a preset bank, and it went when the library stopped reaching into songs: a sound
   you start from and a sound you own turned out to be the same object. A fresh rack gets what is
-  registered, which on a fresh installation is the six soundmachines that ship, and from then on
+  registered, which on a fresh installation is the seven soundmachines that ship, and from then on
   they are ordinary entries with your own settings on them
 - A note played by hand on the tracker's keyboard is that track playing. It goes on the track
   the cursor is in, through its inserts, and moves that track's meter and the master's, which is

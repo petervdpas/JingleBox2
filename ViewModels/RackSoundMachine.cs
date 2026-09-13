@@ -34,7 +34,7 @@ public sealed partial class RackSoundMachine : ObservableObject, IRackRow
     public string Name => Instrument.Name;
 
     /// <summary>The machine's own theme, which is what everything about it is painted from.</summary>
-    public PanelTheme Theme => SoundMachine.For(Instrument.Kind).Theme;
+    public PanelTheme Theme => Instrument.Machine.Theme;
 
     /// <summary>Its colour on its own, for the bar down the side of the row.</summary>
     public string Colour => Theme.Accent;

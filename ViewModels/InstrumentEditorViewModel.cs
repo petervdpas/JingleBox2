@@ -243,7 +243,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
         if (instrument.IsKit)
         {
-            int declared = _machines.For(SoundMachine.For(instrument.Kind).SlotId)
+            int declared = _machines.For(instrument.Machine.SlotId)
                 is { } project
                 ? PresetFiles.Buttons(project).Count
                 : 0;
@@ -327,7 +327,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
     private void Describe(IWaveformService? waveforms)
     {
-        string id = SoundMachine.For(_instrument.Kind).SlotId;
+        string id = _instrument.Machine.SlotId;
 
         if (_machines.PanelFor(id) is not { } face) return;
 
@@ -501,7 +501,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     public TrackerInstrument Instrument => _instrument;
 
     /// <summary>The machine's own theme: its colour and how far it is carried.</summary>
-    public PanelTheme Theme => SoundMachine.For(_instrument.Kind).Theme;
+    public PanelTheme Theme => _instrument.Machine.Theme;
 
     /// <summary>Its colour on its own, for the band across the top of the panel.</summary>
     public string Colour => Theme.Accent;
@@ -757,7 +757,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// cutoff rather than at this instrument's, so the machine is what the mapping names and
     /// the name on the front is not it: that can be reworded, and the id never is.
     /// </remarks>
-    public string MachineId => SoundMachine.For(_instrument.Kind).SlotId;
+    public string MachineId => _instrument.Machine.SlotId;
 
     /// <summary>
     /// The device this is editing, as anything outside it needs it.
@@ -767,7 +767,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// in the same words. A machine that is not installed here still answers, greyed and named
     /// for its engine, which is what a link pointed at it would name anyway.
     /// </remarks>
-    public Rack.SoundDevices.Interfaces.ISoundDevice Device => SoundMachine.For(_instrument.Kind);
+    public Rack.SoundDevices.Interfaces.ISoundDevice Device => _instrument.Machine;
 
     /// <summary>True on the machine with a single voice and its own patch.</summary>
     public bool IsMonoSynth => _instrument.IsMonoSynth;
