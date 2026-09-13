@@ -38,15 +38,28 @@ public sealed class SynthEnvelope : ISynthEnvelope
     /// <param name="patch">The instrument whose four times the envelope is built from.</param>
     /// <param name="sampleRate">The rate the voice is rendered at, which the times are turned into steps against.</param>
     public SynthEnvelope(SynthPatch patch, int sampleRate)
+        : this(patch.AttackMs, patch.DecayMs, patch.Sustain, patch.ReleaseMs, sampleRate)
+    {
+    }
+
+    /// <summary>
+    /// Takes the four stages as numbers, for a sound that has more than one envelope in it.
+    /// </summary>
+    /// <param name="attackMs">How long it takes to reach full.</param>
+    /// <param name="decayMs">How long it takes to fall from full to the sustain level.</param>
+    /// <param name="sustain">Where it holds while the key is down, nought to one.</param>
+    /// <param name="releaseMs">How long it takes to fall away once the key comes up.</param>
+    /// <param name="sampleRate">The rate the voice is rendered at.</param>
+    public SynthEnvelope(double attackMs, double decayMs, double sustain, double releaseMs, int sampleRate)
     {
         double rate = sampleRate <= 0 ? 1 : sampleRate;
 
-        double attackSamples = patch.AttackMs / 1000.0 * rate;
-        double decaySamples = patch.DecayMs / 1000.0 * rate;
+        double attackSamples = attackMs / 1000.0 * rate;
+        double decaySamples = decayMs / 1000.0 * rate;
 
         _sampleRate = rate;
-        _sustain = Math.Clamp(patch.Sustain, 0.0, 1.0);
-        _releaseSamples = patch.ReleaseMs / 1000.0 * rate;
+        _sustain = Math.Clamp(sustain, 0.0, 1.0);
+        _releaseSamples = releaseMs / 1000.0 * rate;
 
         _attackPerSample = attackSamples > 0 ? 1.0 / attackSamples : 1.0;
         _decayPerSample = decaySamples > 0 ? (1.0 - _sustain) / decaySamples : 1.0;

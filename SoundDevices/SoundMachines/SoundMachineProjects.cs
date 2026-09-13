@@ -22,6 +22,10 @@ public sealed class SoundMachineProjects : RackSoundDevices<SoundMachineProject>
     /// device to an engine those were the same answer, and they stopped being the same the day a
     /// second kit could exist. An instrument is let through while any device on its engine is on
     /// the rack, which is the truthful answer to a question phrased in engines.
+    ///
+    /// An engine with no device on it at all has nothing here to play on, which is the case for an
+    /// engine whose machine shipped after ids were free: there is no id to stand in for it, and no
+    /// id is not the same as any id.
     /// </remarks>
     public bool Has(TrackerInstrumentKind kind)
     {
@@ -36,7 +40,7 @@ public sealed class SoundMachineProjects : RackSoundDevices<SoundMachineProject>
 
         if (ids.Count == 0) ids.Add(stands.SlotId);
 
-        return ids.Any(id => id.Length == 0 || (For(id) is not null && (_rack is null || _rack.Contains(id))));
+        return ids.Any(id => id.Length > 0 && For(id) is not null && (_rack is null || _rack.Contains(id)));
     }
 
     /// <summary>Which machines are on the rack, or nothing while nobody has said.</summary>

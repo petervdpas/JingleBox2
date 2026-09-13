@@ -136,6 +136,18 @@ public sealed class TrackerInstrument
     public Synth.MonoSynthPatch? MonoSynth { get; set; }
 
     /// <summary>
+    /// What Operetta plays from: four operators and how they are wired. Null on every other
+    /// machine, and left out of the file there.
+    /// </summary>
+    /// <remarks>
+    /// Its own field for the reason Ouroboros has one, and written under the machine's name for
+    /// the same reason: that is what a file calls it.
+    /// </remarks>
+    [JsonPropertyName("Operetta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Synth.FmPatch? Fm { get; set; }
+
+    /// <summary>
     /// What BongaBong plays: sixteen pads, each with a recording and a key of its own.
     /// </summary>
     /// <remarks>
@@ -179,6 +191,10 @@ public sealed class TrackerInstrument
     [JsonIgnore]
     public bool IsMonoSynth => Kind == TrackerInstrumentKind.MonoSynth;
 
+    /// <summary>On Operetta: four sine operators bending each other's frequency.</summary>
+    [JsonIgnore]
+    public bool IsFm => Kind == TrackerInstrumentKind.Fm;
+
     /// <summary>Which machine this instrument is on, by name and description.</summary>
     [JsonIgnore]
     public SoundMachine Machine => SoundMachine.For(Kind);
@@ -208,6 +224,7 @@ public sealed class TrackerInstrument
             {
                 TrackerInstrumentKind.Synth => machine + ", " + Patch.Wave.ToString().ToLowerInvariant(),
                 TrackerInstrumentKind.MonoSynth => machine + ", " + (MonoSynth?.Wave.ToString().ToLowerInvariant() ?? "saw"),
+                TrackerInstrumentKind.Fm => machine + ", algorithm " + (Fm?.Algorithm ?? 1),
                 _ => machine + ", " + BaseNote
             };
         }
@@ -318,6 +335,20 @@ public sealed class TrackerInstrument
         return instrument;
     }
 
+    /// <summary>A new instrument on Operetta, with a plain two operator sound ready to shape.</summary>
+    public static TrackerInstrument CreateFm(string name)
+    {
+        var instrument = new TrackerInstrument
+        {
+            Name = name,
+            Kind = TrackerInstrumentKind.Fm,
+            Fm = new Synth.FmPatch()
+        };
+
+        instrument.EnsureId();
+        return instrument;
+    }
+
     /// <summary>A new instrument on whichever machine was asked for.</summary>
     /// <remarks>
     /// The Recording machine has to be named here even though what it makes is an instrument
@@ -328,6 +359,7 @@ public sealed class TrackerInstrument
     public static TrackerInstrument CreateOn(SoundMachine machine, string name) => machine?.Kind switch
     {
         TrackerInstrumentKind.MonoSynth => CreateMonoSynth(name),
+        TrackerInstrumentKind.Fm => CreateFm(name),
         TrackerInstrumentKind.Kit => CreateKit(name),
         TrackerInstrumentKind.Sampler => CreateSampler(name),
         TrackerInstrumentKind.Sample => CreateSample(name, "", new Note(48)),
@@ -415,6 +447,7 @@ public sealed class TrackerInstrument
         Kind = other.Kind;
         Patch = other.Patch.Clone();
         MonoSynth = other.MonoSynth?.Clone();
+        Fm = other.Fm?.Clone();
         Kit = other.Kit?.Clone();
         Zones = other.Zones?.Clone();
         Sampler = other.Sampler?.Clone();
@@ -468,6 +501,11 @@ public sealed class TrackerInstrument
                 MonoSynth.CopyFrom(other.MonoSynth ?? new Synth.MonoSynthPatch());
                 break;
 
+            case TrackerInstrumentKind.Fm:
+                Fm ??= new Synth.FmPatch();
+                Fm.CopyFrom(other.Fm ?? new Synth.FmPatch());
+                break;
+
             case TrackerInstrumentKind.Sampler:
                 Zones ??= ZoneMap.Empty();
                 Zones.CopyFrom(other.Zones ?? ZoneMap.Empty());
@@ -514,6 +552,7 @@ public sealed class TrackerInstrument
         Kind = Kind,
         Patch = Patch.Clone(),
         MonoSynth = MonoSynth?.Clone(),
+        Fm = Fm?.Clone(),
         Kit = Kit?.Clone(),
         Zones = Zones?.Clone(),
         Sampler = Sampler?.Clone(),

@@ -79,6 +79,9 @@ public sealed class PresetLoudness : IPresetLoudness
             new MonoSynthVoice(
                 sound.MonoSynth, note, SynthVoice.NoTrack, (float)sound.Volume, 0f, Rate, Seed, null),
 
+        TrackerInstrumentKind.Fm when sound.Fm is not null =>
+            new FmVoice(sound.Fm, note, FmVoice.NoTrack, (float)sound.Volume, 0f, Rate),
+
         _ => null,
     };
 

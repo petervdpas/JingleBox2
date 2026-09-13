@@ -169,7 +169,7 @@ public static class PanelPreview
     {
         /// <inheritdoc/>
         /// <remarks>Nothing sounds, and nothing is held, so the length is nought.</remarks>
-        public double Audition(TrackerInstrument instrument, Note note, int volume) => 0;
+        public double Audition(TrackerInstrument instrument, Note note, int volume, double holdSeconds) => 0;
 
         /// <inheritdoc/>
         public void Let(TrackerInstrument instrument, Note note) { }

@@ -205,6 +205,12 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
             MonoSynth = new MonoSynthPatchViewModel(instrument.MonoSynth, changed);
         }
 
+        if (instrument.IsFm)
+        {
+            instrument.Fm ??= new FmPatch();
+            instrument.Fm.Clamp();
+        }
+
         if (instrument.IsSampler)
         {
             instrument.Zones ??= ZoneMap.Empty();
@@ -773,7 +779,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     public bool IsPlugin => _instrument.IsPlugin;
 
     /// <summary>True on the plain machine that plays one recording, which is what is left over.</summary>
-    public bool IsSample => !IsSynth && !IsPlugin && !IsMonoSynth && !IsKit && !IsSampler;
+    public bool IsSample => !IsSynth && !IsPlugin && !IsMonoSynth && !_instrument.IsFm && !IsKit && !IsSampler;
 
     /// <summary>The plugin's own knobs, when this instrument is a plugin.</summary>
     public PluginControlsViewModel? PluginPanel { get; private set; }

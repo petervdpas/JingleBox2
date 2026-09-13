@@ -120,7 +120,7 @@ public class MissingSoundMachineTests
                  {
                      TrackerInstrumentKind.Sampler, TrackerInstrumentKind.Kit,
                      TrackerInstrumentKind.Synth, TrackerInstrumentKind.MonoSynth,
-                     TrackerInstrumentKind.Sample
+                     TrackerInstrumentKind.Fm, TrackerInstrumentKind.Sample
                  })
         {
             Assert.Equal(0, player.Preview(On(kind), new Note(60)));

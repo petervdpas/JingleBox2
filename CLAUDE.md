@@ -345,7 +345,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   name from the VST3 or CLAP
 - **Engine, machine and instrument are three words and not one.** They are the three layers of
   the same thing and confusing any two of them leads somewhere wrong, so:
-  - An **engine** is what makes the sound. There are six, they are `TrackerInstrumentKind`, they
+  - An **engine** is what makes the sound. There are seven, they are `TrackerInstrumentKind`, they
     are compiled into the application, and their numbers are in every song ever saved so they do
     not move. An engine has no face and no name a person sees
   - A **machine** is a face over an engine: a folder holding `machine.json`, its badge, its
@@ -380,7 +380,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   five soundmachines and `SoundEffectEngines.Was` the three effects, and both are consulted only
   where a manifest is silent, since every song, rack file and chain on anybody's disc names them.
   Compared without regard to case, like every other id here. Every shipped manifest names its
-  engine out loud now, all eleven of them, and `Tests/ShippedEngineTests.cs` holds them to it, including that
+  engine out loud now, every one of them, and `Tests/ShippedEngineTests.cs` holds them to it, including that
   the engine each names is the one its id used to imply: a shipped device that quietly moved
   engines would open every song that plays it and sound like something else
 - **An effect's engine is resolved from the id the chain wrote down**, since a chain writes an
@@ -4192,7 +4192,7 @@ whole exercise and is worth writing down rather than summarising:
   new one starts) and songs (patterns plus their own copies of the instruments they use). There
   was a third, a preset bank, and it went when the library stopped reaching into songs: a sound
   you start from and a sound you own turned out to be the same object. A fresh rack gets what is
-  registered, which on a fresh installation is the five soundmachines that ship, and from then on
+  registered, which on a fresh installation is the six soundmachines that ship, and from then on
   they are ordinary entries with your own settings on them
 - A note played by hand on the tracker's keyboard is that track playing. It goes on the track
   the cursor is in, through its inserts, and moves that track's meter and the master's, which is

@@ -32,6 +32,11 @@ public sealed class SoundMachineValuesFor : ISoundMachineValuesFor
 
                 return new MonoSynthValues(mono ?? new MonoSynthPatchViewModel(instrument.MonoSynth, Nothing), instrument);
 
+            case TrackerInstrumentKind.Fm:
+                instrument.Fm ??= new FmPatch();
+
+                return new FmValues(instrument.Fm, instrument);
+
             case TrackerInstrumentKind.Kit:
                 instrument.Kit ??= DrumKit.Empty(1);
 

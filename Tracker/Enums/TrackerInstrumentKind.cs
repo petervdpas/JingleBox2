@@ -33,5 +33,8 @@ public enum TrackerInstrumentKind
     Kit = 4,
 
     /// <summary>Zampler: recordings laid across the keyboard, each transposed from its root.</summary>
-    Sampler = 5
+    Sampler = 5,
+
+    /// <summary>Operetta: four sine operators modulating each other's frequency.</summary>
+    Fm = 6
 }

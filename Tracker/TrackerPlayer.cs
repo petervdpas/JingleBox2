@@ -48,7 +48,27 @@ public sealed class TrackerPlayer : ITrackerPlayer
     private const double SpinThresholdSeconds = 0.002;
 
     /// <summary>How long an audition holds before it releases, since no key is let go of.</summary>
+    /// <remarks>
+    /// For a press that has nothing to let go of it: the TEST cap, a pad or a zone tapped in an
+    /// editor. A key that comes up asks for <see cref="HeldNoteSeconds"/> instead.
+    /// </remarks>
     public const double PreviewHoldSeconds = 0.4;
+
+    /// <summary>
+    /// How long a note played on a key sounds if nothing ever lets go of it.
+    /// </summary>
+    /// <remarks>
+    /// Long, because every keyboard in this application lets go: the hardware sends the other
+    /// half of the press, the letter rows have a release of their own, and a drawn key is let go
+    /// of when the pointer comes up. So this is a safety net for a release that never arrives
+    /// rather than the length of the note, and it wants to be long enough that nobody ever hears
+    /// it: a held key sounds for as long as it is held.
+    ///
+    /// Ten seconds rather than a minute, because the net is only ever reached when something
+    /// went wrong, and a note left ringing for a minute after a lost release is worse than one
+    /// cut short after ten. Nobody holds a key that long while writing a part.
+    /// </remarks>
+    public const double HeldNoteSeconds = 10;
 
     /// <summary>The pads' engine, shared rather than a second one opened for the tracker.</summary>
     private readonly IAudioEngine _audio;
@@ -543,6 +563,13 @@ public sealed class TrackerPlayer : ITrackerPlayer
         if (instrument.IsMonoSynth)
         {
             _synth.Mixer.Preview(instrument.MonoSynth ?? new Synth.MonoSynthPatch(),
+                note, level, holdSeconds, instrument.Id, track, pan);
+            return holdSeconds;
+        }
+
+        if (instrument.IsFm)
+        {
+            _synth.Mixer.Preview(instrument.Fm ?? new Synth.FmPatch(),
                 note, level, holdSeconds, instrument.Id, track, pan);
             return holdSeconds;
         }
@@ -1510,6 +1537,14 @@ public sealed class TrackerPlayer : ITrackerPlayer
         {
             Where(e.Track, e.Instrument, instrument, song, "played on " + instrument.Machine.Name);
             _synth.Mixer.NoteOn(e.Track, e.Column, instrument.MonoSynth ?? new Synth.MonoSynthPatch(),
+                e.Note, mixed, placed ?? 0f, instrument.NewNoteAction);
+            return;
+        }
+
+        if (instrument.IsFm)
+        {
+            Where(e.Track, e.Instrument, instrument, song, "played on " + instrument.Machine.Name);
+            _synth.Mixer.NoteOn(e.Track, e.Column, instrument.Fm ?? new Synth.FmPatch(),
                 e.Note, mixed, placed ?? 0f, instrument.NewNoteAction);
             return;
         }

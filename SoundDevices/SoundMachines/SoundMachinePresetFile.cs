@@ -90,7 +90,7 @@ public sealed class SoundMachinePresetFile(ISoundMachinePaths? paths = null) : I
 
             var held = (JsonObject)read!;
 
-            var kind = SoundMachine.SlotFor(machine.Id)?.Kind ?? TrackerInstrumentKind.Sample;
+            var kind = SoundMachine.EngineNamed(machine.Engine) ?? SoundMachine.SlotFor(machine.Id)?.Kind ?? TrackerInstrumentKind.Sample;
             var sound = new TrackerInstrument { Kind = kind, Name = Said(held, NameKey) };
 
             if (sound.Name.Length == 0) sound.Name = Path.GetFileNameWithoutExtension(path);
@@ -153,6 +153,8 @@ public sealed class SoundMachinePresetFile(ISoundMachinePaths? paths = null) : I
                     wide = new SynthValues(new ViewModels.SynthPatchViewModel(sound.Patch, () => { }), sound);
                 else if (kind == TrackerInstrumentKind.MonoSynth)
                     wide = new MonoSynthValues(Mono(sound), sound);
+                else if (kind == TrackerInstrumentKind.Fm)
+                    wide = new FmValues(sound.Fm ??= new FmPatch(), sound);
                 else
                     loose = new RecordingValues(sound);
             }
@@ -248,13 +250,14 @@ public sealed class SoundMachinePresetFile(ISoundMachinePaths? paths = null) : I
             return held.ToJsonString(Layout);
         }
 
-        var kind = SoundMachine.SlotFor(machine.Id)?.Kind ?? TrackerInstrumentKind.Sample;
+        var kind = SoundMachine.EngineNamed(machine.Engine) ?? SoundMachine.SlotFor(machine.Id)?.Kind ?? TrackerInstrumentKind.Sample;
 
         IPanelValues plain = kind switch
         {
             TrackerInstrumentKind.Synth =>
                 new SynthValues(new ViewModels.SynthPatchViewModel(sound.Patch, () => { }), sound),
             TrackerInstrumentKind.MonoSynth => new MonoSynthValues(Mono(sound), sound),
+            TrackerInstrumentKind.Fm => new FmValues(sound.Fm ??= new FmPatch(), sound),
             _ => new RecordingValues(sound),
         };
 

@@ -298,8 +298,7 @@
                       "Properties": {
                         "span": "3",
                         "dial": "40",
-                        "headroom": "50",
-                        "lines": "2"
+                        "lines": "1"
                       },
                       "Children": []
                     },
@@ -310,8 +309,7 @@
                       "Properties": {
                         "span": "3",
                         "dial": "40",
-                        "headroom": "50",
-                        "lines": "2"
+                        "lines": "1"
                       },
                       "Children": []
                     },
@@ -321,7 +319,7 @@
                       "Label": "",
                       "Properties": {
                         "span": "2",
-                        "lines": "2",
+                        "lines": "1",
                         "options": "Saw,Pulse"
                       },
                       "Children": []
@@ -333,8 +331,7 @@
                       "Properties": {
                         "span": "3",
                         "dial": "40",
-                        "headroom": "50",
-                        "lines": "2"
+                        "lines": "1"
                       },
                       "Children": []
                     },
@@ -345,8 +342,7 @@
                       "Properties": {
                         "span": "3",
                         "dial": "40",
-                        "headroom": "50",
-                        "lines": "2",
+                        "lines": "1",
                         "tip": "How long a note takes to slide from the one before it. Zero is off."
                       },
                       "Children": []
@@ -380,8 +376,7 @@
                       "Properties": {
                         "span": "3",
                         "dial": "40",
-                        "headroom": "50",
-                        "lines": "2",
+                        "lines": "1",
                         "tip": "Nought is all oscillator, one is all noise, and between them is both."
                       },
                       "Children": []
@@ -390,6 +385,72 @@
                 }
               ]
             },
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Moves the oscillator"
+              },
+              "Children": [
+                {
+                  "Element": "Strip",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "2 3 2"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Switch",
+                      "Parameter": "vco_source",
+                      "Label": "",
+                      "Properties": {
+                        "span": "2",
+                        "lines": "1",
+                        "options": "Envelope,Lfo"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "vco_amount",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "lines": "1"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "vco_target",
+                      "Label": "",
+                      "Properties": {
+                        "span": "2",
+                        "lines": "1",
+                        "options": "Frequency,PulseWidth"
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "10",
+            "heights": "own"
+          },
+          "Children": [
             {
               "Element": "Group",
               "Parameter": "",
@@ -415,8 +476,7 @@
                       "Properties": {
                         "span": "3",
                         "dial": "40",
-                        "headroom": "50",
-                        "lines": "2",
+                        "lines": "1",
                         "display": "cutoff_text"
                       },
                       "Children": []
@@ -428,8 +488,7 @@
                       "Properties": {
                         "span": "3",
                         "dial": "40",
-                        "headroom": "50",
-                        "lines": "2"
+                        "lines": "1"
                       },
                       "Children": []
                     },
@@ -439,7 +498,7 @@
                       "Label": "",
                       "Properties": {
                         "span": "2",
-                        "lines": "2",
+                        "lines": "1",
                         "options": "LowPass,HighPass"
                       },
                       "Children": []
@@ -448,6 +507,74 @@
                 }
               ]
             },
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Moves the filter"
+              },
+              "Children": [
+                {
+                  "Element": "Strip",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "2 3 2"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Switch",
+                      "Parameter": "vcf_source",
+                      "Label": "",
+                      "Properties": {
+                        "span": "2",
+                        "lines": "1",
+                        "options": "Envelope,Lfo"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "vcf_amount",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "lines": "1"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "vcf_polarity",
+                      "Label": "",
+                      "Properties": {
+                        "span": "2",
+                        "lines": "1",
+                        "on": "Close",
+                        "off": "Open",
+                        "tip": "Which way the modulation moves the filter."
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "10",
+            "heights": "own"
+          },
+          "Children": [
             {
               "Element": "Group",
               "Parameter": "",
@@ -472,7 +599,7 @@
                       "Label": "",
                       "Properties": {
                         "span": "2",
-                        "lines": "2",
+                        "lines": "1",
                         "on": "Envelope",
                         "off": "Open",
                         "tip": "Open, a note is simply on at full and the envelope only moves what it is pointed at."
@@ -486,8 +613,7 @@
                       "Properties": {
                         "span": "3",
                         "dial": "40",
-                        "headroom": "50",
-                        "lines": "2"
+                        "lines": "1"
                       },
                       "Children": []
                     },
@@ -504,18 +630,7 @@
                   ]
                 }
               ]
-            }
-          ]
-        },
-        {
-          "Element": "Row",
-          "Parameter": "",
-          "Label": "",
-          "Properties": {
-            "gap": "10",
-            "heights": "own"
-          },
-          "Children": [
+            },
             {
               "Element": "Group",
               "Parameter": "",
@@ -541,8 +656,7 @@
                       "Properties": {
                         "span": "3",
                         "dial": "40",
-                        "headroom": "50",
-                        "lines": "2"
+                        "lines": "1"
                       },
                       "Children": []
                     },
@@ -552,7 +666,7 @@
                       "Label": "",
                       "Properties": {
                         "span": "2",
-                        "lines": "2",
+                        "lines": "1",
                         "on": "Hold",
                         "off": "Decay",
                         "tip": "Hold, the note stays until it is let go. Decay, it falls away and stays gone."
@@ -566,8 +680,7 @@
                       "Properties": {
                         "span": "3",
                         "dial": "40",
-                        "headroom": "50",
-                        "lines": "2"
+                        "lines": "1"
                       },
                       "Children": []
                     }
@@ -600,8 +713,7 @@
                       "Properties": {
                         "span": "3",
                         "dial": "40",
-                        "headroom": "50",
-                        "lines": "2"
+                        "lines": "1"
                       },
                       "Children": []
                     },
@@ -613,7 +725,7 @@
                         "span": "2",
                         "blink": "true",
                         "align": "middle",
-                        "margin": "0,46,0,0",
+                        "margin": "0,15,0,0",
                         "tip": "Goes round at the rate beside it, so the number can be seen as well as read. It runs whether or not a note is playing, which is when the rate is being set."
                       },
                       "Children": []
@@ -624,122 +736,8 @@
                       "Label": "",
                       "Properties": {
                         "span": "2",
-                        "lines": "2",
+                        "lines": "1",
                         "options": "Triangle,Square"
-                      },
-                      "Children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "Element": "Group",
-              "Parameter": "",
-              "Label": "",
-              "Properties": {
-                "caption": "Moves the oscillator"
-              },
-              "Children": [
-                {
-                  "Element": "Strip",
-                  "Parameter": "",
-                  "Label": "",
-                  "Properties": {
-                    "cell": "26",
-                    "gap": "4",
-                    "columns": "2 3 2"
-                  },
-                  "Children": [
-                    {
-                      "Element": "Switch",
-                      "Parameter": "vco_source",
-                      "Label": "",
-                      "Properties": {
-                        "span": "2",
-                        "lines": "2",
-                        "options": "Envelope,Lfo"
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Knob",
-                      "Parameter": "vco_amount",
-                      "Label": "",
-                      "Properties": {
-                        "span": "3",
-                        "dial": "40",
-                        "headroom": "50",
-                        "lines": "2"
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Switch",
-                      "Parameter": "vco_target",
-                      "Label": "",
-                      "Properties": {
-                        "span": "2",
-                        "lines": "2",
-                        "options": "Frequency,PulseWidth"
-                      },
-                      "Children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "Element": "Group",
-              "Parameter": "",
-              "Label": "",
-              "Properties": {
-                "caption": "Moves the filter"
-              },
-              "Children": [
-                {
-                  "Element": "Strip",
-                  "Parameter": "",
-                  "Label": "",
-                  "Properties": {
-                    "cell": "26",
-                    "gap": "4",
-                    "columns": "2 3 2"
-                  },
-                  "Children": [
-                    {
-                      "Element": "Switch",
-                      "Parameter": "vcf_source",
-                      "Label": "",
-                      "Properties": {
-                        "span": "2",
-                        "lines": "2",
-                        "options": "Envelope,Lfo"
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Knob",
-                      "Parameter": "vcf_amount",
-                      "Label": "",
-                      "Properties": {
-                        "span": "3",
-                        "dial": "40",
-                        "headroom": "50",
-                        "lines": "2"
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Switch",
-                      "Parameter": "vcf_polarity",
-                      "Label": "",
-                      "Properties": {
-                        "span": "2",
-                        "lines": "2",
-                        "on": "Close",
-                        "off": "Open",
-                        "tip": "Which way the modulation moves the filter."
                       },
                       "Children": []
                     }

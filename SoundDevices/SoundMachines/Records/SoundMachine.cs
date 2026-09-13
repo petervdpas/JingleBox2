@@ -121,6 +121,7 @@ public sealed record SoundMachine(
     {
         TrackerInstrumentKind.Synth => "Synth",
         TrackerInstrumentKind.MonoSynth => "Mono synth",
+        TrackerInstrumentKind.Fm => "FM",
         TrackerInstrumentKind.Sampler => "Sampler",
         TrackerInstrumentKind.Kit => "Kit",
         TrackerInstrumentKind.Sample => "Recording",
@@ -233,6 +234,7 @@ public sealed record SoundMachine(
         {
             "synth" => TrackerInstrumentKind.Synth,
             "monosynth" => TrackerInstrumentKind.MonoSynth,
+            "fm" => TrackerInstrumentKind.Fm,
             "sampler" => TrackerInstrumentKind.Sampler,
             "kit" => TrackerInstrumentKind.Kit,
             "recording" or "sample" => TrackerInstrumentKind.Sample,

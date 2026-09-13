@@ -2844,7 +2844,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         var instrument = Song.InstrumentAt(InstrumentForTrack(Cursor.Track));
         if (instrument == null) return;
 
-        _player.Preview(instrument, note, GainFor(volume), Cursor.Track, HeldNoteSeconds);
+        _player.Preview(instrument, note, GainFor(volume), Cursor.Track, TrackerPlayer.HeldNoteSeconds);
 
         _sounding[note.Semitone] = instrument;
 
@@ -2852,27 +2852,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Played(Cursor.Track, note, 0d);
     }
-
-    /// <summary>
-    /// How long a note played here sounds if nothing ever lets go of it.
-    /// </summary>
-    /// <remarks>
-    /// Long, because both keyboards on this page do let go: the hardware sends the other half
-    /// of the press and the letter rows have a release of their own now. So this is a safety net
-    /// for a release that never arrives rather than the length of the note, and it wants to be
-    /// long enough that nobody ever hears it.
-    ///
-    /// It was the fixed moment a clicked key wants, four tenths of a second, and that was the
-    /// difference between what a chord sounded like under your hands and what it sounded like
-    /// coming back: three short stabs against three notes ringing until the pattern played
-    /// something else. A panel's own keys still hold for the fixed moment, because a click
-    /// really has nothing to let go of it.
-    ///
-    /// Ten seconds rather than a minute, because the net is only ever reached when something
-    /// went wrong, and a note left ringing for a minute after a lost release is worse than one
-    /// cut short after ten. Nobody holds a key that long while writing a part.
-    /// </remarks>
-    private const double HeldNoteSeconds = 10;
 
     /// <summary>
     /// Which instrument each held note was sounded on, so the release reaches the same one.
@@ -2924,7 +2903,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// missing. The note it would sound is already sounding: the first press started a voice and
     /// the key has not come up, so a second one is the same note twice. Held for a couple of
     /// seconds that is sixty voices, at thirty repeats a second, each alive for
-    /// <see cref="HeldNoteSeconds"/>.
+    /// <see cref="TrackerPlayer.HeldNoteSeconds"/>.
     ///
     /// It was measured rather than reasoned about, in a log taken while somebody held one key:
     /// the mixer went from one voice to forty eight in two seconds, which is where it starts
@@ -3107,11 +3086,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// The master's still moves, because everything reaches the card through the master and
     /// that meter is the one measuring what you actually hear.
     /// </remarks>
-    public double Audition(TrackerInstrument instrument, Note note, int volume)
+    public double Audition(TrackerInstrument instrument, Note note, int volume,
+                           double holdSeconds = TrackerPlayer.PreviewHoldSeconds)
     {
         Meters();
 
-        return _player.Preview(instrument, note, GainFor(volume));
+        return _player.Preview(instrument, note, GainFor(volume), holdSeconds: holdSeconds);
     }
 
     /// <inheritdoc/>

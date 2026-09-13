@@ -82,7 +82,7 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
         }
 
         Editor = new InstrumentEditorViewModel(
-            track, instrument, changed, machines, waveforms, audition, recordings, note => Play(note), keys);
+            track, instrument, changed, machines, waveforms, audition, recordings, note => Play(note, TrackerCell.NoVolume, HoldSeconds), keys);
 
         Location = new TrackLocationViewModel(tracker);
 
@@ -298,7 +298,7 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
     private Rack.SoundDevices.Faces.Interfaces.IPanelLocation? _place;
 
     /// <summary>Plays C at the panel's own octave, which is what the TEST cap does.</summary>
-    private void Test() => Play(Note.FromOctave(0, Octave));
+    private void Test() => Play(Note.FromOctave(0, Octave), TrackerCell.NoVolume, HoldSeconds);
 
     /// <inheritdoc/>
     /// <remarks>
@@ -307,16 +307,24 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
     /// Through the same audition the rack uses, which is the tracker's own engine. A second
     /// engine would be a second output device and a plugin loaded twice.
     ///
-    /// The key is lit for as long as the sound lasts, which for a recording is the recording's
-    /// own length and for anything generated is the usual moment. The scopes draw themselves
+    /// A generated sound holds until the key comes up, since every keyboard here lets go of what
+    /// it pressed; the TEST cap and a tap in the editor have nothing to let go and hold for the
+    /// short moment. A recording sounds for its own length either way. The scopes draw themselves
     /// from <see cref="NoteTrigger"/>, so moving it on is what makes them follow what was
     /// just played.
     /// </remarks>
-    public void Play(Note note, int volume = TrackerCell.NoVolume)
+    public void Play(Note note, int volume = TrackerCell.NoVolume) =>
+        Play(note, volume, TrackerPlayer.HeldNoteSeconds);
+
+    /// <summary>The same, holding a generated sound for as long as it is asked to.</summary>
+    /// <param name="note">Which note.</param>
+    /// <param name="volume">How hard, or none for the instrument's own level.</param>
+    /// <param name="holdSeconds">How long before a generated sound lets go of itself.</param>
+    private void Play(Note note, int volume, double holdSeconds)
     {
         if (!note.IsPlayable) return;
 
-        double held = _audition.Audition(_instrument, note, volume);
+        double held = _audition.Audition(_instrument, note, volume, holdSeconds);
 
         Sounding.Struck(note, held > 0 ? held : HoldSeconds);
         Reveal(note);

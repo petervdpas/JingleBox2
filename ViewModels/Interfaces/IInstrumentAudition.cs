@@ -10,12 +10,23 @@ namespace JingleBox2.ViewModels.Interfaces;
 /// </summary>
 public interface IInstrumentAudition
 {
+    /// <summary>Sounds one note on that instrument.</summary>
+    /// <param name="instrument">What to play it on.</param>
+    /// <param name="note">Which note.</param>
+    /// <param name="volume">How hard, or none for the instrument's own level.</param>
+    /// <param name="holdSeconds">
+    /// How long a generated sound holds before it lets go of itself. A key that comes up hands in
+    /// <see cref="TrackerPlayer.HeldNoteSeconds"/>, which is a safety net rather than a length, so
+    /// the note sounds for as long as the key is held; a press with nothing to let go of it keeps
+    /// the short moment.
+    /// </param>
     /// <returns>
-    /// How long the note will sound. A generated sound holds for a fixed moment; a recording
+    /// How long the note will sound. A generated sound holds for what it was asked to; a recording
     /// holds until it has been heard right through, which is what a keyboard needs to know to
     /// light its key and a picture needs to run its cursor.
     /// </returns>
-    double Audition(TrackerInstrument instrument, Note note, int volume);
+    double Audition(TrackerInstrument instrument, Note note, int volume,
+                    double holdSeconds = TrackerPlayer.PreviewHoldSeconds);
 
     /// <summary>
     /// Lets go of one note played by hand: the same thing a pattern's OFF does to a track.

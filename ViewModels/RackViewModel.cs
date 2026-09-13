@@ -515,14 +515,22 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     /// A note played on the computer keyboard, on a drawn key, or on the hardware while editing.
     /// </summary>
     /// <remarks>
-    /// The key is lit for as long as the note sounds, which for a recording is the recording's own
-    /// length rather than a fixed moment.
+    /// A generated sound holds until the key comes up, since the hardware, the letter rows and a
+    /// drawn key all let go of what they pressed; the TEST cap and a tap in the editor have nothing
+    /// to let go and hold for the short moment. A recording sounds for its own length either way.
     ///
     /// What was heard is said in the status line, and so is a key press that could not be played,
     /// because silence with no explanation is the worst answer to a key press: a silent one is
     /// otherwise impossible to tell from one that never arrived.
     /// </remarks>
-    public void PlayNote(Note note, int volume = TrackerCell.NoVolume)
+    /// <param name="note">Which note.</param>
+    /// <param name="volume">How hard, or none for the instrument's own level.</param>
+    /// <param name="holdSeconds">
+    /// How long a generated sound holds before it lets go of itself. A key comes up, so the
+    /// default is the safety net and the note sounds for as long as the key is held.
+    /// </param>
+    public void PlayNote(Note note, int volume = TrackerCell.NoVolume,
+                         double holdSeconds = TrackerPlayer.HeldNoteSeconds)
     {
         var instrument = Selected?.Instrument;
         if (instrument == null)
@@ -531,7 +539,7 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
             return;
         }
 
-        double held = _audition.Audition(instrument, note, volume);
+        double held = _audition.Audition(instrument, note, volume, holdSeconds);
 
         Sounding.Struck(note, held > 0 ? held : HoldSeconds);
 
@@ -607,7 +615,7 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
             ? null
             : new InstrumentEditorViewModel(
                 Machines.IndexOf(value), value.Instrument, OnInstrumentEdited, _machines,
-                _waveforms, _audition, _recordings, note => PlayNote(note), MidiKeys);
+                _waveforms, _audition, _recordings, note => PlayNote(note, TrackerCell.NoVolume, HoldSeconds), MidiKeys);
 
         Presets = value == null
             ? null
@@ -950,7 +958,7 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
             return;
         }
 
-        PlayNote(Note.FromOctave(0, Octave));
+        PlayNote(Note.FromOctave(0, Octave), TrackerCell.NoVolume, HoldSeconds);
         Status = $"Testing '{instrument.Name}'";
     }
 

@@ -35,7 +35,28 @@ public class DeviceFlowTests
     /// <summary>The audio the rack borrows, which this asks nothing of.</summary>
     private sealed class Silent : IInstrumentAudition
     {
-        public double Audition(TrackerInstrument instrument, Note note, int volume) => 0;
+        public double Audition(TrackerInstrument instrument, Note note, int volume, double holdSeconds) => 0;
+
+        public void Let(TrackerInstrument instrument, Note note) { }
+
+        public void Silence(TrackerInstrument instrument) { }
+
+        public double SamplePosition(int track) => 0;
+
+        public IPluginParameters? PluginFor(TrackerInstrument instrument) => null;
+    }
+
+    /// <summary>The audio the rack borrows, writing down how long each note was asked to hold.</summary>
+    private sealed class Heard : IInstrumentAudition
+    {
+        public System.Collections.Generic.List<double> Holds { get; } = new();
+
+        public double Audition(TrackerInstrument instrument, Note note, int volume, double holdSeconds)
+        {
+            Holds.Add(holdSeconds);
+
+            return holdSeconds;
+        }
 
         public void Let(TrackerInstrument instrument, Note note) { }
 
@@ -142,6 +163,39 @@ public class DeviceFlowTests
         song.SetTrackInstrument(0, song.Instruments.Count - 1);
 
         Assert.Equal("machine.thumper", song.InstrumentAt(song.GetTrackInstrument(0))!.Id);
+    }
+
+    /// <summary>
+    /// A key played on the rack holds its note until the key comes up, and the TEST cap, which
+    /// has no key to come up, holds for the short moment.
+    /// </summary>
+    /// <remarks>
+    /// Every keyboard that reaches the rack lets go, the hardware, the letter rows and a drawn key
+    /// alike, so what a key asks for is the safety net and not a length. It asked for four tenths
+    /// of a second, and an organ held down on a keyboard stopped while the hand was still on it.
+    /// </remarks>
+    [Fact]
+    public void A_key_on_the_rack_holds_until_it_comes_up()
+    {
+        var bench = Set("held");
+
+        Designed(bench.Shipped, "Hummer", "machine.hummer", "FM");
+
+        bench.Projects.Keep(bench.Registry.Load());
+
+        var heard = new Heard();
+        var page = new RackViewModel(bench.Rack, heard, bench.Projects, new ObservableCollection<Recording>());
+
+        page.Refresh();
+        page.Selected = page.Machines.First(one => one.Id == "machine.hummer");
+
+        page.Play(new Note(60), TrackerCell.NoVolume);
+
+        Assert.Equal(TrackerPlayer.HeldNoteSeconds, heard.Holds.Last());
+
+        page.TestCommand.Execute(null);
+
+        Assert.Equal(TrackerPlayer.PreviewHoldSeconds, heard.Holds.Last());
     }
 
     /// <summary>Unregistering takes it off the rack, and the walk stops at the registry.</summary>
