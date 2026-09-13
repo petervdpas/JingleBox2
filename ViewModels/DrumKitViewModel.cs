@@ -164,12 +164,11 @@ public sealed partial class DrumKitViewModel : ObservableObject
         return put;
     }
 
-    /// <summary>Lays windows of one recording over the pads, from the first, and says the kit changed.</summary>
-    /// <param name="filePath">The recording.</param>
-    /// <param name="pieces">Each pad's window and name.</param>
-    public void Lay(string filePath, IReadOnlyList<(double Start, double End, string Name)> pieces)
+    /// <summary>Lays a recording on each pad, from the first, and says the kit changed.</summary>
+    /// <param name="pieces">Each pad's recording and name.</param>
+    public void Lay(IReadOnlyList<(string FilePath, string Name)> pieces)
     {
-        _kit.Lay(filePath, pieces);
+        _kit.Lay(pieces);
 
         Resliced();
 

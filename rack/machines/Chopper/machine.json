@@ -1,7 +1,7 @@
 {
   "Id": "machine.chopper",
   "Name": "Chopper",
-  "Summary": "A kit cut from one recording. A beat or a sheet of hits, chopped across sixteen pads.",
+  "Summary": "A kit chopped out of one recording. It listens for the drums in a beat and cuts each into a sample of its own.",
   "Author": "Peter van de Pas",
   "Version": "1.0",
   "Engine": "Kit",
@@ -15,6 +15,7 @@
     "RowOver": 0.3,
     "RowPicked": 0.58
   },
+  "StartsFrom": "presets",
   "Parameters": [
     {
       "Key": "pad_level",
@@ -75,6 +76,17 @@
               "Children": []
             },
             {
+              "Element": "Preset",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "source": "presets",
+                "caption": "Presets",
+                "width": "258"
+              },
+              "Children": []
+            },
+            {
               "Element": "InstrumentName",
               "Parameter": "",
               "Label": "",
@@ -92,12 +104,13 @@
           },
           "Children": [
             {
-              "Element": "Take",
-              "Parameter": "pad_take",
+              "Element": "Button",
+              "Parameter": "",
               "Label": "",
               "Properties": {
-                "caption": "Patch",
-                "tip": "The one recording the kit is cut from: a beat, or a sheet of hits played one after another. Pick it, then Chop underneath lays its pieces across the pads."
+                "cap": "Chop a recording...",
+                "action": "chop_drums",
+                "tip": "Pick a recording: a beat, or a sheet of hits played one after another. It is listened to, one of each drum in it is cut into a file of its own, and those go on the pads, kick first, named for what they sound like."
               },
               "Children": []
             },
@@ -106,9 +119,9 @@
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "cap": "Find drums",
-                "action": "find_drums",
-                "tip": "Listens to the patch and puts one of each drum it hears on the pads, kick first, named for what it sounds like."
+                "cap": "Clear",
+                "action": "clear_pad",
+                "tip": "Takes the recording off the pad in hand."
               },
               "Children": []
             }
@@ -389,15 +402,6 @@
               ]
             }
           ]
-        },
-        {
-          "Element": "Slices",
-          "Parameter": "",
-          "Label": "",
-          "Properties": {
-            "picture": "120"
-          },
-          "Children": []
         },
         {
           "Element": "Menu",

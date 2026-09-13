@@ -1,53 +1,46 @@
 # Chopper
 
-A kit cut from one recording. A drum beat, or a sample pack's sheet of hits played one after
-another, goes in whole and comes out as sixteen pads you can play in any order.
+A kit chopped out of one recording. Hand it a drum beat, or a sample pack's sheet of hits played
+one after another, and it listens for the drums in it, cuts each one out into a sample of its own,
+and puts those on the pads.
 
 It is the same kit engine BongaBong plays, so everything a pad does is the same: nothing is
-transposed, pads sound over each other, and choke groups silence each other. What differs is
-where the sounds come from. BongaBong is filled a recording to a pad; Chopper is filled from one.
+transposed, pads sound over each other, and choke groups silence each other. What differs is where
+the sounds come from. BongaBong is filled with samples you already have; Chopper makes them.
 
-## Patch
+## Chop a recording
 
-**Patch** is the one recording the kit is cut from, off RECORD's shelf. Import the file there
-first if it is not on it yet. Picking it puts the whole recording on the pads' picture underneath,
-ready to be cut.
+**Chop a recording...** asks for a recording off RECORD's shelf. Import the file there first if it
+is not on it yet. Then:
 
-## Find drums
+1. **It finds every hit.** The bottom, the middle and the top of the sound are followed a few
+   milliseconds at a time, and a hit is wherever any of them jumps: a hat played over the tail of a
+   kick is still found, because the top of the sound leaps even while the kick is louder.
+2. **It hears what each hit is.** Weight under a hundred and fifty cycles that is gone quickly is a
+   kick. A short knock in the middle, or a body with a rattle over it, is a snare. Top that stops
+   at once is a closed hat, top that rings is an open hat, and top that goes on ringing is a
+   cymbal. A tone in the middle that sings is a tom.
+3. **It keeps one of each.** A beat plays the same kick again and again; hits that sound alike are
+   grouped, and the one with least else ringing on top of it is kept. Ghost notes and the room
+   ringing between hits are heard and left out.
+4. **It cuts them out.** Each drum is written to a sample of its own, from just before the hit to
+   where it has died away or the next hit lands, faded at both ends so it does not click.
+5. **It lays them on the pads**, kick first, then snare, hats, toms and cymbals, each named for
+   what it is.
 
-**Find drums** listens to the patch and builds the kit from what it hears: one of each drum, laid
-out kick first, then snare, closed hat, open hat, tom and cymbal, and each pad named for what it
-sounds like. A beat plays the same kick again and again; this keeps one of them, the one with the
-least else ringing on top of it.
+The samples are kept in the application folder under recordings, chopped, in a folder named for
+the recording. Chopping the same recording again makes a second folder beside the first rather than
+writing over it, so a song already using the first chop sounds as it did. A song packed to hand on
+carries them.
 
-It listens the way you would. Weight under a hundred and fifty cycles that is gone quickly is a
-kick. A short knock in the middle, or a body with a rattle over it, is a snare. Top that stops at
-once is a closed hat, top that rings is an open hat, and top that goes on ringing is a cymbal. A
-tone in the middle that sings is a tom. Hits too quiet to matter, the room ringing between beats
-and ghost notes, are heard and not given a pad.
+It is rules, not a model: it listens the way you would, and it is right about drums that sound like
+drums. Something built to sound strange can be heard as the wrong drum. **Clear** takes a pad's
+sample off, and chopping again starts over.
 
-It is rules, not a model, so it is right about drums that sound like drums and can be wrong about
-anything built to sound strange. Each pad plays only its own hit. Pressing it again starts over,
-and **Chop** below cuts the patch the plain way instead, a piece to a pad in the order they play.
+## What ships with it
 
-## Chop
-
-The picture of the recording is at the foot of the machine, with the cutting under it.
-
-- **Pieces** is how many pads to fill, up to sixteen.
-- **Cut at** is where the cuts go. **Hits** finds where each sound starts, which is right for a
-  beat and for a sheet of hits. **Gaps** cuts in the silences between sounds. **Even** cuts into
-  equal lengths, which is right for a loop that is in time.
-- **Chop** does it, laying a piece on each pad from the first, and emptying any pads past the last
-  piece. Each piece is named for the drum it starts with, heard rather than read off the file:
-  Kick 1, Hat closed 1, Snare 1, and so on.
-
-Every cut is a line on the picture and can be dragged where the finder put it wrong. Clicking the
-picture twice adds a cut where there is none and takes one away where there is. The pieces all
-play the one recording, so nothing is copied and nothing on the shelf changes.
-
-For one sound to a pad, cut a beat one bar long into sixteen. A longer beat cut into sixteen
-gives pieces of a beat each, several drums at once.
+**Energy Beat**, a clean drum loop chopped into its kick, snare, two closed hats and an open hat,
+with the three hats in one choke group so an open hat is cut short by a closed one.
 
 ## Pads
 

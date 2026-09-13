@@ -191,20 +191,22 @@ public sealed class DrumKit
     }
 
     /// <summary>
-    /// Puts one window of a recording on each pad, from the first, and empties the rest.
+    /// Puts one recording on each pad, from the first, and empties the rest.
     /// </summary>
     /// <remarks>
-    /// Windows rather than cuts, so they need not touch: a hit found in a beat is where it is, and
-    /// what lies between two of them belongs to neither. So the kit is not marked as sliced, and a
-    /// picture of the recording shows each pad's own window rather than a row of cuts that would
-    /// have to meet end to end. What was set on a pad by hand, its level, its place and its choke
-    /// group, stays where it was.
+    /// Each pad plays the whole of its own recording, which is what a kit of drums cut into files
+    /// of their own is, so the kit is not marked as sliced. What was set on a pad by hand, its
+    /// level, its place and its choke group, stays where it was. A piece naming no file is left
+    /// off, and a list with nothing in it changes nothing.
     /// </remarks>
-    /// <param name="filePath">The recording every window is of.</param>
-    /// <param name="pieces">Each window as fractions of it, with the name the pad is given.</param>
-    public void Lay(string filePath, IReadOnlyList<(double Start, double End, string Name)> pieces)
+    /// <param name="pieces">Each pad's recording and the name the pad is given.</param>
+    public void Lay(IReadOnlyList<(string FilePath, string Name)> pieces)
     {
-        if (string.IsNullOrWhiteSpace(filePath) || pieces is null) return;
+        if (pieces is null) return;
+
+        pieces = pieces.Where(one => !string.IsNullOrWhiteSpace(one.FilePath)).ToList();
+
+        if (pieces.Count == 0) return;
 
         Clamp();
 
@@ -216,10 +218,10 @@ public sealed class DrumKit
 
             if (i < pieces.Count)
             {
-                pad.FilePath = filePath;
+                pad.FilePath = pieces[i].FilePath;
                 pad.Name = pieces[i].Name;
-                pad.Shape.Start = Math.Clamp(pieces[i].Start, 0, 1);
-                pad.Shape.End = Math.Clamp(Math.Max(pieces[i].End, pieces[i].Start), 0, 1);
+                pad.Shape.Start = 0;
+                pad.Shape.End = 1;
             }
             else
             {

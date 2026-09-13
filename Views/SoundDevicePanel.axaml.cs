@@ -148,8 +148,8 @@ public partial class SoundDevicePanel : UserControl
 
                 break;
 
-            case Rack.SoundDevices.Faces.PanelActions.FindDrums:
-                FindDrums();
+            case Rack.SoundDevices.Faces.PanelActions.ChopDrums:
+                ChopDrums();
 
                 break;
 
@@ -392,51 +392,50 @@ public partial class SoundDevicePanel : UserControl
     }
 
     /// <summary>
-    /// Listens to the recording on the kit and lays one of each drum it hears across the pads.
+    /// Asks for a recording off the shelf, cuts the drums out of it into files of their own, and
+    /// lays those across the pads.
     /// </summary>
     /// <remarks>
-    /// The recording is the one on the pad in hand, or on the first pad holding one, which on a
-    /// kit cut from one recording is every pad. Reading and listening are done off the drawing
-    /// thread, since a beat of several seconds is a few hundred thousand samples to follow, and
-    /// only the laying out comes back to it. A recording with nothing in it that sounds like a hit
-    /// is said so, rather than leaving a press that did nothing.
+    /// The files go under the application folder, in a folder of their own per chop, beside the
+    /// recordings rather than among them: the shelf is takes somebody made, and sixteen drums per
+    /// chop would bury them. A song using a chop still carries the files when it is packed, since
+    /// they are not something that ships with the program.
+    ///
+    /// Reading, listening and writing are done off the drawing thread, and only the laying out
+    /// comes back to it. A recording with nothing in it that sounds like a hit is said so, rather
+    /// than leaving a press that did nothing.
     /// </remarks>
-    private async void FindDrums()
+    private async void ChopDrums()
     {
-        var kit = Designer?.Editor?.Kit;
+        var editor = Designer?.Editor;
+        var kit = editor?.Kit;
 
-        if (kit is null) return;
+        if (editor is null || kit is null) return;
 
-        string path = kit.Selected?.Pad.FilePath is { Length: > 0 } picked
-            ? picked
-            : kit.Kit.Pads.FirstOrDefault(pad => pad.HasSound)?.FilePath ?? "";
+        var take = await TakeDialog.PickAsync(editor.Takes);
 
-        if (path.Length == 0)
-        {
-            await ConfirmDialog.NoteAsync("Find drums", "Pick a patch first: the recording the drums are found in.");
-            return;
-        }
+        if (take is null || take.FilePath.Length == 0) return;
 
         int pads = kit.Pads.Count;
+        string recording = take.FilePath;
 
-        var found = await System.Threading.Tasks.Task.Run(() =>
+        var chopped = await System.Threading.Tasks.Task.Run(() =>
         {
-            var listener = new Tracker.DrumListener();
-            var sample = new Tracker.SampleStore().Load(path);
-            var chosen = listener.Kit(listener.Listen(sample), pads);
+            var chopper = new Tracker.DrumChopper();
+            string chops = System.IO.Path.Combine(new Files.AppFolder().Path(), "recordings", "chopped");
 
-            return chosen.Select((hit, at) => (hit.Start, hit.End, listener.NameOf(chosen, at))).ToList();
+            return chopper.Chop(recording, chopper.FolderFor(recording, chops), pads);
         });
 
-        if (found.Count == 0)
+        if (chopped.Count == 0)
         {
-            await ConfirmDialog.NoteAsync("Find drums", "Nothing in that recording sounds like a drum being hit.");
+            await ConfirmDialog.NoteAsync("Chop", "Nothing in that recording sounds like a drum being hit.");
             return;
         }
 
-        kit.Lay(path, found);
+        kit.Lay(chopped.Select(drum => (drum.FilePath, drum.Name)).ToList());
 
-        Designer?.Editor?.SaidAgain();
+        editor.SaidAgain();
     }
 
     /// <summary>Brings samples in from the disc and builds the whole map from them.</summary>

@@ -1,0 +1,39 @@
+{
+  "Name": "Energy Beat",
+  "Machine": "machine.chopper",
+  "C-4": {
+    "pad_take": "Energy Beat/Kick.wav",
+    "pad_name": "Kick",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 0
+  },
+  "C#4": {
+    "pad_take": "Energy Beat/Snare.wav",
+    "pad_name": "Snare",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 0
+  },
+  "D-4": {
+    "pad_take": "Energy Beat/Hat closed 1.wav",
+    "pad_name": "Hat closed 1",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 1
+  },
+  "D#4": {
+    "pad_take": "Energy Beat/Hat closed 2.wav",
+    "pad_name": "Hat closed 2",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 1
+  },
+  "E-4": {
+    "pad_take": "Energy Beat/Hat open.wav",
+    "pad_name": "Hat open",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 1
+  }
+}

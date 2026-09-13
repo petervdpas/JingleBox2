@@ -249,30 +249,4 @@ public sealed class DrumListenerTests
         Assert.Equal(DrumSound.Tom, DrumListener.Sound(0.1, 0.9, 0.0, 0.4, 900));
         Assert.Equal(DrumSound.Snare, DrumListener.Sound(0.06, 0.92, 0.01, 0.11, 900));
     }
-
-    /// <summary>Laying windows on a kit fills the pads from the first, empties the rest, and keeps what was set by hand.</summary>
-    [Fact]
-    public void Laying_windows_fills_from_the_first_and_keeps_levels()
-    {
-        var kit = DrumKit.Empty(4);
-
-        kit.Pads[0].Volume = 0.5;
-        kit.Pads[3].FilePath = "old.wav";
-        kit.Sliced = true;
-
-        kit.Lay("beat.wav", new[] { (0.1, 0.2, "Kick"), (0.3, 0.25, "Snare") });
-
-        Assert.Equal("beat.wav", kit.Pads[0].FilePath);
-        Assert.Equal("Kick", kit.Pads[0].Name);
-        Assert.Equal(0.1, kit.Pads[0].Shape!.Start, 6);
-        Assert.Equal(0.2, kit.Pads[0].Shape!.End, 6);
-        Assert.Equal(0.5, kit.Pads[0].Volume);
-        Assert.True(kit.Pads[1].Shape!.End >= kit.Pads[1].Shape!.Start);
-        Assert.Equal("", kit.Pads[3].FilePath);
-        Assert.False(kit.Sliced);
-
-        kit.Lay("", new[] { (0.0, 1.0, "Nothing") });
-
-        Assert.Equal("beat.wav", kit.Pads[0].FilePath);
-    }
 }

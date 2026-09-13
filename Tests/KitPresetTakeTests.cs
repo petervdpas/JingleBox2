@@ -26,11 +26,13 @@ public sealed class KitPresetTakeTests
         return at is null ? "" : Path.Combine(at.FullName, "rack", "machines", name);
     }
 
-    /// <summary>Every BongaBong preset puts a recording on each pad it names.</summary>
-    [Fact]
-    public void Every_BongaBong_preset_puts_recordings_on_its_pads()
+    /// <summary>Every preset on either kit puts a recording on each pad it names, and the recording is there.</summary>
+    [Theory]
+    [InlineData("BongaBong")]
+    [InlineData("Chopper")]
+    public void Every_kit_preset_puts_recordings_on_its_pads(string kit)
     {
-        string folder = Shipped("BongaBong");
+        string folder = Shipped(kit);
         var machine = SoundMachineProject.Open(folder);
 
         Assert.NotNull(machine);
@@ -51,6 +53,8 @@ public sealed class KitPresetTakeTests
             Assert.NotEmpty(named);
             Assert.All(named, pad => Assert.False(string.IsNullOrEmpty(pad.FilePath),
                 Path.GetFileName(file) + " put nothing on " + pad.Name));
+            Assert.All(named, pad => Assert.True(File.Exists(pad.FilePath),
+                Path.GetFileName(file) + " points " + pad.Name + " at " + pad.FilePath + ", which is not there"));
         }
     }
 }
