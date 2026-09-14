@@ -292,25 +292,14 @@ public sealed class ControlTemplates : IControlTemplates
     /// <param name="one">The link to ask about.</param>
     private static bool Strips(ControlMapping one) => one.Kind == ControlKind.Mix;
 
-    /// <summary>
-    /// Whether this computer can see the controller a template names.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// The one thing the ports are asked, since nothing here writes a port down: it decides the
-    /// wording on the line and nothing else. A controller in the other room lays its links down
-    /// exactly as one on the desk does.
-    ///
-    /// By what a profile calls a port rather than by the port's own spelling, which is the whole
-    /// reason a template names the controller. A controller with no profile is called by its
-    /// port, so this still sees it where the two computers spell it the same way, which is what
-    /// a file made and opened on one machine does.
+    /// A controller with no profile is called by its port, so this still sees it where the two
+    /// computers spell it the same way, which is what a file made and opened on one machine does.
     /// </remarks>
-    /// <param name="controller">What the file named.</param>
-    /// <param name="ports">The MIDI ports this computer has.</param>
-    /// <param name="called">What a port's profile calls it.</param>
-    private static bool Here(string controller, IEnumerable<string>? ports, Func<string, string>? called)
+    public bool Here(string controller, IEnumerable<string>? ports, Func<string, string>? called = null)
     {
-        if (controller.Length == 0 || ports is null) return false;
+        if (string.IsNullOrEmpty(controller) || ports is null) return false;
 
         return ports.Any(port =>
             string.Equals(called?.Invoke(port) ?? port, controller, StringComparison.OrdinalIgnoreCase)

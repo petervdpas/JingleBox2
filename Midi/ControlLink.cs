@@ -89,7 +89,7 @@ public sealed class ControlLink
     public Interfaces.IControlTemplateBlock? Templates { get; set; }
 
     /// <summary>
-    /// Which MIDI ports this computer has, for settling a template's controller on arrival.
+    /// Which MIDI ports are plugged in now, for settling a template's controller on arrival.
     /// </summary>
     /// <remarks>
     /// The one part of a template that does not travel. A file names the controller as its
@@ -102,6 +102,20 @@ public sealed class ControlLink
     /// for it, which is the rule a link already keeps.
     /// </remarks>
     public Func<IEnumerable<string>>? Ports { get; set; }
+
+    /// <summary>
+    /// Whether a controller is plugged in that could teach a link, or nothing where nobody has said.
+    /// </summary>
+    /// <remarks>
+    /// Learning waits for a control on the desk to be touched, so with no controller connected the
+    /// mode would be on with nothing that could ever finish it, which reads as a gesture that does
+    /// not work. Set once as the window is built, beside <see cref="Ports"/>; where it is not set,
+    /// a panel shown outside the application, learning is left as it always was.
+    /// </remarks>
+    public Func<bool>? Connected { get; set; }
+
+    /// <summary>Whether learning can be turned on now: a controller is connected, or nobody has said.</summary>
+    public bool CanLearn => Connected?.Invoke() ?? true;
 
     /// <summary>
     /// What a profile calls the device a port belongs to, or nothing where nobody knows.

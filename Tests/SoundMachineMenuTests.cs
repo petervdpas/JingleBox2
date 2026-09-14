@@ -185,6 +185,79 @@ public class SoundMachineMenuTests
     }
 
     /// <summary>
+    /// A desk's line can only be chosen while that desk is plugged in, and says so while it is not.
+    /// </summary>
+    /// <remarks>
+    /// Pointing a controller nobody can touch at a machine is a press nothing on the desk could
+    /// confirm, so the line stays in the list, grey, naming what is missing. A controller known by
+    /// its profile's name counts as well as one known by its port, whatever the case.
+    /// </remarks>
+    [Fact]
+    public void A_desk_that_is_not_plugged_in_cannot_be_chosen()
+    {
+        var offers = Part(
+            out _,
+            out var link,
+            out _,
+            OnMachine("attack", 0),
+            OnMachine("duty", 2, "Desk Two")).Read();
+
+        Assert.False(offers[0].Live);
+        Assert.Contains("not connected", offers[0].Tip, StringComparison.Ordinal);
+
+        link.Ports = () => new[] { "Desk One" };
+
+        var again = new ControlMenu(() => Id, () => Named, () => link).Read();
+
+        Assert.True(again[0].Live);
+        Assert.False(again[1].Live);
+
+        var templates = new ControlTemplates();
+
+        Assert.True(templates.Here("Desk Two", new[] { "desk two port" }, port => port == "desk two port" ? "Desk Two" : port));
+        Assert.True(templates.Here("desk two port", new[] { "DESK TWO PORT" }));
+        Assert.False(templates.Here("Desk Two", new[] { "Desk One" }, port => port));
+        Assert.False(templates.Here("", new[] { "" }));
+        Assert.False(templates.Here("Desk Two", null));
+    }
+
+    /// <summary>
+    /// Learning cannot be started with no controller connected, and can always be stopped.
+    /// </summary>
+    /// <remarks>
+    /// Learning waits for a control on the desk to be touched, so with nothing connected the mode
+    /// would be on with nothing that could finish it. Where nobody has said what is connected,
+    /// which is a panel shown outside the application, the line is live as it always was.
+    /// </remarks>
+    [Fact]
+    public void Learning_waits_for_a_controller()
+    {
+        var part = Part(out _, out var link, out _);
+
+        Assert.True(part.Read()[^1].Live);
+
+        link.Connected = () => false;
+
+        var grey = part.Read()[^1];
+
+        Assert.Equal(Learn, grey.Said);
+        Assert.False(grey.Live);
+        Assert.Contains("No controller is connected", grey.Tip, StringComparison.Ordinal);
+
+        link.IsLinking = true;
+
+        var stop = part.Read()[^1];
+
+        Assert.Equal(Stop, stop.Said);
+        Assert.True(stop.Live);
+
+        link.Connected = () => true;
+        link.IsLinking = false;
+
+        Assert.True(part.Read()[^1].Live);
+    }
+
+    /// <summary>
     /// A desk pointed at another machine is that machine's business and not this one's.
     /// </summary>
     /// <remarks>

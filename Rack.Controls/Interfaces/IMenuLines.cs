@@ -19,12 +19,22 @@ namespace JingleBox2.Rack.Controls.Interfaces;
 /// </remarks>
 public interface IMenuLines
 {
-    /// <summary>The same lines as menu items, ready to be an items source.</summary>
+    /// <summary>The same lines as menu items, with a divider between parts, ready to be an items source.</summary>
     /// <remarks>
     /// Handed over as a source rather than built into a menu, since a control put into an items
     /// source is its own container. Nothing here decides anything: a line with nothing to do is a
     /// line with no command.
     /// </remarks>
     /// <param name="offers">The lines to draw.</param>
-    IReadOnlyList<MenuItem> Listed(IEnumerable<PanelMenuItem> offers);
+    IReadOnlyList<Control> Listed(IEnumerable<PanelMenuItem> offers);
+
+    /// <summary>
+    /// Whether a divider goes in front of that line: it is in another part of the Menu from the line above it.
+    /// </summary>
+    /// <remarks>
+    /// Never above the first line, since a divider there divides nothing.
+    /// </remarks>
+    /// <param name="above">The line above, or nothing for the first.</param>
+    /// <param name="line">The line.</param>
+    bool Divides(PanelMenuItem? above, PanelMenuItem line);
 }

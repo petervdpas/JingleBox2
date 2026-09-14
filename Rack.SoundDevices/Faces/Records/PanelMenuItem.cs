@@ -39,4 +39,23 @@ public sealed record PanelMenuItem(string Said)
     /// a line that is not part of an option is: something the Menu always says.
     /// </remarks>
     public string Option { get; init; } = "";
+
+    /// <summary>
+    /// Which part of the Menu the line is drawn in, where a divider parts one part from the next.
+    /// </summary>
+    /// <remarks>
+    /// A Menu does several different jobs, the device's own page, its presets, and the hardware
+    /// pointed at it, and a divider between them is how every menu says so without a heading.
+    /// Nothing said means the line's own option, which is the ordinary case; a line that belongs
+    /// with another option's lines says that option, the way learning a control belongs with the
+    /// control surfaces it is learned on.
+    /// </remarks>
+    public string Section
+    {
+        get => _section ?? Option;
+        init => _section = value;
+    }
+
+    /// <summary>What was said about the part, or nothing for the line's own option.</summary>
+    private readonly string? _section;
 }

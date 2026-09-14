@@ -95,4 +95,16 @@ public interface IControlExchange
     /// </remarks>
     /// <param name="control">What that control offers a knob.</param>
     bool Wired(ControlMapping? control);
+
+    /// <summary>
+    /// Whether the controller that template is for is plugged in now.
+    /// </summary>
+    /// <remarks>
+    /// What a Menu asks before it lets a template be chosen: laying one down for a controller that
+    /// is not on the desk points hardware nobody can touch at this, and nothing on the screen or
+    /// the desk could then say whether it took. Asked each time the Menu opens, since a controller
+    /// is plugged in and out while a panel is on screen.
+    /// </remarks>
+    /// <param name="template">The template, as the block holds it.</param>
+    bool Plugged(ControlTemplate? template);
 }

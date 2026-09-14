@@ -58,6 +58,8 @@ public sealed class HelpText : IHelpText
     public const string PadsLayingOut = "pads.laying-out";
     /// <summary>Making a take, trimming it, and where it goes.</summary>
     public const string RecordTakes = "record.takes";
+    /// <summary>Where RECORD takes its sound from, and the controls that make a take.</summary>
+    public const string RecordCapture = "record.capture";
     /// <summary>How the pattern grid is read and written.</summary>
     public const string TrackerPattern = "tracker.pattern";
     /// <summary>What a song holds and how one travels.</summary>

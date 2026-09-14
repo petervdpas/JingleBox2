@@ -142,6 +142,20 @@ public interface IControlTemplates
     /// <param name="called">What a port's profile calls it, or the port itself where none does.</param>
     ControlTemplateReading Take(ControlTemplate? template, IEnumerable<string>? ports = null, Func<string, string>? called = null);
 
+    /// <summary>
+    /// Whether the controller a template names is one of the ports this computer has plugged in.
+    /// </summary>
+    /// <remarks>
+    /// By what a profile calls a port as well as by the port's own spelling, since a template names
+    /// the controller as its profile calls it. Laying a template down asks it for the wording, and a
+    /// Menu asks it before offering the template at all: pointing a controller that is not on the
+    /// desk at something is a press that could not be checked by touching anything.
+    /// </remarks>
+    /// <param name="controller">What the template names.</param>
+    /// <param name="ports">The MIDI ports plugged in now.</param>
+    /// <param name="called">What a port's profile calls it.</param>
+    bool Here(string controller, IEnumerable<string>? ports, Func<string, string>? called = null);
+
     /// <summary>Writes it out whole, so a half-written file cannot replace a good one.</summary>
     /// <param name="path">Where to write it.</param>
     /// <param name="template">What to write.</param>

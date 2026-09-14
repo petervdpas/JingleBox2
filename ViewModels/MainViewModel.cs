@@ -232,7 +232,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         new(() => "", () => "the pads", kind: JingleBox2.Midi.LinkTargets.Pads);
 
     /// <summary>
-    /// Which MIDI ports this computer has, asked rather than held.
+    /// Which MIDI ports are plugged in now, asked rather than held.
     /// </summary>
     /// <remarks>
     /// A template names its controller as a profile calls it, since a port is spelled
@@ -241,7 +241,10 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     /// open, and a list read when the page was built would refuse the device somebody has just
     /// put on the desk.
     /// </remarks>
-    private IEnumerable<string> Ports() => Midi.Devices.Select(one => one.Name).ToList();
+    private IEnumerable<string> Ports() => Midi.Devices.Where(one => one.IsConnected).Select(one => one.Name).ToList();
+
+    /// <summary>Whether a controller is plugged in with a job to do, which is what learning a control needs.</summary>
+    private bool Connected() => Midi.Devices.Any(one => one.IsConnected && one.Role != MidiPortRole.None);
 
     /// <summary>
     /// Every link named by its controller rather than by the port it arrived on, and one link
@@ -2540,6 +2543,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         // than being threaded through every place a face can be drawn.
         ControlLink.Templates = blocks.Templates;
         ControlLink.Ports = Ports;
+        ControlLink.Connected = Connected;
         ControlLink.Called = port => _profiles.Called(port);
 
         Links = new ControlLinksViewModel(ControlLink, profiles: _profiles, ports: Ports);

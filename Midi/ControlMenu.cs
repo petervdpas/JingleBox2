@@ -197,6 +197,9 @@ public sealed class ControlMenu : IPanelMenu
     /// Headed with the surface, since that is what somebody is choosing between: which of the
     /// boxes on this desk do I want driving this machine.
     ///
+    /// Only while that controller is connected: the line is there and grey otherwise, saying so,
+    /// since pointing hardware nobody can touch at something is a press nothing could confirm.
+    ///
     /// Laid down through <see cref="ControlLink.Take"/>, which is the one door a batch of links
     /// goes through and keeps the rules a link made by hand keeps. A template already in force
     /// therefore comes back exactly as it was, and one whose knobs have since been pointed
@@ -208,12 +211,17 @@ public sealed class ControlMenu : IPanelMenu
     {
         string controller = template.Controller.Length > 0 ? template.Controller : Anonymous;
 
+        bool here = Hook.Plugged(template);
+
         return new PanelMenuItem(controller + Beside + Counted(template.Controls.Count))
         {
             Option = MenuOptionWords.Surfaces,
-            Tip = "Points that controller at " + called + " the way this template says. One "
+            Live = here,
+            Tip = here
+                ? "Points that controller at " + called + " the way this template says. One "
                   + "control does one job, so each of them takes back whatever has been pointed "
-                  + "at the same thing since.",
+                  + "at the same thing since."
+                : controller + " is not connected. Plug it in to point it at " + called + ".",
             Chosen = () =>
             {
                 var reading = Hook.Take(template);
@@ -234,6 +242,9 @@ public sealed class ControlMenu : IPanelMenu
     /// eventually disagree, and the way that fails is a menu saying the mode is off while the
     /// keystroke has it on. It says which way it is about to turn it, since the menu is read
     /// again every time it is opened and there is no other sign of the mode on a machine's face.
+    ///
+    /// Grey while no controller is connected, since learning waits for a control on the desk to be
+    /// touched and nothing could ever finish it. Stopping is always live.
     /// </remarks>
     /// <param name="link">Where the links live, and what holds the mode.</param>
     /// <param name="called">What the machine is called, for the wording.</param>
@@ -241,10 +252,14 @@ public sealed class ControlMenu : IPanelMenu
         new(link.IsLinking ? "Stop learning" : "Learn a control")
         {
             Option = MenuOptionWords.Learn,
+            Section = MenuOptionWords.Surfaces,
+            Live = link.IsLinking || link.CanLearn,
             Tip = link.IsLinking
                 ? "Turns the mode off again. The same as pressing Ctrl+Shift+M."
-                : "The same as pressing Ctrl+Shift+M. Rest the pointer on one of " + called
-                  + "'s controls until it glows, then touch the control on your desk.",
+                : link.CanLearn
+                    ? "The same as pressing Ctrl+Shift+M. Rest the pointer on one of " + called
+                      + "'s controls until it glows, then touch the control on your desk."
+                    : "No controller is connected. Plug one in, and give it a job in SETTINGS, MIDI, to learn a control.",
             Chosen = () =>
             {
                 link.IsLinking = !link.IsLinking;

@@ -154,6 +154,9 @@ public static class LinkKey
     /// With nothing on screen to point at the keystroke is left alone rather than swallowed: a
     /// gesture that does nothing here may mean something to whatever is in front of you.
     ///
+    /// With no controller connected it will turn the mode off and never on, since learning waits
+    /// for a control on the desk to be touched and nothing could finish it.
+    ///
     /// The moment is stamped whether or not the press was answered. A key leant on is one
     /// gesture however many times the keyboard says it, and every repeat pushing the moment
     /// forward is what makes none of them count.
@@ -167,7 +170,8 @@ public static class LinkKey
 
         var now = System.DateTime.UtcNow;
 
-        if (Answers(Pointable, now - _answered) && Midi.ControlLink.Current is { } link)
+        if (Answers(Pointable, now - _answered) && Midi.ControlLink.Current is { } link
+            && (link.IsLinking || link.CanLearn))
             link.IsLinking = !link.IsLinking;
 
         _answered = now;

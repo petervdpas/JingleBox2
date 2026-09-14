@@ -123,4 +123,9 @@ public sealed class ControlExchange : IControlExchange
 
     /// <inheritdoc/>
     public bool Wired(ControlMapping? control) => _desk()?.Holds(control) ?? false;
+
+    /// <inheritdoc/>
+    public bool Plugged(ControlTemplate? template) =>
+        template is not null && _desk() is { } link
+        && _templates.Here(template.Controller ?? "", link.Ports?.Invoke(), port => _profiles.Called(port));
 }

@@ -9,12 +9,17 @@ namespace JingleBox2.Rack.Controls;
 public sealed class MenuLines : IMenuLines
 {
     /// <inheritdoc/>
-    public IReadOnlyList<MenuItem> Listed(IEnumerable<PanelMenuItem> offers)
+    public IReadOnlyList<Control> Listed(IEnumerable<PanelMenuItem> offers)
     {
-        var made = new List<MenuItem>();
+        var made = new List<Control>();
+        PanelMenuItem? above = null;
 
         foreach (var offer in offers)
         {
+            if (Divides(above, offer)) made.Add(new Separator());
+
+            above = offer;
+
             var item = new MenuItem { Header = offer.Said, IsEnabled = offer.Live };
 
             if (offer.Chosen is { } chosen) item.Click += (_, _) => chosen();
@@ -26,4 +31,9 @@ public sealed class MenuLines : IMenuLines
 
         return made;
     }
+
+    /// <inheritdoc/>
+    public bool Divides(PanelMenuItem? above, PanelMenuItem line) =>
+        above is not null && line is not null
+        && !string.Equals(above.Section, line.Section, System.StringComparison.Ordinal);
 }
