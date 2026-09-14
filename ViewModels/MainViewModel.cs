@@ -2356,7 +2356,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         Tracker.Player.ClockFollow = _clockFollow;
 
         Tracker.Player.MidiOut = new TrackMidiOut(midiService);
-        Tracker.MidiInputs = () => Midi.Devices.Select(port => port.Name).ToList();
+        Tracker.MidiInputs = () => Midi.Devices.Where(port => port.IsConnected).Select(port => port.Name).ToList();
         Tracker.MidiOutputs = () => Midi.ClockOutputs.Select(port => port.Name).ToList();
         Tracker.MidiPortsMoved = Midi.Listen;
         Tracker.ListMidiPorts();

@@ -609,7 +609,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         MidiPortsMoved?.Invoke();
     }
 
-    /// <summary>The input ports a track's MIDI block offers, asked for each time the block is made.</summary>
+    /// <summary>The input ports plugged in now, which a track's MIDI block offers, asked for each time the block is made.</summary>
     /// <remarks>Set by whoever knows the machine's ports; left alone, a block offers any port and nothing else.</remarks>
     public Func<IEnumerable<string>> MidiInputs { get; set; } = Array.Empty<string>;
 

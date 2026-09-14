@@ -1,0 +1,56 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             x:Class="JingleBox2.Views.TrackMidiBlock"
+             x:DataType="vm:TrackMidiViewModel">
+
+  <!-- A track's MIDI, drawn as a block in front of its chain: where its notes come in from and
+       where they go out to. Its own control so the strip only says where it stands, and so the
+       block keeps its own look wherever it is put. The frame is the chain's device look, which
+       comes from whatever holds it; what is decided here is what is inside the frame. -->
+  <UserControl.Styles>
+    <!-- Small enough that two rows of pickers fit the chain's height under the pattern: a full
+         size picker is taller than a reading, and two of them would push the strip past the room
+         it is given. -->
+    <Style Selector="ComboBox">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="MinHeight" Value="22" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Padding" Value="6,0,0,0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="TextBlock.midiKey">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Opacity" Value="0.75" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Classes="device midi"
+          ToolTip.Tip="Which MIDI port and channel this track plays from, and sends its notes to.">
+    <!-- The heading shares the row the column names are on, so the block is three rows tall
+         rather than four and sits inside the chain's height. -->
+    <Grid Margin="8,5,8,6" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="Auto,Auto,Auto"
+          ColumnSpacing="6" RowSpacing="4">
+      <TextBlock Grid.Row="0" Grid.Column="0" Classes="deviceName" Text="MIDI" VerticalAlignment="Bottom" />
+      <TextBlock Grid.Row="0" Grid.Column="1" Classes="midiKey" Text="Port" VerticalAlignment="Bottom" />
+      <TextBlock Grid.Row="0" Grid.Column="2" Classes="midiKey" Text="Channel" VerticalAlignment="Bottom" />
+
+      <TextBlock Grid.Row="1" Grid.Column="0" Classes="midiKey" Text="In" VerticalAlignment="Center" />
+      <ComboBox Grid.Row="1" Grid.Column="1" Width="120"
+                ItemsSource="{Binding InPorts}" SelectedItem="{Binding InPort}"
+                ToolTip.Tip="The port this track listens to. Any port hears every port that is open." />
+      <ComboBox Grid.Row="1" Grid.Column="2" Width="72"
+                ItemsSource="{Binding Channels}" SelectedIndex="{Binding InChannel}"
+                ToolTip.Tip="The channel this track listens to. Notes on it play this track and are recorded into it when armed." />
+
+      <TextBlock Grid.Row="2" Grid.Column="0" Classes="midiKey" Text="Out" VerticalAlignment="Center" />
+      <ComboBox Grid.Row="2" Grid.Column="1" Width="120"
+                ItemsSource="{Binding OutPorts}" SelectedItem="{Binding OutPort}"
+                ToolTip.Tip="The port this track sends its notes to. The instrument still sounds." />
+      <ComboBox Grid.Row="2" Grid.Column="2" Width="72"
+                ItemsSource="{Binding Channels}" SelectedIndex="{Binding OutChannel}"
+                ToolTip.Tip="The channel this track sends on." />
+    </Grid>
+  </Border>
+</UserControl>
