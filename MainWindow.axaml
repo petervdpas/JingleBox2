@@ -2,6 +2,7 @@
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:vm="clr-namespace:JingleBox2.ViewModels"
   xmlns:views="clr-namespace:JingleBox2.Views"
+  xmlns:ur="clr-namespace:JingleBox2.UI.Records"
   x:Class="JingleBox2.MainWindow"
   x:DataType="vm:MainViewModel"
   MinWidth="520" MinHeight="480"
@@ -29,6 +30,27 @@
          The transport belongs to the whole window rather than to the tracker page: what it is
          doing is worth seeing from the pads, and worth stopping from wherever you are. -->
     <Grid>
+
+      <!-- The toasts, in the upper right corner of the page just under the tab strip, oldest at
+           the top. Laid over the page and above everything on it; the list itself takes no
+           clicks, so only a toast is in the way of the page, not the room around the toasts. -->
+      <ItemsControl ItemsSource="{Binding Toasts.Showing}"
+                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Margin="0,32,-8,0" ZIndex="10">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <!-- Negative, to take back the room each toast leaves round itself for its shadow:
+                 48 pixels between two cards' edges, less 40, is 8. -->
+            <StackPanel Spacing="-40" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="ur:StatusMessage">
+            <views:Toast Message="{Binding}"
+                         DismissCommand="{Binding $parent[Window].((vm:MainViewModel)DataContext).Toasts.DismissCommand}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
 
       <views:Transport HorizontalAlignment="Right"
                        VerticalAlignment="Top"

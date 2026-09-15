@@ -106,7 +106,28 @@ public sealed class StatusBus
     {
         Post(text, StatusKind.Fault, from);
 
-        Log.Write(LogArea.App, () => "status fault: " + (from.Length > 0 ? from + ": " : "") + text);
+        WriteDown(text, from);
+    }
+
+    /// <summary>
+    /// Something worth looking up from the work for: said in the bar like anything else, and
+    /// shown as a toast in the corner of the window as well.
+    /// </summary>
+    /// <remarks>
+    /// One bus rather than a second one beside it, so a toast is in the bar's history with
+    /// everything else and whoever speaks has one place to speak. Most messages are not toasts:
+    /// a toast covers part of a page, which is a price worth paying for news somebody would
+    /// otherwise miss and not for a note that a file was saved.
+    /// </remarks>
+    /// <param name="text">What to say. A blank one says nothing.</param>
+    /// <param name="kind">How it wants to be read.</param>
+    /// <param name="from">Who is saying it.</param>
+    /// <param name="link">Where clicking the toast takes you, or empty where it goes nowhere.</param>
+    public void Toast(string text, StatusKind kind = StatusKind.Plain, string from = "", string link = "")
+    {
+        Post(text, kind, from, toast: true, link: link ?? "");
+
+        if (kind == StatusKind.Fault) WriteDown(text, from);
     }
 
     /// <summary>True while that message is still standing in front of the context.</summary>
@@ -120,20 +141,25 @@ public sealed class StatusBus
     public static bool Holding(StatusMessage? message, DateTime now) =>
         message != null && (message.Kind == StatusKind.Fault || now - message.At < Holds);
 
+    /// <summary>A fault into the log, so it can be read after the bar and the toast have moved on.</summary>
+    private static void WriteDown(string text, string from) =>
+        Log.Write(LogArea.App, () => "status fault: " + (from.Length > 0 ? from + ": " : "") + text);
+
     /// <summary>Writes one message down and tells whoever is listening.</summary>
     /// <remarks>
     /// Saying the same thing twice running is one thing happening rather than two. The first is
     /// replaced rather than the second dropped, so its four seconds start again.
     /// </remarks>
-    private void Post(string text, StatusKind kind, string from)
+    private void Post(string text, StatusKind kind, string from, bool toast = false, string link = "")
     {
         if (string.IsNullOrWhiteSpace(text)) return;
 
-        var message = new StatusMessage(text.Trim(), kind, from, DateTime.Now);
+        var message = new StatusMessage(text.Trim(), kind, from, DateTime.Now, toast, link);
 
         lock (_lock)
         {
-            if (_said.Count > 0 && _said[^1].Text == message.Text && _said[^1].Kind == message.Kind)
+            if (_said.Count > 0 && _said[^1].Text == message.Text && _said[^1].Kind == message.Kind
+                && _said[^1].Toast == message.Toast)
                 _said.RemoveAt(_said.Count - 1);
 
             _said.Add(message);

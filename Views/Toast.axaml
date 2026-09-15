@@ -1,0 +1,45 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="JingleBox2.Views.Toast"
+             Cursor="Hand">
+
+  <!-- One toast, drawn as a card like every other card in the application: the card's own
+       surface, border and corner, its title and its hint. What is filled in comes from the
+       message in the code beside this, so the layout says only where things go. -->
+  <UserControl.Styles>
+    <Style Selector="Button.dismiss">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="4" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+  </UserControl.Styles>
+
+  <!-- A card like the page's, floating over it on a soft shadow. The shadow is drawn outside
+       the card, so the card stands inside a margin that gives the shadow room to be drawn in:
+       without it the shadow is clipped to the card and all that shows is a sliver at a corner.
+       The list the toasts stand in takes the margin back with its own spacing and position. -->
+  <Border Classes="card" Width="320" Margin="24,16,24,32"
+          BoxShadow="0 8 24 0 #66000000">
+    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="4">
+      <TextBlock x:Name="Heading" Grid.Row="0" Grid.Column="0" Classes="cardTitle"
+                 VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+      <!-- A cross drawn rather than typed, since a character is at the mercy of whichever font
+           the machine falls back to. It takes the toast down and opens nothing. -->
+      <Button Grid.Row="0" Grid.Column="1" Classes="dismiss" Click="OnDismiss"
+              ToolTip.Tip="Close">
+        <Path Data="M0,0 L8,8 M8,0 L0,8" Stroke="{DynamicResource TextMutedBrush}"
+              StrokeThickness="1.4" Width="8" Height="8" />
+      </Button>
+
+      <TextBlock x:Name="Words" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                 TextWrapping="Wrap" />
+
+      <TextBlock x:Name="LinkHint" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                 Classes="cardHint" Text="Click to open" />
+    </Grid>
+  </Border>
+</UserControl>

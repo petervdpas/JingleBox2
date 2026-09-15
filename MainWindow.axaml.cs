@@ -313,6 +313,8 @@ public partial class MainWindow : Window
             Title = $"JingleBox2 v{version}";
         }
 
+        Opened += (_, _) => _ = vm.CheckReleases(version ?? "");
+
         Views.LinkKey.Listen(this);
 
         Shortcuts.ShortcutKeys.Map.Take(cfg.Shortcuts);

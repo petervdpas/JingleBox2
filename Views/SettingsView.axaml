@@ -721,6 +721,29 @@
             </StackPanel>
           </Border>
 
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <TextBlock Classes="cardTitle" Text="Toasts" />
+
+              <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="10">
+                <TextBlock Grid.Column="0" Classes="label" Text="Stands for:" />
+                <ui:NumberField Grid.Column="1"
+                                Minimum="{Binding LeastToastSeconds}"
+                                Maximum="{Binding MostToastSeconds}"
+                                Value="{Binding ToastSeconds}"
+                                HorizontalAlignment="Left"
+                                Width="62" />
+                <TextBlock Grid.Column="2" Classes="label" Text="seconds" />
+              </Grid>
+
+              <CheckBox Content="Look for a new release when JingleBox2 starts"
+                        IsChecked="{Binding CheckForReleases}" />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                         Text="A toast is news worth looking up for, shown in the upper right corner and in the bar along the bottom. It goes after this long, or when you click it. A fault stays until it is clicked. Looking for a release asks GitHub once as the application starts, and says something only when there is a newer one." />
+            </StackPanel>
+          </Border>
+
           </StackPanel>
         </ScrollViewer>
     </TabItem>

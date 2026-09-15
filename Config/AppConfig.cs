@@ -133,6 +133,33 @@ public sealed class AppConfig
     public bool PulseWhilePlaying { get; set; } = true;
 
     /// <summary>
+    /// How many seconds a toast stands in the corner of the window before it goes.
+    /// </summary>
+    /// <remarks>
+    /// A preference rather than a fact about the application, since how long somebody takes to
+    /// look up from the work differs. A fault is not held to it and stands until it is clicked.
+    /// </remarks>
+    public double ToastSeconds { get; set; } = DefaultToastSeconds;
+
+    /// <summary>How long a toast stands on a fresh installation.</summary>
+    public const double DefaultToastSeconds = 6;
+
+    /// <summary>The shortest a toast may stand, which is about as long as reading one takes.</summary>
+    public const double LeastToastSeconds = 2;
+
+    /// <summary>The longest a toast may stand before it stops being a toast.</summary>
+    public const double MostToastSeconds = 8;
+
+    /// <summary>
+    /// Whether the application asks, as it starts, if there is a newer release than this one.
+    /// </summary>
+    /// <remarks>
+    /// On unless somebody says otherwise. A setting at all because it goes out onto the network
+    /// every start, which is something a machine may have good reason not to do.
+    /// </remarks>
+    public bool CheckForReleases { get; set; } = true;
+
+    /// <summary>
     /// Whether the machine editor is a page of its own along the top.
     /// </summary>
     /// <remarks>

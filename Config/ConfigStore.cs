@@ -290,6 +290,8 @@ public sealed class ConfigStore : IConfigStore
         cfg.SelectedProfile = string.IsNullOrWhiteSpace(cfg.SelectedProfile) ? DefaultProfile : cfg.SelectedProfile.Trim();
         cfg.SelectedTheme = string.IsNullOrWhiteSpace(cfg.SelectedTheme) ? "Dark" : cfg.SelectedTheme.Trim();
 
+        cfg.ToastSeconds = Math.Clamp(cfg.ToastSeconds, AppConfig.LeastToastSeconds, AppConfig.MostToastSeconds);
+
         cfg.Rows = Math.Clamp(cfg.Rows, 1, PadMatrix.Most);
         cfg.Columns = Math.Clamp(cfg.Columns, 1, PadMatrix.Most);
 

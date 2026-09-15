@@ -3,7 +3,9 @@ using Avalonia.Media;
 using System;
 using System.Globalization;
 using JingleBox2.Rack.Controls;
+using JingleBox2.UI;
 using JingleBox2.UI.Enums;
+using JingleBox2.UI.Interfaces;
 using JingleBox2.Rack.Controls.Records;
 
 namespace JingleBox2.Views;
@@ -69,13 +71,13 @@ public class StatusBar : ThemedControl
     /// <summary>Between the lamp and the words.</summary>
     private const double Gap = 8;
 
-    /// <summary>A warning is amber and a fault is the red a record button is.</summary>
+    /// <summary>The meters' colours: amber where a level is warm and red where it is clipped.</summary>
     private static readonly Color Amber = Color.FromRgb(0xF5, 0xA6, 0x23);
 
     /// <inheritdoc cref="Amber"/>
     private static readonly Color Red = Color.FromRgb(0xE5, 0x39, 0x35);
 
-    /// <summary>And something that worked is green, which is also a meter with room left in it.</summary>
+    /// <summary>And green, a meter with room left in it.</summary>
     private static readonly Color Green = Color.FromRgb(0x4C, 0xAF, 0x50);
 
     /// <summary>Everything drawn is a render; only the height is a measurement.</summary>
@@ -259,13 +261,9 @@ public class StatusBar : ThemedControl
         }
     }
 
+    /// <summary>Which colour a kind of message is lit in, the same rule a toast asks.</summary>
+    private static readonly IStatusLamp Lamps = new StatusLamp();
+
     /// <summary>The lamp's colour for the kind, and the theme's muted for the resting state.</summary>
-    private Color Lamp(ThemePalette palette) => Kind switch
-    {
-        StatusKind.Done => Green,
-        StatusKind.Warning => Amber,
-        StatusKind.Fault => Red,
-        StatusKind.Plain => palette.Accent,
-        _ => palette.Muted
-    };
+    private Color Lamp(ThemePalette palette) => Lamps.For(Kind, palette.Accent, palette.Muted);
 }

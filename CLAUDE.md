@@ -3216,6 +3216,16 @@ whole exercise and is worth writing down rather than summarising:
   taken on purpose and asked about first. One `Color.Unsaved` became the two, per theme as it
   always was, and the same pair is on the machine editor's header, which has the identical two
   buttons doing the identical job
+- **A toast is a status message that asks to be one, so there is still one place to speak.**
+  `StatusBus.Toast` posts through the bar like everything else, marked, with an optional link;
+  `IToastShelf` is which stand and when they go, `ToastsViewModel` the wiring, and `Views/Toast.axaml`
+  the card, built from the same `card` styles every page uses and set in the upper right corner,
+  with its heading coloured through `IStatusLamp` so one message reads the same as in the bar.
+  How long one stands is SETTINGS, Looks; a fault stands until clicked, the bar's own rule. The
+  first toast is `IReleaseCheck`, asked once as the window opens: a newer release is said, being
+  up to date says nothing, and a build from a checkout says which release is latest, since it
+  cannot be behind anything and saying nothing there would make the check invisible where it is
+  written. `IReleaseFeed` is the half that goes onto the network and answers null for any failure
 - **Every page starts the same distance under the tab strip, and `tabRoot` is that distance.**
   The rule was already written in `App.axaml` and reached nothing: its selector named
   `StackPanel` and no page is one, so all six set their own and drifted, twelve above the takes,

@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
 using JingleBox2.Config;
+using System.Threading.Tasks;
 using JingleBox2.Midi;
 using JingleBox2.Controllers;
 using JingleBox2.Audio.Records;
@@ -401,6 +402,9 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
     /// <summary>What the bar along the bottom of the window shows.</summary>
     public StatusViewModel StatusLine { get; }
+
+    /// <summary>The toasts in the corner of the window, fed by <see cref="Bus"/>.</summary>
+    public ToastsViewModel Toasts { get; }
 
     /// <summary>The pads, as the transport sees them: one cap, and it silences the lot.</summary>
     private PadDeck? _padDeck;
@@ -2418,6 +2422,8 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
             () => Record.Level,
             () => Math.Max(_audio.GetOutputLevel(), Tracker.OutputLevel));
 
+        Toasts = new ToastsViewModel(Bus, () => TimeSpan.FromSeconds(_cfg.ToastSeconds));
+
         Follow(Tracker);
         Follow(Machines);
         Follow(Record);
@@ -2727,6 +2733,69 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         }
     }
 
+    /// <summary>How many seconds a toast stands, as SETTINGS, Looks sets it.</summary>
+    /// <remarks>Held inside the ends <see cref="AppConfig"/> names, since a field can be typed past them.</remarks>
+    public double ToastSeconds
+    {
+        get => _cfg.ToastSeconds;
+        set
+        {
+            double wanted = Math.Clamp(value, AppConfig.LeastToastSeconds, AppConfig.MostToastSeconds);
+
+            if (_cfg.ToastSeconds == wanted) return;
+
+            _cfg.ToastSeconds = wanted;
+            _settings.Moved();
+
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>The shortest a toast may be set to stand, for the field's own end.</summary>
+    public double LeastToastSeconds => AppConfig.LeastToastSeconds;
+
+    /// <summary>The longest a toast may be set to stand.</summary>
+    public double MostToastSeconds => AppConfig.MostToastSeconds;
+
+    /// <summary>Whether a newer release is looked for as the application starts.</summary>
+    public bool CheckForReleases
+    {
+        get => _cfg.CheckForReleases;
+        set
+        {
+            if (_cfg.CheckForReleases == value) return;
+
+            _cfg.CheckForReleases = value;
+            _settings.Moved();
+
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Looks for a newer release and says so as a toast, where the setting allows it.
+    /// </summary>
+    /// <remarks>
+    /// Off the drawing thread from the first line, since the asking is a trip across the network
+    /// and a start that waits on it is a start that hangs on a bad connection. What it finds is
+    /// said through the bus, which is safe from any thread. Nothing is said where nothing is
+    /// known or nothing is new: see <see cref="Releases.Interfaces.IReleaseCheck"/>.
+    /// </remarks>
+    /// <param name="running">The version this build carries.</param>
+    /// <param name="check">How the release is looked for, or the real one.</param>
+    public Task CheckReleases(string running, Releases.Interfaces.IReleaseCheck? check = null)
+    {
+        if (!CheckForReleases) return Task.CompletedTask;
+
+        var asking = check ?? new Releases.ReleaseCheck();
+
+        return Task.Run(async () =>
+        {
+            if (await asking.Check(running).ConfigureAwait(false) is { } news)
+                Bus.Toast(news.Text, news.Kind, "Releases", news.Link);
+        });
+    }
+
     /// <summary>The most pads the settings page will let you ask for as things stand.</summary>
     public int MostPads => ExtendedPadMatrix ? PadMatrix.Most : PadMatrix.Usual;
 
@@ -2892,8 +2961,14 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     }
 
     /// <summary>
-    /// A theme was picked: resolved against the ones there are, applied at once and stored.
+    /// A theme was picked: resolved against the ones there are, applied at once, stored and said
+    /// as a toast.
     /// </summary>
+    /// <remarks>
+    /// Said after it is applied, so the toast is drawn in the theme it names. The theme the
+    /// settings open with is set with saving suspended and returns before this, so starting the
+    /// application says nothing.
+    /// </remarks>
     partial void OnSelectedThemeChanged(string value)
     {
         if (_suspendSave) return;
@@ -2902,6 +2977,8 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
         _cfg.SelectedTheme = resolved;
         ThemeSwitch.Apply(resolved);
+
+        Bus.Toast("The theme is " + resolved + " now.", UI.Enums.StatusKind.Done, "Looks");
 
         _settings.Moved();
     }
