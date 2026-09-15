@@ -68,17 +68,24 @@ public sealed class ControlLinksViewModel : ObservableObject
     /// </param>
     /// <param name="ports">
     /// Which MIDI ports this computer has, for working out which is the controller a template
-    /// names. Left out, a template still reads and its links wait for the controller it names.
+    /// names. Left out, nothing is connected and every template is refused.
     /// </param>
     /// <param name="templates">Writing a template out and reading one back.</param>
     /// <param name="naming">What a target is called, shared with the file so the two agree.</param>
+    /// <param name="connected">
+    /// Whether a controller is plugged in with a job to do, which is what Import needs. Left out,
+    /// nothing is connected.
+    /// </param>
     public ControlLinksViewModel(
         ControlLink link,
         IControllerProfiles? profiles = null,
         Func<IEnumerable<string>>? ports = null,
         IControlTemplates? templates = null,
-        ILinkTargets? naming = null)
+        ILinkTargets? naming = null,
+        Func<bool>? connected = null)
     {
+        _connected = connected ?? (() => false);
+
         _profiles = profiles ?? new ControllerProfiles();
         _link = link;
         _naming = naming ?? new LinkTargets();
@@ -161,6 +168,33 @@ public sealed class ControlLinksViewModel : ObservableObject
     /// one Export button.
     /// </remarks>
     public ObservableCollection<ControlTemplateLinks> Cards { get; } = new();
+
+    /// <summary>Whether a controller is plugged in with a job to do, asked whenever Import is.</summary>
+    private readonly Func<bool> _connected;
+
+    /// <summary>
+    /// Whether Import can be pressed: only while a controller is connected.
+    /// </summary>
+    /// <remarks>
+    /// A template is links for one controller, and with none connected there is nothing it could
+    /// be for. Which controller a file is for is only known once it is read, so a template for a
+    /// controller other than the one plugged in is still refused by <see cref="Import"/>. Asked
+    /// afresh each time and told to the page through <see cref="Replug"/>, since a controller
+    /// can be plugged in while the page is open.
+    /// </remarks>
+    public bool CanImport => _connected();
+
+    /// <summary>What Import says under a hand: what it does, or why it cannot be pressed.</summary>
+    public string ImportTip => CanImport
+        ? "Read a template somebody made, here or elsewhere. What it points at is named by id, so it means the same thing on any installation that has the machine."
+        : "No controller is connected. Plug one in and give it a job in SETTINGS to import a template for it.";
+
+    /// <summary>Says whether Import can be pressed again, because what is plugged in may have moved.</summary>
+    public void Replug()
+    {
+        OnPropertyChanged(nameof(CanImport));
+        OnPropertyChanged(nameof(ImportTip));
+    }
 
     /// <summary>True when there is anything to show, so the page can say <see cref="Nothing"/>.</summary>
     public bool HasLinks => Links.Count > 0;
@@ -370,9 +404,12 @@ public sealed class ControlLinksViewModel : ObservableObject
     /// control. That is what makes importing the same template twice do nothing the second time
     /// rather than piling up.
     ///
-    /// Every outcome is said, because none of them looks like anything on its own. A template
-    /// for a controller that is not plugged in applies perfectly and moves nothing until it is,
-    /// and that is exactly the case somebody would otherwise read as the import having failed.
+    /// A template for a controller that is not connected is refused and nothing is laid down,
+    /// which is the rule pointing a control and applying a template from a Menu already keep:
+    /// links for a desk that is not here can only be checked against a desk that is. The refusal
+    /// names the controller, so it is plain what to plug in.
+    ///
+    /// Every outcome is said, because none of them looks like anything on its own.
     /// </remarks>
     /// <param name="path">The file to read.</param>
     public void Import(string path)
@@ -395,13 +432,18 @@ public sealed class ControlLinksViewModel : ObservableObject
             return;
         }
 
+        if (!reading.Found)
+        {
+            Status = (reading.Controller.Length > 0 ? reading.Controller : "The controller this template is for")
+                     + " is not connected. Plug it in and import the template again.";
+
+            return;
+        }
+
         int took = _link.Take(reading.Links);
 
         string said = "Took " + took + (took == 1 ? " control for " : " controls for ")
                       + (template.Target.Name.Length > 0 ? template.Target.Name : template.Target.Kind);
-
-        if (!reading.Found)
-            said += ", waiting for " + reading.Controller;
 
         if (reading.Skipped > 0)
             said += ". " + reading.Skipped

@@ -447,6 +447,67 @@ public class ControlLinksPageTests
         Assert.Contains("2 controls for OddSkilla", page.Status);
     }
 
+    /// <summary>
+    /// A template for a controller that is not plugged in is refused, and nothing is laid down.
+    /// </summary>
+    /// <remarks>
+    /// Twice: with ports that do not include it, and with no list of ports at all, which is a
+    /// computer that cannot say what is connected and so has nothing connected.
+    /// </remarks>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void A_template_for_a_controller_that_is_not_connected_is_refused(bool otherPorts)
+    {
+        var page = Page(out var desk);
+        var card = Assert.Single(page.Cards);
+
+        string path = Path.Combine(new ControlTemplates().Folder(), "unplugged.jbtl");
+        page.Export(card, path);
+
+        var desk2 = new List<ControlMapping>();
+        var elsewhere = new ControlLinksViewModel(
+            Wired(desk2),
+            ports: otherPorts ? () => new[] { "Midi Through Port-0" } : null);
+
+        elsewhere.Import(path);
+        elsewhere.Reread();
+
+        Assert.Empty(desk2);
+        Assert.Empty(elsewhere.Cards);
+        Assert.Contains("is not connected", elsewhere.Status);
+        Assert.Contains("nanoKONTROL2", elsewhere.Status);
+    }
+
+    /// <summary>
+    /// Import can only be pressed while a controller is connected, and the page hears when that changes.
+    /// </summary>
+    [Fact]
+    public void Import_is_live_only_while_a_controller_is_connected()
+    {
+        bool plugged = false;
+        var page = new ControlLinksViewModel(Wired(new List<ControlMapping>()), connected: () => plugged);
+        var heard = new List<string?>();
+        page.PropertyChanged += (_, e) => heard.Add(e.PropertyName);
+
+        Assert.False(page.CanImport);
+        Assert.Contains("No controller is connected", page.ImportTip);
+
+        plugged = true;
+        page.Replug();
+
+        Assert.True(page.CanImport);
+        Assert.Contains(nameof(ControlLinksViewModel.CanImport), heard);
+        Assert.DoesNotContain("No controller is connected", page.ImportTip);
+    }
+
+    /// <summary>With nothing saying what is connected, nothing is.</summary>
+    [Fact]
+    public void A_page_told_nothing_about_controllers_cannot_import()
+    {
+        Assert.False(new ControlLinksViewModel(Wired(new List<ControlMapping>())).CanImport);
+    }
+
     /// <summary>Picking the wrong file says so rather than doing nothing.</summary>
     [Fact]
     public void A_file_that_is_not_a_template_says_so()

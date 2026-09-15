@@ -39,10 +39,9 @@ seen this program.
 
 The port is the only thing in a link that cannot travel, since the same desk is
 spelled differently by different systems, so a file names the controller as its
-profile calls it and the ports are looked through on arrival. A controller that is
-not plugged in keeps the name the file carried and its links wait for it, and the
-page says so, because a template that applies perfectly and moves nothing until the
-device arrives reads exactly like a file that failed to open.
+profile calls it and the ports are looked through on arrival. The controller has to
+be connected: a template for one that is not plugged in is refused, and the page
+names the controller so you know what to plug in before importing it again.
 
 Importing lays the links down by the same rules a link made by hand keeps, so
 importing the same template twice leaves what it did the first time. What cannot be

@@ -2552,7 +2552,8 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         ControlLink.Connected = Connected;
         ControlLink.Called = port => _profiles.Called(port);
 
-        Links = new ControlLinksViewModel(ControlLink, profiles: _profiles, ports: Ports);
+        Links = new ControlLinksViewModel(ControlLink, profiles: _profiles, ports: Ports, connected: Connected);
+        Midi.Devices.CollectionChanged += (_, _) => Links.Replug();
 
 
         var transport = new MidiTransportRouter(new TransportAdapter(Transport), _profiles);

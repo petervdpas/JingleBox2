@@ -27,6 +27,21 @@ public partial class ControlLinksView : UserControl
         InitializeComponent();
     }
 
+    /// <summary>
+    /// Asks again whether Import can be pressed each time the page comes on screen.
+    /// </summary>
+    /// <remarks>
+    /// A job given to a controller in SETTINGS is not a change to the list of ports, so the page
+    /// would not otherwise hear of it; coming back to MIDI CC from SETTINGS is exactly that path.
+    /// </remarks>
+    /// <param name="e">Unused beyond the base.</param>
+    protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+
+        Layer?.Replug();
+    }
+
     /// <summary>The list this is showing, or nothing before it has been given one.</summary>
     private ControlLinksViewModel? Layer => DataContext as ControlLinksViewModel;
 

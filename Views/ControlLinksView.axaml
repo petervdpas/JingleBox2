@@ -108,7 +108,9 @@
     <StackPanel Orientation="Horizontal" Spacing="8">
       <Button Content="Import a template..." Classes="page"
               Click="Import_Click"
-              ToolTip.Tip="Read a template somebody made, here or elsewhere. What it points at is named by id, so it means the same thing on any installation that has the machine." />
+              IsEnabled="{Binding CanImport}"
+              ToolTip.ShowOnDisabled="True"
+              ToolTip.Tip="{Binding ImportTip}" />
 
       <Button Content="Forget them all" Classes="danger"
               IsEnabled="{Binding HasLinks}"

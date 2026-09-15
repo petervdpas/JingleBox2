@@ -2572,11 +2572,11 @@ whole exercise and is worth writing down rather than summarising:
 - The port is the only thing in a link that cannot travel, and settling it is the only conversion
   an import does. The same nanoKONTROL2 is `nanoKONTROL2 _ CTRL` to the ALSA sequencer and
   `nanoKONTROL2 _ SLIDER/KNOB` to rawmidi, and Windows spells it a third way, so a file names the
-  controller as its profile calls it and the ports are looked through on arrival. A controller
-  that is not plugged in keeps the name the file carried and its links wait for it, which is the
-  rule a link already kept: a controller left in the other room is not a decision to unwire it.
-  Said out loud, because a template that applies perfectly and moves nothing until the device
-  arrives reads exactly like a file that failed to open
+  controller as its profile calls it and the ports are looked through on arrival. **A template
+  for a controller that is not connected is refused**, naming the controller, which is the rule
+  pointing a control and applying a template from a Menu keep: links for a desk that is not here
+  cannot be checked against anything. Links already laid down still survive the controller being
+  unplugged, since a controller left in the other room is not a decision to unwire it
 - Conflicts needed no new rule. `ControlLink.Take` lays a batch down by the rules a link made by
   hand keeps, so an arriving link displaces whatever held its control and whatever else was
   pointed at its target, and importing the same template twice leaves what once did. One act
