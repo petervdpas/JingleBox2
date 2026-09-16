@@ -115,18 +115,34 @@ public sealed unsafe class Vst3Editor : IPluginEditor
         return editor;
     }
 
+    /// <summary>The last size the view was willing to give, which is what a refusal answers.</summary>
+    /// <remarks>
+    /// A view is allowed to refuse the question rather than answer it, and JUCE's does: it builds
+    /// its editor when the window arrives, so everything asked before that comes back
+    /// kResultFalse. A refusal and a size of nothing are not the same thing, and turning one into
+    /// the other is how a window ends up built for a plugin that never said it was that small.
+    /// </remarks>
+    private (int Width, int Height) _known;
+
     /// <inheritdoc/>
-    /// <remarks>Nought by nought for a disposed editor, or one whose view refuses to say.</remarks>
+    /// <remarks>
+    /// The last size that was given, where the view will not say: nought by nought only until it
+    /// has said once. Asking again after the window has been handed over is what gets a real
+    /// answer out of a plugin that had none before, which is why <see cref="Attach"/> asks.
+    /// </remarks>
     public (int Width, int Height) Size
     {
         get
         {
-            if (_disposed) return (0, 0);
+            if (_disposed) return _known;
 
             var rect = new ViewRect();
-            if (_view->Vtbl->GetSize(_view, &rect) != Vst3Abi.ResultOk) return (0, 0);
 
-            return (Math.Max(0, rect.Width), Math.Max(0, rect.Height));
+            if (_view->Vtbl->GetSize(_view, &rect) != Vst3Abi.ResultOk) return _known;
+
+            _known = (Math.Max(0, rect.Width), Math.Max(0, rect.Height));
+
+            return _known;
         }
     }
 
@@ -211,6 +227,20 @@ public sealed unsafe class Vst3Editor : IPluginEditor
         _attached = true;
 
         Said("the plugin took window " + window + " and is in it");
+
+        /* Asked again now it is in a window, because this is the first moment a JUCE plugin can
+           answer: its editor is built inside attached, so everything before this was refused and
+           the size the host laid out for is whatever it had to fall back on. */
+        var was = _known;
+        var now = Size;
+
+        if (now != was && now.Width > 0 && now.Height > 0)
+        {
+            Said("the plugin only knew its size once it had the window: "
+                 + now.Width + " by " + now.Height);
+
+            ResizeRequested?.Invoke(now.Width, now.Height);
+        }
 
         return true;
     }

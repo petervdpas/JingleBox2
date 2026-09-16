@@ -442,12 +442,11 @@ public sealed class PluginEditorHost : NativeControlHost
 
         if (settled.Width <= 0 || settled.Height <= 0) return;
 
-        _width = settled.Width;
-        _height = settled.Height;
-
-        editor.Resized(settled.Width, settled.Height);
-
-        InvalidateMeasure();
+        /* Through Made rather than by hand, so the layout is run here and not asked for. A plugin
+           that could not say how big it was until it had a window has just said, and the window
+           under this control is resized during a layout pass: leaving it to the next one leaves
+           the window at whatever size it was built from the answer that never came. */
+        Made(settled.Width, settled.Height);
     }
 
     /// <summary>
