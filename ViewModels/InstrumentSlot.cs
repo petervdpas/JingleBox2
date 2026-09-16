@@ -64,7 +64,18 @@ public sealed partial class InstrumentSlot : ObservableObject
         _offered ? Instrument.Machine.Theme : JingleBox2.SoundDevices.SoundMachines.Records.SoundMachine.Absent;
 
     /// <summary>Its colour on its own, for the bar down the side of the row.</summary>
-    public string Colour => Theme.Accent;
+    /// <remarks>
+    /// A plugin built to carry one is drawn in it, which ours are and nobody else's are, so the
+    /// row reads the way the machine's rows do rather than as the one grey every plugin shares.
+    /// </remarks>
+    public string Colour =>
+        Instrument.IsPlugin && (_colour ??= Audio.Plugins.PluginColour.For(Instrument.PluginPath) ?? "") is { Length: > 0 } own
+            ? own
+            : Theme.Accent;
+
+    /// <summary>What the plugin answered about its colour, asked once.</summary>
+    /// <remarks>Null until it has been asked; empty once asked and told nothing.</remarks>
+    private string? _colour;
 
     /// <summary>The row's own wash, and the two it takes under the pointer and in hand.</summary>
     public IBrush Row => Wash(Theme.Row);

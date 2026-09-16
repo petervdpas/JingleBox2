@@ -264,7 +264,8 @@ public sealed class PluginChainState : IPluginChainState
                 continue;
             }
 
-            var described = new PluginInfo(saved.Id, saved.Name, "", "", saved.Path, saved.Format);
+            var described = new PluginInfo(saved.Id, saved.Name, "", "", saved.Path, saved.Format,
+                                           false, PluginColour.For(saved.Path));
             var effect = _plugins.Load(described, sampleRate, maxFrames);
 
             if (effect == null)

@@ -22,6 +22,10 @@ namespace JingleBox2.Audio.Plugins.Records;
 /// True when the plugin takes notes rather than audio. A scan works this out from the categories
 /// the plugin lists about itself.
 /// </param>
+/// <param name="Colour">
+/// The colour this plugin asked to be drawn in, or null where it asked for none, which is all
+/// but ours. See <see cref="PluginColour"/> for where it comes from.
+/// </param>
 public sealed record PluginInfo(
     string Id,
     string Name,
@@ -29,7 +33,8 @@ public sealed record PluginInfo(
     string Version,
     string Path,
     PluginFormat Format = PluginFormat.Clap,
-    bool IsInstrument = false)
+    bool IsInstrument = false,
+    string? Colour = null)
 {
     /// <summary>The name with the vendor after it, which is how a picker row reads.</summary>
     public override string ToString() => string.IsNullOrWhiteSpace(Vendor) ? Name : Name + " (" + Vendor + ")";

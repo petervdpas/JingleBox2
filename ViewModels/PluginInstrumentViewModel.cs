@@ -190,10 +190,17 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// </summary>
     /// <remarks>
     /// The same colour the rack and the song's instrument list use for the same machine. A
-    /// plugin has none of ours, so it gets nothing and is told apart by saying VST3 or CLAP.
+    /// plugin carries its own where it was built to, which ours are and nobody else's is; one
+    /// that says nothing gets nothing and is told apart by saying VST3 or CLAP.
     /// </remarks>
     public string Colour =>
-        _instrument.IsPlugin ? "" : _instrument.Machine.Theme.Accent;
+        _instrument.IsPlugin
+            ? _colour ??= Audio.Plugins.PluginColour.For(_instrument.PluginPath) ?? ""
+            : _instrument.Machine.Theme.Accent;
+
+    /// <summary>What the plugin answered about its colour, asked once.</summary>
+    /// <remarks>Null until it has been asked; empty once asked and told nothing.</remarks>
+    private string? _colour;
 
     /// <summary>What kind of thing it is, for the corner of the block.</summary>
     public string Badge => _instrument.IsPlugin ? "PLUGIN" : "MACHINE";

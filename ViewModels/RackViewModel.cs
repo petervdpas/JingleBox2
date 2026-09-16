@@ -742,7 +742,9 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
                     null,
                     one,
                     twice.Contains(one.Name) ? one.Name + "  " + one.Format.ToString().ToUpperInvariant() : one.Name,
-                    SoundMachine.For(Tracker.Enums.TrackerInstrumentKind.Plugin).Theme.Accent)));
+                    one.Colour is { Length: > 0 } own
+                        ? own
+                        : SoundMachine.For(Tracker.Enums.TrackerInstrumentKind.Plugin).Theme.Accent)));
 
             return offered;
         }

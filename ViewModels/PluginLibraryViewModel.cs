@@ -122,7 +122,10 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
                 continue;
             }
 
-            Plugins.Add(plugin);
+            /* Its colour is read again rather than trusted from the last scan. The colour lives
+               in the plugin, so a plugin that has been rebuilt or replaced since is drawn as it
+               is now, and one saved before this existed is drawn at all. */
+            Plugins.Add(plugin with { Colour = Audio.Plugins.PluginColour.For(plugin.Path) });
         }
 
         Listed();

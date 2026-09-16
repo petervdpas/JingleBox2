@@ -250,6 +250,10 @@ public sealed unsafe class Vst3Module : IDisposable
 
         string vendor = FactoryVendor();
 
+        /* Read once for the bundle rather than once for each class in it: the file belongs to the
+           plugin on disc, not to the classes inside it. */
+        string? colour = PluginColour.For(Path);
+
         int count = _factory->Vtbl->CountClasses(_factory);
 
         for (int index = 0; index < count; index++)
@@ -284,7 +288,8 @@ public sealed unsafe class Vst3Module : IDisposable
                 detailed ? Text(full.Version, Vst3Abi.VersionSize) : "",
                 Path,
                 PluginFormat.Vst3,
-                instrument));
+                instrument,
+                colour));
         }
 
         return plugins;
