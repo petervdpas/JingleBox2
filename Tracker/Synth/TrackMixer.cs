@@ -160,12 +160,19 @@ public sealed class TrackMixer : ITrackMixer
     /// The voices as they stood when the lock was taken, which is what the block renders.
     /// </summary>
     /// <remarks>
-    /// Grown when it has to be and reused when it does not, so a run of notes does not leave an
-    /// array behind for every one of them. Nothing is cleared past
-    /// <see cref="_voiceCount"/>: the tail is whatever the last, longer block held, and the
-    /// count is what says where to stop.
+    /// As long as <see cref="MaxVoices"/> from the start, and never replaced. <see cref="Add"/>
+    /// takes the oldest voice away rather than let the list grow past that, so this is the
+    /// largest a snapshot can be, and there is nothing left for a longer block to ask for.
+    ///
+    /// It used to grow on demand, which put a <c>new IVoice[]</c> on the audio thread the first
+    /// time a song wanted more voices than it had wanted before. Rare, and rare is the bad kind:
+    /// it lands on a callback that has no slack in it, and an allocation is where the collector
+    /// gets its chance to run.
+    ///
+    /// Nothing is cleared past <see cref="_voiceCount"/>: the tail is whatever the last, longer
+    /// block held, and the count is what says where to stop.
     /// </remarks>
-    private IVoice[] _snapshot = Array.Empty<IVoice>();
+    private readonly IVoice[] _snapshot = new IVoice[MaxVoices];
 
     /// <summary>How much of <see cref="_snapshot"/> is this block's, the rest being stale.</summary>
     private int _voiceCount;
@@ -1399,11 +1406,10 @@ public sealed class TrackMixer : ITrackMixer
 
             if (_snapshotStale)
             {
-                if (_snapshot.Length < _voices.Count) _snapshot = new IVoice[Math.Max(_voices.Count, 16)];
+                _voiceCount = Math.Min(_voices.Count, _snapshot.Length);
 
-                _voices.CopyTo(_snapshot);
+                _voices.CopyTo(0, _snapshot, 0, _voiceCount);
 
-                _voiceCount = _voices.Count;
                 _snapshotStale = false;
             }
 
@@ -1735,8 +1741,6 @@ public sealed class TrackMixer : ITrackMixer
     /// <param name="sounding">How many of them are this block's.</param>
     private void Thread(IVoice[] playing, int sounding)
     {
-        if (_voiceNext.Length < sounding) _voiceNext = new int[Math.Max(sounding, 16)];
-
         for (int track = 0; track < MaxTracks; track++) _voiceHead[track] = -1;
 
         for (int index = 0; index < sounding; index++)
@@ -2014,10 +2018,11 @@ public sealed class TrackMixer : ITrackMixer
     /// The voice after each voice, on its own track's chain, or minus one at the end of one.
     /// </summary>
     /// <remarks>
-    /// As long as the voice snapshot rather than as long as the tracks, and grown the same way:
-    /// only upwards, and only when a block holds more voices than any block before it.
+    /// As long as the voice snapshot rather than as long as the tracks, and sized once for the
+    /// same reason: <see cref="MaxVoices"/> is the most a block can ever hold, so the array that
+    /// indexes it never has to be made again on the audio thread.
     /// </remarks>
-    private int[] _voiceNext = System.Array.Empty<int>();
+    private readonly int[] _voiceNext = new int[MaxVoices];
 
     /// <summary>What each track's bus peaked at before its chain touched it, for the log.</summary>
     /// <remarks><inheritdoc cref="_flying" path="/remarks"/></remarks>
