@@ -427,7 +427,13 @@ internal sealed class PluginProcess : IDisposable
             FileName = self,
             UseShellExecute = false,
             CreateNoWindow = true,
-            WorkingDirectory = AppContext.BaseDirectory
+            WorkingDirectory = AppContext.BaseDirectory,
+
+            /* Taken rather than left to fall through to whatever console this was started from.
+               A plugin that prints about itself is often the only account of what it was doing,
+               and on somebody else's machine there is no console to fall through to at all. */
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
         };
 
         string name = Path.GetFileNameWithoutExtension(self);
@@ -461,11 +467,50 @@ internal sealed class PluginProcess : IDisposable
 
         try
         {
-            return Process.Start(start);
+            var child = Process.Start(start);
+
+            if (child != null) Overhear(child, plugin.Name);
+
+            return child;
         }
         catch (Exception)
         {
             return null;
+        }
+    }
+
+    /// <summary>Puts whatever the child prints into the log, a line at a time.</summary>
+    /// <remarks>
+    /// Both streams, since a plugin decides for itself which one it talks on and most of them
+    /// talk on neither until something has gone wrong. Read rather than merely redirected: a
+    /// redirected stream nobody empties fills its pipe and stops the process that is writing to
+    /// it, which would be this application hanging a plugin for the crime of being chatty.
+    ///
+    /// Blank lines are dropped, since a stream that has been closed reports one last empty line
+    /// and toolkits pad their output with them.
+    /// </remarks>
+    /// <param name="child">The process that was just started.</param>
+    /// <param name="name">What to call it in the log.</param>
+    private static void Overhear(Process child, string name)
+    {
+        void Heard(object? _, DataReceivedEventArgs said)
+        {
+            if (string.IsNullOrWhiteSpace(said.Data)) return;
+
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () => name + " said: " + said.Data);
+        }
+
+        try
+        {
+            child.OutputDataReceived += Heard;
+            child.ErrorDataReceived += Heard;
+
+            child.BeginOutputReadLine();
+            child.BeginErrorReadLine();
+        }
+        catch (Exception)
+        {
+            /* A process that ended between starting and this has nothing to be overheard. */
         }
     }
 

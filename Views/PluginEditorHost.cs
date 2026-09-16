@@ -244,6 +244,17 @@ public sealed class PluginEditorHost : NativeControlHost
         Measure(new Size(width, height));
         Arrange(new Rect(0, 0, width, height));
 
+        /* Avalonia gives up sizing a window to its contents the moment that window has been
+           resized, and the first thing a plugin asks for resizes it. Everything after that laid
+           the control out and left the window where it was, which shows as a band of empty
+           window under a plugin that asked to be smaller than it first was. Set away and back,
+           since setting a property to what it already holds tells nobody anything. */
+        if (TopLevel.GetTopLevel(this) is Window holder && holder.SizeToContent != SizeToContent.Manual)
+        {
+            holder.SizeToContent = SizeToContent.Manual;
+            holder.SizeToContent = SizeToContent.WidthAndHeight;
+        }
+
         Said("the plugin asked to be " + width + " by " + height + ", and has been told it is");
 
         try
