@@ -58,6 +58,13 @@ public sealed partial class PluginSlotViewModel : ObservableObject, Interfaces.I
     /// <summary>Who made it, when they said.</summary>
     public string Vendor => Effect.Info.Vendor ?? "";
 
+    /// <summary>What it said its colour was, or nothing where it said nothing.</summary>
+    /// <remarks>
+    /// Read off the bundle when the plugin was found rather than asked of the running plugin, so
+    /// it costs nothing here. Only ours say it; anybody else's block keeps the plain edge.
+    /// </remarks>
+    public string Colour => Effect.Info.Colour ?? "";
+
     /// <summary>
     /// The first few of its controls, printed on the block itself.
     /// </summary>

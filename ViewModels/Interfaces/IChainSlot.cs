@@ -34,6 +34,16 @@ public interface IChainSlot
     /// <summary>Who made it, when they said, shown where there are no readings.</summary>
     string Vendor { get; }
 
+    /// <summary>Its own colour, as "#RRGGBB", or empty where it has none.</summary>
+    /// <remarks>
+    /// The stripe down the leading edge of the block, the same one the instrument at the head of
+    /// the chain carries. One of ours paints it from its face, so a chain of ours reads as the
+    /// rack does. A plugin has it only where it was built to say so, which is what
+    /// <see cref="JingleBox2.Audio.Plugins.PluginColour"/> reads; one that says nothing gets
+    /// nothing and is told apart by the format in its corner.
+    /// </remarks>
+    string Colour { get; }
+
     /// <summary>The first few of its controls, printed on the block itself.</summary>
     /// <remarks>
     /// The point of a chain you can read: what a device is set to, without opening it. A chain of

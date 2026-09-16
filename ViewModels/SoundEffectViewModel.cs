@@ -106,6 +106,13 @@ public sealed partial class SoundEffectViewModel : ObservableObject, IChainSlot,
 
     /// <inheritdoc/>
     /// <remarks>
+    /// Its face's own accent, which is what the rack row and its window are painted from, so one
+    /// effect is one colour wherever it is looked at.
+    /// </remarks>
+    public string Colour => Effect.Theme.Accent;
+
+    /// <inheritdoc/>
+    /// <remarks>
     /// Straight off the engine, since it is in this process and holds its own values: a plugin's
     /// are worth keeping because reading one is a round trip to another process, and these are
     /// not.
