@@ -151,6 +151,29 @@ the pattern had no release at all, which was enough while a track held one note 
 enough now. It ends the chord and not the sound, because a note played by hand runs its own
 length here.
 
+**And all of that is the stopped rule, because what makes a chord is whatever decides a line.**
+Stepping, there is no clock to ask and the keys under one hand are the notes that belong on one
+line. Running, each key's own moment has already decided its line, so the chord is the notes that
+landed on the same line and the hand says nothing about it. Read the stopped way while recording,
+a phrase played legato came back as a chord, since a hand that holds each key until the next is
+struck never lets the count reach nought: every note went into the columns of whichever line the
+first one fell on. The line being filled is remembered rather than counted off the pattern, so a
+second pass plays over what is on a line rather than stacking a column onto it, and a key coming
+up does not give the line away, or a chord played staccato inside one line would write its notes
+over each other. One memory for the cursor's keyboard and one per track for the tracks that claim
+a channel of their own.
+
+A chord does not have to land on one line to be one. The line nearest a moment changes at the half
+way point between two lines, so a chord spread over twenty milliseconds falls either side of that
+point whenever the hand lands near it, which at 120 to the minute and four lines to the beat is
+about one chord in six. `IChordWindow` keeps them together: the notes struck within forty
+milliseconds of the first share its line whatever each is nearest. The number sits between a
+hand's chord, which arrives over twenty to fifty milliseconds, and the fastest deliberate spacing
+anybody plays in, sixteenths at two hundred to the minute at 75 ms. It is held to half a line as
+well, for songs whose lines are shorter than the window, and anchored on the first note rather
+than the one before it, or a run inside the window would chain onto one line for as long as
+somebody kept playing. `Tests/LiveNoteLineTests.cs`.
+
 **History.** `Pattern.Cells`, `Holds` and `Restore` carry the column counts, and a step that did
 not would hold cells of the wrong length, be refused, and say nothing. This codebase has had
 that exact bug twice and both times it survived because doing nothing looks like working.

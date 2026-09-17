@@ -2912,6 +2912,37 @@ whole exercise and is worth writing down rather than summarising:
   are the same hand, and the letter rows needed a key-up they had never had: a note typed into
   the pattern had no release at all, which was enough while a track held one note. It ends the
   chord and not the sound, since a note played by hand runs its own length here
+- **And that rule is the stopped one, because what makes a chord is whatever decides a line.**
+  Stepping, there is no clock to ask, so the keys under one hand are the notes that belong on one
+  line. Running, the moment each key was struck has already decided its line, so a chord is two
+  notes that landed on the same line and nothing else: whether either key was still down when the
+  other arrived says nothing about it. Read the stopped way while recording, **a phrase played
+  legato came back as a chord**, since a hand that keeps each key until the next is struck never
+  lets the count reach nought, and every note of it went into the columns of whichever line the
+  first one fell on, however far the transport had moved. Reported as notes getting set on the
+  same line, and it looked like a tempo fault because a faster song is where fingers overlap
+- The line being filled is remembered rather than counted off the pattern, which is what keeps a
+  second pass over a part from stacking a column onto every line it plays over: the first note to
+  land on a line is played over what is there and the ones after it go beside it. A key coming up
+  may not give the line away either, or a chord played staccato inside one line would write its
+  notes over each other. `TrackerViewModel` keeps one for the cursor's keyboard and one per track
+  for the tracks that claim a channel of their own, since a sequencer feeding four tracks is four
+  hands
+- **And a chord does not have to land on one line to be one, which is the half that saves the
+  feature rather than the phrase.** The line nearest a moment changes at the half way point
+  between two lines, so a chord whose notes are twenty milliseconds apart falls either side of it
+  whenever the hand happens to land there: a line is 125 ms at a hundred and twenty to the minute
+  and four to the beat, so about one chord in six would have come out split, which quantising
+  afterwards cannot put back since by then it is two notes on two lines like any other.
+  `IChordWindow` is the answer, **forty milliseconds**, and the number is chosen between two
+  measured things rather than picked: a hand's chord arrives over twenty to fifty milliseconds,
+  and the fastest thing anybody plays into a tracker on purpose is sixteenths at two hundred to
+  the minute, which is 75 ms apart. Held to half a line as well, or a song whose lines are shorter
+  than the window would have it gathering notes that really are a line apart
+- Anchored on the first note of the chord and not on the one before it, or a run of notes each
+  inside the window of the last would chain onto one line for as long as somebody kept playing.
+  `Tests/LiveNoteLineTests.cs` is the whole rule, thirteen tests: four fail with the held-key
+  chord put back and four with the window taken out, which is the two halves of it
 - **Clearing a track gives back the note columns it grew.** A track that widened to three while
   a chord was played into it stayed three wide once the chord was deleted, and every column is
   width on the screen, so emptying a track has to be allowed to give the room back. Clear track

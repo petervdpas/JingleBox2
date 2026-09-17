@@ -1835,6 +1835,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             }
 
             Song.Normalize();
+            ForgetLiveLines();
             _player.Play(Song, new TrackerPosition(OrderIndex, 0), PlayMode);
             Status = PlayMode == TrackerPlayMode.Pattern ? "Playing pattern" : "Playing song";
         }
@@ -1867,6 +1868,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             int lines = CurrentPattern?.Lines ?? 0;
             int at = lines > 0 ? Math.Clamp(line, 0, lines - 1) : 0;
 
+            ForgetLiveLines();
             _player.Play(Song, new TrackerPosition(OrderIndex, at), PlayMode);
 
             Status = "Following, from line " + at;
@@ -1903,6 +1905,21 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _player.Stop();
         PlayingLine = -1;
         Status = "Stopped";
+
+        ForgetLiveLines();
+    }
+
+    /// <summary>Forgets which line the last live note went on, for every keyboard playing in.</summary>
+    /// <remarks>
+    /// Which line a note shares with the one before it is a question about one pass, so a pass
+    /// beginning or ending gives the answer up. Without it a pass started again on the line the
+    /// last one was left on would take its first note as the second note of a chord played
+    /// before the transport stopped.
+    /// </remarks>
+    private void ForgetLiveLines()
+    {
+        _trackLine.Clear();
+        _chordLine = -1;
     }
 
     /// <summary>Both automation panels follow the playing line, so their pictures show it.</summary>
@@ -2972,11 +2989,23 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// drawn, since that is told to this thread after the line has begun, so a key struck just
     /// ahead of the beat it meant landed a line early. See <see cref="ITrackerPlayer.NearestLine"/>.
     ///
+    /// **What a chord is depends on the transport, because what decides a line does.** Stepping,
+    /// it is keys held together: there is no clock to ask, so the notes under one hand are the
+    /// ones that belong on one line, and the second of them goes into the next note column.
+    /// Running, the line is already decided by the moment each key was struck, so a chord is
+    /// simply two notes that landed on the same line, whether or not the first key is still
+    /// down. Playing legato is what makes the difference audible: a phrase where each key is
+    /// still held as the next is struck is one hand's ordinary playing, and read as a chord it
+    /// went into the columns of the line the first note happened to land on, however far the
+    /// transport had moved since.
+    ///
     /// A key already down arriving again is the letter row repeating, which is how a column is
     /// filled quickly and stays. It is dropped while another key is down, because there it is
     /// not somebody filling a column: it is a hand resting on a chord, and every repeat would
     /// spray a single note down the pattern under the chord that was just written. Hardware
-    /// never reaches this, since a key that is down cannot be pressed again.
+    /// never reaches this, since a key that is down cannot be pressed again. A repeat is never
+    /// a chord either, whichever way the line was decided, or a held key would fill the track's
+    /// columns with copies of one note.
     ///
     /// The three answers are <see cref="Tracker.Interfaces.INotePress"/>, out on their own so
     /// what a press means can be put a question to without a song or a keyboard.
@@ -3008,13 +3037,31 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         if (wanted == Tracker.Enums.NoteWant.Nothing) return;
 
-        bool chord = _chordLine >= 0 && _holding.Count > 0 && !again;
+        bool together = _holding.Count > 0 && !again;
 
         if (wanted == Tracker.Enums.NoteWant.SoundAndWrite) PreviewNote(note, volume);
 
         _holding.Add(note.Semitone);
 
         if (CurrentPattern == null || !IsRecording) return;
+
+        bool running = _player.IsPlaying;
+        long when = arrived == 0 ? System.Diagnostics.Stopwatch.GetTimestamp() : arrived;
+        var pattern = CurrentPattern;
+        var target = Cursor;
+
+        if (running)
+        {
+            var nearest = _player.NearestLine(when);
+
+            pattern = Song.PatternAt(nearest.OrderIndex) ?? CurrentPattern;
+            target = Cursor with { Line = nearest.Line };
+        }
+
+        bool chord = _chordLine >= 0 && !again && (running
+            ? _window.Together(_chordWhen, when, LineTicks)
+                || (_chordLine == target.Line && ReferenceEquals(_chordPattern, pattern))
+            : together);
 
         if (chord)
         {
@@ -3034,18 +3081,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             return;
         }
 
-        bool running = _player.IsPlaying;
-        var pattern = CurrentPattern;
-        var target = Cursor;
-
-        if (running)
-        {
-            var nearest = _player.NearestLine(arrived == 0 ? System.Diagnostics.Stopwatch.GetTimestamp() : arrived);
-
-            pattern = Song.PatternAt(nearest.OrderIndex) ?? CurrentPattern;
-            target = Cursor with { Line = nearest.Line };
-        }
-
         if (target.Line >= pattern.Lines) return;
 
         Edits.EnterNote(pattern, target, note, InstrumentForTrack(target.Track), volume);
@@ -3054,6 +3089,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _chordLine = target.Line;
         _chordStart = target.NoteColumn;
         _chordFilled = 1;
+        _chordWhen = when;
 
         if (!running) StepDown();
     }
@@ -3089,18 +3125,45 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>Which notes are still held, however they arrived, so a chord can be recognised.</summary>
     /// <remarks>
-    /// A press while another key is still down is a chord and goes into the next note column;
-    /// the same key arriving again is the keyboard repeating and is an ordinary note. Both
-    /// sources are counted together, since a hand on the hardware and a hand on the letter rows
-    /// are the same hand.
+    /// A press while another key is still down is a chord while the transport is stopped, and
+    /// goes into the next note column; the same key arriving again is the keyboard repeating
+    /// and is an ordinary note. Both sources are counted together, since a hand on the hardware
+    /// and a hand on the letter rows are the same hand.
+    ///
+    /// While the transport runs it says nothing about chords, since the line a note belongs to
+    /// is the moment it was struck rather than the hand it was struck with. It is still what
+    /// tells a repeat from a press.
     /// </remarks>
     private readonly HashSet<int> _holding = new();
 
     /// <summary>What a press means, given what is already held.</summary>
     private readonly Tracker.Interfaces.INotePress _pressed = new Tracker.NotePress();
 
-    /// <summary>Which line the chord being played is being written on, or -1 when none is.</summary>
+    /// <summary>How close together two notes have to be struck to be one chord.</summary>
+    private readonly Tracker.Interfaces.IChordWindow _window = new Tracker.ChordWindow();
+
+    /// <summary>How long a line is in stopwatch ticks, which is what the window is held to.</summary>
+    private long LineTicks =>
+        (long)(Song.Timing.SecondsPerLine * System.Diagnostics.Stopwatch.Frequency);
+
+    /// <summary>Which line the notes under the hand are being written on, or -1 when none is.</summary>
+    /// <remarks>
+    /// Stepping, it is the line the first note of the chord went on and it is forgotten when the
+    /// last key comes up. Running, it is the line the last note went on and it is forgotten by
+    /// the next note landing on another one, which is what lets two notes a few milliseconds
+    /// apart share a line without either key being held for the other.
+    /// </remarks>
     private int _chordLine = -1;
+
+    /// <summary>
+    /// When the first note on that line was struck, which is what the window is measured from.
+    /// </summary>
+    /// <remarks>
+    /// The first and not the one before, so a chord is the notes within one window of its
+    /// beginning rather than a chain that carries on for as long as somebody keeps playing
+    /// inside it.
+    /// </remarks>
+    private long _chordWhen;
 
     /// <summary>
     /// Which pattern that line is in, which is not always the one on the screen: a chord struck
@@ -3132,6 +3195,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Called for both kinds of keyboard. A letter key has no release of its own in the note
     /// path, so the view raises one, and without it the first chord anybody typed would go on
     /// filling columns for the rest of the session.
+    ///
+    /// The last key coming up ends the chord only while the transport is stopped, since that is
+    /// the only time the hand is what decides a line. Running, the line does, so a staccato pair
+    /// struck inside one line still shares it, and the line is given up by the next note landing
+    /// on another one.
     /// </remarks>
     public void LetNote(Note note)
     {
@@ -3139,7 +3207,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         _holding.Remove(note.Semitone);
 
-        if (_holding.Count == 0) _chordLine = -1;
+        if (_holding.Count == 0 && !_player.IsPlaying) _chordLine = -1;
 
         if (_sounding.Remove(note.Semitone, out var instrument)) _player.LetPreview(instrument, note);
     }
@@ -3175,6 +3243,24 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     private readonly Dictionary<(int Track, int Semitone), (TrackerInstrument? Instrument, int Column, int Line, int Order)> _trackHeld = new();
 
+    /// <summary>
+    /// The line the last note played into each track was written on while the transport ran, how
+    /// many of its columns that filled, and when the first of them was struck.
+    /// </summary>
+    /// <remarks>
+    /// What makes a chord a chord while the transport runs, since the keys held say nothing
+    /// about it there: two notes belong on one line because they were struck within one line of
+    /// each other, and either key may already be up by the time the other arrives. A note
+    /// landing on another line takes the track's entry with it, so the first note on a line
+    /// writes into the first column and whatever was already there is played over rather than
+    /// pushed along. The moment is <see cref="Tracker.Interfaces.IChordWindow"/>'s, which is what
+    /// keeps a chord struck either side of the half way point between two lines on one of them.
+    ///
+    /// Per track, because a sequencer feeding four tracks is four hands as far as this is
+    /// concerned, and apart from <see cref="_chordLine"/>, which is the cursor's keyboard.
+    /// </remarks>
+    private readonly Dictionary<int, (int Order, int Line, int Filled, long When)> _trackLine = new();
+
     /// <summary>How a volume becomes a velocity for a track's MIDI out.</summary>
     private readonly Music.Interfaces.IMidiNoteInput _wire = new Music.MidiNoteInput();
 
@@ -3188,9 +3274,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     ///
     /// Where it is written is the line nearest the moment it arrived while the transport runs,
     /// in whichever pattern that line is in, and the cursor's line while it does not, stepping
-    /// down the way typing does. Keys held together on one track are
-    /// a chord and go on the line the first of them went on, one column each, the track widening
-    /// to fit; a chord wider than a track can be keeps the notes it has room for.
+    /// down the way typing does.
+    ///
+    /// Notes that land on one line share it, a column each, and the track widens to fit them; a
+    /// line with more notes on it than a track can hold keeps the ones it has room for. Running,
+    /// landing on one line is the whole of what makes a chord, which is why a part played legato
+    /// is written as it was played rather than stacked into the columns of whichever line the
+    /// first note of the phrase fell on. Stopped, there is no clock to ask, so the keys held
+    /// together are the chord and they go on the line the first of them went on.
     ///
     /// A key already down is not struck again, since a device does not send a second press
     /// without a release and a repeat here would stack a voice for nothing.
@@ -3227,15 +3318,16 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _player.MidiOut?.NoteOn(Song.Mix, track, Midi.TrackMidiOut.LiveVoices + note.Semitone, note,
             _wire.VelocityFor(volume));
 
-        bool chord = held > 0;
-
         bool running = _player.IsPlaying;
+        long when = arrived == 0 ? System.Diagnostics.Stopwatch.GetTimestamp() : arrived;
+
+        bool chord = !running && held > 0;
 
         if (!chord)
         {
             if (running)
             {
-                var nearest = _player.NearestLine(arrived == 0 ? System.Diagnostics.Stopwatch.GetTimestamp() : arrived);
+                var nearest = _player.NearestLine(when);
                 line = nearest.Line;
                 order = nearest.OrderIndex;
             }
@@ -3246,7 +3338,24 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             }
         }
 
-        _trackHeld[(track, note.Semitone)] = (instrument, held, line, order);
+        int column = held;
+        long began = when;
+
+        if (running)
+        {
+            column = 0;
+
+            if (_trackLine.TryGetValue(track, out var last) &&
+                (_window.Together(last.When, when, LineTicks) || (last.Order == order && last.Line == line)))
+            {
+                column = last.Filled;
+                began = last.When;
+                order = last.Order;
+                line = last.Line;
+            }
+        }
+
+        _trackHeld[(track, note.Semitone)] = (instrument, column, line, order);
 
         Meters();
         Played(track, note, 0d);
@@ -3256,11 +3365,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (pattern == null || !IsRecording) return;
         if (line < 0 || line >= pattern.Lines) return;
 
-        MakeRoom(track, held);
+        MakeRoom(track, column);
 
-        if (held >= Song.ColumnsOn(track)) return;
+        if (column >= Song.ColumnsOn(track)) return;
 
-        Edits.EnterNote(pattern, new PatternCursor(line, track, CellColumn.Note, held), note,
+        if (running) _trackLine[track] = (order, line, column + 1, began);
+
+        Edits.EnterNote(pattern, new PatternCursor(line, track, CellColumn.Note, column), note,
             InstrumentForTrack(track), volume);
 
         if (!chord && !running) StepDown();
