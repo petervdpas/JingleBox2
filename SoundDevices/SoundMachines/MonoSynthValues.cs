@@ -93,6 +93,9 @@ public sealed class MonoSynthValues(MonoSynthPatchViewModel patch, TrackerInstru
     /// <summary>The low frequency oscillator: how fast it runs.</summary>
     private const string LfoRateKey = "lfo_rate";
 
+    /// <summary>Or, instead of that rate, which note length it runs at.</summary>
+    private const string LfoSyncKey = "lfo_sync";
+
     /// <summary>And what shape it is.</summary>
     private const string LfoWaveKey = "lfo_wave";
 
@@ -141,6 +144,7 @@ public sealed class MonoSynthValues(MonoSynthPatchViewModel patch, TrackerInstru
         DecayKey => patch.DecayMs,
 
         LfoRateKey => patch.LfoRateHz,
+        LfoSyncKey => patch.LfoSync,
         LfoWaveKey => (double)patch.LfoWave,
 
         VcoSourceKey => (double)patch.VcoModSource,
@@ -188,6 +192,8 @@ public sealed class MonoSynthValues(MonoSynthPatchViewModel patch, TrackerInstru
             DecayKey => Moved(patch.DecayMs, value, () => patch.DecayMs = value),
 
             LfoRateKey => Moved(patch.LfoRateHz, value, () => patch.LfoRateHz = value),
+            LfoSyncKey => Picked(patch.LfoSync, value, Rack.SoundDevices.Timing.Division.Most,
+                at => patch.LfoSync = at),
             LfoWaveKey => Picked((int)patch.LfoWave, value, (int)LfoWave.Square,
                 at => patch.LfoWave = (LfoWave)at),
 

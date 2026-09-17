@@ -104,11 +104,17 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
     /// <summary>How fast the pitch wobbles.</summary>
     private const string VibratoRateKey = "vib_rate";
 
+    /// <summary>Or, instead of that rate, which note length it runs at.</summary>
+    private const string VibratoSyncKey = "vib_sync";
+
     /// <summary>And how far, in cents.</summary>
     private const string VibratoDepthKey = "vib_depth";
 
     /// <summary>How fast the level wobbles.</summary>
     private const string TremoloRateKey = "trem_rate";
+
+    /// <summary>Or, instead of that rate, which note length it runs at.</summary>
+    private const string TremoloSyncKey = "trem_sync";
 
     /// <summary>And how far.</summary>
     private const string TremoloDepthKey = "trem_depth";
@@ -164,8 +170,10 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
         EvenDriveKey => patch.EvenDrive ? 1 : 0,
         FilterFirstKey => patch.FilterFirst ? 1 : 0,
         VibratoRateKey => patch.VibratoRateHz,
+        VibratoSyncKey => patch.VibratoSync,
         VibratoDepthKey => patch.VibratoDepthCents,
         TremoloRateKey => patch.TremoloRateHz,
+        TremoloSyncKey => patch.TremoloSync,
         TremoloDepthKey => patch.TremoloDepth,
 
         CyclesKey => _cycles,
@@ -214,9 +222,13 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
             EvenDriveKey => Moved(patch.EvenDrive, value, on => patch.EvenDrive = on),
             FilterFirstKey => Moved(patch.FilterFirst, value, on => patch.FilterFirst = on),
             VibratoRateKey => Moved(patch.VibratoRateHz, value, () => patch.VibratoRateHz = value),
+            VibratoSyncKey => Moved(patch.VibratoSync, value, 0, Rack.SoundDevices.Timing.Division.Most,
+                at => patch.VibratoSync = at),
             VibratoDepthKey => Moved(
                 patch.VibratoDepthCents, value, () => patch.VibratoDepthCents = value),
             TremoloRateKey => Moved(patch.TremoloRateHz, value, () => patch.TremoloRateHz = value),
+            TremoloSyncKey => Moved(patch.TremoloSync, value, 0, Rack.SoundDevices.Timing.Division.Most,
+                at => patch.TremoloSync = at),
             TremoloDepthKey => Moved(patch.TremoloDepth, value, () => patch.TremoloDepth = value),
 
             CyclesKey => Zoomed(value),

@@ -188,6 +188,15 @@
       "Saved": true
     },
     {
+      "Key": "vibrato_sync",
+      "Name": "Vib sync",
+      "Unit": "",
+      "Min": 0,
+      "Max": 8,
+      "Default": 0,
+      "Step": 1
+    },
+    {
       "Key": "vibrato_depth",
       "Name": "Vib depth",
       "Unit": "c",
@@ -226,6 +235,15 @@
       "Default": 0,
       "Step": 0.1,
       "Saved": true
+    },
+    {
+      "Key": "tremolo_sync",
+      "Name": "Trem sync",
+      "Unit": "",
+      "Min": 0,
+      "Max": 8,
+      "Default": 0,
+      "Step": 1
     },
     {
       "Key": "tremolo_depth",
@@ -619,6 +637,17 @@
                       "Children": []
                     },
                     {
+                      "Element": "Choice",
+                      "Parameter": "vibrato_sync",
+                      "Label": "",
+                      "Properties": {
+                        "span": "4",
+                        "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
+                        "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
+                      },
+                      "Children": []
+                    },
+                    {
                       "Element": "Knob",
                       "Parameter": "vibrato_depth",
                       "Label": "",
@@ -659,6 +688,17 @@
                         "dial": "40",
                         "row": "1",
                         "column": "2"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Choice",
+                      "Parameter": "tremolo_sync",
+                      "Label": "",
+                      "Properties": {
+                        "span": "4",
+                        "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
+                        "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
                       },
                       "Children": []
                     },

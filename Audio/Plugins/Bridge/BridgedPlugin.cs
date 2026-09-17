@@ -682,7 +682,7 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
                 return null;
             }
 
-            var answer = process.Call(BridgeCall.OpenEditor, null, PluginBridge.WindowTimeoutMilliseconds);
+            var answer = process.Call(BridgeCall.OpenEditor, null, PluginBridge.WindowTimeoutMilliseconds, false);
 
             if (answer.Call != BridgeCall.Ok)
             {
@@ -877,7 +877,7 @@ public sealed class BridgedEditor : IPluginEditor
     {
         if (_closed) return false;
 
-        var answer = _process.Call(BridgeCall.Attach, _body.Handle(window), PluginBridge.WindowTimeoutMilliseconds);
+        var answer = _process.Call(BridgeCall.Attach, _body.Handle(window), PluginBridge.WindowTimeoutMilliseconds, false);
 
         if (answer.Call != BridgeCall.Ok) return false;
 
@@ -898,7 +898,7 @@ public sealed class BridgedEditor : IPluginEditor
     {
         if (_closed) return;
 
-        _process.Call(BridgeCall.Detach, null, PluginBridge.WindowTimeoutMilliseconds);
+        _process.Call(BridgeCall.Detach, null, PluginBridge.WindowTimeoutMilliseconds, false);
     }
 
     /// <inheritdoc/>
@@ -910,7 +910,7 @@ public sealed class BridgedEditor : IPluginEditor
     {
         if (_closed || width <= 0 || height <= 0) return;
 
-        _process.Call(BridgeCall.Resized, _body.Pair(width, height), PluginBridge.WindowTimeoutMilliseconds);
+        _process.Call(BridgeCall.Resized, _body.Pair(width, height), PluginBridge.WindowTimeoutMilliseconds, false);
     }
 
     /// <summary>Called when the plugin died underneath the window. There is nothing left to tell.</summary>
@@ -938,7 +938,7 @@ public sealed class BridgedEditor : IPluginEditor
         _closed = true;
         _process.ResizeRequested -= OnResizeRequested;
 
-        _process.Call(BridgeCall.CloseEditor, null, PluginBridge.WindowTimeoutMilliseconds);
+        _process.Call(BridgeCall.CloseEditor, null, PluginBridge.WindowTimeoutMilliseconds, false);
 
         _owner.Forget(this);
     }

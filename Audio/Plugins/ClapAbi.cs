@@ -89,6 +89,27 @@ internal static class ClapAbi
     /// and not an index into anything here.
     /// </summary>
     public const ushort ParamValueEvent = 5;
+
+    /// <summary>Where the song is, as an event rather than as a field of its own.</summary>
+    public const ushort TransportEvent = 9;
+
+    /// <summary>
+    /// Which parts of a transport were filled in, as CLAP's own flags. Like VST3's, an unset flag
+    /// means no answer rather than an answer of nought.
+    /// </summary>
+    public const uint TransportHasTempo = 1u << 0;
+    public const uint TransportHasBeats = 1u << 1;
+    public const uint TransportHasSeconds = 1u << 2;
+    public const uint TransportHasTimeSignature = 1u << 3;
+    public const uint TransportIsPlaying = 1u << 4;
+
+    /// <summary>
+    /// What a beat and a second are counted in: fixed point, with thirty one bits under the
+    /// point. CLAP does it this way so that a position is exact rather than nearly right, which
+    /// over a long song is the difference between in time and not.
+    /// </summary>
+    public const long BeatTimeFactor = 1L << 31;
+    public const long SecondsTimeFactor = 1L << 31;
 }
 
 /// <summary>
@@ -339,8 +360,8 @@ internal unsafe struct ClapProcess
     public uint FramesCount;
 
     /// <summary>
-    /// Where the song is and how fast, or null for a host that does not say. Null here: nothing
-    /// in this application tells a plugin about the tracker's clock yet.
+    /// Where the song is and how fast, as a <see cref="ClapEventTransport"/>, or null for a host
+    /// that does not say. A plugin with a delay in note lengths reads this and nothing else.
     /// </summary>
     public void* Transport;
 
@@ -463,6 +484,47 @@ internal struct ClapEventParamValue
 
     /// <summary>The new value, in the parameter's own units and inside its own range.</summary>
     public double Value;
+}
+
+/// <summary>
+/// Where the song is, in CLAP's own shape.
+/// </summary>
+/// <remarks>
+/// Laid out as the header says, because the plugin reads it by offset. The positions are fixed
+/// point with thirty one bits under the point; see <see cref="ClapAbi.BeatTimeFactor"/>.
+/// </remarks>
+[StructLayout(LayoutKind.Sequential)]
+internal struct ClapEventTransport
+{
+    public ClapEventHeader Header;
+
+    /// <summary>Which of the fields below hold anything. See ClapAbi's Transport flags.</summary>
+    public uint Flags;
+
+    /// <summary>How far into the song, in beats, fixed point.</summary>
+    public long SongPositionBeats;
+
+    /// <summary>And in seconds, the same way.</summary>
+    public long SongPositionSeconds;
+
+    public double Tempo;
+
+    /// <summary>How much the tempo moves per sample, for a host that is ramping it. Nought here.</summary>
+    public double TempoIncrement;
+
+    public long LoopStartBeats;
+    public long LoopEndBeats;
+    public long LoopStartSeconds;
+    public long LoopEndSeconds;
+
+    /// <summary>The beat the current bar began on, fixed point.</summary>
+    public long BarStart;
+
+    /// <summary>Which bar that is, counting from nought.</summary>
+    public int BarNumber;
+
+    public ushort TimeSignatureNumerator;
+    public ushort TimeSignatureDenominator;
 }
 
 /// <summary>The plugin's knobs, as the <c>clap.params</c> extension offers them.</summary>

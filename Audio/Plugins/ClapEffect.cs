@@ -1,8 +1,9 @@
+using JingleBox2.Audio.Plugins.Records;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using JingleBox2.Audio.Plugins.Interfaces;
-using JingleBox2.Audio.Plugins.Records;
+using JingleBox2.Rack.SoundDevices.Timing;
 
 namespace JingleBox2.Audio.Plugins;
 
@@ -95,6 +96,9 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
 
     /// <summary>What is handed to the plugin per block. Filled in at activation and reused.</summary>
     private ClapProcess* _process;
+
+    /// <summary>Where the song is, handed to the plugin on every block. See TellTheTime.</summary>
+    private ClapEventTransport* _transport;
 
     /// <summary>The event list the plugin reads its parameter moves out of.</summary>
     private ClapInputEvents* _inEvents;
@@ -419,7 +423,13 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         _outEvents = Alloc<ClapOutputEvents>(1);
         _outEvents->TryPush = &TakeEvent;
 
+        _transport = Alloc<ClapEventTransport>(1);
+        _transport->Header.Size = (uint)sizeof(ClapEventTransport);
+        _transport->Header.SpaceId = ClapAbi.CoreEventSpace;
+        _transport->Header.Type = ClapAbi.TransportEvent;
+
         _process = Alloc<ClapProcess>(1);
+        _process->Transport = _transport;
         _process->AudioInputs = _inputBuffer;
         _process->AudioOutputs = _outputBuffer;
         _process->AudioInputsCount = (uint)_inputPortChannels.Length;
@@ -556,6 +566,8 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         _process->FramesCount = (uint)frames;
         _process->SteadyTime = _steadyTime;
 
+        TellTheTime();
+
         lock (_flush)
         {
             _current = this;
@@ -593,6 +605,39 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     }
 
     /// <summary>Turns the knob moves waiting since the last block into events for this one.</summary>
+    /// <summary>Where the song is, put into the shape a CLAP plugin reads it in.</summary>
+    /// <remarks>
+    /// The same answer VST3 is given, in different clothes: CLAP counts beats and seconds in fixed
+    /// point with thirty one bits under the point, so that a position an hour into a song is still
+    /// exact rather than nearly right.
+    /// </remarks>
+    private void TellTheTime()
+    {
+        if (_transport == null) return;
+
+        var now = SongClock.Now;
+
+        uint flags = ClapAbi.TransportHasTempo
+                   | ClapAbi.TransportHasBeats
+                   | ClapAbi.TransportHasSeconds
+                   | ClapAbi.TransportHasTimeSignature;
+
+        if (now.Playing) flags |= ClapAbi.TransportIsPlaying;
+
+        double seconds = now.Beats * 60.0 / Math.Max(1.0, now.Bpm);
+        double perBar = Math.Max(1, now.Numerator) * 4.0 / Math.Max(1, now.Denominator);
+
+        _transport->Flags = flags;
+        _transport->SongPositionBeats = (long)(now.Beats * ClapAbi.BeatTimeFactor);
+        _transport->SongPositionSeconds = (long)(seconds * ClapAbi.SecondsTimeFactor);
+        _transport->Tempo = now.Bpm;
+        _transport->TempoIncrement = 0;
+        _transport->BarStart = (long)(now.BarBeats * ClapAbi.BeatTimeFactor);
+        _transport->BarNumber = perBar > 0 ? (int)(now.BarBeats / perBar) : 0;
+        _transport->TimeSignatureNumerator = (ushort)Math.Max(1, now.Numerator);
+        _transport->TimeSignatureDenominator = (ushort)Math.Max(1, now.Denominator);
+    }
+
     private void TakePending()
     {
         lock (_lock)

@@ -2,6 +2,7 @@
   "Name": "Jet",
   "Effect": "effect.phaser",
   "rate": 0.08,
+  "rate_sync": 0,
   "depth": 1,
   "centre": 1200,
   "feedback": 0.8,

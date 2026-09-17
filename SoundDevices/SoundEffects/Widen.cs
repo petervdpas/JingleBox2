@@ -100,6 +100,15 @@ public sealed class Widen : ISoundEffectEngine
     /// <summary>How quickly those two lengths move, in cycles a second.</summary>
     public const string Rate = "rate";
 
+    /// <summary>
+    /// Or, instead of that rate, which note length it runs at.
+    /// </summary>
+    /// <remarks>
+    /// Nought is Free, which is the rate knob and is what every preset written before this
+    /// existed means. See <see cref="Rack.SoundDevices.Timing.Division"/>.
+    /// </remarks>
+    public const string RateSync = "rate_sync";
+
     /// <summary>The plain delay on one side, in milliseconds.</summary>
     public const string Haas = "haas";
 
@@ -210,6 +219,9 @@ public sealed class Widen : ISoundEffectEngine
     /// <inheritdoc cref="_width"/>
     private float _sweep = (float)RateThen;
 
+    /// <summary>Which note length it runs at, or nought for the knob. See RateSync.</summary>
+    private int _sync;
+
     /// <inheritdoc cref="_width"/>
     private float _haas = (float)HaasThen;
 
@@ -268,6 +280,7 @@ public sealed class Widen : ISoundEffectEngine
         Width => _width,
         Depth => _depth,
         Rate => _sweep,
+        RateSync => _sync,
         Haas => _haas,
         Side => _side,
         Mix => _mix,
@@ -293,6 +306,10 @@ public sealed class Widen : ISoundEffectEngine
 
             case Rate:
                 _sweep = (float)Math.Clamp(value, LeastRate, MostRate);
+                break;
+
+            case RateSync:
+                _sync = (int)Math.Clamp(value, 0, Rack.SoundDevices.Timing.Division.Most);
                 break;
 
             case Haas:
@@ -382,7 +399,7 @@ public sealed class Widen : ISoundEffectEngine
         double gain = _width * SideMost;
         double half = Frames(_depth) * 0.5;
         double haas = Frames(_haas);
-        double step = 2 * Math.PI * _sweep / _rate;
+        double step = 2 * Math.PI * (float)Rack.SoundDevices.Timing.Division.HertzIn(_sync, Rack.SoundDevices.Timing.SongClock.Now, _sweep) / _rate;
         bool onLeft = _side >= 0.5f;
         double bass = _bass;
         double low = bass > 0 ? 1 - Math.Exp(-2 * Math.PI * bass / _rate) : 0;

@@ -10,6 +10,7 @@
   "mix": 1.0,
   "swing": 0.0,
   "swing_rate": 1.0,
+  "swing_sync": 0,
   "follow": 0.0,
   "level": 0.0
 }

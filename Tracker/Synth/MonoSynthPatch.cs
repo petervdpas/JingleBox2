@@ -128,6 +128,16 @@ public sealed class MonoSynthPatch
     /// <summary>How fast the low frequency oscillator runs, for whichever route is pointed at it.</summary>
     public double LfoRateHz { get; set; } = 5;
 
+    /// <summary>
+    /// Whether it runs at that rate or in time with the song, and at what note length.
+    /// </summary>
+    /// <remarks>
+    /// Nought is Free, which is the rate beside it and is what every patch written before this
+    /// existed means. Anything else is a note length and the rate knob is ignored. See
+    /// <see cref="Rack.SoundDevices.Timing.Division"/>.
+    /// </remarks>
+    public int LfoSync { get; set; }
+
     /// <summary>Its shape: a wobble or a trill.</summary>
     public LfoWave LfoWave { get; set; } = LfoWave.Triangle;
 
@@ -175,6 +185,7 @@ public sealed class MonoSynthPatch
         Sustain = Sustain,
         EnvelopeToAmp = EnvelopeToAmp,
         LfoRateHz = LfoRateHz,
+        LfoSync = LfoSync,
         LfoWave = LfoWave,
         VcoModSource = VcoModSource,
         VcoModAmount = VcoModAmount,
@@ -207,6 +218,7 @@ public sealed class MonoSynthPatch
         Sustain = other.Sustain;
         EnvelopeToAmp = other.EnvelopeToAmp;
         LfoRateHz = other.LfoRateHz;
+        LfoSync = other.LfoSync;
         LfoWave = other.LfoWave;
         VcoModSource = other.VcoModSource;
         VcoModAmount = other.VcoModAmount;
@@ -239,6 +251,7 @@ public sealed class MonoSynthPatch
         AttackMs = Clamp(AttackMs, MinTimeMs, MaxAttackMs);
         DecayMs = Clamp(DecayMs, MinTimeMs, MaxDecayMs);
         LfoRateHz = Clamp(LfoRateHz, MinLfoRateHz, MaxLfoRateHz);
+        LfoSync = (int)Clamp(LfoSync, 0, Rack.SoundDevices.Timing.Division.Most);
         VcoModAmount = Clamp(VcoModAmount, 0, 1);
         VcfModAmount = Clamp(VcfModAmount, 0, 1);
         Volume = Clamp(Volume, 0, 2);

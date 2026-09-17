@@ -236,6 +236,19 @@ public sealed class MonoSynthPatchViewModel : ObservableObject
     }
 
     /// <summary>How fast the low frequency oscillator goes round, which is what the lamp shows.</summary>
+    /// <summary>
+    /// Whether the wobble runs at its own rate or in time with the song, and at what note length.
+    /// </summary>
+    /// <remarks>
+    /// Nought is Free, which is the rate above, and is what every patch written before this
+    /// existed means. See <see cref="Rack.SoundDevices.Timing.Division"/>.
+    /// </remarks>
+    public int LfoSync
+    {
+        get => _patch.LfoSync;
+        set => Set(value, _patch.LfoSync, v => _patch.LfoSync = v);
+    }
+
     public double LfoRateHz
     {
         get => _patch.LfoRateHz;

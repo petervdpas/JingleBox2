@@ -280,7 +280,13 @@ public sealed class MonoSynthVoice : IVoice
     /// </remarks>
     private double Lfo()
     {
-        _lfoPhase += _patch.LfoRateHz / _sampleRate;
+        /* In time with the song where it is set to be, and at its own rate otherwise. Asked every
+           sample rather than at the start of the note, so that turning the tempo while a note is
+           held is heard rather than waited for. */
+        double rate = Rack.SoundDevices.Timing.Division.HertzIn(
+            _patch.LfoSync, Rack.SoundDevices.Timing.SongClock.Now, _patch.LfoRateHz);
+
+        _lfoPhase += rate / _sampleRate;
         if (_lfoPhase >= 1) _lfoPhase -= Math.Floor(_lfoPhase);
 
         if (_patch.LfoWave == LfoWave.Square) return _lfoPhase < 0.5 ? 1.0 : -1.0;

@@ -25,6 +25,7 @@ using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Interfaces;
 using JingleBox2.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Timing;
 
 namespace JingleBox2.ViewModels;
 
@@ -1266,6 +1267,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Changing("the tempo");
 
             Song.Bpm = Math.Clamp(value, TrackerTiming.MinBpm, TrackerTiming.MaxBpm);
+
+            /* The plugins hear it at once, whether or not the transport is rolling: a plugin
+               whose rate is in note lengths has to be told before the next block, not when the
+               song is next started. */
+            Rack.SoundDevices.Timing.SongClock.Tempo(Song.Timing.ClampedBpm);
+
             OnPropertyChanged();
             MarkDirty("the tempo");
         }

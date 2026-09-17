@@ -2,6 +2,7 @@
   "Name": "Swoosh",
   "Effect": "effect.phaser",
   "rate": 0.5,
+  "rate_sync": 0,
   "depth": 0.7,
   "centre": 800,
   "feedback": 0.3,

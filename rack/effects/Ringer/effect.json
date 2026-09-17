@@ -80,6 +80,15 @@
       "Step": 0.01
     },
     {
+      "Key": "swing_sync",
+      "Name": "Sync",
+      "Unit": "",
+      "Min": 0,
+      "Max": 8,
+      "Default": 0,
+      "Step": 1
+    },
+    {
       "Key": "level",
       "Name": "Level",
       "Unit": "dB",
@@ -233,7 +242,7 @@
               "Properties": {
                 "cell": "26",
                 "gap": "6",
-                "columns": "3 3"
+                "columns": "3 3 5"
               },
               "Children": [
                 {
@@ -257,6 +266,17 @@
                     "dial": "44",
                     "lines": "1",
                     "tip": "How fast the swing goes, in turns a second."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Choice",
+                  "Parameter": "swing_sync",
+                  "Label": "",
+                  "Properties": {
+                    "span": "4",
+                    "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
+                    "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
                   },
                   "Children": []
                 }

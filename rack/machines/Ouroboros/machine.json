@@ -163,6 +163,15 @@
       "Step": 0.01
     },
     {
+      "Key": "lfo_sync",
+      "Name": "Sync",
+      "Unit": "",
+      "Min": 0,
+      "Max": 8,
+      "Default": 0,
+      "Step": 1
+    },
+    {
       "Key": "lfo_wave",
       "Name": "Wave",
       "Unit": "",
@@ -703,7 +712,7 @@
                   "Properties": {
                     "cell": "26",
                     "gap": "4",
-                    "columns": "3 2 2"
+                    "columns": "3 5 2 2"
                   },
                   "Children": [
                     {
@@ -714,6 +723,17 @@
                         "span": "3",
                         "dial": "40",
                         "lines": "1"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Choice",
+                      "Parameter": "lfo_sync",
+                      "Label": "",
+                      "Properties": {
+                        "span": "4",
+                        "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
+                        "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
                       },
                       "Children": []
                     },

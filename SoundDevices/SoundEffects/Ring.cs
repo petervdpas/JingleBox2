@@ -65,6 +65,15 @@ public sealed class Ring : ISoundEffectEngine
     /// <summary>How fast that sine goes, in turns a second.</summary>
     public const string SwingRate = "swing_rate";
 
+    /// <summary>
+    /// Or, instead of that rate, which note length it runs at.
+    /// </summary>
+    /// <remarks>
+    /// Nought is Free, which is the rate knob and is what every preset written before this
+    /// existed means. See <see cref="Rack.SoundDevices.Timing.Division"/>.
+    /// </remarks>
+    public const string SwingSync = "swing_sync";
+
     /// <summary>The furthest the swing reaches either way, in octaves.</summary>
     public const double MostSwing = 3;
 
@@ -145,6 +154,9 @@ public sealed class Ring : ISoundEffectEngine
     /// <inheritdoc cref="_carrier"/>
     private float _swingRate = 0.5f;
 
+    /// <summary>Which note length it runs at, or nought for the knob. See SwingSync.</summary>
+    private int _sync;
+
     /// <summary>The slow sine the swing reads.</summary>
     private readonly ISlowOscillator _swinging;
 
@@ -176,6 +188,7 @@ public sealed class Ring : ISoundEffectEngine
         Mix => _mix,
         Swing => _swing,
         SwingRate => _swingRate,
+        SwingSync => _sync,
         IEffectLevel.Key => _level.Db,
         _ => 0
     };
@@ -218,6 +231,10 @@ public sealed class Ring : ISoundEffectEngine
             case SwingRate:
                 _swingRate = (float)Math.Clamp(value, LeastSwingRate, MostSwingRate);
                 break;
+
+            case SwingSync:
+                _sync = (int)Math.Clamp(value, 0, Rack.SoundDevices.Timing.Division.Most);
+                break;
         }
     }
 
@@ -254,7 +271,7 @@ public sealed class Ring : ISoundEffectEngine
         double stepRight = 2 * Math.PI * Math.Max(0, _carrier + half) / _rate;
         double levels = _crush <= 0 ? 0 : Math.Pow(2, (16 - (Bits * _crush)) - 1);
         double swing = _swing;
-        double speed = _swingRate;
+        double speed = (float)Rack.SoundDevices.Timing.Division.HertzIn(_sync, Rack.SoundDevices.Timing.SongClock.Now, _swingRate);
         double carrier = _carrier;
 
         for (int at = 0; at < block; at++)

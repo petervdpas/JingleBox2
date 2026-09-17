@@ -50,6 +50,15 @@ public sealed class Delay : ISoundEffectEngine
     /// </remarks>
     public const string Time = "time";
 
+    /// <summary>
+    /// Or, instead of that time, which note length the repeats come back at.
+    /// </summary>
+    /// <remarks>
+    /// Nought is Free, which is the time knob and is what every preset written before this
+    /// existed means. See <see cref="Rack.SoundDevices.Timing.Division"/>.
+    /// </remarks>
+    public const string Sync = "time_sync";
+
     /// <summary>How much of the repeat goes back in, which is how many repeats there are.</summary>
     public const string Feedback = "feedback";
 
@@ -145,6 +154,9 @@ public sealed class Delay : ISoundEffectEngine
     /// <inheritdoc cref="_now"/>
     private double _want = TimeThen;
 
+    /// <summary>Which note length the repeats come back at, or nought for the knob. See Sync.</summary>
+    private int _sync;
+
     /// <summary>The one pole in each channel's feedback path.</summary>
     private double _dampedLeft;
 
@@ -215,10 +227,26 @@ public sealed class Delay : ISoundEffectEngine
     /// <param name="ms">The time in milliseconds.</param>
     private double Frames(double ms) => Math.Clamp(ms * 0.001 * _rate, 1, _room - 2);
 
+    /// <summary>
+    /// How long the delay is now: the note length where one is set, and the knob otherwise.
+    /// </summary>
+    /// <remarks>
+    /// Asked every block rather than kept, so that turning the tempo moves the repeats. The time
+    /// glides towards this the same either way, which is what keeps a tempo change from jumping.
+    /// </remarks>
+    private double Wanted()
+    {
+        double synced = Rack.SoundDevices.Timing.Division.SecondsIn(
+            _sync, Rack.SoundDevices.Timing.SongClock.Now, 0.0) * 1000.0;
+
+        return synced > 0.0 ? Math.Clamp(synced, LeastMs, MostMs) : _want;
+    }
+
     /// <inheritdoc/>
     public double ValueOf(string? key) => key switch
     {
         Time => _want,
+        Sync => _sync,
         Feedback => _feedback,
         Mix => _mix,
         Damp => _damp,
@@ -238,7 +266,12 @@ public sealed class Delay : ISoundEffectEngine
         {
             case Time:
                 _want = Math.Clamp(value, LeastMs, MostMs);
-                if (!_running) _now = Frames(_want);
+                if (!_running) _now = Frames(Wanted());
+                break;
+
+            case Sync:
+                _sync = (int)Math.Clamp(value, 0, Rack.SoundDevices.Timing.Division.Most);
+                if (!_running) _now = Frames(Wanted());
                 break;
 
             case Feedback:
@@ -292,7 +325,7 @@ public sealed class Delay : ISoundEffectEngine
 
         if (block <= 0) return;
 
-        double target = Frames(_want);
+        double target = Frames(Wanted());
         double feedback = _feedback;
         double mix = _mix;
         double keep = 1 - _damp * 0.9;

@@ -2,6 +2,7 @@
   "Name": "Across",
   "Effect": "effect.phaser",
   "rate": 0.3,
+  "rate_sync": 0,
   "depth": 0.8,
   "centre": 700,
   "feedback": 0.5,

@@ -5,6 +5,7 @@ using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Synth.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Rack.SoundDevices.Timing;
 
 namespace JingleBox2.Tracker.Synth;
 
@@ -1326,6 +1327,11 @@ public sealed class TrackMixer : ITrackMixer
         try
         {
             Mix(buffer, frames);
+
+            /* The beat moves by however much audio was made, which is the only honest measure of
+               it: the clock thread runs ahead of the sound, and a plugin told where that thread
+               had got to would be early by exactly as far as it was running ahead. */
+            Rack.SoundDevices.Timing.SongClock.Advance(frames, SampleRate);
         }
         finally
         {

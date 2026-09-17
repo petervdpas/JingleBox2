@@ -1,3 +1,4 @@
+using JingleBox2.Audio.Plugins.Records;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,7 +7,7 @@ using System.Net.Sockets;
 using System.Text;
 using JingleBox2.Audio.Plugins.Bridge.Enums;
 using JingleBox2.Audio.Plugins.Bridge.Interfaces;
-using JingleBox2.Audio.Plugins.Records;
+using JingleBox2.Rack.SoundDevices.Timing;
 
 namespace JingleBox2.Audio.Plugins.Bridge;
 
@@ -125,6 +126,19 @@ internal static class PluginBridge
     /// merely working.
     /// </remarks>
     public const int WaitForEver = 0;
+
+    /// <summary>
+    /// Where the transport sits in the header: the flags, then the tempo, the beat and the time
+    /// signature.
+    /// </summary>
+    /// <remarks>
+    /// In the header rather than in a message of its own, because it has to be true of the block
+    /// of audio it belongs to and a message would arrive whenever it arrived. The header is
+    /// written by the parent immediately before it asks for the block and read by the child
+    /// immediately after, so the two cannot come apart. It costs nothing: these bytes were spare
+    /// between the read index and the events.
+    /// </remarks>
+    public const int TransportOffset = 24;
 
     /// <summary>How big the shared block has to be for this many frames.</summary>
     /// <remarks>
@@ -593,6 +607,45 @@ internal sealed unsafe class BridgeBlock : IDisposable
 
     /// <summary>How many have ever been taken, at offset 20, counted the same way.</summary>
     private int* ReadIndex => (int*)(_base + 20);
+
+    /// <summary>
+    /// Where the song is, written by the parent before it asks for a block and read by the child
+    /// before it renders one. See <see cref="PluginBridge.TransportOffset"/>.
+    /// </summary>
+    public Transport Transport
+    {
+        get
+        {
+            byte* at = _base + PluginBridge.TransportOffset;
+
+            int flags = *(int*)at;
+            int numerator = *(int*)(at + 4);
+            double bpm = *(double*)(at + 8);
+            double beats = *(double*)(at + 16);
+            int denominator = *(int*)(at + 24);
+
+            if (bpm <= 1.0 || !double.IsFinite(bpm)) return Transport.Still;
+
+            return new Transport((flags & 1) != 0, bpm, beats,
+                                         numerator < 1 ? 4 : numerator,
+                                         denominator < 1 ? 4 : denominator);
+        }
+
+        set
+        {
+            var told = value ?? Transport.Still;
+            byte* at = _base + PluginBridge.TransportOffset;
+
+            *(int*)(at + 4) = told.Numerator;
+            *(double*)(at + 8) = told.Bpm;
+            *(double*)(at + 16) = told.Beats;
+            *(int*)(at + 24) = told.Denominator;
+
+            /* The flags last, since it is the one the reader checks: everything else is already
+               in place by the time it can be believed. */
+            *(int*)at = told.Playing ? 1 : 0;
+        }
+    }
 
     /// <summary>Makes the shared block and says where it is, for the parent to pass on.</summary>
     /// <remarks>

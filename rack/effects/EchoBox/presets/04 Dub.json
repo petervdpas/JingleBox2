@@ -2,6 +2,7 @@
   "Name": "Dub",
   "Effect": "effect.echobox",
   "time": 420,
+  "time_sync": 0,
   "feedback": 0.78,
   "damp": 0.72,
   "mix": 0.44,

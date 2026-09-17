@@ -111,6 +111,9 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
     /// <summary>How fast the pitch wobbles.</summary>
     private const string VibratoRateKey = "vibrato_rate";
 
+    /// <summary>Or, instead of that rate, which note length it runs at.</summary>
+    private const string VibratoSyncKey = "vibrato_sync";
+
     /// <summary>And how far, in cents.</summary>
     private const string VibratoDepthKey = "vibrato_depth";
 
@@ -122,6 +125,9 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
 
     /// <summary>How fast the level wobbles.</summary>
     private const string TremoloRateKey = "tremolo_rate";
+
+    /// <summary>Or, instead of that rate, which note length it runs at.</summary>
+    private const string TremoloSyncKey = "tremolo_sync";
 
     /// <summary>And how far.</summary>
     private const string TremoloDepthKey = "tremolo_depth";
@@ -204,10 +210,12 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
         TuneKey => Voice.TuneSemitones,
         FineKey => Voice.FineCents,
         VibratoRateKey => Voice.VibratoRateHz,
+        VibratoSyncKey => Voice.VibratoSync,
         VibratoDepthKey => Voice.VibratoDepthCents,
         PitchEnvKey => Voice.PitchEnvSemitones,
         PitchTimeKey => Voice.PitchEnvMs,
         TremoloRateKey => Voice.TremoloRateHz,
+        TremoloSyncKey => Voice.TremoloSync,
         TremoloDepthKey => Voice.TremoloDepth,
         CutoffKey => _hz.ToPosition(Voice.FilterCutoffHz),
         ResonanceKey => Voice.FilterResonance,
@@ -245,10 +253,14 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
             TuneKey => Number(Voice.TuneSemitones, value, SynthPatch.MinTuneSemitones, SynthPatch.MaxTuneSemitones, v => Voice.TuneSemitones = v),
             FineKey => Number(Voice.FineCents, value, SynthPatch.MinFineCents, SynthPatch.MaxFineCents, v => Voice.FineCents = v),
             VibratoRateKey => Number(Voice.VibratoRateHz, value, SynthPatch.MinRateHz, SynthPatch.MaxRateHz, v => Voice.VibratoRateHz = v),
+            VibratoSyncKey => Moved(Voice.VibratoSync, value, 0, Rack.SoundDevices.Timing.Division.Most,
+                at => Voice.VibratoSync = at),
             VibratoDepthKey => Number(Voice.VibratoDepthCents, value, SynthPatch.MinVibratoDepthCents, SynthPatch.MaxVibratoDepthCents, v => Voice.VibratoDepthCents = v),
             PitchEnvKey => Number(Voice.PitchEnvSemitones, value, SynthPatch.MinPitchEnvSemitones, SynthPatch.MaxPitchEnvSemitones, v => Voice.PitchEnvSemitones = v),
             PitchTimeKey => Number(Voice.PitchEnvMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxPitchEnvMs, v => Voice.PitchEnvMs = v),
             TremoloRateKey => Number(Voice.TremoloRateHz, value, SynthPatch.MinRateHz, SynthPatch.MaxRateHz, v => Voice.TremoloRateHz = v),
+            TremoloSyncKey => Moved(Voice.TremoloSync, value, 0, Rack.SoundDevices.Timing.Division.Most,
+                at => Voice.TremoloSync = at),
             TremoloDepthKey => Number(Voice.TremoloDepth, value, SynthPatch.MinTremoloDepth, SynthPatch.MaxTremoloDepth, v => Voice.TremoloDepth = v),
             CutoffKey => Number(_hz.ToPosition(Voice.FilterCutoffHz), value, Least, Most, v => Voice.FilterCutoffHz = _hz.ToHz(v)),
             ResonanceKey => Number(Voice.FilterResonance, value, SynthPatch.MinResonance, SynthPatch.MaxResonance, v => Voice.FilterResonance = v),

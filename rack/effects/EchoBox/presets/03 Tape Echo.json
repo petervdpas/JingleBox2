@@ -2,6 +2,7 @@
   "Name": "Tape Echo",
   "Effect": "effect.echobox",
   "time": 260,
+  "time_sync": 0,
   "feedback": 0.5,
   "damp": 0.68,
   "mix": 0.34,

@@ -172,6 +172,17 @@ public sealed class SynthPatchViewModel : ObservableObject
     }
 
     /// <summary>How fast the pitch wobbles, in hertz.</summary>
+    /// <summary>
+    /// Whether the vibrato runs at its own rate or in time with the song, and at what note length.
+    /// </summary>
+    /// <remarks>Nought is Free, which is the rate below. See Division.</remarks>
+    public int VibratoSync
+    {
+        get => _patch.VibratoSync;
+        set => Set(v => _patch.VibratoSync = (int)v, _patch.VibratoSync, value,
+                   0, Rack.SoundDevices.Timing.Division.Most);
+    }
+
     public double VibratoRateHz
     {
         get => _patch.VibratoRateHz;
@@ -188,6 +199,17 @@ public sealed class SynthPatchViewModel : ObservableObject
     }
 
     /// <summary>How fast the level wobbles, in hertz.</summary>
+    /// <summary>
+    /// Whether the tremolo runs at its own rate or in time with the song, and at what note length.
+    /// </summary>
+    /// <remarks>Nought is Free, which is the rate below. See Division.</remarks>
+    public int TremoloSync
+    {
+        get => _patch.TremoloSync;
+        set => Set(v => _patch.TremoloSync = (int)v, _patch.TremoloSync, value,
+                   0, Rack.SoundDevices.Timing.Division.Most);
+    }
+
     public double TremoloRateHz
     {
         get => _patch.TremoloRateHz;

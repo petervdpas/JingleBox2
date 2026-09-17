@@ -83,6 +83,15 @@ public sealed class Sweep : ISoundEffectEngine
     /// <summary>How fast that sine goes, in turns a second.</summary>
     public const string SwingRate = "swing_rate";
 
+    /// <summary>
+    /// Or, instead of that rate, which note length it runs at.
+    /// </summary>
+    /// <remarks>
+    /// Nought is Free, which is the rate knob and is what every preset written before this
+    /// existed means. See <see cref="Rack.SoundDevices.Timing.Division"/>.
+    /// </remarks>
+    public const string SwingSync = "swing_sync";
+
     /// <summary>How many octaves the track's own loudness moves the cutoff by, minus to plus.</summary>
     public const string Follow = "follow";
 
@@ -204,6 +213,9 @@ public sealed class Sweep : ISoundEffectEngine
     /// <summary>How fast it goes.</summary>
     private volatile float _swingRate = 1;
 
+    /// <summary>Which note length it runs at, or nought for the knob. See SwingSync.</summary>
+    private int _sync;
+
     /// <summary>How far the loudness moves the cutoff, in octaves.</summary>
     private volatile float _follow;
 
@@ -250,6 +262,7 @@ public sealed class Sweep : ISoundEffectEngine
         Mix => _mix,
         Swing => _swing,
         SwingRate => _swingRate,
+        SwingSync => _sync,
         Follow => _follow,
         IEffectLevel.Key => _level.Db,
         _ => 0
@@ -308,6 +321,10 @@ public sealed class Sweep : ISoundEffectEngine
                 _swingRate = (float)Math.Clamp(value, LeastSwingRate, MostSwingRate);
                 break;
 
+            case SwingSync:
+                _sync = (int)Math.Clamp(value, 0, Rack.SoundDevices.Timing.Division.Most);
+                break;
+
             case Follow:
                 _follow = (float)Math.Clamp(value, -MostFollow, MostFollow);
                 break;
@@ -353,7 +370,7 @@ public sealed class Sweep : ISoundEffectEngine
         double makeup = even ? 1 : drive > 1 ? 1.0 / Audio.TangentSwitch.Now.Of(drive) : 1;
         int mode = (int)_mode;
         double swing = _swing;
-        double speed = _swingRate * Chunk;
+        double speed = (float)Rack.SoundDevices.Timing.Division.HertzIn(_sync, Rack.SoundDevices.Timing.SongClock.Now, _swingRate) * Chunk;
         double follow = _follow;
         bool moving = swing > 0 || follow != 0;
 

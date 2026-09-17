@@ -1,8 +1,9 @@
+using JingleBox2.Audio.Plugins.Records;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using JingleBox2.Audio.Plugins.Interfaces;
-using JingleBox2.Audio.Plugins.Records;
+using JingleBox2.Rack.SoundDevices.Timing;
 
 namespace JingleBox2.Audio.Plugins;
 
@@ -151,6 +152,12 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
     /// <summary>What is handed to the plugin per block. Filled in at activation and reused.</summary>
     private ProcessData* _process;
+
+    /// <summary>Where the song is, handed to the plugin on every block. See TellTheTime.</summary>
+    private ProcessContext* _context;
+
+    /// <summary>What the plugin was set up at, kept because the process context says it again.</summary>
+    private double _sampleRate = 44100;
 
     /// <summary>
     /// The largest block the plugin was set up for. A longer one from the device is fed through
@@ -436,6 +443,7 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     private bool Activate(int sampleRate, int maxFrames)
     {
         _maxFrames = Math.Max(1, maxFrames);
+        _sampleRate = sampleRate <= 0 ? 44100 : sampleRate;
 
         if (_processor->Vtbl->CanProcessSampleSize(_processor, Vst3Abi.Sample32) != Vst3Abi.ResultOk) return false;
 
@@ -575,6 +583,9 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         _notes = new Vst3EventList(MaxNotesPerBlock);
         _played = new Vst3EventList(MaxNotesPerBlock);
 
+        _context = Alloc<ProcessContext>(1);
+        _context->SampleRate = _sampleRate;
+
         _process = Alloc<ProcessData>(1);
         _process->ProcessMode = Vst3Abi.RealtimeMode;
         _process->SymbolicSampleSize = Vst3Abi.Sample32;
@@ -586,7 +597,40 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         _process->OutputParameterChanges = _outgoing.Pointer;
         _process->InputEvents = _notes.Pointer;
         _process->OutputEvents = _played.Pointer;
-        _process->ProcessContext = null;
+        _process->ProcessContext = _context;
+    }
+
+    /// <summary>Where the song is, put into the shape the plugin reads it in.</summary>
+    /// <remarks>
+    /// Filled in before every block rather than once, because all of it moves: the tempo can be
+    /// turned while the song plays, and the position moves by definition. The samples are worked
+    /// out from the beats rather than counted separately, so the two can never disagree.
+    /// </remarks>
+    private void TellTheTime()
+    {
+        if (_context == null) return;
+
+        var now = SongClock.Now;
+
+        uint state = Vst3Abi.ContextProjectTimeMusicValid
+                   | Vst3Abi.ContextTempoValid
+                   | Vst3Abi.ContextBarPositionValid
+                   | Vst3Abi.ContextTimeSigValid
+                   | Vst3Abi.ContextContTimeValid;
+
+        if (now.Playing) state |= Vst3Abi.ContextPlaying;
+
+        long samples = (long)(now.Beats * 60.0 / Math.Max(1.0, now.Bpm) * _sampleRate);
+
+        _context->State = state;
+        _context->SampleRate = _sampleRate;
+        _context->ProjectTimeSamples = samples;
+        _context->ContinousTimeSamples = samples;
+        _context->ProjectTimeMusic = now.Beats;
+        _context->BarPositionMusic = now.BarBeats;
+        _context->Tempo = now.Bpm;
+        _context->TimeSigNumerator = now.Numerator;
+        _context->TimeSigDenominator = now.Denominator;
     }
 
     /// <summary>
@@ -720,6 +764,7 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
         TakePending();
         TakeNotes();
+        TellTheTime();
 
         _process->NumSamples = frames;
 

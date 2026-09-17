@@ -47,6 +47,15 @@ public sealed class Phase : ISoundEffectEngine
     /// </remarks>
     public const string Rate = "rate";
 
+    /// <summary>
+    /// Or, instead of that rate, which note length it runs at.
+    /// </summary>
+    /// <remarks>
+    /// Nought is Free, which is the rate knob and is what every preset written before this
+    /// existed means. See <see cref="Rack.SoundDevices.Timing.Division"/>.
+    /// </remarks>
+    public const string RateSync = "rate_sync";
+
     /// <summary>How far it sweeps, nought to one, which is up to two octaves either way.</summary>
     public const string Depth = "depth";
 
@@ -146,6 +155,9 @@ public sealed class Phase : ISoundEffectEngine
     /// <summary>The knobs, as single words so a thread never reads half of one.</summary>
     private float _speed = (float)RateThen;
 
+    /// <summary>Which note length it runs at, or nought for the knob. See RateSync.</summary>
+    private int _sync;
+
     /// <inheritdoc cref="_speed"/>
     private float _depth = (float)DepthThen;
 
@@ -187,6 +199,7 @@ public sealed class Phase : ISoundEffectEngine
     public double ValueOf(string? key) => key switch
     {
         Rate => _speed,
+        RateSync => _sync,
         Depth => _depth,
         Centre => _centre,
         Feedback => _feedback,
@@ -210,6 +223,10 @@ public sealed class Phase : ISoundEffectEngine
         {
             case Rate:
                 _speed = (float)Math.Clamp(value, LeastRate, MostRate);
+                break;
+
+            case RateSync:
+                _sync = (int)Math.Clamp(value, 0, Rack.SoundDevices.Timing.Division.Most);
                 break;
 
             case Depth:
@@ -294,7 +311,7 @@ public sealed class Phase : ISoundEffectEngine
 
         if (_centreAt <= 0) _centreAt = _centre;
 
-        double speed = _speed;
+        double speed = (float)Rack.SoundDevices.Timing.Division.HertzIn(_sync, Rack.SoundDevices.Timing.SongClock.Now, _speed);
         double reach = _depth * Octaves;
         double centre = _centre;
         double feedback = _feedback;

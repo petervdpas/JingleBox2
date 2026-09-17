@@ -4,6 +4,7 @@
   "width": 0.5,
   "depth": 3.0,
   "rate": 0.35,
+  "rate_sync": 0,
   "haas": 0.0,
   "side": 0,
   "mix": 1.0,

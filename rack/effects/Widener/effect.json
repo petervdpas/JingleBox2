@@ -44,6 +44,15 @@
       "Step": 0.01
     },
     {
+      "Key": "rate_sync",
+      "Name": "Sync",
+      "Unit": "",
+      "Min": 0,
+      "Max": 8,
+      "Default": 0,
+      "Step": 1
+    },
+    {
       "Key": "haas",
       "Name": "Haas",
       "Unit": "ms",
@@ -139,7 +148,7 @@
               "Properties": {
                 "cell": "26",
                 "gap": "6",
-                "columns": "3 3 3 3 4 3 3 3"
+                "columns": "3 3 3 5 3 4 3 3 3"
               },
               "Children": [
                 {
@@ -175,6 +184,17 @@
                     "dial": "44",
                     "lines": "1",
                     "tip": "How quickly the two lengths move. Slow is a picture that drifts, which is what you want on a voice; fast enough and it stops reading as width and starts reading as movement."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Choice",
+                  "Parameter": "rate_sync",
+                  "Label": "",
+                  "Properties": {
+                    "span": "4",
+                    "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
+                    "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
                   },
                   "Children": []
                 },

@@ -2,6 +2,7 @@
   "Name": "Ping Pong",
   "Effect": "effect.echobox",
   "time": 375,
+  "time_sync": 0,
   "feedback": 0.45,
   "damp": 0.35,
   "mix": 0.35,

@@ -26,8 +26,11 @@ public sealed class PitchMotion : IPitchMotion
         double at = double.IsFinite(seconds) ? Math.Max(0, seconds) : 0;
         double offset = 0;
 
-        if (patch.VibratoDepthCents > 0 && patch.VibratoRateHz > 0)
-            offset += patch.VibratoDepthCents / 100.0 * Math.Sin(2 * Math.PI * patch.VibratoRateHz * at);
+        double wobble = Rack.SoundDevices.Timing.Division.HertzIn(
+            patch.VibratoSync, Rack.SoundDevices.Timing.SongClock.Now, patch.VibratoRateHz);
+
+        if (patch.VibratoDepthCents > 0 && wobble > 0)
+            offset += patch.VibratoDepthCents / 100.0 * Math.Sin(2 * Math.PI * wobble * at);
 
         double envelopeSeconds = patch.PitchEnvMs / 1000.0;
         if (patch.PitchEnvSemitones != 0 && envelopeSeconds > 0 && at < envelopeSeconds)

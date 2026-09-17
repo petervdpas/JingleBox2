@@ -2,6 +2,7 @@
   "Name": "Slapback",
   "Effect": "effect.echobox",
   "time": 110,
+  "time_sync": 0,
   "feedback": 0.12,
   "damp": 0.25,
   "mix": 0.28,

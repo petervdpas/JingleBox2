@@ -8,5 +8,6 @@
   "mix": 1.0,
   "swing": 1.5,
   "swing_rate": 0.4,
+  "swing_sync": 0,
   "level": 0
 }

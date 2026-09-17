@@ -132,11 +132,29 @@ public sealed class SynthPatch
     /// <summary>How fast the pitch wobbles. Nought is no vibrato at all.</summary>
     public double VibratoRateHz { get; set; }
 
+    /// <summary>
+    /// Whether the vibrato runs at that rate or in time with the song, and at what note length.
+    /// </summary>
+    /// <remarks>
+    /// Nought is Free, which is the rate above and is what every patch written before this
+    /// existed means. See <see cref="Rack.SoundDevices.Timing.Division"/>.
+    /// </remarks>
+    public int VibratoSync { get; set; }
+
     /// <summary>How far it wobbles, in hundredths of a semitone.</summary>
     public double VibratoDepthCents { get; set; }
 
     /// <summary>How fast the level wobbles. Nought is no tremolo at all.</summary>
     public double TremoloRateHz { get; set; }
+
+    /// <summary>
+    /// Whether the tremolo runs at that rate or in time with the song, and at what note length.
+    /// </summary>
+    /// <remarks>
+    /// Nought is Free, which is the rate above and is what every patch written before this
+    /// existed means. See <see cref="Rack.SoundDevices.Timing.Division"/>.
+    /// </remarks>
+    public int TremoloSync { get; set; }
 
     /// <summary>How far down the trough goes, nought to one.</summary>
     public double TremoloDepth { get; set; }

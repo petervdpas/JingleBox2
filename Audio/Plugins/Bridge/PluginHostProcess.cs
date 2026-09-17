@@ -1,3 +1,4 @@
+using JingleBox2.Audio.Plugins.Records;
 using JingleBox2.Audio.Plugins.Bridge.Enums;
 using System;
 using JingleBox2.Diagnostics;
@@ -10,6 +11,7 @@ using System.Threading;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins.Bridge.Interfaces;
+using JingleBox2.Rack.SoundDevices.Timing;
 
 namespace JingleBox2.Audio.Plugins.Bridge;
 
@@ -894,6 +896,11 @@ public static class PluginHostProcess
 
             int frames = BitConverter.ToInt32(message, 4);
             if (frames <= 0 || frames > maxFrames) frames = Math.Min(Math.Max(frames, 0), maxFrames);
+
+            /* Where the song is, taken out of the block the parent wrote it into. This process
+               has its own copy of the clock, and filling it in here is what lets everything
+               below read the transport without knowing which side of the bridge it is on. */
+            SongClock.Set(block.Transport);
 
             Deliver(block, instrument, plugin);
 

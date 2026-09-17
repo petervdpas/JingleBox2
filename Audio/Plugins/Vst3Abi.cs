@@ -61,6 +61,18 @@ internal static class Vst3Abi
     /// </summary>
     public static int NotImplemented => OperatingSystem.IsWindows() ? unchecked((int)0x80004001) : unchecked((int)0x80000001);
 
+    /// <summary>
+    /// Which parts of a <see cref="ProcessContext"/> were filled in, as Steinberg's
+    /// StatesAndFlags. A plugin reads only what the flags claim, so an unset flag is the same as
+    /// having no answer rather than an answer of nought.
+    /// </summary>
+    public const uint ContextPlaying = 1u << 1;
+    public const uint ContextProjectTimeMusicValid = 1u << 9;
+    public const uint ContextTempoValid = 1u << 10;
+    public const uint ContextBarPositionValid = 1u << 11;
+    public const uint ContextTimeSigValid = 1u << 13;
+    public const uint ContextContTimeValid = 1u << 17;
+
     /// <summary>A bus carrying audio. One of Steinberg's MediaTypes.</summary>
     public const int MediaAudio = 0;
 
@@ -780,10 +792,65 @@ internal unsafe struct ProcessData
     public void* OutputEvents;
 
     /// <summary>
-    /// Where the song is and how fast. Null here: nothing in this application tells a plugin
-    /// about the tracker's clock yet.
+    /// Where the song is and how fast, as a <see cref="ProcessContext"/>. A plugin with an
+    /// arpeggiator or a delay in beats reads this and nothing else, so a null here is a plugin
+    /// that cannot be in time with anything.
     /// </summary>
     public void* ProcessContext;
+}
+
+/// <summary>
+/// Where the song is, in VST3's own shape: the flags saying which of the rest to believe, then
+/// the clock, the position and the time signature.
+/// </summary>
+/// <remarks>
+/// Laid out exactly as the SDK's struct, because the plugin reads it by offset. Every field is
+/// here whether this application has an answer for it or not; the flags are what say which ones
+/// were filled in, and a plugin is required to ignore the rest.
+/// </remarks>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct ProcessContext
+{
+    /// <summary>Which of the fields below hold anything, as <see cref="Vst3Abi"/>'s Context flags.</summary>
+    public uint State;
+
+    public double SampleRate;
+
+    /// <summary>How far into the song, in samples.</summary>
+    public long ProjectTimeSamples;
+
+    /// <summary>The system clock, in nanoseconds. Not filled in here.</summary>
+    public long SystemTime;
+
+    /// <summary>Samples since the transport last started, which is not wound back by a loop.</summary>
+    public long ContinousTimeSamples;
+
+    /// <summary>How far into the song, in quarter notes.</summary>
+    public double ProjectTimeMusic;
+
+    /// <summary>The quarter note the current bar began on.</summary>
+    public double BarPositionMusic;
+
+    public double CycleStartMusic;
+    public double CycleEndMusic;
+
+    public double Tempo;
+
+    public int TimeSigNumerator;
+    public int TimeSigDenominator;
+
+    /// <summary>The chord the song is on, as a key note, a root note and a mask. Not filled in.</summary>
+    public byte ChordKeyNote;
+    public byte ChordRootNote;
+    public short ChordMask;
+
+    public int SmpteOffsetSubframes;
+
+    /// <summary>The frame rate, as a count and a pair of flags. Not filled in.</summary>
+    public uint FramesPerSecond;
+    public uint FrameRateFlags;
+
+    public int SamplesToNextClock;
 }
 
 /// <summary>The settings half of a plugin: what the knobs are and where they stand.</summary>

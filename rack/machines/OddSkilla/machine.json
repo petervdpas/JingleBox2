@@ -198,6 +198,15 @@
       "Saved": true
     },
     {
+      "Key": "vib_sync",
+      "Name": "Vib sync",
+      "Unit": "",
+      "Min": 0,
+      "Max": 8,
+      "Default": 0,
+      "Step": 1
+    },
+    {
       "Key": "vib_depth",
       "Name": "Vib depth",
       "Unit": "c",
@@ -216,6 +225,15 @@
       "Default": 0,
       "Step": 0.1,
       "Saved": true
+    },
+    {
+      "Key": "trem_sync",
+      "Name": "Trem sync",
+      "Unit": "",
+      "Min": 0,
+      "Max": 8,
+      "Default": 0,
+      "Step": 1
     },
     {
       "Key": "trem_depth",
@@ -572,7 +590,7 @@
               "Properties": {
                 "cell": "26",
                 "gap": "4",
-                "columns": "5 4 3 3 3 3 3"
+                "columns": "5 4 3 3 5 3 3 5 3"
               },
               "Children": [
                 {
@@ -621,6 +639,17 @@
                   "Children": []
                 },
                 {
+                  "Element": "Choice",
+                  "Parameter": "vib_sync",
+                  "Label": "",
+                  "Properties": {
+                    "span": "4",
+                    "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
+                    "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
+                  },
+                  "Children": []
+                },
+                {
                   "Element": "Knob",
                   "Parameter": "vib_depth",
                   "Label": "",
@@ -639,6 +668,17 @@
                     "span": "3",
                     "dial": "40",
                     "tip": "How fast the level wavers."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Choice",
+                  "Parameter": "trem_sync",
+                  "Label": "",
+                  "Properties": {
+                    "span": "4",
+                    "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
+                    "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
                   },
                   "Children": []
                 },

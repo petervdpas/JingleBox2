@@ -2,6 +2,7 @@
   "Name": "Ninety",
   "Effect": "effect.phaser",
   "rate": 0.9,
+  "rate_sync": 0,
   "depth": 0.6,
   "centre": 600,
   "feedback": 0.15,

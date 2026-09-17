@@ -1,3 +1,4 @@
+using JingleBox2.Audio.Plugins.Records;
 using JingleBox2.Audio.Plugins.Bridge.Enums;
 using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
@@ -7,7 +8,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Threading;
 using JingleBox2.Audio.Plugins.Enums;
-using JingleBox2.Audio.Plugins.Records;
+using JingleBox2.Rack.SoundDevices.Timing;
 using JingleBox2.Audio.Plugins.Bridge.Interfaces;
 
 namespace JingleBox2.Audio.Plugins.Bridge;
@@ -540,7 +541,20 @@ internal sealed class PluginProcess : IDisposable
     /// stops answering is treated as gone: waiting forever on somebody else's process is how a
     /// host that meant to be careful ends up frozen.
     /// </remarks>
-    public (BridgeCall Call, byte[] Payload) Call(BridgeCall call, byte[]? payload, int timeout = PluginBridge.CallTimeoutMilliseconds)
+    /// <param name="fatal">
+    /// Whether an answer that never comes means the plugin is gone. True for anything the
+    /// application needs an answer to in order to carry on, and false for anything to do with the
+    /// plugin's own window.
+    ///
+    /// A window is the one thing a plugin can be slow at without being broken. Some of them build
+    /// a whole browser the first time one is asked for, which on a busy machine is longer than
+    /// anybody would wait for a knob, and the audio thread is perfectly happy throughout. Burying
+    /// it for that turns a window that was merely late into a plugin that has stopped playing,
+    /// which is the loudest possible answer to the quietest possible problem.
+    /// </param>
+    public (BridgeCall Call, byte[] Payload) Call(BridgeCall call, byte[]? payload,
+                                                  int timeout = PluginBridge.CallTimeoutMilliseconds,
+                                                  bool fatal = true)
     {
         lock (_callGate)
         {
@@ -563,7 +577,10 @@ internal sealed class PluginProcess : IDisposable
 
             if (answer == null)
             {
-                Bury("stopped answering");
+                if (fatal) Bury("stopped answering");
+                else Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins,
+                                           () => "a plugin took too long over " + call + ", and is left playing");
+
                 return (BridgeCall.Fail, Array.Empty<byte>());
             }
 
@@ -643,6 +660,16 @@ internal sealed class PluginProcess : IDisposable
     public bool Ask(int frames)
     {
         if (!_alive || _outstanding) return false;
+
+        /* Where the song is, written into the block before it is asked for, so what crosses is
+           the transport belonging to this block of audio.
+           
+           Here and not in Render, because Render is not the only way in. A plugin is normally
+           asked for a block well before the answer is wanted, so the work overlaps with the rest
+           of the mixing, and that path comes straight to this method. Putting it in Render told
+           the truth to whichever plugins happened to take the slow road and left the rest at the
+           tempo they were born with. */
+        Block.Transport = SongClock.Now;
 
         Span<byte> message = stackalloc byte[8];
 

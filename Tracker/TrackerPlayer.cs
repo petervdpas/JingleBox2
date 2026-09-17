@@ -16,6 +16,7 @@ using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Timing;
 
 namespace JingleBox2.Tracker;
 
@@ -468,20 +469,47 @@ public sealed class TrackerPlayer : ITrackerPlayer
     }
 
     /// <summary>Moves the transport, and says so only when it really moved.</summary>
+    /// <remarks>
+    /// The plugins are told at the same moment, since to them the transport is one fact and not
+    /// an event they subscribed to. Starting sets the beat back to the top; stopping leaves it
+    /// where it was, so a plugin asked while the transport sits still gives the answer it had a
+    /// moment ago rather than nought.
+    /// </remarks>
     private void SetState(TrackerTransportState state)
     {
         if (State == state) return;
 
         State = state;
+
+        if (state == TrackerTransportState.Playing)
+        {
+            Song? song;
+            lock (_lock) song = _song;
+
+            Rack.SoundDevices.Timing.SongClock.Started(song?.Timing.ClampedBpm ?? TrackerTiming.DefaultBpm);
+        }
+        else
+        {
+            Rack.SoundDevices.Timing.SongClock.Stopped();
+        }
+
         StateChanged?.Invoke(this, state);
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// The plugins are told this song's tempo at once. Without it they would keep whatever the
+    /// last song was at, or the default if there has not been one, until somebody happened to
+    /// type in the tempo box: a song opened at sixty would play its plugins at a hundred and
+    /// twenty and nothing on the screen would say why.
+    /// </remarks>
     public void Use(Song song)
     {
         if (song is null) return;
 
         lock (_lock) _song = song;
+
+        Rack.SoundDevices.Timing.SongClock.Tempo(song.Timing.ClampedBpm);
     }
 
     /// <inheritdoc/>

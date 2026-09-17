@@ -199,8 +199,8 @@ public sealed class SynthVoice : IVoice
         _driveFade = Shaper.Fade(_drive);
         _filterFirst = _patch.FilterFirst;
         _hisses = _patch.Wave == SynthWave.Noise;
-        _wobbles = _patch.TremoloDepth > 0 && _patch.TremoloRateHz > 0;
-        _bends = (_patch.VibratoDepthCents > 0 && _patch.VibratoRateHz > 0)
+        _wobbles = _patch.TremoloDepth > 0 && (_patch.TremoloRateHz > 0 || _patch.TremoloSync > 0);
+        _bends = (_patch.VibratoDepthCents > 0 && (_patch.VibratoRateHz > 0 || _patch.VibratoSync > 0))
             || (_patch.PitchEnvSemitones != 0 && _patch.PitchEnvMs > 0);
         _filter = new ToneFilter(_patch.FilterCutoffHz, _patch.FilterResonance, _sampleRate);
         _noise = new Random(noiseSeed);
@@ -403,9 +403,12 @@ public sealed class SynthVoice : IVoice
     /// <summary>Amplitude modulation between full and (1 - depth).</summary>
     private double TremoloAt(double time)
     {
-        if (_patch.TremoloDepth <= 0 || _patch.TremoloRateHz <= 0) return 1.0;
+        double shake = Rack.SoundDevices.Timing.Division.HertzIn(
+            _patch.TremoloSync, Rack.SoundDevices.Timing.SongClock.Now, _patch.TremoloRateHz);
 
-        double lfo = 0.5 + 0.5 * Math.Sin(2 * Math.PI * _patch.TremoloRateHz * time);
+        if (_patch.TremoloDepth <= 0 || shake <= 0) return 1.0;
+
+        double lfo = 0.5 + 0.5 * Math.Sin(2 * Math.PI * shake * time);
         return 1.0 - _patch.TremoloDepth * lfo;
     }
 }
