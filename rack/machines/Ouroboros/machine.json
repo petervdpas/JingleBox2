@@ -278,8 +278,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "10",
-            "heights": "own"
+            "gap": "10"
           },
           "Children": [
             {
@@ -456,8 +455,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "10",
-            "heights": "own"
+            "gap": "10"
           },
           "Children": [
             {
@@ -572,18 +570,7 @@
                   ]
                 }
               ]
-            }
-          ]
-        },
-        {
-          "Element": "Row",
-          "Parameter": "",
-          "Label": "",
-          "Properties": {
-            "gap": "10",
-            "heights": "own"
-          },
-          "Children": [
+            },
             {
               "Element": "Group",
               "Parameter": "",
@@ -639,7 +626,17 @@
                   ]
                 }
               ]
-            },
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "10"
+          },
+          "Children": [
             {
               "Element": "Group",
               "Parameter": "",
@@ -712,7 +709,7 @@
                   "Properties": {
                     "cell": "26",
                     "gap": "4",
-                    "columns": "3 5 2 2"
+                    "columns": "3 2 5 2"
                   },
                   "Children": [
                     {
@@ -727,17 +724,6 @@
                       "Children": []
                     },
                     {
-                      "Element": "Choice",
-                      "Parameter": "lfo_sync",
-                      "Label": "",
-                      "Properties": {
-                        "span": "4",
-                        "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
-                        "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
-                      },
-                      "Children": []
-                    },
-                    {
                       "Element": "Led",
                       "Parameter": "lfo_rate",
                       "Label": "rate",
@@ -747,6 +733,17 @@
                         "align": "middle",
                         "margin": "0,15,0,0",
                         "tip": "Goes round at the rate beside it, so the number can be seen as well as read. It runs whether or not a note is playing, which is when the rate is being set."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Choice",
+                      "Parameter": "lfo_sync",
+                      "Label": "",
+                      "Properties": {
+                        "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
+                        "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored.",
+                        "align": "middle"
                       },
                       "Children": []
                     },

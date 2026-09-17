@@ -1331,7 +1331,7 @@ public sealed class TrackMixer : ITrackMixer
             /* The beat moves by however much audio was made, which is the only honest measure of
                it: the clock thread runs ahead of the sound, and a plugin told where that thread
                had got to would be early by exactly as far as it was running ahead. */
-            Rack.SoundDevices.Timing.SongClock.Advance(frames, SampleRate);
+            SongClock.Advance(frames, SampleRate);
         }
         finally
         {

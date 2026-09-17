@@ -39,13 +39,21 @@ public class PadGrid : Decorator
     public static readonly StyledProperty<int> ColumnsProperty =
         AvaloniaProperty.Register<PadGrid, int>(nameof(Columns), 4);
 
-    /// <summary>Backs <see cref="CapWidth"/> and <see cref="CapHeight"/>: how big one pad is.</summary>
+    /// <summary>
+    /// Backs <see cref="CapWidth"/> and <see cref="CapHeight"/>: how big one pad is.
+    /// </summary>
+    /// <remarks>
+    /// Square, because a pad is square on every machine that has ever had one, and a machine
+    /// that wants an oblong says so rather than getting one by default. They were 86 by 42 here,
+    /// which is a button, and the key each one answers to was written on a line underneath that
+    /// cost the grid a row of writing for every row of pads.
+    /// </remarks>
     public static readonly StyledProperty<double> CapWidthProperty =
-        AvaloniaProperty.Register<PadGrid, double>(nameof(CapWidth), 86);
+        AvaloniaProperty.Register<PadGrid, double>(nameof(CapWidth), 64);
 
     /// <inheritdoc cref="CapWidthProperty"/>
     public static readonly StyledProperty<double> CapHeightProperty =
-        AvaloniaProperty.Register<PadGrid, double>(nameof(CapHeight), 42);
+        AvaloniaProperty.Register<PadGrid, double>(nameof(CapHeight), 64);
 
     /// <summary>Backs <see cref="Gap"/>, the air between one pad and the next.</summary>
     public static readonly StyledProperty<double> GapProperty =
@@ -268,6 +276,7 @@ public class PadGrid : Decorator
                 Colour = Colour,
                 HasLamp = true,
                 LampBelow = false,
+                LabelOnCap = true,
                 Margin = new Thickness(0, 0, Gap, Gap),
             };
 

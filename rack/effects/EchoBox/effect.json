@@ -134,147 +134,158 @@
           "Children": []
         },
         {
-          "Element": "Group",
+          "Element": "Row",
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "caption": "Delay"
+            "gap": "12"
           },
           "Children": [
             {
-              "Element": "Strip",
+              "Element": "Group",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "cell": "26",
-                "gap": "6",
-                "columns": "3 5 3 3 3 3"
+                "caption": "Delay"
               },
               "Children": [
                 {
-                  "Element": "Knob",
-                  "Parameter": "time",
+                  "Element": "Strip",
+                  "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1"
+                    "cell": "26",
+                    "gap": "6",
+                    "columns": "3 5 3 3 3 3"
                   },
-                  "Children": []
-                },
-                {
-                  "Element": "Choice",
-                  "Parameter": "time_sync",
-                  "Label": "",
-                  "Properties": {
-                    "span": "4",
-                    "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
-                    "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "feedback",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "damp",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "mix",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "level",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How loud the effect hands the track back. It is the last thing the sound goes through, so it evens out what the effect did to the level without moving the track's fader."
-                  },
-                  "Children": []
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "time",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Choice",
+                      "Parameter": "time_sync",
+                      "Label": "",
+                      "Properties": {
+                        "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
+                        "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored.",
+                        "align": "middle"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "feedback",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "damp",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "mix",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "level",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How loud the effect hands the track back. It is the last thing the sound goes through, so it evens out what the effect did to the level without moving the track's fader."
+                      },
+                      "Children": []
+                    }
+                  ]
                 }
               ]
-            }
-          ]
-        },
-        {
-          "Element": "Group",
-          "Parameter": "",
-          "Label": "",
-          "Properties": {
-            "caption": "Tape"
-          },
-          "Children": [
+            },
             {
-              "Element": "Strip",
+              "Element": "Group",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "cell": "26",
-                "gap": "6",
-                "columns": "5 3 3"
+                "caption": "Tape"
               },
               "Children": [
                 {
-                  "Element": "Choice",
-                  "Parameter": "ping",
+                  "Element": "Strip",
+                  "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "span": "5",
-                    "options": "Straight,Ping-pong",
-                    "width": "110",
-                    "tip": "Straight keeps each side's repeats on that side. Ping-pong sends the first repeat to the left and the next to the right, so the echoes bounce across the room."
+                    "cell": "26",
+                    "gap": "6",
+                    "columns": "5 3 3"
                   },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "wow",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How much the tape wanders. A slow drift and a quick flutter on top, so each repeat comes back a few cents out and moving, like a machine that does not quite hold speed."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "grit",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How hard what goes back in is bent. Quiet repeats are left alone and loud ones are squashed a little more on every pass, which keeps a long feedback from running away and gives it the sound of a worn head."
-                  },
-                  "Children": []
+                  "Children": [
+                    {
+                      "Element": "Choice",
+                      "Parameter": "ping",
+                      "Label": "",
+                      "Properties": {
+                        "span": "5",
+                        "options": "Straight,Ping-pong",
+                        "width": "110",
+                        "tip": "Straight keeps each side's repeats on that side. Ping-pong sends the first repeat to the left and the next to the right, so the echoes bounce across the room.",
+                        "align": "middle"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "wow",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How much the tape wanders. A slow drift and a quick flutter on top, so each repeat comes back a few cents out and moving, like a machine that does not quite hold speed."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "grit",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How hard what goes back in is bent. Quiet repeats are left alone and loud ones are squashed a little more on every pass, which keeps a long feedback from running away and gives it the sound of a worn head."
+                      },
+                      "Children": []
+                    }
+                  ]
                 }
               ]
             }

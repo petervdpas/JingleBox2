@@ -73,7 +73,7 @@
     {
       "Key": "spread",
       "Name": "Spread",
-      "Unit": "\u00b0",
+      "Unit": "°",
       "Min": 0,
       "Max": 180,
       "Default": 60,
@@ -168,9 +168,9 @@
                   "Parameter": "rate_sync",
                   "Label": "",
                   "Properties": {
-                    "span": "4",
                     "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
-                    "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
+                    "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored.",
+                    "align": "middle"
                   },
                   "Children": []
                 },
@@ -218,7 +218,8 @@
                     "span": "4",
                     "options": "4 stages,6 stages,8 stages,12 stages",
                     "width": "100",
-                    "tip": "How many stages the sound goes through. Four makes two notches, which is the classic pedal; twelve makes six, which is thicker and more like a flanger."
+                    "tip": "How many stages the sound goes through. Four makes two notches, which is the classic pedal; twelve makes six, which is thicker and more like a flanger.",
+                    "align": "middle"
                   },
                   "Children": []
                 },

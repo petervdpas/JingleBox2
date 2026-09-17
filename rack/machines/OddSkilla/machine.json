@@ -320,8 +320,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "16",
-            "heights": "own"
+            "gap": "16"
           },
           "Children": [
             {
@@ -381,330 +380,395 @@
                 "tip": "How much of the wave the view shows. A view setting: it is not part of the sound."
               },
               "Children": []
-            }
-          ]
-        },
-        {
-          "Element": "Group",
-          "Parameter": "",
-          "Label": "",
-          "Properties": {
-            "caption": "Oscillator",
-            "height": "150"
-          },
-          "Children": [
+            },
             {
-              "Element": "Strip",
+              "Element": "Group",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "cell": "26",
-                "gap": "4",
-                "columns": "4 3 3 3 3 3"
+                "caption": "Oscillator",
+                "height": "150"
               },
               "Children": [
                 {
-                  "Element": "Switch",
-                  "Parameter": "wave",
+                  "Element": "Strip",
+                  "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "span": "4",
-                    "options": "Sine,Square,Saw,Triangle,Pulse,Noise"
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "4 3 3 3 3 3"
                   },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "duty",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "40",
-                    "when": "wave",
-                    "is": "4",
-                    "tip": "How far through the cycle a pulse turns over. Only a pulse has one, so it greys out on the other waves."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "tune",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "40",
-                    "tip": "Whole semitones added to every note this instrument plays."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "fine",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "40",
-                    "tip": "Hundredths of a semitone, for sitting this voice against another."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "pitch_env",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "40",
-                    "tip": "How far the pitch starts away from the note. Negative drops into it, which is a kick drum."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "pitch_time",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "40",
-                    "tip": "How long that pitch offset takes to arrive at the note."
-                  },
-                  "Children": []
+                  "Children": [
+                    {
+                      "Element": "Switch",
+                      "Parameter": "wave",
+                      "Label": "",
+                      "Properties": {
+                        "span": "4",
+                        "options": "Sine,Square,Saw,Triangle,Pulse,Noise"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "duty",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "when": "wave",
+                        "is": "4",
+                        "tip": "How far through the cycle a pulse turns over. Only a pulse has one, so it greys out on the other waves."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "tune",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "tip": "Whole semitones added to every note this instrument plays."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "fine",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "tip": "Hundredths of a semitone, for sitting this voice against another."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "pitch_env",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "tip": "How far the pitch starts away from the note. Negative drops into it, which is a kick drum."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "pitch_time",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "tip": "How long that pitch offset takes to arrive at the note."
+                      },
+                      "Children": []
+                    }
+                  ]
                 }
               ]
             }
           ]
         },
         {
-          "Element": "Group",
+          "Element": "Row",
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "caption": "Amplifier"
+            "gap": "16"
           },
           "Children": [
             {
-              "Element": "Strip",
+              "Element": "Group",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "cell": "26",
-                "gap": "4",
-                "columns": "4 3 3 3 3 3 3 3"
+                "caption": "Amplifier"
               },
               "Children": [
                 {
-                  "Element": "Fader",
-                  "Parameter": "attack",
+                  "Element": "Strip",
+                  "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "span": "4"
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "4 3 3 3 3 3 3 3"
                   },
-                  "Children": []
-                },
+                  "Children": [
+                    {
+                      "Element": "Fader",
+                      "Parameter": "attack",
+                      "Label": "",
+                      "Properties": {
+                        "span": "4"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "decay",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "sustain",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "release",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "drive",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "tip": "Rounds the wave off into itself: fuller and harder, at the same level."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "level",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "ticks": "6,0,-12,-40",
+                        "tip": "Unity is 0 dB, and above it is makeup gain."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "new_note",
+                      "Label": "",
+                      "Properties": {
+                        "options": "Cut,Release,Sustain",
+                        "tip": "What happens to the note this track is still sounding when the next one lands on it. Cut stops it; Release lets it play its own release under the new note; Sustain leaves it holding until an OFF."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "even_drive",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "options": "Peak,Loudness",
+                        "tip": "What the drive is levelled out by. Peak holds the height of the wave, which is what this machine has always done and lets the knob add about five decibels on the way up. Loudness holds the area instead, so the knob changes the tone and not the level. Peak is what every preset written before this was made against."
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Filter"
+              },
+              "Children": [
                 {
-                  "Element": "Fader",
-                  "Parameter": "decay",
+                  "Element": "Strip",
+                  "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "span": "3"
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "5 4 3"
                   },
-                  "Children": []
-                },
-                {
-                  "Element": "Fader",
-                  "Parameter": "sustain",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Fader",
-                  "Parameter": "release",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "drive",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "40",
-                    "tip": "Rounds the wave off into itself: fuller and harder, at the same level."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Fader",
-                  "Parameter": "level",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "ticks": "6,0,-12,-40",
-                    "tip": "Unity is 0 dB, and above it is makeup gain."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Switch",
-                  "Parameter": "new_note",
-                  "Label": "",
-                  "Properties": {
-                    "options": "Cut,Release,Sustain",
-                    "tip": "What happens to the note this track is still sounding when the next one lands on it. Cut stops it; Release lets it play its own release under the new note; Sustain leaves it holding until an OFF."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Switch",
-                  "Parameter": "even_drive",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "options": "Peak,Loudness",
-                    "tip": "What the drive is levelled out by. Peak holds the height of the wave, which is what this machine has always done and lets the knob add about five decibels on the way up. Loudness holds the area instead, so the knob changes the tone and not the level. Peak is what every preset written before this was made against."
-                  },
-                  "Children": []
+                  "Children": [
+                    {
+                      "Element": "Switch",
+                      "Parameter": "filter_first",
+                      "Label": "",
+                      "Properties": {
+                        "span": "5",
+                        "options": "Drive first,Filter first",
+                        "tip": "Which comes first. Drive first squares the wave up and then takes the top off what it made, which is what this machine has always done; Filter first shapes the wave and then rounds off what is left, so a resonant peak is not applied to something already squared off."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "cutoff",
+                      "Label": "",
+                      "Properties": {
+                        "span": "4",
+                        "dial": "40",
+                        "display": "cutoff_text",
+                        "tip": "A low pass. Wide open at the top, where it does nothing at all."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "resonance",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "tip": "How much the filter rings at its cutoff."
+                      },
+                      "Children": []
+                    }
+                  ]
                 }
               ]
             }
           ]
         },
         {
-          "Element": "Group",
+          "Element": "Row",
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "caption": "Filter and modulation"
+            "gap": "16"
           },
           "Children": [
             {
-              "Element": "Strip",
+              "Element": "Group",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "cell": "26",
-                "gap": "4",
-                "columns": "5 4 3 3 5 3 3 5 3"
+                "caption": "Vibrato"
               },
               "Children": [
                 {
-                  "Element": "Switch",
-                  "Parameter": "filter_first",
+                  "Element": "Strip",
+                  "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "span": "5",
-                    "options": "Drive first,Filter first",
-                    "tip": "Which comes first. Drive first squares the wave up and then takes the top off what it made, which is what this machine has always done; Filter first shapes the wave and then rounds off what is left, so a resonant peak is not applied to something already squared off."
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "3 5 3"
                   },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "cutoff",
-                  "Label": "",
-                  "Properties": {
-                    "span": "4",
-                    "dial": "40",
-                    "display": "cutoff_text",
-                    "tip": "A low pass. Wide open at the top, where it does nothing at all."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "resonance",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "40",
-                    "tip": "How much the filter rings at its cutoff."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "vib_rate",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "40",
-                    "tip": "How fast the pitch wavers."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Choice",
-                  "Parameter": "vib_sync",
-                  "Label": "",
-                  "Properties": {
-                    "span": "4",
-                    "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
-                    "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "vib_depth",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "40",
-                    "tip": "How far it wavers, in hundredths of a semitone."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "trem_rate",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "40",
-                    "tip": "How fast the level wavers."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Choice",
-                  "Parameter": "trem_sync",
-                  "Label": "",
-                  "Properties": {
-                    "span": "4",
-                    "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
-                    "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "trem_depth",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "40",
-                    "tip": "How far it wavers, as a fraction of full level."
-                  },
-                  "Children": []
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "vib_rate",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "tip": "How fast the pitch wavers."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Choice",
+                      "Parameter": "vib_sync",
+                      "Label": "",
+                      "Properties": {
+                        "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
+                        "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored.",
+                        "align": "middle"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "vib_depth",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "tip": "How far it wavers, in hundredths of a semitone."
+                      },
+                      "Children": []
+                    }
+                  ]
                 }
               ]
+            },
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Tremolo"
+              },
+              "Children": [
+                {
+                  "Element": "Strip",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "3 5 3"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "trem_rate",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "tip": "How fast the level wavers."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Choice",
+                      "Parameter": "trem_sync",
+                      "Label": "",
+                      "Properties": {
+                        "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
+                        "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored.",
+                        "align": "middle"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "trem_depth",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "tip": "How far it wavers, as a fraction of full level."
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Element": "Keys",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down, not for as long as what it started goes on sounding. The arrows and the lamps move the three octaves on show.",
+                "align": "bottom"
+              },
+              "Children": []
             }
           ]
-        },
-        {
-          "Element": "Keys",
-          "Parameter": "",
-          "Label": "",
-          "Properties": {
-            "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down, not for as long as what it started goes on sounding. The arrows and the lamps move the three octaves on show."
-          },
-          "Children": []
         },
         {
           "Element": "Menu",

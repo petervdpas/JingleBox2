@@ -171,7 +171,6 @@ public sealed class SynthPatchViewModel : ObservableObject
             nameof(Drive));
     }
 
-    /// <summary>How fast the pitch wobbles, in hertz.</summary>
     /// <summary>
     /// Whether the vibrato runs at its own rate or in time with the song, and at what note length.
     /// </summary>
@@ -183,6 +182,7 @@ public sealed class SynthPatchViewModel : ObservableObject
                    0, Rack.SoundDevices.Timing.Division.Most);
     }
 
+    /// <summary>How fast the pitch wobbles, in hertz.</summary>
     public double VibratoRateHz
     {
         get => _patch.VibratoRateHz;
@@ -198,7 +198,6 @@ public sealed class SynthPatchViewModel : ObservableObject
             SynthPatch.MinVibratoDepthCents, SynthPatch.MaxVibratoDepthCents, nameof(VibratoDepthCents));
     }
 
-    /// <summary>How fast the level wobbles, in hertz.</summary>
     /// <summary>
     /// Whether the tremolo runs at its own rate or in time with the song, and at what note length.
     /// </summary>
@@ -210,6 +209,7 @@ public sealed class SynthPatchViewModel : ObservableObject
                    0, Rack.SoundDevices.Timing.Division.Most);
     }
 
+    /// <summary>How fast the level wobbles, in hertz.</summary>
     public double TremoloRateHz
     {
         get => _patch.TremoloRateHz;

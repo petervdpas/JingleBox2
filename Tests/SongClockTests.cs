@@ -1,4 +1,3 @@
-using JingleBox2.Audio.Plugins;
 using JingleBox2.Rack.SoundDevices.Timing;
 using Xunit;
 

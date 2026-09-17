@@ -91,6 +91,15 @@
     <None Remove="Tests\**" />
     <AvaloniaResource Remove="Tests\**" />
     <AvaloniaXaml Remove="Tests\**" />
+
+    <!-- And the tools beside it, which are projects of their own for the same reason again. One
+         of them references this project, so swallowing its sources here would be this project
+         compiling something that is built on top of it. -->
+    <Compile Remove="tools\**" />
+    <EmbeddedResource Remove="tools\**" />
+    <None Remove="tools\**" />
+    <AvaloniaResource Remove="tools\**" />
+    <AvaloniaXaml Remove="tools\**" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.1" />

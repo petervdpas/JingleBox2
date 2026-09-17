@@ -1,6 +1,7 @@
 using Avalonia.Threading;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -1094,6 +1095,40 @@ public class PanelView : Decorator
              or ElementKinds.Strip;
 
     /// <summary>
+    /// Whether a control is one that takes whatever height it is given rather than keeping its
+    /// own.
+    /// </summary>
+    /// <remarks>
+    /// A fader is drawn to its room: the label sits above the groove, the reading below it, and
+    /// the groove is whatever is left. In a row that is taller than the fader needs, because the
+    /// section beside it is taller, a fader that kept its own height left the bottom of the frame
+    /// empty. A knob is not on this list and never will be: a dial stretched is an oval.
+    /// </remarks>
+    private static bool Reaches(string kind) => kind is ElementKinds.Fader;
+
+    /// <summary>
+    /// Whether a section can do anything with height it did not ask for.
+    /// </summary>
+    /// <remarks>
+    /// Sections in a row are as tall as the tallest of them, so their frames line up along the
+    /// panel. That is right where the extra room goes somewhere: faders grow into it, a column
+    /// of rows shares it out between them, and a picture is drawn to whatever it is given. It is
+    /// wrong for a section holding something with a size of its own, a grid of pads above all,
+    /// where the frame grows and what is in it does not, and what shows is a box with a hand's
+    /// width of nothing under the pads. Such a section keeps its own height and the room is left
+    /// under it, which is a panel with air in it rather than a panel with a hole in it.
+    /// </remarks>
+    private static bool Uses(PanelElement element) =>
+        Anywhere(element, ElementKinds.Fader)
+        || Anywhere(element, ElementKinds.Column)
+        || Anywhere(element, ElementKinds.Wave)
+        || Anywhere(element, ElementKinds.Scope)
+        || Anywhere(element, ElementKinds.Envelope)
+        || Anywhere(element, ElementKinds.Zones)
+        || Anywhere(element, ElementKinds.Slices)
+        || Anywhere(element, ElementKinds.Take);
+
+    /// <summary>
     /// A grid of cells, with what it holds where each thing says.
     /// </summary>
     /// <remarks>
@@ -1174,8 +1209,23 @@ public class PanelView : Decorator
 
         if (Measurement(element, "inset") is { } inset) group.Inset = inset;
 
+        // A section is as tall as the tallest section beside it, and what to do with the extra
+        // depends on what is in it. A single row of knobs sits in the middle of it, which is
+        // where a row of knobs belongs. Anything that can use the room takes it instead: a
+        // column shares the extra out between its rows, and a fader grows into it, so neither
+        // leaves a band of nothing under it.
+        group.ContentAlignment =
+            element.Children is [{ } only]
+            && (only.Element == ElementKinds.Column || Anywhere(only, ElementKinds.Fader))
+                ? VerticalAlignment.Stretch
+                : VerticalAlignment.Center;
+
         return group;
     }
+
+    /// <summary>Whether that kind of thing is anywhere inside this one.</summary>
+    private static bool Anywhere(PanelElement element, string kind) =>
+        element.Element == kind || element.Children.Any(child => Anywhere(child, kind));
 
     /// <summary>
     /// What a group holds: the one container it was given, or a row of the several things it was.
@@ -1191,6 +1241,14 @@ public class PanelView : Decorator
     /// </remarks>
     private Control Inside(PanelElement element, Dictionary<string, Parameter> parameters)
     {
+        // A column that is the whole of a section is built to share out spare height, since a
+        // section is as tall as the tallest one beside it and the extra has to go somewhere. A
+        // column anywhere else is a stack: down the panel itself there is no spare height to
+        // share, and a grid there would squeeze the last thing in it, which on most machines is
+        // the keyboard, whenever the panel is taller than the window.
+        if (element.Children is [{ Element: ElementKinds.Column } column])
+            return Fill(new Grid(), column, parameters, Orientation.Vertical);
+
         if (element.Children is [{ } only] && Holds(only.Element) && Build(only, parameters) is { } one)
             return one;
 
@@ -1328,21 +1386,47 @@ public class PanelView : Decorator
                 if (Across(child) is { } own) control.VerticalAlignment = own;
                 else if (across is { } said) control.VerticalAlignment = said;
                 else if (control.VerticalAlignment == VerticalAlignment.Stretch)
-                    control.VerticalAlignment = Holds(child.Element) && matched
-                        ? VerticalAlignment.Stretch
-                        : VerticalAlignment.Top;
+                    control.VerticalAlignment =
+                        matched && (Reaches(child.Element) || (Holds(child.Element) && Uses(child)))
+                            ? VerticalAlignment.Stretch
+                            : VerticalAlignment.Top;
 
                 container.Children.Add(control);
             }
             else
             {
-                control.HorizontalAlignment = across switch
+                // Down a column, spare height is shared out between the rows rather than left at
+                // the bottom. A section is as tall as the tallest section beside it, so a column
+                // of two rows of knobs inside one had both rows at the top and a hand's width of
+                // nothing under them. Each row keeps its own height, which is what Auto is for,
+                // and what is over goes into the gaps between them evenly.
+                if (container is Grid down)
+                {
+                    if (i > 0) down.RowDefinitions.Add(new RowDefinition(1, GridUnitType.Star));
+
+                    down.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+
+                    Grid.SetRow(control, down.RowDefinitions.Count - 1);
+                }
+
+                var side = across switch
                 {
                     VerticalAlignment.Bottom => HorizontalAlignment.Right,
                     VerticalAlignment.Center => HorizontalAlignment.Center,
                     VerticalAlignment.Stretch => HorizontalAlignment.Stretch,
                     _ => HorizontalAlignment.Left,
                 };
+
+                // A section standing on its own down a column keeps its own width, whatever the
+                // column says. A column says stretch so that what is in it lines up down the
+                // page, and for a scope or a waveform that is right: those are drawn to whatever
+                // room they are given. A group is not. It is a frame around a fixed set of
+                // controls, and a frame stretched to the widest row on the panel is a box with
+                // the knobs at one end of it and a hand's width of nothing at the other.
+                if (child.Element == ElementKinds.Group && !Has(child, "align"))
+                    side = HorizontalAlignment.Left;
+
+                control.HorizontalAlignment = side;
 
                 container.Children.Add(control);
             }
@@ -3818,11 +3902,27 @@ public class PanelView : Decorator
         element.Label.Length > 0 ? element.Label : parameter.Name;
 
     /// <summary>
+    /// The muted brush a machine's theme puts up, which is what a knob prints its name in.
+    /// </summary>
+    /// <remarks>
+    /// Named rather than built, so the key appears in the source as a string and can be found
+    /// from either end. It is a brush rather than a colour because this is written onto a
+    /// control's own property rather than painted by hand.
+    /// </remarks>
+    private const string MutedBrushKey = "TextMutedBrush";
+
+    /// <summary>
     /// Writes a name over a control that has none of its own, and hands back the pair as one.
     /// </summary>
     /// <remarks>
     /// A knob and a fader draw their own name; a number field and a dropdown do not. Without
     /// this they would be the only things on a panel nobody could label.
+    ///
+    /// Printed the way a knob prints its own: eleven point, the theme's quiet ink, centred over
+    /// what it names. A dropdown standing in a row of knobs was the one thing on a panel whose
+    /// name was bright where every other name was quiet and left where every other name was
+    /// centred, which read as a different kind of control rather than as the same kind wearing a
+    /// different shape.
     /// </remarks>
     private static Control Captioned(string caption, Control control)
     {
@@ -3830,7 +3930,17 @@ public class PanelView : Decorator
 
         var stack = new StackPanel { Orientation = Orientation.Vertical, Spacing = 2 };
 
-        stack.Children.Add(new TextBlock { Text = caption, FontSize = 11 });
+        var name = new TextBlock
+        {
+            Text = caption,
+            FontSize = 11,
+            TextAlignment = TextAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+
+        name[!TextBlock.ForegroundProperty] = new DynamicResourceExtension(MutedBrushKey);
+
+        stack.Children.Add(name);
         stack.Children.Add(control);
 
         return stack;

@@ -111,8 +111,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "12",
-            "heights": "own"
+            "gap": "12"
           },
           "Children": [
             {
@@ -130,8 +129,6 @@
                   "Properties": {
                     "rows": "4",
                     "columns": "4",
-                    "cap": "86",
-                    "capHeight": "42",
                     "gap": "5",
                     "tip": "Hits the pad. The key under it is the one that fires it in a pattern."
                   },
@@ -467,15 +464,6 @@
                       ]
                     }
                   ]
-                },
-                {
-                  "Element": "Keys",
-                  "Parameter": "",
-                  "Label": "",
-                  "Properties": {
-                    "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down; the pad it fires stays lit for as long as it sounds. The pad in hand is the outlined key."
-                  },
-                  "Children": []
                 }
               ]
             }
@@ -486,7 +474,16 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "picture": "90"
+            "picture": "56"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Keys",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down; the pad it fires stays lit for as long as it sounds. The pad in hand is the outlined key."
           },
           "Children": []
         },

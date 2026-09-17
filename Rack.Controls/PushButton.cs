@@ -31,6 +31,9 @@ public class PushButton : ThemedControl
     /// <inheritdoc cref="LampGap"/>
     private const double LabelGap = 2;
 
+    /// <summary>How far in from the corner of the cap a label printed on it sits.</summary>
+    private const double CornerGap = 3;
+
     /// <summary>
     /// How far the triangle is drawn inside the cap it fills.
     /// </summary>
@@ -197,6 +200,20 @@ public class PushButton : ThemedControl
         AvaloniaProperty.Register<PushButton, bool>(nameof(LampBelow));
 
     /// <summary>
+    /// Backs <see cref="LabelOnCap"/>: whether what is written under the cap goes in the corner
+    /// of it instead.
+    /// </summary>
+    /// <remarks>
+    /// For a pad, whose label is the key it answers to rather than what it is called. Under the
+    /// cap it is a line of writing that costs the pad its own height twice over: once for the
+    /// line and once for the gap above it, on every row of a grid of them. In the corner it sits
+    /// on the moulding the way a key number is printed on a drum machine, and a square pad stays
+    /// square.
+    /// </remarks>
+    public static readonly StyledProperty<bool> LabelOnCapProperty =
+        AvaloniaProperty.Register<PushButton, bool>(nameof(LabelOnCap));
+
+    /// <summary>
     /// Backs <see cref="LampColour"/>, red unless a panel says otherwise.
     /// </summary>
     /// <remarks>
@@ -250,12 +267,13 @@ public class PushButton : ThemedControl
         AffectsRender<PushButton>(
             LabelProperty, CapTextProperty, IsCheckedProperty, IsSelectedProperty, LitProperty, HasLampProperty,
             CapHeightProperty, CapWidthProperty, ShapeProperty, PointsProperty, ColourProperty,
-            FontSizeProperty, LampSizeProperty, LampBelowProperty, LampColourProperty, MarkProperty);
+            FontSizeProperty, LampSizeProperty, LampBelowProperty, LabelOnCapProperty, LampColourProperty,
+            MarkProperty);
 
         AffectsMeasure<PushButton>(
             LabelProperty, CapTextProperty, HasLampProperty,
             CapHeightProperty, CapWidthProperty, HoldsWidthProperty, ShapeProperty, FontSizeProperty, LampSizeProperty,
-            LampBelowProperty);
+            LampBelowProperty, LabelOnCapProperty);
 
         FocusableProperty.OverrideDefaultValue<PushButton>(true);
     }
@@ -394,6 +412,13 @@ public class PushButton : ThemedControl
         set => SetValue(LampBelowProperty, value);
     }
 
+    /// <inheritdoc cref="LabelOnCapProperty"/>
+    public bool LabelOnCap
+    {
+        get => GetValue(LabelOnCapProperty);
+        set => SetValue(LabelOnCapProperty, value);
+    }
+
     /// <inheritdoc cref="LampColourProperty"/>
     public Color LampColour
     {
@@ -460,11 +485,11 @@ public class PushButton : ThemedControl
                 ? CapWidth
                 : Math.Max(CapWidth > 0 ? CapWidth : 30, cap.Width + FontSize * 1.8);
 
-        width = Math.Max(width, label.Width);
+        if (!LabelOnCap) width = Math.Max(width, label.Width);
 
         double height = CapHeight;
         if (HasLamp) height += LampSize + LampGap;
-        if (!string.IsNullOrEmpty(Label)) height += LabelGap + label.Height;
+        if (!LabelOnCap && !string.IsNullOrEmpty(Label)) height += LabelGap + label.Height;
 
         return new Size(width, height);
     }
@@ -551,7 +576,7 @@ public class PushButton : ThemedControl
             if (Held)
             {
                 text.MaxTextWidth = Math.Max(1, capWidth - FontSize * 1.8);
-                text.MaxLineCount = 1;
+                text.MaxLineCount = LabelOnCap ? 2 : 1;
                 text.Trimming = TextTrimming.CharacterEllipsis;
             }
 
@@ -567,6 +592,19 @@ public class PushButton : ThemedControl
             DrawWindow(context, cap, new SolidColorBrush(dark ? Colors.Black : Colors.White), Down ? 0.5 : 0);
         }
 
+        // The key a pad answers to, printed on the moulding in the top right the way a drum
+        // machine prints it. Dimmer than what the pad is called and smaller, since it is there
+        // to be found rather than read: what the pad is called is the thing being read.
+        if (LabelOnCap && !string.IsNullOrEmpty(Label))
+        {
+            var note = new FormattedText(Label, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                                         new Typeface(FontFamily.Default), Math.Max(8, FontSize - 2),
+                                         new SolidColorBrush(dark ? Colors.Black : Colors.White, 0.55));
+
+            context.DrawText(note, new Point(cap.Right - note.Width - CornerGap,
+                                             cap.Top + CornerGap + (Down ? 0.5 : 0)));
+        }
+
         double under = cap.Bottom;
 
         if (HasLamp && LampBelow)
@@ -576,7 +614,7 @@ public class PushButton : ThemedControl
             under += LampSize;
         }
 
-        if (!string.IsNullOrEmpty(Label))
+        if (!string.IsNullOrEmpty(Label) && !LabelOnCap)
         {
             var text = Text(Label, palette.MutedBrush);
             context.DrawText(text, new Point(middle - text.Width / 2, under + LabelGap));

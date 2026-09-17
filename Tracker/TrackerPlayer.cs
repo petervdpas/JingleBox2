@@ -486,11 +486,11 @@ public sealed class TrackerPlayer : ITrackerPlayer
             Song? song;
             lock (_lock) song = _song;
 
-            Rack.SoundDevices.Timing.SongClock.Started(song?.Timing.ClampedBpm ?? TrackerTiming.DefaultBpm);
+            SongClock.Started(song?.Timing.ClampedBpm ?? TrackerTiming.DefaultBpm);
         }
         else
         {
-            Rack.SoundDevices.Timing.SongClock.Stopped();
+            SongClock.Stopped();
         }
 
         StateChanged?.Invoke(this, state);
@@ -509,7 +509,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         lock (_lock) _song = song;
 
-        Rack.SoundDevices.Timing.SongClock.Tempo(song.Timing.ClampedBpm);
+        SongClock.Tempo(song.Timing.ClampedBpm);
     }
 
     /// <inheritdoc/>

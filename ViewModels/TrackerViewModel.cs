@@ -1271,7 +1271,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             /* The plugins hear it at once, whether or not the transport is rolling: a plugin
                whose rate is in note lengths has to be told before the next block, not when the
                song is next started. */
-            Rack.SoundDevices.Timing.SongClock.Tempo(Song.Timing.ClampedBpm);
+            SongClock.Tempo(Song.Timing.ClampedBpm);
 
             OnPropertyChanged();
             MarkDirty("the tempo");

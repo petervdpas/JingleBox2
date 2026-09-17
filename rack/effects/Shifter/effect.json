@@ -116,128 +116,138 @@
           "Children": []
         },
         {
-          "Element": "Group",
+          "Element": "Row",
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "caption": "Pitch"
+            "gap": "12"
           },
           "Children": [
             {
-              "Element": "Strip",
+              "Element": "Group",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "cell": "26",
-                "gap": "6",
-                "columns": "3 3 3 3 3"
+                "caption": "Pitch"
               },
               "Children": [
                 {
-                  "Element": "Knob",
-                  "Parameter": "steps",
+                  "Element": "Strip",
+                  "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How far to move it, in semitones. Twelve is an octave and nought is straight through, since with nothing to move the taps stand still and what would come out is the dry signal a fraction of a window late."
+                    "cell": "26",
+                    "gap": "6",
+                    "columns": "3 3 3 3 3"
                   },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "cents",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "And the part of a semitone, a hundred either way. Its own knob because a detune is dialled in by ear where an interval is chosen."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "window",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How long each tap runs before it is crossfaded away. Short follows a drum and flutters on a held note; long holds a note and smears a drum. There is no setting that does both: that is what this kind of shifter is."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "mix",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How much of what you hear has been moved. Kept back with an interval on it, the original and the shifted copy are a harmony."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "level",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How loud the effect hands the track back. It is the last thing the sound goes through, so it evens out what the effect did to the level without moving the track's fader."
-                  },
-                  "Children": []
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "steps",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How far to move it, in semitones. Twelve is an octave and nought is straight through, since with nothing to move the taps stand still and what would come out is the dry signal a fraction of a window late."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "cents",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "And the part of a semitone, a hundred either way. Its own knob because a detune is dialled in by ear where an interval is chosen."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "window",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How long each tap runs before it is crossfaded away. Short follows a drum and flutters on a held note; long holds a note and smears a drum. There is no setting that does both: that is what this kind of shifter is."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "mix",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How much of what you hear has been moved. Kept back with an interval on it, the original and the shifted copy are a harmony."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "level",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How loud the effect hands the track back. It is the last thing the sound goes through, so it evens out what the effect did to the level without moving the track's fader."
+                      },
+                      "Children": []
+                    }
+                  ]
                 }
               ]
-            }
-          ]
-        },
-        {
-          "Element": "Group",
-          "Parameter": "",
-          "Label": "",
-          "Properties": {
-            "caption": "Double"
-          },
-          "Children": [
+            },
             {
-              "Element": "Strip",
+              "Element": "Group",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "cell": "26",
-                "gap": "6",
-                "columns": "3 3"
+                "caption": "Double"
               },
               "Children": [
                 {
-                  "Element": "Knob",
-                  "Parameter": "detune",
+                  "Element": "Strip",
+                  "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How far the two sides are pulled apart, in cents: the left down and the right up. With no interval at all it is a doubler, two copies of the sound across the room."
+                    "cell": "26",
+                    "gap": "6",
+                    "columns": "3 3"
                   },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "feedback",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How much of what comes out goes back in, so what was moved is moved again. An octave up with feedback is a note climbing out of the top of itself, which is shimmer."
-                  },
-                  "Children": []
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "detune",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How far the two sides are pulled apart, in cents: the left down and the right up. With no interval at all it is a doubler, two copies of the sound across the room."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "feedback",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How much of what comes out goes back in, so what was moved is moved again. An octave up with feedback is a note climbing out of the top of itself, which is shimmer."
+                      },
+                      "Children": []
+                    }
+                  ]
                 }
               ]
             }

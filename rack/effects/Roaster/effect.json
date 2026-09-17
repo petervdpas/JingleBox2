@@ -153,7 +153,8 @@
                     "span": "4",
                     "options": "Warm,Hard,Fold",
                     "width": "90",
-                    "tip": "Which curve the signal is bitten by. Warm bends it further the harder it is pushed and never quite reaches the top, which is an amplifier. Hard cuts it off flat at full scale, which is a fuzz. Fold sends it back down once it reaches the top, so pushing harder folds it over again and adds new harmonics rather than more of the same."
+                    "tip": "Which curve the signal is bitten by. Warm bends it further the harder it is pushed and never quite reaches the top, which is an amplifier. Hard cuts it off flat at full scale, which is a fuzz. Fold sends it back down once it reaches the top, so pushing harder folds it over again and adds new harmonics rather than more of the same.",
+                    "align": "middle"
                   },
                   "Children": []
                 },
@@ -165,7 +166,8 @@
                     "span": "4",
                     "options": "Peak,Loudness",
                     "width": "100",
-                    "tip": "What the drive is levelled out by. Peak holds the height of the wave, which is what this effect has always done and lets the knob add several decibels on the way up. Loudness measures what actually went past and gives that back instead, so the knob changes the tone and not the level. Peak is what every chain written before this was made against."
+                    "tip": "What the drive is levelled out by. Peak holds the height of the wave, which is what this effect has always done and lets the knob add several decibels on the way up. Loudness measures what actually went past and gives that back instead, so the knob changes the tone and not the level. Peak is what every chain written before this was made against.",
+                    "align": "middle"
                   },
                   "Children": []
                 },

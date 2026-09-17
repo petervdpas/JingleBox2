@@ -235,7 +235,6 @@ public sealed class MonoSynthPatchViewModel : ObservableObject
         set => Set(value, _patch.EnvelopeToAmp, v => _patch.EnvelopeToAmp = v);
     }
 
-    /// <summary>How fast the low frequency oscillator goes round, which is what the lamp shows.</summary>
     /// <summary>
     /// Whether the wobble runs at its own rate or in time with the song, and at what note length.
     /// </summary>
@@ -249,6 +248,7 @@ public sealed class MonoSynthPatchViewModel : ObservableObject
         set => Set(value, _patch.LfoSync, v => _patch.LfoSync = v);
     }
 
+    /// <summary>How fast the low frequency oscillator goes round, which is what the lamp shows.</summary>
     public double LfoRateHz
     {
         get => _patch.LfoRateHz;

@@ -134,151 +134,162 @@
           "Children": []
         },
         {
-          "Element": "Group",
+          "Element": "Row",
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "caption": "Ring"
+            "gap": "12"
           },
           "Children": [
             {
-              "Element": "Strip",
+              "Element": "Group",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "cell": "26",
-                "gap": "6",
-                "columns": "3 4 3 3 3 3"
+                "caption": "Ring"
               },
               "Children": [
                 {
-                  "Element": "Knob",
-                  "Parameter": "carrier",
+                  "Element": "Strip",
+                  "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "What the signal is multiplied by. Above about twenty a second the pitch of the original is gone and what is left is a machine; under it the same arithmetic is heard as the level going up and down, which is a tremolo."
+                    "cell": "26",
+                    "gap": "6",
+                    "columns": "3 4 3 3 3 3"
                   },
-                  "Children": []
-                },
-                {
-                  "Element": "Choice",
-                  "Parameter": "square",
-                  "Label": "",
-                  "Properties": {
-                    "span": "4",
-                    "options": "Tone,Square",
-                    "width": "100",
-                    "tip": "What the carrier is. A tone gives the clean two sideband sound. A square is that tone and every odd harmonic of it, so it gives the same sound several times over at once, which is harsher and reads as older hardware."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "spread",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How far apart the two sides are carried. Nought is one carrier and dead centre; a few cycles apart puts the machine across the room rather than inside your head."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "crush",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How many bits are taken away afterwards, down to two. What a converter does with the bits it has not got, applied to the sound you are keeping rather than to what went in."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "mix",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How much of what you hear has been modulated. Kept back, the words come back through the machine."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "level",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How loud the effect hands the track back. It is the last thing the sound goes through, so it evens out what the effect did to the level without moving the track's fader."
-                  },
-                  "Children": []
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "carrier",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "What the signal is multiplied by. Above about twenty a second the pitch of the original is gone and what is left is a machine; under it the same arithmetic is heard as the level going up and down, which is a tremolo."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Choice",
+                      "Parameter": "square",
+                      "Label": "",
+                      "Properties": {
+                        "span": "4",
+                        "options": "Tone,Square",
+                        "width": "100",
+                        "tip": "What the carrier is. A tone gives the clean two sideband sound. A square is that tone and every odd harmonic of it, so it gives the same sound several times over at once, which is harsher and reads as older hardware.",
+                        "align": "middle"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "spread",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How far apart the two sides are carried. Nought is one carrier and dead centre; a few cycles apart puts the machine across the room rather than inside your head."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "crush",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How many bits are taken away afterwards, down to two. What a converter does with the bits it has not got, applied to the sound you are keeping rather than to what went in."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "mix",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How much of what you hear has been modulated. Kept back, the words come back through the machine."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "level",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How loud the effect hands the track back. It is the last thing the sound goes through, so it evens out what the effect did to the level without moving the track's fader."
+                      },
+                      "Children": []
+                    }
+                  ]
                 }
               ]
-            }
-          ]
-        },
-        {
-          "Element": "Group",
-          "Parameter": "",
-          "Label": "",
-          "Properties": {
-            "caption": "Swing"
-          },
-          "Children": [
+            },
             {
-              "Element": "Strip",
+              "Element": "Group",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "cell": "26",
-                "gap": "6",
-                "columns": "3 3 5"
+                "caption": "Swing"
               },
               "Children": [
                 {
-                  "Element": "Knob",
-                  "Parameter": "swing",
+                  "Element": "Strip",
+                  "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How many octaves a slow wave moves the carrier up and down by. Slow and deep is a siren; fast and shallow is a machine gargling. Nought holds it still."
+                    "cell": "26",
+                    "gap": "6",
+                    "columns": "3 3 5"
                   },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "swing_rate",
-                  "Label": "",
-                  "Properties": {
-                    "span": "3",
-                    "dial": "44",
-                    "lines": "1",
-                    "tip": "How fast the swing goes, in turns a second."
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Choice",
-                  "Parameter": "swing_sync",
-                  "Label": "",
-                  "Properties": {
-                    "span": "4",
-                    "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
-                    "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
-                  },
-                  "Children": []
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "swing",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How many octaves a slow wave moves the carrier up and down by. Slow and deep is a siren; fast and shallow is a machine gargling. Nought holds it still."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "swing_rate",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "44",
+                        "lines": "1",
+                        "tip": "How fast the swing goes, in turns a second."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Choice",
+                      "Parameter": "swing_sync",
+                      "Label": "",
+                      "Properties": {
+                        "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
+                        "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored.",
+                        "align": "middle"
+                      },
+                      "Children": []
+                    }
+                  ]
                 }
               ]
             }

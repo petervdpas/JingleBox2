@@ -43,11 +43,17 @@
 
   <!-- The machine itself: a plate in its own colours, standing inside whatever is holding it.
        The gap around it is the control's padding, so a rack can leave room around the box and
-       a window of its own can give it every pixel it has. -->
+       a window of its own can give it every pixel it has.
+
+       As big as the machine on it and no bigger. Left to fill what holds it, the plate was a
+       page-wide sheet of a machine's own colour with the machine in one corner of it, which
+       reads as a panel with a hole in it rather than as a panel on a page. -->
   <Border Background="{DynamicResource BgBrush}"
           BorderBrush="{DynamicResource BorderBrush}"
           BorderThickness="1"
           CornerRadius="6"
+          HorizontalAlignment="Left"
+          VerticalAlignment="Top"
           Padding="12">
 
   <Panel>
@@ -134,11 +140,15 @@
                  machine this installation does not have draws nothing here, which is what the
                  list in SETTINGS is for.
 
-                 Across the page, not pinned to the left. What a machine is drawn against is the
-                 room the page has: a machine's own description says which of its parts spread
-                 and which keep their size, and a panel held to its contents took that choice
-                 away. -->
+                 Pinned to the left and to the top, at the size the panel itself comes to. It
+                 was drawn across the page before, on the grounds that a machine's description
+                 says which of its parts spread, and what that came to in practice was every
+                 machine wearing the width of whatever window it happened to be in: groups
+                 stretched to a page and a half, knobs spread out inside them, and a hole where
+                 the last row ran out of controls. A front panel is the size it is. -->
             <ui:PanelView x:Name="Face"
+                                 HorizontalAlignment="Left"
+                                 VerticalAlignment="Top"
                                  IsVisible="{Binding Editor.IsDescribed}"
                                  Face="{Binding Editor.Described}"
                                  Values="{Binding Editor.Values}"

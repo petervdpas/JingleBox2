@@ -616,15 +616,24 @@ public class Fader : ThemedControl
     /// Where the throw starts and how long it is. The label sits above it and the value below,
     /// so a stretching fader gives the groove whatever is left between them.
     /// </summary>
+    /// <remarks>
+    /// The declared length is a floor rather than a ceiling. A fader standing in a section that
+    /// is taller than it needs to be, because the section beside it is taller, used to draw its
+    /// hundred and twenty and leave the rest of the box empty, which is a groove with a hand's
+    /// width of nothing under it. Given more room it takes it, so a row of faders reaches the
+    /// bottom of whatever frame it is in.
+    /// </remarks>
     private (double Top, double Length) Track()
     {
         var label = BuildText(Label, LabelFontSize, FontFamily.Default, Brushes.Black);
 
         double top = label.Height + TextGap + CapHeight / 2;
 
+        double room = Bounds.Height - top - CapHeight / 2 - ReadingRoom();
+
         double length = TrackLength > 0
-            ? TrackLength
-            : Math.Max(MinimumTrackLength, Bounds.Height - top - CapHeight / 2 - ReadingRoom());
+            ? Math.Max(TrackLength, room)
+            : Math.Max(MinimumTrackLength, room);
 
         return (top, length);
     }

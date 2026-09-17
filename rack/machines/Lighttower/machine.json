@@ -161,8 +161,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "10",
-            "heights": "own"
+            "gap": "10"
           },
           "Children": [
             {
@@ -194,8 +193,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "10",
-            "heights": "own"
+            "gap": "10"
           },
           "Children": [
             {
@@ -307,8 +305,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "10",
-            "heights": "own"
+            "gap": "10"
           },
           "Children": [
             {

@@ -143,8 +143,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "12",
-            "heights": "own"
+            "gap": "12"
           },
           "Children": [
             {
@@ -162,8 +161,6 @@
                   "Properties": {
                     "rows": "4",
                     "columns": "4",
-                    "cap": "86",
-                    "capHeight": "42",
                     "gap": "5",
                     "tip": "Hits the pad. The key under it is the one that fires it in a pattern."
                   },

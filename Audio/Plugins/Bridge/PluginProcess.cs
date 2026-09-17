@@ -541,6 +541,9 @@ internal sealed class PluginProcess : IDisposable
     /// stops answering is treated as gone: waiting forever on somebody else's process is how a
     /// host that meant to be careful ends up frozen.
     /// </remarks>
+    /// <param name="call">What is being asked.</param>
+    /// <param name="payload">What goes with the question, or nothing where it needs none.</param>
+    /// <param name="timeout">How long to wait for the answer, in milliseconds.</param>
     /// <param name="fatal">
     /// Whether an answer that never comes means the plugin is gone. True for anything the
     /// application needs an answer to in order to carry on, and false for anything to do with the

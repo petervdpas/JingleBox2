@@ -368,8 +368,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "10",
-            "heights": "own"
+            "gap": "10"
           },
           "Children": [
             {
@@ -398,7 +397,8 @@
                         "span": "5",
                         "options": "4→3→2→1,3+4→2→1,2+(4→3)→1,2→1 & 4→3,4→1+2+3,2→1 & 3 & 4,2+3+4→1,1+2+3+4",
                         "width": "130",
-                        "tip": "How the four operators are wired. An arrow is one operator bending the next; a plus is two heard or two bending together. Only what reaches the end of a line is heard. One long line is the brightest and most complex; all four side by side is an organ."
+                        "tip": "How the four operators are wired. An arrow is one operator bending the next; a plus is two heard or two bending together. Only what reaches the end of a line is heard. One long line is the brightest and most complex; all four side by side is an organ.",
+                        "align": "middle"
                       },
                       "Children": []
                     },
@@ -471,8 +471,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "10",
-            "heights": "own"
+            "gap": "10"
           },
           "Children": [
             {
@@ -588,8 +587,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "10",
-            "heights": "own"
+            "gap": "10"
           },
           "Children": [
             {
@@ -705,8 +703,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "10",
-            "heights": "own"
+            "gap": "10"
           },
           "Children": [
             {
@@ -822,8 +819,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "10",
-            "heights": "own"
+            "gap": "10"
           },
           "Children": [
             {

@@ -592,126 +592,140 @@
               },
               "Children": [
                 {
-                  "Element": "Grid",
+                  "Element": "Column",
                   "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "rows": "Auto,Auto",
-                    "columns": "Auto,Auto,Auto,Auto",
                     "gap": "10"
                   },
                   "Children": [
                     {
-                      "Element": "Knob",
-                      "Parameter": "tune",
+                      "Element": "Strip",
+                      "Parameter": "",
                       "Label": "",
                       "Properties": {
-                        "dial": "40",
-                        "row": "0",
-                        "column": "0",
-                        "tip": "Whole semitones added to every note this instrument plays."
+                        "cell": "26",
+                        "gap": "6",
+                        "columns": "3 3 3 5 3"
                       },
-                      "Children": []
+                      "Children": [
+                        {
+                          "Element": "Knob",
+                          "Parameter": "tune",
+                          "Label": "",
+                          "Properties": {
+                            "dial": "40",
+                            "tip": "Whole semitones added to every note this instrument plays.",
+                            "span": "3"
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Knob",
+                          "Parameter": "fine",
+                          "Label": "",
+                          "Properties": {
+                            "dial": "40",
+                            "tip": "Hundredths of a semitone, for sitting this voice against another.",
+                            "span": "3"
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Knob",
+                          "Parameter": "vibrato_rate",
+                          "Label": "",
+                          "Properties": {
+                            "dial": "40",
+                            "span": "3"
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Choice",
+                          "Parameter": "vibrato_sync",
+                          "Label": "",
+                          "Properties": {
+                            "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
+                            "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored.",
+                            "align": "middle"
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Knob",
+                          "Parameter": "vibrato_depth",
+                          "Label": "",
+                          "Properties": {
+                            "dial": "40",
+                            "span": "3"
+                          },
+                          "Children": []
+                        }
+                      ]
                     },
                     {
-                      "Element": "Knob",
-                      "Parameter": "fine",
+                      "Element": "Strip",
+                      "Parameter": "",
                       "Label": "",
                       "Properties": {
-                        "dial": "40",
-                        "row": "0",
-                        "column": "1",
-                        "tip": "Hundredths of a semitone, for sitting this voice against another."
+                        "cell": "26",
+                        "gap": "6",
+                        "columns": "3 3 3 5 3"
                       },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Knob",
-                      "Parameter": "vibrato_rate",
-                      "Label": "",
-                      "Properties": {
-                        "dial": "40",
-                        "row": "0",
-                        "column": "2"
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Choice",
-                      "Parameter": "vibrato_sync",
-                      "Label": "",
-                      "Properties": {
-                        "span": "4",
-                        "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
-                        "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Knob",
-                      "Parameter": "vibrato_depth",
-                      "Label": "",
-                      "Properties": {
-                        "dial": "40",
-                        "row": "0",
-                        "column": "3"
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Knob",
-                      "Parameter": "pitch_env",
-                      "Label": "",
-                      "Properties": {
-                        "dial": "40",
-                        "row": "1",
-                        "column": "0"
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Knob",
-                      "Parameter": "pitch_time",
-                      "Label": "",
-                      "Properties": {
-                        "dial": "40",
-                        "row": "1",
-                        "column": "1"
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Knob",
-                      "Parameter": "tremolo_rate",
-                      "Label": "",
-                      "Properties": {
-                        "dial": "40",
-                        "row": "1",
-                        "column": "2"
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Choice",
-                      "Parameter": "tremolo_sync",
-                      "Label": "",
-                      "Properties": {
-                        "span": "4",
-                        "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
-                        "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Knob",
-                      "Parameter": "tremolo_depth",
-                      "Label": "",
-                      "Properties": {
-                        "dial": "40",
-                        "row": "1",
-                        "column": "3"
-                      },
-                      "Children": []
+                      "Children": [
+                        {
+                          "Element": "Knob",
+                          "Parameter": "pitch_env",
+                          "Label": "",
+                          "Properties": {
+                            "dial": "40",
+                            "span": "3"
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Knob",
+                          "Parameter": "pitch_time",
+                          "Label": "",
+                          "Properties": {
+                            "dial": "40",
+                            "span": "3"
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Knob",
+                          "Parameter": "tremolo_rate",
+                          "Label": "",
+                          "Properties": {
+                            "dial": "40",
+                            "span": "3"
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Choice",
+                          "Parameter": "tremolo_sync",
+                          "Label": "",
+                          "Properties": {
+                            "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
+                            "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored.",
+                            "align": "middle"
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Knob",
+                          "Parameter": "tremolo_depth",
+                          "Label": "",
+                          "Properties": {
+                            "dial": "40",
+                            "span": "3"
+                          },
+                          "Children": []
+                        }
+                      ]
                     }
                   ]
                 }

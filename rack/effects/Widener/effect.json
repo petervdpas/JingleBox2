@@ -192,9 +192,9 @@
                   "Parameter": "rate_sync",
                   "Label": "",
                   "Properties": {
-                    "span": "4",
                     "options": "Free,1/1,1/2,1/4,1/8,1/8T,1/16,1/16T,1/32",
-                    "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored."
+                    "tip": "Free runs at the rate beside it. Anything else runs in time with the song, at that note length, and the rate is ignored.",
+                    "align": "middle"
                   },
                   "Children": []
                 },
@@ -218,7 +218,8 @@
                     "span": "4",
                     "options": "Right,Left",
                     "width": "100",
-                    "tip": "Which side the plain delay goes on, which decides which way the sound leans. The other side is the one that reaches the ear first, so a delay on the right leans the sound left."
+                    "tip": "Which side the plain delay goes on, which decides which way the sound leans. The other side is the one that reaches the ear first, so a delay on the right leans the sound left.",
+                    "align": "middle"
                   },
                   "Children": []
                 },
