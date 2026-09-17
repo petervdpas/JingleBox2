@@ -78,7 +78,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
     private readonly ISampleStore _samples = new SampleStore();
 
     /// <summary>The one stream everything sounds through, and the mixer behind it.</summary>
-    private readonly Audio.Interfaces.ITrackerOutput _synth = new Audio.TrackerOutput();
+    private readonly Audio.Interfaces.ITrackerOutput _synth;
 
     /// <inheritdoc/>
     public int SongStream => _synth.Handle;
@@ -117,6 +117,38 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// <summary>Where each column's last note asked to be placed, or null for wherever the strip puts it.</summary>
     private float?[] _notePan = Array.Empty<float?>();
 
+    /// <summary>
+    /// What a track's plugin instrument was last asked for, before the strip had its say, kept so
+    /// the mixer can be re-applied to a plugin that is already sounding.
+    /// </summary>
+    /// <remarks>
+    /// **A plugin holds its own voices, so nothing here can turn one of them down.** What a
+    /// plugin's track is heard at is one level applied to the bus it fills, and that level is
+    /// written when a note is sent; without this, a mute or a solo pressed over a plugin that is
+    /// already ringing reached nothing until the next note, which from a chair is a solo that
+    /// does not work. Our own voices need no such memory, since each one is reachable by track
+    /// and column.
+    ///
+    /// The widest a song can be rather than the width of the song that is open, so a note played
+    /// before a pass has started has somewhere to be written down. Unity to begin with, which is
+    /// what the mixer opens every track at.
+    /// </remarks>
+    private readonly float[] _pluginGain = Filled(Song.MaxTrackCount, 1f);
+
+    /// <summary>Where that plugin was asked to sit, or null for wherever the strip puts it.</summary>
+    private readonly float?[] _pluginPan = new float?[Song.MaxTrackCount];
+
+    /// <summary>An array of one value repeated, for a memory that does not start at nought.</summary>
+    /// <param name="length">How many.</param>
+    /// <param name="value">What each one is.</param>
+    private static float[] Filled(int length, float value)
+    {
+        var made = new float[length];
+        Array.Fill(made, value);
+
+        return made;
+    }
+
     /// <summary>How many note columns the memory has room for on each track.</summary>
     /// <remarks>
     /// The widest a track can be rather than the widest it is, the same as the sequencer's
@@ -152,10 +184,16 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// What this installation has registered, for turning the id a chain wrote down back into an
     /// engine. Left out, only the effects whose ids the application still recognises come back.
     /// </param>
+    /// <param name="output">
+    /// Where the mix is made and sent. Left out, the real one, which is what every caller but a
+    /// test wants: handed one, what the mixer was told can be read back without a sound card.
+    /// </param>
     public TrackerPlayer(IAudioEngine audio, ISoundMachineProjects? machines = null,
-                         SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null)
+                         SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null,
+                         Audio.Interfaces.ITrackerOutput? output = null)
     {
         _audio = audio;
+        _synth = output ?? new Audio.TrackerOutput();
         _machines = machines ?? new SoundDevices.SoundMachines.SoundMachineProjects();
         _chains = new Audio.Plugins.PluginChainState(
             new SoundDevices.SoundEffects.SoundEffectEngines(effects));
@@ -588,6 +626,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             if (playing >= 0)
             {
+                PluginStands(playing, gain * (float)instrument.Volume, null);
+
                 _synth.Mixer.PreviewOnTrack(playing, note, level, holdSeconds, ending, pan);
                 return holdSeconds;
             }
@@ -1540,6 +1580,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         if (instrument.IsPlugin)
         {
+            PluginStands(e.Track, gain, pan);
+
             LetGo(instrument, e.Track, e.Column);
 
             if (PlayerFor(e.Track, instrument) != null)
@@ -1757,6 +1799,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         var (mixed, placed) = WithMix(song, e.Track, gain, pan);
 
+        PluginStands(e.Track, gain, pan);
+
         _synth.Mixer.SetLevels(e.Track, e.Column, mixed, placed);
         _synth.Mixer.SetPluginLevels(e.Track, mixed, placed);
     }
@@ -1797,6 +1841,26 @@ public sealed class TrackerPlayer : ITrackerPlayer
         return (mixed, pan ?? Levels.PanFor(song.Mix, track));
     }
 
+    /// <summary>
+    /// Writes down where a track's plugin instrument was asked to stand, before the strip.
+    /// </summary>
+    /// <remarks>
+    /// Said wherever a plugin is given a level, so that <see cref="ApplyMix"/> has the same
+    /// number to put back through the strip. What is kept is the note's own level rather than
+    /// the level that went to the mixer: the strip is applied again on the way out, and keeping
+    /// the mixed one would multiply a fader by itself on every move.
+    /// </remarks>
+    /// <param name="track">Which track's plugin.</param>
+    /// <param name="gain">What the note asked for, before the strip.</param>
+    /// <param name="pan">Where it asked to sit, or null for wherever the strip puts it.</param>
+    private void PluginStands(int track, float gain, float? pan)
+    {
+        if (track < 0 || track >= _pluginGain.Length) return;
+
+        _pluginGain[track] = gain;
+        _pluginPan[track] = pan;
+    }
+
     /// <inheritdoc/>
     /// <remarks>
     /// The side chain is part of the strip, so it is pushed with the rest of it rather than
@@ -1805,6 +1869,16 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// Then the strip everything has already been through. Muted is nothing rather than a level,
     /// the same as a track: a fader pulled to the bottom and a mute are two different gestures
     /// and only one of them is remembered when it is undone.
+    ///
+    /// **A plugin instrument is reached as well as our own voices, and it has to be reached
+    /// differently.** A voice of ours is found by track and column and turned down where it
+    /// stands; a plugin holds its own voices and is heard through one level on the bus it fills,
+    /// so what is put back through the strip is the level that plugin was last asked for. Left
+    /// out, a mute or a solo over a ringing plugin did nothing at all until the next note.
+    ///
+    /// Walked by the song's track count rather than by the memory's, since that memory is made
+    /// when a pass starts and a strip can be pressed before one ever has: the columns are the
+    /// only part of this that reads it.
     /// </remarks>
     public void ApplyMix()
     {
@@ -1812,15 +1886,21 @@ public sealed class TrackerPlayer : ITrackerPlayer
         lock (_lock) song = _song;
         if (song == null) return;
 
-        for (int track = 0; track < Tracks; track++)
+        int tracks = Math.Min(song.TrackCount, Song.MaxTrackCount);
+
+        for (int track = 0; track < tracks; track++)
         {
-            for (int column = 0; column < song.ColumnsOn(track); column++)
+            for (int column = 0; column < song.ColumnsOn(track) && track < Tracks; column++)
             {
                 var (mixed, placed) = WithMix(
                     song, track, _noteGain[At(track, column)], _notePan[At(track, column)]);
 
                 _synth.Mixer.SetLevels(track, column, mixed, placed);
             }
+
+            var (level, sitting) = WithMix(song, track, _pluginGain[track], _pluginPan[track]);
+
+            _synth.Mixer.SetPluginLevels(track, level, sitting);
 
             _synth.Mixer.SetDucking(
                 track,

@@ -412,6 +412,15 @@ public sealed class PatternGrid : ThemedControl
     ///
     /// Before the first arrange the bounds are empty, and then the whole pattern is drawn: that
     /// is cheaper than culling every row against a size that is not real yet, and it is one pass.
+    ///
+    /// **The whole of it is filled before anything else is drawn, and that is what makes it
+    /// answer the mouse.** A drawn control is hit tested against what it drew rather than
+    /// against the room it was given, so every part of this that happened to have nothing on it
+    /// was dead to a press: the half screen above and below the pattern, the space to the right
+    /// of the last track, and the gaps between one track's fields and the next. A click there
+    /// did nothing at all, with nothing to say why. The fill is transparent, so the picture is
+    /// exactly what it was and the card behind still shows through. It is the same sentence this
+    /// codebase has already paid for on a chain's blocks and on the patchbay's pan.
     /// </remarks>
     public override void Render(DrawingContext context)
     {
@@ -435,6 +444,9 @@ public sealed class PatternGrid : ThemedControl
         var cursor = EditCursor.Clamp(pattern.Lines, pattern.TrackCount, metrics.Columns);
         var barShade = palette.RowShade(0x1C);
         var beatShade = palette.RowShade(0x0E);
+
+        context.FillRectangle(Brushes.Transparent,
+            new Rect(0, 0, rowWidth, Math.Max(contentHeight, visibleHeight)));
 
         DrawSelectedTrack(context, metrics, palette, cursor.Track, contentHeight);
         DrawSelection(context, metrics, palette, pattern);
