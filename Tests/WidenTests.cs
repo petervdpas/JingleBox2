@@ -452,7 +452,7 @@ public class WidenTests
         var widen = new Widen(Rate);
 
         Assert.Equal(
-            new[] { Widen.Width, Widen.Depth, Widen.Rate, Widen.Haas, Widen.Side, Widen.Mix, Widen.Bass, IEffectLevel.Key },
+            new[] { Widen.Width, Widen.Depth, Widen.Rate, Widen.RateSync, Widen.Haas, Widen.Side, Widen.Mix, Widen.Bass, IEffectLevel.Key },
             widen.Keys);
 
         Assert.Equal(0, widen.ValueOf("nothing anybody named"));

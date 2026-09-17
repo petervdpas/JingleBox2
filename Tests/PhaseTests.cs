@@ -104,7 +104,7 @@ public sealed class PhaseTests
 
         Assert.Equal(SoundEffectEngines.Phaser, phase.Id);
         Assert.Equal(
-            new[] { Phase.Rate, Phase.Depth, Phase.Centre, Phase.Feedback, Phase.Stages, Phase.Spread, Phase.Mix, IEffectLevel.Key },
+            new[] { Phase.Rate, Phase.RateSync, Phase.Depth, Phase.Centre, Phase.Feedback, Phase.Stages, Phase.Spread, Phase.Mix, IEffectLevel.Key },
             phase.Keys);
         Assert.True(new SoundEffectEngines().HasEngine(SoundEffectEngines.Phased));
     }
