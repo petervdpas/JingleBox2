@@ -214,7 +214,7 @@ public sealed partial class SoundEffectViewModel : ObservableObject, IChainSlot,
     public IPanelPresets Presets => Picker;
 
     /// <summary>The picker behind <see cref="Presets"/>, made once so the face and the Menu work on the same one.</summary>
-    private SoundEffectPresetNames Picker => _presets ??= new SoundEffectPresetNames(Effect, Values);
+    private SoundEffectPresetNames Picker => _presets ??= new SoundEffectPresetNames(Effect, Values, engine: Engine);
 
     /// <inheritdoc cref="Picker"/>
     private SoundEffectPresetNames? _presets;

@@ -147,8 +147,11 @@ public sealed class Sweep : ISoundEffectEngine
     /// <inheritdoc/>
     public string Id { get; }
 
+    /// <inheritdoc/>
+    public string? Preset { get; set; }
+
     /// <summary>Every parameter, in the order a face reads them.</summary>
-    private static readonly string[] Words = { Cutoff, Resonance, Drive, Mode, Mix, FilterFirst, Even, Swing, SwingRate, Follow, IEffectLevel.Key };
+    private static readonly string[] Words = { Cutoff, Resonance, Drive, Mode, Mix, FilterFirst, Even, Swing, SwingRate, SwingSync, Follow, IEffectLevel.Key };
 
     /// <inheritdoc/>
     public System.Collections.Generic.IReadOnlyList<string> Keys => Words;

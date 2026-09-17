@@ -239,6 +239,19 @@ public sealed class TrackerInstrument
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? MachineId { get; set; }
 
+    /// <summary>
+    /// The preset last picked for this instrument's sound, by the name its picker shows, or
+    /// nothing.
+    /// </summary>
+    /// <remarks>
+    /// Written into the song with the rest of the instrument and handed back to the picker when
+    /// the song is opened, so what was picked is what shows. By the name rather than the file,
+    /// since a song carried to another computer finds its presets somewhere else. Left out of the
+    /// file while there is none.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Preset { get; set; }
+
     /// <summary>Which machine this instrument is on, by name and description.</summary>
     /// <remarks>
     /// The machine it says it came off, where that is registered on its engine; then a machine
@@ -518,6 +531,7 @@ public sealed class TrackerInstrument
         Name = other.Name;
         Kind = other.Kind;
         MachineId = other.MachineId;
+        Preset = other.Preset;
         Patch = other.Patch.Clone();
         MonoSynth = other.MonoSynth?.Clone();
         Fm = other.Fm?.Clone();
@@ -632,6 +646,7 @@ public sealed class TrackerInstrument
         Name = Name,
         Kind = Kind,
         MachineId = MachineId,
+        Preset = Preset,
         Patch = Patch.Clone(),
         MonoSynth = MonoSynth?.Clone(),
         Fm = Fm?.Clone(),

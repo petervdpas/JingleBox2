@@ -119,6 +119,9 @@ public sealed class Drive : ISoundEffectEngine
     /// <inheritdoc/>
     public string Id { get; }
 
+    /// <inheritdoc/>
+    public string? Preset { get; set; }
+
     /// <summary>Every parameter, in the order a face reads them.</summary>
     private static readonly string[] Words = { Amount, Tilt, Bias, Level, Mix, Even, Shape };
 

@@ -37,6 +37,14 @@ public interface ISoundEffectEngine : IAudioInsert
     /// </remarks>
     string Id { get; }
 
+    /// <summary>The preset last picked on this effect, by the name its picker shows, or nothing.</summary>
+    /// <remarks>
+    /// Kept by the effect with the rest of what it is set to, the way a plugin keeps the preset it
+    /// is on inside its own state: a chain writes it down with the knobs and hands it back when it
+    /// is opened, and the face drawn then shows it. Only ever touched on the UI thread.
+    /// </remarks>
+    string? Preset { get; set; }
+
     /// <summary>
     /// Every parameter this engine has, by key.
     /// </summary>

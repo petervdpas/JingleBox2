@@ -175,8 +175,11 @@ public sealed class Ring : ISoundEffectEngine
     public string Id { get; }
 
     /// <inheritdoc/>
+    public string? Preset { get; set; }
+
+    /// <inheritdoc/>
     public System.Collections.Generic.IReadOnlyList<string> Keys { get; } =
-        new[] { Carrier, Square, Spread, Crush, Mix, Swing, SwingRate, IEffectLevel.Key };
+        new[] { Carrier, Square, Spread, Crush, Mix, Swing, SwingRate, SwingSync, IEffectLevel.Key };
 
     /// <inheritdoc/>
     public double ValueOf(string? key) => key switch

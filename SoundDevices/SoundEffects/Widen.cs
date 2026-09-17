@@ -271,8 +271,11 @@ public sealed class Widen : ISoundEffectEngine
     public string Id { get; }
 
     /// <inheritdoc/>
+    public string? Preset { get; set; }
+
+    /// <inheritdoc/>
     public System.Collections.Generic.IReadOnlyList<string> Keys { get; } =
-        new[] { Width, Depth, Rate, Haas, Side, Mix, Bass, IEffectLevel.Key };
+        new[] { Width, Depth, Rate, RateSync, Haas, Side, Mix, Bass, IEffectLevel.Key };
 
     /// <inheritdoc/>
     public double ValueOf(string? key) => key switch

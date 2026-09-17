@@ -192,8 +192,11 @@ public sealed class Phase : ISoundEffectEngine
     public string Id { get; }
 
     /// <inheritdoc/>
+    public string? Preset { get; set; }
+
+    /// <inheritdoc/>
     public System.Collections.Generic.IReadOnlyList<string> Keys { get; } =
-        new[] { Rate, Depth, Centre, Feedback, Stages, Spread, Mix, IEffectLevel.Key };
+        new[] { Rate, RateSync, Depth, Centre, Feedback, Stages, Spread, Mix, IEffectLevel.Key };
 
     /// <inheritdoc/>
     public double ValueOf(string? key) => key switch

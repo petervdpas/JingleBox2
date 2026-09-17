@@ -49,6 +49,18 @@ public sealed class PluginSlotConfig
     public bool Bypassed { get; set; }
 
     /// <summary>
+    /// The preset last picked on one of our effects, by the name its picker shows, or nothing.
+    /// </summary>
+    /// <remarks>
+    /// The part of an effect of ours that is not a number, written beside its parameters, the way
+    /// a plugin's own state carries the preset it is on. Left out of the file while there is
+    /// none, and absent from every chain saved before it existed, which reads back as nothing
+    /// picked.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Preset { get; set; }
+
+    /// <summary>
     /// Parameter values by id. Keyed as text because that is what JSON can hold, and because
     /// a plugin's ids are its own business.
     /// </summary>
@@ -98,6 +110,7 @@ public sealed class PluginChainConfig
                 Format = device.Format,
                 Name = device.Name,
                 Bypassed = device.Bypassed,
+                Preset = device.Preset,
                 Parameters = new Dictionary<string, double>(device.Parameters),
                 State = device.State
             });
@@ -207,7 +220,8 @@ public sealed class PluginChainState : IPluginChainState
         {
             Effect = engine.Id,
             Name = engine.Id,
-            Bypassed = device.Bypassed
+            Bypassed = device.Bypassed,
+            Preset = engine.Preset
         };
 
         foreach (string key in engine.Keys) saved.Parameters[key] = engine.ValueOf(key);
@@ -258,6 +272,8 @@ public sealed class PluginChainState : IPluginChainState
                 }
 
                 foreach (var (key, value) in saved.Parameters) engine.SetValue(key, value);
+
+                engine.Preset = saved.Preset;
 
                 chain.Add(engine).Bypassed = saved.Bypassed;
 

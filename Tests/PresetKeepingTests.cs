@@ -240,6 +240,41 @@ public sealed class PresetKeepingTests : IDisposable
         Assert.Contains(Library().For(Sound().Machine), one => one.Yours && one.Name == "Keeper");
     }
 
+    /// <summary>What is picked is kept by the instrument, goes into the song with it, and the next face shows it.</summary>
+    /// <remarks>
+    /// A face is drawn fresh every time a song is opened, so a picker that only remembered for
+    /// itself showed nothing picked on every machine in the song.
+    /// </remarks>
+    [Fact]
+    public void The_instrument_keeps_what_was_picked_for_the_next_face()
+    {
+        var sound = Sound();
+        Rack.SoundDevices.Faces.Interfaces.IPanelPresets face = new InstrumentPresets(sound, () => { }, _projects, library: Library());
+
+        face.Picked = 0;
+
+        string shown = face.Names[0];
+
+        Assert.Equal(shown, sound.Preset);
+
+        var reopened = System.Text.Json.JsonSerializer.Deserialize<TrackerInstrument>(
+            System.Text.Json.JsonSerializer.Serialize(sound))!;
+
+        Assert.Equal(shown, reopened.Preset);
+        Assert.Equal(shown, reopened.Clone().Preset);
+
+        Rack.SoundDevices.Faces.Interfaces.IPanelPresets again = new InstrumentPresets(reopened, () => { }, _projects, library: Library());
+
+        Assert.Equal(0, again.Picked);
+    }
+
+    /// <summary>An instrument nobody picked a preset for writes none into the song.</summary>
+    [Fact]
+    public void An_instrument_on_no_preset_writes_none()
+    {
+        Assert.DoesNotContain("\"Preset\"", System.Text.Json.JsonSerializer.Serialize(Sound()));
+    }
+
     /// <summary>The Menu's Save asks a name, keeps it, and shows it as picked; a refused name writes nothing.</summary>
     [Fact]
     public async Task Save_on_the_menu_keeps_and_picks_it()

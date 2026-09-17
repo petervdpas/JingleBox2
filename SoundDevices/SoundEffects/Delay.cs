@@ -220,8 +220,11 @@ public sealed class Delay : ISoundEffectEngine
     public string Id { get; }
 
     /// <inheritdoc/>
+    public string? Preset { get; set; }
+
+    /// <inheritdoc/>
     public System.Collections.Generic.IReadOnlyList<string> Keys { get; } =
-        new[] { Time, Feedback, Damp, Mix, Ping, Wow, Grit, IEffectLevel.Key };
+        new[] { Time, Sync, Feedback, Damp, Mix, Ping, Wow, Grit, IEffectLevel.Key };
 
     /// <summary>That many milliseconds as frames, held inside the line.</summary>
     /// <param name="ms">The time in milliseconds.</param>

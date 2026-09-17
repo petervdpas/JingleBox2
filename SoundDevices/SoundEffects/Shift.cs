@@ -176,6 +176,9 @@ public sealed class Shift : ISoundEffectEngine
     public string Id { get; }
 
     /// <inheritdoc/>
+    public string? Preset { get; set; }
+
+    /// <inheritdoc/>
     public System.Collections.Generic.IReadOnlyList<string> Keys { get; } =
         new[] { Steps, Cents, Window, Mix, Detune, Feedback, IEffectLevel.Key };
 

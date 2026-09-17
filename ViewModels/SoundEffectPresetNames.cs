@@ -50,19 +50,39 @@ public sealed class SoundEffectPresetNames : IPanelPresets, IPresetKeeping, INot
     /// <summary>The file of the one showing, or nothing for none.</summary>
     private string _picked = "";
 
+    /// <summary>The effect that keeps what is picked, or nothing where there is no effect running.</summary>
+    private readonly ISoundEffectEngine? _engine;
+
     /// <summary>Reads that effect's presets, ready to be picked from.</summary>
     /// <param name="effect">The effect whose folder holds them. Nothing offers nothing.</param>
     /// <param name="values">Where a picked preset is written. Left out, picking does nothing and nothing can be kept.</param>
     /// <param name="shelf">The presets on disc. Left out, the ordinary shelf.</param>
+    /// <param name="engine">
+    /// The effect that is running, which keeps the preset picked on it with the rest of its state,
+    /// so a song opened again shows it. Left out, what is picked lasts as long as this picker does.
+    /// </param>
     public SoundEffectPresetNames(
         SoundEffectProject? effect,
         IPanelValues? values = null,
-        ISoundEffectPresets? shelf = null)
+        ISoundEffectPresets? shelf = null,
+        ISoundEffectEngine? engine = null)
     {
         _effect = effect;
         _values = values;
         _shelf = shelf ?? new SoundEffectPresets();
+        _engine = engine;
         _presets = _shelf.For(effect);
+
+        /* The preset the effect says it is on, found again by the name the picker shows rather than
+           by its file, since a song carried to another computer finds its presets somewhere else. */
+        if (engine?.Preset is { Length: > 0 } said)
+            _picked = _presets.FirstOrDefault(one => string.Equals(one.Shown, said, StringComparison.Ordinal))?.File ?? "";
+    }
+
+    /// <summary>Tells the effect which preset is showing now, so it is kept with its state.</summary>
+    private void Remember()
+    {
+        if (_engine is not null) _engine.Preset = Showing?.Shown;
     }
 
     /// <inheritdoc/>
@@ -99,6 +119,8 @@ public sealed class SoundEffectPresetNames : IPanelPresets, IPresetKeeping, INot
             var preset = _presets[value];
 
             _picked = preset.File;
+
+            Remember();
 
             if (_values is null) return;
 
@@ -144,6 +166,8 @@ public sealed class SoundEffectPresetNames : IPanelPresets, IPresetKeeping, INot
         _presets = _shelf.For(_effect);
         _picked = kept.File;
 
+        Remember();
+
         Said();
 
         return true;
@@ -156,6 +180,8 @@ public sealed class SoundEffectPresetNames : IPanelPresets, IPresetKeeping, INot
 
         _presets = _shelf.For(_effect);
         _picked = "";
+
+        Remember();
 
         Said();
 

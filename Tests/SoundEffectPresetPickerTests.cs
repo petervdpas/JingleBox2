@@ -142,6 +142,31 @@ public class SoundEffectPresetPickerTests : IDisposable
         Assert.Empty(knobs.Written);
     }
 
+    /// <summary>What is picked is kept by the effect, and the next face over it shows the same.</summary>
+    /// <remarks>
+    /// A face is drawn fresh every time a song is opened, so a picker that only remembered for
+    /// itself showed nothing picked on every effect in the song.
+    /// </remarks>
+    [Fact]
+    public void The_effect_keeps_what_was_picked_for_the_next_face()
+    {
+        var engine = new Delay(48000);
+
+        new SoundEffectPresetNames(_effect, new Knobs(), engine: engine).Picked = 1;
+
+        Assert.Equal("\u2605 Long", engine.Preset);
+        Assert.Equal(1, new SoundEffectPresetNames(_effect, engine: engine).Picked);
+    }
+
+    /// <summary>A preset the effect remembers that is no longer on the shelf shows as none.</summary>
+    [Fact]
+    public void A_remembered_preset_that_has_gone_shows_as_none()
+    {
+        var engine = new Delay(48000) { Preset = "\u2605 Thrown away" };
+
+        Assert.Equal(-1, new SoundEffectPresetNames(_effect, engine: engine).Picked);
+    }
+
     /// <summary>Somewhere to read and write, standing in for a panel's own values.</summary>
     private sealed class Knobs : IPanelValues
     {

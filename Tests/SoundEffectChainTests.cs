@@ -61,6 +61,43 @@ public class SoundEffectChainTests
         Assert.Equal(0.45, saved.Parameters[Delay.Mix], 5);
     }
 
+    /// <summary>The preset an effect is on is written down with its knobs and comes back with them.</summary>
+    /// <remarks>
+    /// Through the song's own JSON as well, since that is where it was lost: a Phaser picked onto a
+    /// preset came back with the knobs right and the picker empty.
+    /// </remarks>
+    [Fact]
+    public void The_preset_an_effect_is_on_goes_into_the_song_and_comes_back()
+    {
+        var state = new PluginChainState();
+        var (chain, engine) = Made();
+
+        engine.Preset = "\u2605 Long";
+
+        var written = state.Capture(chain);
+        var read = System.Text.Json.JsonSerializer.Deserialize<PluginChainConfig>(
+            System.Text.Json.JsonSerializer.Serialize(written))!;
+
+        var into = new PluginChain();
+
+        Assert.Empty(state.Restore(into, read, Rate, Block));
+
+        var device = Assert.Single(into.Slots);
+
+        Assert.Equal("\u2605 Long", Assert.IsAssignableFrom<ISoundEffectEngine>(device.Insert).Preset);
+        Assert.Equal("\u2605 Long", Assert.Single(read.Clone().Devices).Preset);
+    }
+
+    /// <summary>An effect nobody picked a preset on writes none, and reads back as none.</summary>
+    [Fact]
+    public void An_effect_on_no_preset_writes_none()
+    {
+        var written = new PluginChainState().Capture(Made().Chain);
+
+        Assert.Null(Assert.Single(written.Devices).Preset);
+        Assert.DoesNotContain("Preset", System.Text.Json.JsonSerializer.Serialize(written));
+    }
+
     /// <summary>And it comes back the same, in the same place, switched off if it was.</summary>
     [Fact]
     public void And_comes_back_the_same()
@@ -158,7 +195,7 @@ public class SoundEffectChainTests
         var engine = new SoundEffectEngines().Make(SoundEffectEngines.EchoBox, Rate, Block)!;
 
         Assert.Equal(
-            new[] { Delay.Damp, Delay.Feedback, Delay.Grit, IEffectLevel.Key, Delay.Mix, Delay.Ping, Delay.Time, Delay.Wow },
+            new[] { Delay.Damp, Delay.Feedback, Delay.Grit, IEffectLevel.Key, Delay.Mix, Delay.Ping, Delay.Time, Delay.Sync, Delay.Wow },
             engine.Keys.OrderBy(one => one, System.StringComparer.Ordinal).ToArray());
     }
 }

@@ -153,6 +153,7 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets,
     {
         if (_filling || value == null) return;
 
+        _instrument.Preset = value.Shown;
         _instrument.TakeSoundFrom(value.Sound);
         _applied();
     }
@@ -196,7 +197,11 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets,
                 foreach (var preset in _presets.For(_instrument.Machine)) Items.Add(preset);
             }
 
-            Selected = null;
+            /* The one the instrument says was picked, which is what a song opened again shows. By
+               the name the picker shows, which is what the instrument keeps. */
+            Selected = _instrument.Preset is { Length: > 0 } said
+                ? Items.FirstOrDefault(one => string.Equals(one.Shown, said, StringComparison.Ordinal))
+                : null;
         }
         finally
         {
@@ -264,6 +269,8 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets,
         Refresh();
         Quietly(kept.File);
 
+        _instrument.Preset = Selected?.Shown;
+
         return true;
     }
 
@@ -271,6 +278,8 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets,
     public bool RemovePicked()
     {
         if (Selected is not { Yours: true } yours || !_presets.Remove(_instrument.Machine, yours)) return false;
+
+        _instrument.Preset = null;
 
         Refresh();
 
