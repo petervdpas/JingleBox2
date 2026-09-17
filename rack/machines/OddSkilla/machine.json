@@ -482,106 +482,33 @@
           },
           "Children": [
             {
-              "Element": "Group",
+              "Element": "Column",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "caption": "Amplifier"
+                "gap": "10"
               },
-              "Children": [
-                {
-                  "Element": "Strip",
-                  "Parameter": "",
-                  "Label": "",
-                  "Properties": {
-                    "cell": "26",
-                    "gap": "4",
-                    "columns": "4 3 3 3 3 3 3 3"
-                  },
-                  "Children": [
-                    {
-                      "Element": "Fader",
-                      "Parameter": "attack",
-                      "Label": "",
-                      "Properties": {
-                        "span": "4"
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Fader",
-                      "Parameter": "decay",
-                      "Label": "",
-                      "Properties": {
-                        "span": "3"
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Fader",
-                      "Parameter": "sustain",
-                      "Label": "",
-                      "Properties": {
-                        "span": "3"
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Fader",
-                      "Parameter": "release",
-                      "Label": "",
-                      "Properties": {
-                        "span": "3"
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Knob",
-                      "Parameter": "drive",
-                      "Label": "",
-                      "Properties": {
-                        "span": "3",
-                        "dial": "40",
-                        "tip": "Rounds the wave off into itself: fuller and harder, at the same level."
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Fader",
-                      "Parameter": "level",
-                      "Label": "",
-                      "Properties": {
-                        "span": "3",
-                        "ticks": "6,0,-12,-40",
-                        "tip": "Unity is 0 dB, and above it is makeup gain."
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Switch",
-                      "Parameter": "new_note",
-                      "Label": "",
-                      "Properties": {
-                        "options": "Cut,Release,Sustain",
-                        "tip": "What happens to the note this track is still sounding when the next one lands on it. Cut stops it; Release lets it play its own release under the new note; Sustain leaves it holding until an OFF."
-                      },
-                      "Children": []
-                    },
-                    {
-                      "Element": "Switch",
-                      "Parameter": "even_drive",
-                      "Label": "",
-                      "Properties": {
-                        "span": "3",
-                        "options": "Peak,Loudness",
-                        "tip": "What the drive is levelled out by. Peak holds the height of the wave, which is what this machine has always done and lets the knob add about five decibels on the way up. Loudness holds the area instead, so the knob changes the tone and not the level. Peak is what every preset written before this was made against."
-                      },
-                      "Children": []
-                    }
-                  ]
-                }
-              ]
+              "Children": []
             },
+            {
+              "Element": "Column",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "gap": "10"
+              },
+              "Children": []
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "16"
+          },
+          "Children": [
             {
               "Element": "Group",
               "Parameter": "",
@@ -637,17 +564,7 @@
                   ]
                 }
               ]
-            }
-          ]
-        },
-        {
-          "Element": "Row",
-          "Parameter": "",
-          "Label": "",
-          "Properties": {
-            "gap": "16"
-          },
-          "Children": [
+            },
             {
               "Element": "Group",
               "Parameter": "",
@@ -751,6 +668,117 @@
                         "span": "3",
                         "dial": "40",
                         "tip": "How far it wavers, as a fraction of full level."
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "16"
+          },
+          "Children": [
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Amplifier"
+              },
+              "Children": [
+                {
+                  "Element": "Strip",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "4 3 3 3 3 3 3 3"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Fader",
+                      "Parameter": "attack",
+                      "Label": "",
+                      "Properties": {
+                        "span": "4"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "decay",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "sustain",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "release",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "drive",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "tip": "Rounds the wave off into itself: fuller and harder, at the same level."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "level",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "ticks": "6,0,-12,-40",
+                        "tip": "Unity is 0 dB, and above it is makeup gain."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "new_note",
+                      "Label": "",
+                      "Properties": {
+                        "options": "Cut,Release,Sustain",
+                        "tip": "What happens to the note this track is still sounding when the next one lands on it. Cut stops it; Release lets it play its own release under the new note; Sustain leaves it holding until an OFF."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "even_drive",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "options": "Peak,Loudness",
+                        "tip": "What the drive is levelled out by. Peak holds the height of the wave, which is what this machine has always done and lets the knob add about five decibels on the way up. Loudness holds the area instead, so the knob changes the tone and not the level. Peak is what every preset written before this was made against."
                       },
                       "Children": []
                     }

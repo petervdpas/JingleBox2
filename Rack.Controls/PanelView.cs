@@ -803,8 +803,7 @@ public class PanelView : Decorator
             ElementKinds.Group => BuildGroup(element, parameters),
             ElementKinds.Row => Fill(
                 new StackPanel { Orientation = Orientation.Horizontal }, element, parameters, Orientation.Horizontal),
-            ElementKinds.Column => Fill(
-                new StackPanel { Orientation = Orientation.Vertical }, element, parameters, Orientation.Vertical),
+            ElementKinds.Column => BuildColumn(element, parameters),
             ElementKinds.Strip => BuildStrip(element, parameters),
             ElementKinds.Knob => BuildKnob(element, parameters),
             ElementKinds.Fader => BuildFader(element, parameters),
@@ -1241,14 +1240,6 @@ public class PanelView : Decorator
     /// </remarks>
     private Control Inside(PanelElement element, Dictionary<string, Parameter> parameters)
     {
-        // A column that is the whole of a section is built to share out spare height, since a
-        // section is as tall as the tallest one beside it and the extra has to go somewhere. A
-        // column anywhere else is a stack: down the panel itself there is no spare height to
-        // share, and a grid there would squeeze the last thing in it, which on most machines is
-        // the keyboard, whenever the panel is taller than the window.
-        if (element.Children is [{ Element: ElementKinds.Column } column])
-            return Fill(new Grid(), column, parameters, Orientation.Vertical);
-
         if (element.Children is [{ } only] && Holds(only.Element) && Build(only, parameters) is { } one)
             return one;
 
@@ -1273,6 +1264,25 @@ public class PanelView : Decorator
     /// control: a lamp is a dot, and a dot stretched to the height of the knobs beside it is a
     /// dot in the wrong place.
     /// </remarks>
+    /// <summary>
+    /// One thing under another.
+    /// </summary>
+    /// <remarks>
+    /// A column inside anything else shares out height it did not ask for, so that two rows of
+    /// knobs in a section as tall as the section beside it sit apart rather than both at the top.
+    /// Each row keeps its own height and what is over goes into the gaps between them.
+    ///
+    /// The panel's own outermost column is a stack instead. There is no spare height down there
+    /// to share: the panel is as tall as what is on it, and where that is taller than the window
+    /// it scrolls. A grid there would hand the last thing in it whatever was left, which on most
+    /// machines is the keyboard, and a keyboard given fifteen pixels is a row of slivers.
+    /// </remarks>
+    private Control BuildColumn(PanelElement element, Dictionary<string, Parameter> parameters) =>
+        ReferenceEquals(element, Face?.Panel.Root)
+            ? Fill(new StackPanel { Orientation = Orientation.Vertical },
+                   element, parameters, Orientation.Vertical)
+            : Fill(new Grid(), element, parameters, Orientation.Vertical);
+
     private Control BuildStrip(PanelElement element, Dictionary<string, Parameter> parameters)
     {
         var strip = new PanelStrip
