@@ -89,7 +89,8 @@
 
   <!-- One part at a time. Everything here used to be one column of cards taller than the
        window, which is a page you scroll rather than a page you read. -->
-  <TabControl x:Name="Sections" Classes="rail tabRoot" TabStripPlacement="Left" Padding="0">
+  <TabControl x:Name="Sections" Classes="rail tabRoot" TabStripPlacement="Left" Padding="0"
+              SelectedIndex="{Binding SettingsSection, Mode=TwoWay}">
 
     <!-- A shape of its own, so the line between the sections and their settings can be
          dragged. A docked tab strip has nowhere to put a handle: it is as wide as it is and
@@ -847,6 +848,21 @@
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap"
                          Text="Puts DESIGNER in the menu along the top, beside RECORD and TRACKER, for when the machine is the work rather than the song. It is inside the tracker either way." />
+            </StackPanel>
+          </Border>
+
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <TextBlock Classes="cardTitle" Text="The bar along the bottom" />
+
+              <CheckBox Content="Show the input and output levels"
+                        IsChecked="{Binding ShowFooterLevels}" />
+
+              <CheckBox Content="Show the processors and the memory"
+                        IsChecked="{Binding ShowFooterLoad}" />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                         Text="Small meters at the right hand end of the bar. Clicking the levels opens the MIXER, and clicking the processors and memory opens SETTINGS, System, where the whole picture is. Off, the processors and memory are not read at all." />
             </StackPanel>
           </Border>
 

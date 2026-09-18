@@ -28,6 +28,64 @@ namespace JingleBox2.ViewModels;
 /// <param name="load">Where the figures come from.</param>
 public sealed partial class SystemLoadViewModel(ISystemLoad load) : ObservableObject
 {
+    /// <summary>How long between the footer's glances.</summary>
+    private static readonly TimeSpan GlanceEvery = TimeSpan.FromSeconds(2);
+
+    /// <summary>The footer's ticking, while the footer shows the load.</summary>
+    private Timer? _glancing;
+
+    /// <summary>How busy the processors are, nought to one, for the footer.</summary>
+    [ObservableProperty] private double glanceCpu;
+
+    /// <summary>How full the memory is, nought to one, for the footer.</summary>
+    [ObservableProperty] private double glanceMemory;
+
+    /// <summary>
+    /// Starts the footer's glance at the processors and the memory, every two seconds until it is
+    /// stopped. Asking twice is the same as asking once.
+    /// </summary>
+    /// <remarks>
+    /// Runs whatever page is showing, unlike the card, for as long as the footer shows the load.
+    /// It costs two small file reads every two seconds and walks no processes: see
+    /// <see cref="ISystemLoad.Glance"/>.
+    /// </remarks>
+    public void Glance()
+    {
+        if (_glancing != null) return;
+
+        _glancing = new Timer(_ => Glimpse(), null, TimeSpan.Zero, GlanceEvery);
+    }
+
+    /// <summary>Stops the footer's glance, for a footer that no longer shows the load.</summary>
+    public void StopGlancing()
+    {
+        _glancing?.Dispose();
+        _glancing = null;
+    }
+
+    /// <summary>Takes one glance off the drawing thread and puts it in the footer.</summary>
+    private void Glimpse()
+    {
+        SystemGlance? now = null;
+
+        try
+        {
+            now = load.Glance();
+        }
+        catch (Exception)
+        {
+            /* A glance the system would not give leaves the footer where it was. */
+        }
+
+        if (now is not { } glance) return;
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            GlanceCpu = glance.Cpu;
+            GlanceMemory = glance.Memory;
+        });
+    }
+
     /// <summary>How many readings a chart holds, one a second, which is the minute it spans.</summary>
     public const int Seconds = 61;
 

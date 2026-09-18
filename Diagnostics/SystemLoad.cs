@@ -18,7 +18,8 @@ namespace JingleBox2.Diagnostics;
 /// processes are asked again: a plugin is started now and then, and one that ended in the meantime
 /// is simply not there to answer.
 ///
-/// One thread at a time: the view model reading it once a second is the only caller.
+/// <see cref="Read"/> and <see cref="Glance"/> keep apart what they remember, so each can be
+/// called from a thread of its own; each of the two is called from one thread at a time.
 /// </remarks>
 /// <param name="counters">The system's own figures, or nothing on a system that has none.</param>
 /// <param name="root">The process whose family is this program, which is this process.</param>
@@ -153,6 +154,26 @@ public sealed class SystemLoad(ISystemCounters? counters, int root) : ISystemLoa
         _at = now;
 
         return new LoadReading(machine, own, cores, memory.Value, held, counted, network, disks);
+    }
+
+    /// <summary>The processors' time at the last glance, and nothing before one.</summary>
+    private CoreTime? _glanced;
+
+    /// <inheritdoc/>
+    public SystemGlance? Glance()
+    {
+        if (counters?.Memory() is not { Total: > 0 } memory) return null;
+
+        double cpu = 0;
+
+        if (counters.Processors() is { } times)
+        {
+            if (_glanced is { } before) cpu = Share(before, times.Whole);
+
+            _glanced = times.Whole;
+        }
+
+        return new SystemGlance(cpu, (double)(memory.Total - memory.Available) / memory.Total);
     }
 
     /// <summary>The network's and the discs' totals at the last reading, and nothing before one.</summary>

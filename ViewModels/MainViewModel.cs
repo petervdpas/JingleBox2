@@ -390,6 +390,22 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     /// <remarks>Reads nothing until the card is on screen; see <see cref="SystemLoadViewModel.Watch"/>.</remarks>
     public SystemLoadViewModel Load { get; } = new(Diagnostics.SystemLoad.ForThisMachine());
 
+    /// <summary>Which section of SETTINGS is showing, counted down the rail from Audio.</summary>
+    [ObservableProperty] private int settingsSection;
+
+    /// <summary>SETTINGS, System's place down the rail.</summary>
+    private const int SystemSection = 6;
+
+    /// <summary>Opens the mixer, which is what clicking the footer's level meters does.</summary>
+    public IRelayCommand ShowMixerCommand => new RelayCommand(() => SelectedTab = MixerTab);
+
+    /// <summary>Opens SETTINGS, System, which is what clicking the footer's load meters does.</summary>
+    public IRelayCommand ShowSystemCommand => new RelayCommand(() =>
+    {
+        SelectedTab = SettingsTab;
+        SettingsSection = SystemSection;
+    });
+
     /// <summary>
     /// The same page again for effects, which are imported and thrown out exactly as machines are.
     /// </summary>
@@ -730,6 +746,42 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
             _cfg.FreeTrackerPlugins = value;
             _settings.Moved();
+
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Whether the bar along the bottom shows the main input and output levels.</summary>
+    public bool ShowFooterLevels
+    {
+        get => _cfg.FooterLevels;
+        set
+        {
+            if (_cfg.FooterLevels == value) return;
+
+            _cfg.FooterLevels = value;
+            _settings.Moved();
+
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Whether the bar along the bottom shows the processors and the memory.
+    /// </summary>
+    /// <remarks>The glance that feeds it runs only while this is on.</remarks>
+    public bool ShowFooterLoad
+    {
+        get => _cfg.FooterLoad;
+        set
+        {
+            if (_cfg.FooterLoad == value) return;
+
+            _cfg.FooterLoad = value;
+            _settings.Moved();
+
+            if (value) Load.Glance();
+            else Load.StopGlancing();
 
             OnPropertyChanged();
         }
@@ -2440,6 +2492,8 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         Retell();
 
         AddProfileCommand = new RelayCommand(AddProfile);
+
+        if (_cfg.FooterLoad) Load.Glance();
         DeleteProfileCommand = new RelayCommand(DeleteProfile);
         ApplyMatrixSizeCommand = new RelayCommand(ApplyMatrixSize, CanApplyMatrixSize);
 

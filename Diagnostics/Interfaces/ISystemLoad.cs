@@ -24,6 +24,18 @@ public interface ISystemLoad
     /// </remarks>
     LoadReading? Read();
 
+    /// <summary>
+    /// How busy the processors are and how full the memory is, and nothing else, or nothing on a
+    /// system this cannot ask.
+    /// </summary>
+    /// <remarks>
+    /// The footer's reading, which is taken whatever page is showing, so it is only the two
+    /// figures that cost a file each and never the walk through the processes. Busy is measured
+    /// since the last glance, apart from <see cref="Read"/>'s own, so the two can be taken on
+    /// their own clocks without either spoiling the other.
+    /// </remarks>
+    SystemGlance? Glance();
+
     /// <summary>What the computer is, asked once and kept.</summary>
     MachineFacts Facts();
 }

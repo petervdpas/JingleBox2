@@ -476,6 +476,17 @@ public sealed class AppConfig
     /// </remarks>
     public bool FreeTrackerPlugins { get; set; }
 
+    /// <summary>Whether the bar along the bottom shows the main input and output levels.</summary>
+    /// <remarks>Off until it is asked for, like everything else the bar can carry.</remarks>
+    public bool FooterLevels { get; set; }
+
+    /// <summary>Whether the bar along the bottom shows how busy the processors are and how full the memory is.</summary>
+    /// <remarks>
+    /// Off until it is asked for. Off, nothing reads the computer's load at all unless SETTINGS,
+    /// System is on screen.
+    /// </remarks>
+    public bool FooterLoad { get; set; }
+
     /// <summary>
     /// Whether the application and every plugin process write what they are doing to
     /// <c>jinglebox.log</c> beside this file.

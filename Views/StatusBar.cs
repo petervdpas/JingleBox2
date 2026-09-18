@@ -1,6 +1,8 @@
 using Avalonia;
+using Avalonia.Input;
 using Avalonia.Media;
 using System;
+using System.Windows.Input;
 using System.Globalization;
 using JingleBox2.Rack.Controls;
 using JingleBox2.UI;
@@ -84,7 +86,8 @@ public class StatusBar : ThemedControl
     static StatusBar()
     {
         AffectsRender<StatusBar>(TextProperty, KindProperty, FontSizeProperty, BarHeightProperty,
-                                 InputLevelProperty, OutputLevelProperty, ShowLevelsProperty);
+                                 InputLevelProperty, OutputLevelProperty, ShowLevelsProperty,
+                                 CpuLoadProperty, MemoryLoadProperty, ShowLoadProperty);
         AffectsMeasure<StatusBar>(BarHeightProperty);
     }
 
@@ -137,6 +140,97 @@ public class StatusBar : ThemedControl
         set => SetValue(ShowLevelsProperty, value);
     }
 
+    /// <summary>How busy the computer's processors are, nought to one, drawn beside the levels.</summary>
+    public static readonly StyledProperty<double> CpuLoadProperty =
+        AvaloniaProperty.Register<StatusBar, double>(nameof(CpuLoad));
+
+    /// <summary>How full the computer's memory is, nought to one, drawn beside the processors.</summary>
+    public static readonly StyledProperty<double> MemoryLoadProperty =
+        AvaloniaProperty.Register<StatusBar, double>(nameof(MemoryLoad));
+
+    /// <summary>Whether the processor and memory meters are drawn.</summary>
+    public static readonly StyledProperty<bool> ShowLoadProperty =
+        AvaloniaProperty.Register<StatusBar, bool>(nameof(ShowLoad));
+
+    /// <inheritdoc cref="ShowLoadProperty"/>
+    public bool ShowLoad
+    {
+        get => GetValue(ShowLoadProperty);
+        set => SetValue(ShowLoadProperty, value);
+    }
+
+    /// <summary>What clicking the level meters does, or nothing.</summary>
+    public static readonly StyledProperty<ICommand?> LevelsCommandProperty =
+        AvaloniaProperty.Register<StatusBar, ICommand?>(nameof(LevelsCommand));
+
+    /// <summary>What clicking the load meters does, or nothing.</summary>
+    public static readonly StyledProperty<ICommand?> LoadCommandProperty =
+        AvaloniaProperty.Register<StatusBar, ICommand?>(nameof(LoadCommand));
+
+    /// <inheritdoc cref="CpuLoadProperty"/>
+    public double CpuLoad
+    {
+        get => GetValue(CpuLoadProperty);
+        set => SetValue(CpuLoadProperty, value);
+    }
+
+    /// <inheritdoc cref="MemoryLoadProperty"/>
+    public double MemoryLoad
+    {
+        get => GetValue(MemoryLoadProperty);
+        set => SetValue(MemoryLoadProperty, value);
+    }
+
+    /// <inheritdoc cref="LevelsCommandProperty"/>
+    public ICommand? LevelsCommand
+    {
+        get => GetValue(LevelsCommandProperty);
+        set => SetValue(LevelsCommandProperty, value);
+    }
+
+    /// <inheritdoc cref="LoadCommandProperty"/>
+    public ICommand? LoadCommand
+    {
+        get => GetValue(LoadCommandProperty);
+        set => SetValue(LoadCommandProperty, value);
+    }
+
+    /// <summary>Where the level meters and the load meters were last drawn, for a click to find them.</summary>
+    private Rect _levelsArea, _loadArea;
+
+    /// <summary>Which of the two a point is on: the command to run, or nothing.</summary>
+    /// <param name="at">The point, in this control's own space.</param>
+    private ICommand? CommandAt(Point at) =>
+        _levelsArea.Contains(at) ? LevelsCommand
+        : _loadArea.Contains(at) ? LoadCommand
+        : null;
+
+    /// <summary>A hand over either set of meters, since both can be clicked.</summary>
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+
+        Cursor = CommandAt(e.GetPosition(this)) != null ? HandCursor : Cursor.Default;
+    }
+
+    /// <summary>Runs whichever of the two commands the click landed on.</summary>
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        var command = CommandAt(e.GetPosition(this));
+
+        if (command == null || !command.CanExecute(null)) return;
+
+        command.Execute(null);
+        e.Handled = true;
+    }
+
+    /// <summary>The hand, made once.</summary>
+    private static readonly Cursor HandCursor = new(StandardCursorType.Hand);
+
     /// <summary>
     /// As wide as it is offered and exactly <see cref="BarHeight"/> tall, so the line along the
     /// bottom of a window does not move as its wording changes.
@@ -179,13 +273,16 @@ public class StatusBar : ThemedControl
         Led.DrawLamp(context, new Point(Inset + LampSize / 2, height / 2), LampSize / 2, lamp,
                      Kind != StatusKind.Context);
 
+        DrawMeters(context, palette, area);
+
         if (Text.Length == 0) return;
 
         var ink = Kind == StatusKind.Context
             ? new SolidColorBrush(palette.Muted)
             : new SolidColorBrush(palette.Text);
 
-        double meters = ShowLevels ? MeterWidth * 2 + MeterGap + Inset + LabelRoom : 0;
+        double meters = (ShowLevels ? MeterWidth * 2 + MeterGap + Inset + LabelRoom : 0)
+                        + (ShowLoad ? LoadRoom + (ShowLevels ? 0 : Inset) : 0);
 
         var text = new FormattedText(
             Text,
@@ -201,23 +298,37 @@ public class StatusBar : ThemedControl
         };
 
         context.DrawText(text, new Point(Inset + LampSize + Gap, (height - text.Height) / 2));
-
-        if (ShowLevels) DrawLevels(context, palette, area);
     }
 
     /// <summary>How much room the two little letters beside the meters take.</summary>
     private const double LabelRoom = 16;
 
+    /// <summary>How much room the processor and memory meters take, their words and gaps included.</summary>
+    private const double LoadRoom = 84;
+
+    /// <summary>Between a load meter's word and the meter itself.</summary>
+    private const double WordGap = 5;
+
+    /// <summary>Between the processor meter and the memory meter's word.</summary>
+    private const double PairGap = 12;
+
+    /// <summary>Between the load meters and the levels.</summary>
+    private const double GroupGap = 16;
+
     /// <summary>
-    /// The main input and the main output, as two thin columns at the far end.
+    /// The main input and the main output as two thin columns at the far end, and the computer's
+    /// processors and memory as two more to the left of them, each pair where it is switched on.
     /// </summary>
     /// <remarks>
     /// Peak rather than average, and coloured by where the peak is rather than by a line drawn
     /// across it: the whole use of a meter this size is to be read without being looked at, and
     /// a colour is the only thing that can be.
     /// </remarks>
-    private void DrawLevels(DrawingContext context, ThemePalette palette, Rect area)
+    private void DrawMeters(DrawingContext context, ThemePalette palette, Rect area)
     {
+        _levelsArea = default;
+        _loadArea = default;
+
         double top = 4;
         double bottom = area.Height - 4;
         double tall = bottom - top;
@@ -225,21 +336,54 @@ public class StatusBar : ThemedControl
         if (tall <= 2) return;
 
         double right = area.Width - Inset;
-        double outputX = right - MeterWidth;
-        double inputX = outputX - MeterGap - MeterWidth;
 
-        Draw(inputX, InputLevel);
-        Draw(outputX, OutputLevel);
+        if (ShowLevels)
+        {
+            double outputX = right - MeterWidth;
+            double inputX = outputX - MeterGap - MeterWidth;
 
-        var letters = new FormattedText(
-            "io",
+            Draw(inputX, InputLevel);
+            Draw(outputX, OutputLevel);
+
+            Word("io", inputX - LabelRoom + 2);
+
+            _levelsArea = new Rect(inputX - LabelRoom, 0, right - inputX + LabelRoom, area.Height);
+
+            right = inputX - LabelRoom - GroupGap;
+        }
+
+        if (!ShowLoad) return;
+
+        /* The computer's load, the same thin columns to the left of the levels, each with its own
+           word since they are two different things rather than a pair. */
+        double memoryX = right - MeterWidth;
+        Draw(memoryX, MemoryLoad);
+
+        double memoryWord = memoryX - WordGap - Words("mem").Width;
+        Word("mem", memoryWord);
+
+        double cpuX = memoryWord - PairGap - MeterWidth;
+        Draw(cpuX, CpuLoad);
+
+        double cpuWord = cpuX - WordGap - Words("cpu").Width;
+        Word("cpu", cpuWord);
+
+        _loadArea = new Rect(cpuWord - 2, 0, memoryX + MeterWidth - cpuWord + 4, area.Height);
+
+        FormattedText Words(string word) => new(
+            word,
             CultureInfo.CurrentCulture,
             FlowDirection.LeftToRight,
             Typeface.Default,
             9,
             new SolidColorBrush(palette.Muted, 0.8));
 
-        context.DrawText(letters, new Point(inputX - LabelRoom + 2, (area.Height - letters.Height) / 2));
+        void Word(string word, double x)
+        {
+            var letters = Words(word);
+
+            context.DrawText(letters, new Point(x, (area.Height - letters.Height) / 2));
+        }
 
         void Draw(double x, double level)
         {

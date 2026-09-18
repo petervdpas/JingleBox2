@@ -17,13 +17,20 @@
          they live in SETTINGS with the rest of them. What is left is the page you are on. -->
 
     <!-- One bar for the whole window. Where you are when nothing is happening, what just
-         happened when something is, and the main input and output beside it. -->
+         happened when something is, the main input and output beside it, and the computer's
+         processors and memory beside those. Clicking the levels opens the mixer and clicking
+         the load opens SETTINGS, System. -->
     <views:StatusBar DockPanel.Dock="Bottom" Margin="0,10,0,0"
-                     ShowLevels="True"
+                     ShowLevels="{Binding ShowFooterLevels}"
+                     ShowLoad="{Binding ShowFooterLoad}"
                      Text="{Binding StatusLine.Text}"
                      Kind="{Binding StatusLine.Kind}"
                      InputLevel="{Binding StatusLine.InputLevel}"
                      OutputLevel="{Binding StatusLine.OutputLevel}"
+                     CpuLoad="{Binding Load.GlanceCpu}"
+                     MemoryLoad="{Binding Load.GlanceMemory}"
+                     LevelsCommand="{Binding ShowMixerCommand}"
+                     LoadCommand="{Binding ShowSystemCommand}"
                      ToolTip.Tip="{Binding StatusLine.History}" />
 
     <!-- The tabs, and the transport sitting on the same line at the other end of it.
