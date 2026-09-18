@@ -40,6 +40,19 @@ public interface IBridgeCost
     /// <param name="rate">The rate the audio is made at, which turns frames into time.</param>
     string? Crossed(int frames, double milliseconds, int rate);
 
+    /// <summary>
+    /// Records how long each side took to wake during one crossing, for the stretch's line.
+    /// </summary>
+    /// <remarks>
+    /// A crossing's round trip is one number from the parent, and a late one can be late for
+    /// three reasons wanting three different fixes: the child woken late, the plugin slow, or the
+    /// parent woken late to collect. The plugin's own time is already said by the child. These are
+    /// the other two, measured against the stopwatch both processes share.
+    /// </remarks>
+    /// <param name="childWoke">Milliseconds from the parent asking to the child waking to it.</param>
+    /// <param name="parentWoke">Milliseconds from the child answering to the parent picking it up.</param>
+    void Waited(double childWoke, double parentWoke);
+
     /// <summary>The dearest crossing of the stretch so far, as a share of the time it had.</summary>
     double Worst { get; }
 

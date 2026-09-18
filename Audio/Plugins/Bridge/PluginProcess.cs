@@ -182,6 +182,10 @@ internal sealed class PluginProcess : IDisposable
         if (line != null) Log.Write(LogArea.Audio, line);
     }
 
+    /// <summary>A stretch of stopwatch ticks in milliseconds.</summary>
+    /// <param name="ticks">The stretch, in the stopwatch's own ticks.</param>
+    private static double Milliseconds(long ticks) => ticks * 1000.0 / Stopwatch.Frequency;
+
     /// <summary>The shared memory the audio crosses in. Only touched between Enter and Leave.</summary>
     public BridgeBlock Block { get; }
 
@@ -681,6 +685,10 @@ internal sealed class PluginProcess : IDisposable
 
         _asked = Stopwatch.GetTimestamp();
 
+        Block.AskedAt = _asked;
+        Block.WokeAt = 0;
+        Block.DoneAt = 0;
+
         try
         {
             int sent = _audio.Socket.Send(message);
@@ -733,7 +741,18 @@ internal sealed class PluginProcess : IDisposable
                 _audio.Socket.ReceiveTimeout = PluginBridge.BlockTimeoutMilliseconds;
             }
 
-            Counted(frames, Stopwatch.GetElapsedTime(_asked).TotalMilliseconds);
+            long back = Stopwatch.GetTimestamp();
+
+            /* Which side waited, from the child's own two moments set against the parent's. Only
+               where the child wrote both, since a child built before there were any leaves them
+               at nought. */
+            long woke = Block.WokeAt;
+            long done = Block.DoneAt;
+
+            if (woke >= _asked && done >= woke && back >= done)
+                _cost.Waited(Milliseconds(woke - _asked), Milliseconds(back - done));
+
+            Counted(frames, Milliseconds(back - _asked));
 
             return reply[0] == (byte)BridgeCall.Rendered;
         }

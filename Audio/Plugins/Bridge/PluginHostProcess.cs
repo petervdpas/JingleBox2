@@ -893,6 +893,10 @@ public static class PluginHostProcess
 
             long began = System.Diagnostics.Stopwatch.GetTimestamp();
 
+            /* Woken, written where the parent will find it, so a late crossing can be told apart:
+               a child woken late, or a parent. See PluginBridge.TimingOffset. */
+            block.WokeAt = began;
+
             int frames = BitConverter.ToInt32(message, 4);
             if (frames <= 0 || frames > maxFrames) frames = Math.Min(Math.Max(frames, 0), maxFrames);
 
@@ -939,7 +943,10 @@ public static class PluginHostProcess
 
             BitConverter.TryWriteBytes(reply.AsSpan(4, 4), frames);
 
-            long took = System.Diagnostics.Stopwatch.GetTimestamp() - began;
+            long finished = System.Diagnostics.Stopwatch.GetTimestamp();
+            long took = finished - began;
+
+            block.DoneAt = finished;
 
             _spent += took;
             if (took > _worst) _worst = took;

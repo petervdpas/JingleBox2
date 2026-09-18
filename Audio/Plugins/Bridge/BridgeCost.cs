@@ -25,6 +25,19 @@ public sealed class BridgeCost(string name) : IBridgeCost
     /// <summary>The milliseconds added up, for the half of the answer a share cannot give.</summary>
     private double _spent;
 
+    /// <summary>The longest the plugin's process took to wake to a block this stretch, in milliseconds.</summary>
+    private double _childLate;
+
+    /// <summary>And the longest the mixing took to wake to the answer.</summary>
+    private double _parentLate;
+
+    /// <inheritdoc/>
+    public void Waited(double childWoke, double parentWoke)
+    {
+        if (childWoke > _childLate) _childLate = childWoke;
+        if (parentWoke > _parentLate) _parentLate = parentWoke;
+    }
+
     /// <inheritdoc/>
     public double Worst { get; private set; }
 
@@ -57,7 +70,10 @@ public sealed class BridgeCost(string name) : IBridgeCost
     private string Said() =>
         "bridge: " + name + " " + Crossings + " crossings, worst "
         + Percent(Worst) + " of the time they had, mean " + Percent(_total / Crossings)
-        + ", " + (_spent / Crossings).ToString("0.000", CultureInfo.InvariantCulture) + " ms each";
+        + ", " + (_spent / Crossings).ToString("0.000", CultureInfo.InvariantCulture) + " ms each"
+        + "; longest waits: plugin woke " + _childLate.ToString("0.0", CultureInfo.InvariantCulture)
+        + " ms after being asked, mixer " + _parentLate.ToString("0.0", CultureInfo.InvariantCulture)
+        + " ms after the answer";
 
     /// <summary>Starts the next stretch, keeping nothing from the last one.</summary>
     private void Fresh()
@@ -67,6 +83,8 @@ public sealed class BridgeCost(string name) : IBridgeCost
         _spent = 0;
         Worst = 0;
         Crossings = 0;
+        _childLate = 0;
+        _parentLate = 0;
     }
 
     /// <summary>A share, as whole percent, which is what anybody compares.</summary>

@@ -67,12 +67,26 @@ internal static class PluginBridge
     /// </remarks>
     public const int EventSize = 16;
 
+    /// <summary>
+    /// Where the three moments of a crossing are written, as stopwatch timestamps: when the parent
+    /// asked, when the child woke to it, and when the child had finished.
+    /// </summary>
+    /// <remarks>
+    /// Both processes read the same monotonic clock through the stopwatch, so the three can be set
+    /// against the parent's own moment of picking the answer up. What that says is which side
+    /// waited when a crossing was late: a child woken late, a plugin slow to render, or a parent
+    /// woken late to collect. From the parent alone all three are one number, and that one number
+    /// had already been read wrongly once.
+    /// </remarks>
+    public const int TimingOffset = 64;
+
     /// <summary>Where the events start, past the header.</summary>
     /// <remarks>
-    /// Sixty four bytes of header, of which the magic, the frame count, the channel count and
-    /// the ring's two indexes are what is used. See <see cref="BridgeBlock"/> for the offsets.
+    /// Ninety six bytes of header: the magic, the frame count, the channel count, the ring's two
+    /// indexes and the transport in the first sixty four, and the crossing's timing after them.
+    /// See <see cref="BridgeBlock"/> for the offsets.
     /// </remarks>
-    public const int EventsOffset = 64;
+    public const int EventsOffset = 96;
 
     /// <summary>Where the audio starts, past the events.</summary>
     public const int AudioOffset = EventsOffset + MaxEvents * EventSize;
@@ -645,6 +659,27 @@ internal sealed unsafe class BridgeBlock : IDisposable
                in place by the time it can be believed. */
             *(int*)at = told.Playing ? 1 : 0;
         }
+    }
+
+    /// <summary>When the parent asked for the block now crossing. See <see cref="PluginBridge.TimingOffset"/>.</summary>
+    public long AskedAt
+    {
+        get => *(long*)(_base + PluginBridge.TimingOffset);
+        set => *(long*)(_base + PluginBridge.TimingOffset) = value;
+    }
+
+    /// <summary>When the child woke to it.</summary>
+    public long WokeAt
+    {
+        get => *(long*)(_base + PluginBridge.TimingOffset + 8);
+        set => *(long*)(_base + PluginBridge.TimingOffset + 8) = value;
+    }
+
+    /// <summary>And when the child had finished it and was about to answer.</summary>
+    public long DoneAt
+    {
+        get => *(long*)(_base + PluginBridge.TimingOffset + 16);
+        set => *(long*)(_base + PluginBridge.TimingOffset + 16) = value;
     }
 
     /// <summary>Makes the shared block and says where it is, for the parent to pass on.</summary>
