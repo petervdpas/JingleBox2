@@ -19,6 +19,16 @@ public class SongClockTests
     /// <summary>Forty one thousand, which is a rate nothing else here would land on by accident.</summary>
     private const int Rate = 41000;
 
+    /// <summary>
+    /// Every test starts with nothing to check the clock against. A player made by another test
+    /// leaves its reference behind, and the ones here that are about the count alone must not be
+    /// put right by it.
+    /// </summary>
+    public SongClockTests() => SongClock.Follow(null);
+
+    /// <summary>A block of 512 at the test rate, which is what the reconciling is measured in.</summary>
+    private const int Block = 512;
+
     /// <summary>Nothing has been said yet, so nothing is playing and the tempo is a sane one.</summary>
     [Fact]
     public void A_clock_nobody_has_set_is_still()
@@ -157,5 +167,92 @@ public class SongClockTests
     {
         Assert.Equal(3.0, new Transport(true, 120.0, 5.5, 3, 4).BarBeats);
         Assert.Equal(1.5, new Transport(true, 120.0, 2.0, 3, 8).BarBeats);
+    }
+
+    /// <summary>With nothing to check against, the beat is the samples and nothing else.</summary>
+    [Fact]
+    public void With_no_player_the_beat_is_the_samples()
+    {
+        SongClock.Started(120.0);
+        SongClock.Advance(Rate, Rate);
+
+        Assert.Equal(2.0, SongClock.Now.Beats, 9);
+    }
+
+    /// <summary>
+    /// A player a little ahead is left alone, since its thread always is and never by the same
+    /// amount twice; following it would hand every plugin that wobble.
+    /// </summary>
+    [Fact]
+    public void A_player_a_little_ahead_is_left_alone()
+    {
+        SongClock.Started(120.0);
+
+        double counted = Block / (double)Rate * 2.0;
+
+        SongClock.Follow(_ => counted + 0.01);
+        SongClock.Advance(Block, Rate);
+
+        Assert.Equal(counted, SongClock.Now.Beats, 9);
+    }
+
+    /// <summary>
+    /// A stall: the audio missed a sixth of a second and the player did not. The beat is put where
+    /// the player is at once, rather than leaving every plugin that far behind the notes for good.
+    /// </summary>
+    [Fact]
+    public void After_a_stall_the_beat_is_put_where_the_player_is()
+    {
+        SongClock.Started(120.0);
+
+        double counted = Block / (double)Rate * 2.0;
+        double player = counted + 0.35;
+
+        SongClock.Follow(_ => player);
+        SongClock.Advance(Block, Rate);
+
+        Assert.Equal(player, SongClock.Now.Beats, 9);
+    }
+
+    /// <summary>
+    /// Between the two, a drift is eased back a hundredth at a time, which is two clocks that do
+    /// not quite agree and is never heard as a jump.
+    /// </summary>
+    [Fact]
+    public void A_drift_is_eased_back()
+    {
+        SongClock.Started(120.0);
+
+        double counted = Block / (double)Rate * 2.0;
+        double player = counted + 0.1;
+
+        SongClock.Follow(_ => player);
+        SongClock.Advance(Block, Rate);
+
+        Assert.Equal(counted + 0.1 * 0.01, SongClock.Now.Beats, 9);
+    }
+
+    /// <summary>A player that cannot say where it is changes nothing.</summary>
+    [Fact]
+    public void A_player_that_cannot_say_changes_nothing()
+    {
+        SongClock.Started(120.0);
+        SongClock.Follow(_ => double.NaN);
+        SongClock.Advance(Rate, Rate);
+
+        Assert.Equal(2.0, SongClock.Now.Beats, 9);
+    }
+
+    /// <summary>And a stopped clock stays stopped, whatever the player says.</summary>
+    [Fact]
+    public void A_stopped_clock_is_not_moved_by_the_player()
+    {
+        SongClock.Started(120.0);
+        SongClock.Advance(Rate, Rate);
+        SongClock.Stopped();
+        SongClock.Follow(_ => 50.0);
+        SongClock.Advance(Rate, Rate);
+
+        Assert.Equal(2.0, SongClock.Now.Beats, 9);
     }
 }

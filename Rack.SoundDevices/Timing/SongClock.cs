@@ -1,3 +1,5 @@
+using System;
+using System.Diagnostics;
 using System.Threading;
 
 namespace JingleBox2.Rack.SoundDevices.Timing;
@@ -27,6 +29,34 @@ public static class SongClock
 {
     /// <summary>What everything is being told, swapped whole.</summary>
     private static Transport _now = Transport.Still;
+
+    /// <summary>
+    /// Where whatever is playing the song says it has got to at a stopwatch moment, in beats since
+    /// it started, or not a number where it cannot say. Null where nothing has said it will.
+    /// </summary>
+    private static Func<long, double>? _reference;
+
+    /// <summary>
+    /// Hands the clock something to be checked against: the player's own idea of where the song is,
+    /// which is what the notes it sends are placed by.
+    /// </summary>
+    /// <remarks>
+    /// The beat is counted in samples rendered, and that is right for as long as every sample is
+    /// rendered. It stops being right the moment one is not. When the audio thread is held up long
+    /// enough that the device plays silence in its place (a plugin taking fifteen blocks to answer,
+    /// which is what opening a window in the same process as a plugin can cost), those samples
+    /// never happen, the count never moves for them, and every plugin reading this falls behind the
+    /// notes the player is sending by exactly as long as the stall lasted. For good: nothing ever
+    /// put it back. A drum machine following the host ended up a sixth of a second behind the
+    /// tracker after one stall, and further behind after every one that followed.
+    ///
+    /// The player keeps its lines against a stopwatch, which a stall does not stop. So the count is
+    /// checked against it, and put right when the two have come apart. See <see cref="Reconciled"/>.
+    ///
+    /// Null lets go, which is what the far side of a bridge has: it is told the beat whole with
+    /// every block and has nothing to check it against.
+    /// </remarks>
+    public static void Follow(Func<long, double>? reference) => Volatile.Write(ref _reference, reference);
 
     /// <summary>Where the song is. Never null.</summary>
     public static Transport Now => Volatile.Read(ref _now);
@@ -78,7 +108,56 @@ public static class SongClock
 
         if (!was.Playing) return;
 
-        Set(was with { Beats = was.Beats + frames / (double)sampleRate * was.Bpm / 60.0 });
+        double counted = was.Beats + frames / (double)sampleRate * was.Bpm / 60.0;
+
+        Set(was with { Beats = Reconciled(counted, was.Bpm, frames / (double)sampleRate) });
+    }
+
+    /// <summary>
+    /// The counted beat, left alone, eased back, or put right, against what the player says.
+    /// </summary>
+    /// <remarks>
+    /// Three answers, by how far apart the two are.
+    ///
+    /// **Close together, the count is kept as it is.** The player's thread runs ahead of the sound
+    /// by up to a block, since a note it sends is rendered at the next block, so its answer is
+    /// always a little early and never exactly the same distance early twice. Following it closely
+    /// would be telling every plugin that jitter. The count is smooth to the sample, which is why
+    /// it is the beat in the first place. Close means within two blocks, or a fortieth of a second
+    /// where blocks are short.
+    ///
+    /// **A little further, the count is eased towards the player,** a hundredth of the difference a
+    /// block. That is a sound card whose crystal and the computer's stopwatch do not quite agree,
+    /// which every pair of clocks does, by a few parts in a hundred thousand: left alone it is a
+    /// fraction of a beat an hour, and eased it is never heard.
+    ///
+    /// **Far apart, the count is put where the player is, at once.** That is a stall: samples that
+    /// were never rendered. A plugin sees its song jump forward, which is what just happened to the
+    /// song, and plays on in time with the notes rather than a stall behind them. Far means four
+    /// blocks, or a twelfth of a second.
+    /// </remarks>
+    /// <param name="counted">The beat the samples rendered say.</param>
+    /// <param name="bpm">The tempo, to turn beats into time.</param>
+    /// <param name="blockSeconds">How long the block just rendered was.</param>
+    private static double Reconciled(double counted, double bpm, double blockSeconds)
+    {
+        var reference = Volatile.Read(ref _reference);
+
+        if (reference is null) return counted;
+
+        double told = reference(Stopwatch.GetTimestamp());
+
+        if (!double.IsFinite(told)) return counted;
+
+        double secondsPerBeat = 60.0 / Math.Max(1.0, bpm);
+        double apart = (told - counted) * secondsPerBeat;
+        double close = Math.Max(0.025, blockSeconds * 2.0);
+        double far = Math.Max(0.08, blockSeconds * 4.0);
+
+        if (Math.Abs(apart) <= close) return counted;
+        if (Math.Abs(apart) > far) return told;
+
+        return counted + (told - counted) * 0.01;
     }
 
     /// <summary>A tempo a clock can be run at, whatever it was handed.</summary>

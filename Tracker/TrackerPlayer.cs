@@ -199,6 +199,32 @@ public sealed class TrackerPlayer : ITrackerPlayer
             new SoundDevices.SoundEffects.SoundEffectEngines(effects));
 
         _watch = new System.Threading.Timer(_ => Muster(), null, WatchMilliseconds, WatchMilliseconds);
+
+        /* The beat the plugins are told is counted in samples rendered, and a stall in the audio
+           leaves it behind the lines this player is sending for good. This is what it is checked
+           against. See SongClock.Follow. */
+        SongClock.Follow(BeatAt);
+    }
+
+    /// <summary>
+    /// Where this player's own clock says the song is at a stopwatch moment, in beats since playing
+    /// began, or not a number when it is not playing.
+    /// </summary>
+    /// <remarks>
+    /// Read on the audio thread, so it takes no lock and makes nothing: the line last played is
+    /// one volatile read, and the beat is that line's plus however far into it the moment is. Held
+    /// to the line it is in, since the clock thread that plays the next one can be a moment late
+    /// and a beat worked out past the end of a line would be guessing at a line not yet played.
+    /// </remarks>
+    private double BeatAt(long timestamp)
+    {
+        var mark = _mark;
+
+        if (mark is null || State != TrackerTransportState.Playing || mark.Length <= 0) return double.NaN;
+
+        double into = Math.Clamp((timestamp - mark.Began) / (double)mark.Length, 0.0, 1.0);
+
+        return mark.Beat + into * mark.BeatsPerLine;
     }
 
     /// <inheritdoc/>
@@ -262,8 +288,12 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// <inheritdoc/>
     public TrackerPosition Position { get; private set; } = TrackerPosition.Start;
 
-    /// <summary>A line as the clock thread played it: where, when it began, and how long a line is, in stopwatch ticks.</summary>
-    private sealed record LineMark(TrackerPosition Position, long Began, long Length);
+    /// <summary>
+    /// A line as the clock thread played it: where, when it began, and how long a line is, in
+    /// stopwatch ticks; and the beat it began on, counted from where playing began, with how many
+    /// beats a line is.
+    /// </summary>
+    private sealed record LineMark(TrackerPosition Position, long Began, long Length, double Beat = 0, double BeatsPerLine = 0);
 
     /// <summary>The line last played, swapped whole on the clock thread and read from anywhere.</summary>
     private volatile LineMark? _mark;
@@ -404,6 +434,11 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// </remarks>
     private void StartClock()
     {
+        /* Forgotten before the transport says it is playing, since the plugins' beat is checked
+           against it from that moment: a mark left from the last run would put the new run's beat
+           wherever the last one had got to. */
+        _mark = null;
+
         _cancel = new CancellationTokenSource();
         var token = _cancel.Token;
         int generation = Interlocked.Increment(ref _generation);
@@ -1368,6 +1403,11 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         int lines = 0;
 
+        /* The beat each line begins on, counted from where playing began, the same count the
+           plugins are told. Summed a line at a time rather than worked out from the number of
+           lines, because the lines to a beat can change partway through a song. */
+        double beat = 0;
+
         while (!token.IsCancellationRequested)
         {
             if (generation != Volatile.Read(ref _generation)) return;
@@ -1376,8 +1416,12 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             ApplyEvents(sequencer.EventsFor(song, position), song);
             Position = position;
+            double beatsPerLine = 1.0 / Math.Max(1, song.Timing.ClampedLinesPerBeat);
+
             _mark = new LineMark(position, Stopwatch.GetTimestamp(),
-                (long)(song.Timing.SecondsPerLine * Stopwatch.Frequency));
+                (long)(song.Timing.SecondsPerLine * Stopwatch.Frequency), beat, beatsPerLine);
+
+            beat += beatsPerLine;
             PositionChanged?.Invoke(this, position);
 
             var next = Mode == TrackerPlayMode.Pattern
@@ -1956,6 +2000,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
     public void Dispose()
     {
         _watch.Dispose();
+
+        SongClock.Follow(null);
 
         Stop();
         _samples.Clear();
