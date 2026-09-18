@@ -645,6 +645,19 @@ internal sealed class PluginProcess : IDisposable
     public bool Outstanding => _outstanding;
 
     /// <summary>
+    /// Whether the plugin still owes the answer to a block it was too late with, which comes in
+    /// on the socket whenever it comes and has to be taken off before the next answer can be
+    /// read. See <see cref="MixDeadline"/>.
+    /// </summary>
+    private bool _owed;
+
+    /// <summary>
+    /// Whether the block outstanding now was never sent, because the plugin was still busy with
+    /// the late one. Collecting it answers at once that nothing came back.
+    /// </summary>
+    private bool _skipped;
+
+    /// <summary>
     /// Asks for a block and comes straight back without waiting for it.
     /// </summary>
     /// <remarks>
@@ -661,12 +674,29 @@ internal sealed class PluginProcess : IDisposable
     /// Asking twice without collecting is refused rather than allowed to overwrite: there is one
     /// buffer each way, so the second ask would be handing the plugin a block it is already
     /// halfway through.
+    ///
+    /// A plugin that is still working on a block it was too late with is not asked again until
+    /// that answer is in, for the same reason. The block is taken as asked for and not sent, so
+    /// the caller goes on exactly as it would have and collects nothing. Nothing is lost that
+    /// way but sound: the notes go through a ring of their own, which the plugin reads on the
+    /// next block it is really asked for.
     /// </remarks>
     /// <param name="frames">How many frames this crossing carries.</param>
     /// <returns>Whether the request went. False means the plugin has gone and nothing is owed.</returns>
     public bool Ask(int frames)
     {
         if (!_alive || _outstanding) return false;
+
+        if (_owed && !Settled())
+        {
+            if (!_alive) return false;
+
+            _cost.Missed();
+            _outstanding = true;
+            _skipped = true;
+
+            return true;
+        }
 
         /* Where the song is, written into the block before it is asked for, so what crosses is
            the transport belonging to this block of audio.
@@ -721,10 +751,24 @@ internal sealed class PluginProcess : IDisposable
 
         _outstanding = false;
 
+        if (_skipped)
+        {
+            _skipped = false;
+            return false;
+        }
+
         if (!_alive) return false;
 
         try
         {
+            if (!_patient && !InTime(frames))
+            {
+                _owed = true;
+                _cost.Missed();
+
+                return false;
+            }
+
             Span<byte> reply = stackalloc byte[8];
             int read = 0;
 
@@ -763,6 +807,69 @@ internal sealed class PluginProcess : IDisposable
                 : "stopped while a block was in it");
 
             return false;
+        }
+        catch (Exception)
+        {
+            Bury("stopped while a block was in it");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Waits for the answer until the mixing's deadline, and says whether it came.
+    /// </summary>
+    /// <remarks>
+    /// Where there is no deadline, which is every thread but the one mixing ahead, it answers yes
+    /// at once and the read after it waits the way it always did. The first block is never put
+    /// on the clock either: that is where a plugin does its lazy loading, and it is given seconds.
+    /// </remarks>
+    /// <param name="frames">How many frames the block carries.</param>
+    private bool InTime(int frames)
+    {
+        long due = MixDeadline.Due(_asked, frames);
+
+        if (due == 0) return true;
+
+        long left = due - Stopwatch.GetTimestamp();
+        int micro = left <= 0 ? 0 : (int)Math.Min(int.MaxValue, left * 1_000_000 / Stopwatch.Frequency);
+
+        return _audio.Socket.Poll(micro, SelectMode.SelectRead);
+    }
+
+    /// <summary>
+    /// Takes the late answer off the socket if it has come, and says whether the plugin is free
+    /// to be asked again.
+    /// </summary>
+    /// <remarks>
+    /// Thrown away rather than played: it is the sound of a block whose moment has gone, and the
+    /// song has moved on under it. A plugin that has owed an answer for longer than a block is
+    /// ever given is let go, the same as one that kept the mixer waiting that long used to be.
+    /// </remarks>
+    private bool Settled()
+    {
+        try
+        {
+            if (!_audio.Socket.Poll(0, SelectMode.SelectRead))
+            {
+                if (Milliseconds(Stopwatch.GetTimestamp() - _asked) > PluginBridge.BlockTimeoutMilliseconds)
+                    Bury("stopped keeping up and was let go");
+
+                return false;
+            }
+
+            Span<byte> reply = stackalloc byte[8];
+            int read = 0;
+
+            while (read < 8)
+            {
+                int got = _audio.Socket.Receive(reply.Slice(read));
+                if (got <= 0) { Bury("stopped while a block was in it"); return false; }
+                read += got;
+            }
+
+            _owed = false;
+
+            return true;
         }
         catch (Exception)
         {

@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using JingleBox2.Tracker.Synth;
 using ManagedBass;
 using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio.Plugins.Bridge;
 
 namespace JingleBox2.Audio;
 
@@ -515,6 +516,12 @@ public sealed class TrackerOutput(IRenderCost? cost = null) : ITrackerOutput
             }
 
             long began = System.Diagnostics.Stopwatch.GetTimestamp();
+
+            /* How long the plugins can be waited for: until what is already in the queue has been
+               played. See MixDeadline. */
+            MixDeadline.Set(
+                began + (long)(held / Channels) * System.Diagnostics.Stopwatch.Frequency / SampleRate,
+                SampleRate);
 
             try
             {

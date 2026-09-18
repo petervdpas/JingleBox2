@@ -38,6 +38,12 @@ public sealed class BridgeCost(string name) : IBridgeCost
         if (parentWoke > _parentLate) _parentLate = parentWoke;
     }
 
+    /// <summary>How many blocks the mixing gave up waiting for this stretch.</summary>
+    private int _missed;
+
+    /// <inheritdoc/>
+    public void Missed() => _missed++;
+
     /// <inheritdoc/>
     public double Worst { get; private set; }
 
@@ -73,7 +79,8 @@ public sealed class BridgeCost(string name) : IBridgeCost
         + ", " + (_spent / Crossings).ToString("0.000", CultureInfo.InvariantCulture) + " ms each"
         + "; longest waits: plugin woke " + _childLate.ToString("0.0", CultureInfo.InvariantCulture)
         + " ms after being asked, mixer " + _parentLate.ToString("0.0", CultureInfo.InvariantCulture)
-        + " ms after the answer";
+        + " ms after the answer"
+        + (_missed > 0 ? "; " + _missed + " block(s) too late to wait for, played as silence" : "");
 
     /// <summary>Starts the next stretch, keeping nothing from the last one.</summary>
     private void Fresh()
@@ -85,6 +92,7 @@ public sealed class BridgeCost(string name) : IBridgeCost
         Crossings = 0;
         _childLate = 0;
         _parentLate = 0;
+        _missed = 0;
     }
 
     /// <summary>A share, as whole percent, which is what anybody compares.</summary>

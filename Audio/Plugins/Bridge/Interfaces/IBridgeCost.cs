@@ -53,6 +53,15 @@ public interface IBridgeCost
     /// <param name="parentWoke">Milliseconds from the child answering to the parent picking it up.</param>
     void Waited(double childWoke, double parentWoke);
 
+    /// <summary>
+    /// Records one block the mixing could not wait for, which played as silence.
+    /// </summary>
+    /// <remarks>
+    /// Counted apart from the crossings, since a block given up on has no round trip to measure,
+    /// and said on the stretch's line only when there were any.
+    /// </remarks>
+    void Missed();
+
     /// <summary>The dearest crossing of the stretch so far, as a share of the time it had.</summary>
     double Worst { get; }
 
