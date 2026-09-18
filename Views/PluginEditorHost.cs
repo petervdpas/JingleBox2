@@ -2,6 +2,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
+using Avalonia.Layout;
 using JingleBox2.Audio.Plugins;
 using System;
 using JingleBox2.Audio.Plugins.Interfaces;
@@ -244,16 +246,11 @@ public sealed class PluginEditorHost : NativeControlHost
         Measure(new Size(width, height));
         Arrange(new Rect(0, 0, width, height));
 
-        /* Avalonia gives up sizing a window to its contents the moment that window has been
-           resized, and the first thing a plugin asks for resizes it. Everything after that laid
-           the control out and left the window where it was, which shows as a band of empty
-           window under a plugin that asked to be smaller than it first was. Set away and back,
-           since setting a property to what it already holds tells nobody anything. */
-        if (TopLevel.GetTopLevel(this) is Window holder && holder.SizeToContent != SizeToContent.Manual)
-        {
-            holder.SizeToContent = SizeToContent.Manual;
-            holder.SizeToContent = SizeToContent.WidthAndHeight;
-        }
+        /* Only while the window is still there. A plugin's request is posted across from the
+           thread it arrived on, so it can land after the window has closed, and a closed window
+           cannot be asked which screen it is on: it throws, and took the application with it. */
+        if (_handle != 0 && TopLevel.GetTopLevel(this) is Window { IsVisible: true } holder)
+            Fit(holder);
 
         Said("the plugin asked to be " + width + " by " + height + ", and has been told it is");
 
@@ -267,6 +264,87 @@ public sealed class PluginEditorHost : NativeControlHost
                 "the plugin threw while being told its new size", ex);
         }
     }
+
+    /// <summary>
+    /// Makes the window exactly as big as what is in it, which with a plugin showing is the size
+    /// the plugin asked for.
+    /// </summary>
+    /// <remarks>
+    /// Said outright rather than left to the window sizing itself to its contents, because that
+    /// could not be trusted to hold. Avalonia stops sizing a window to its contents the moment
+    /// anything else has resized it, and a window manager placing or constraining a new window
+    /// counts. From then on the window stayed whatever size it had reached, and every plugin
+    /// asking for a size after that was laid out inside it: a band of empty window beside a
+    /// plugin smaller than that, and the bottom cut off one taller, with a scroll bar to reach
+    /// it. The old way round asked the window to size itself to its contents again, and only
+    /// while it still believed it did, which by then it no longer did.
+    ///
+    /// So the contents are measured with nothing holding them in, and the window is given that
+    /// size, capped to the screen it is on. A plugin bigger than the screen scrolls, which is
+    /// what the scroll viewer round it is for.
+    ///
+    /// Everything between this control and the window is told its size is out of date first.
+    /// A layout remembers what it measured last and answers the same again when asked the same
+    /// question, and a plugin asking for a second size is the same question: measured with
+    /// nothing holding it in. Without that the window kept the first size a plugin asked for,
+    /// which for one that asks for a size and then settles on a smaller one left a band of empty
+    /// window under it.
+    /// </remarks>
+    /// <param name="holder">The window this control is in.</param>
+    private void Fit(Window holder)
+    {
+        if (holder.Content is not Control content) return;
+
+        for (Visual? inside = this; inside != null && inside != holder; inside = inside.GetVisualParent())
+            (inside as Layoutable)?.InvalidateMeasure();
+
+        content.Measure(Size.Infinity);
+
+        var wanted = content.DesiredSize;
+
+        if (wanted.Width < 1 || wanted.Height < 1) return;
+
+        double width = Math.Max(wanted.Width, holder.MinWidth);
+        double height = Math.Max(wanted.Height, holder.MinHeight);
+
+        if (Screen(holder) is { } screen)
+        {
+            double scale = screen.Scaling > 0 ? screen.Scaling : 1;
+
+            width = Math.Min(width, screen.WorkingArea.Width / scale);
+            height = Math.Min(height, screen.WorkingArea.Height / scale - TitleRoom);
+        }
+
+        holder.SizeToContent = SizeToContent.Manual;
+
+        holder.Width = width;
+        holder.Height = height;
+    }
+
+    /// <summary>The screen a window is on, or nothing where that cannot be asked.</summary>
+    /// <remarks>
+    /// Caught rather than trusted to the check before it: a window can be closing between the
+    /// check and the question, and a window that has gone is a reason to leave its size alone,
+    /// not to stop the application.
+    /// </remarks>
+    /// <param name="holder">The window being asked about.</param>
+    private static Screen? Screen(Window holder)
+    {
+        try
+        {
+            return holder.Screens.ScreenFromWindow(holder);
+        }
+        catch (ObjectDisposedException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// What a window's title bar and frame take from the height of the screen, so a window capped
+    /// to the screen still has its title bar on it.
+    /// </summary>
+    private const double TitleRoom = 48;
 
     /// <summary>
     /// Whatever size the plugin asked for, and only the base's answer when it has not asked.
