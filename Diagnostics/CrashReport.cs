@@ -199,6 +199,7 @@ public static class CrashReport
         report.Append("System        : ").Append(Environment.OSVersion).Append(", ")
             .Append(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture).Append(", .NET ")
             .Append(Environment.Version).Append('\n');
+        report.Append(Computer(memoryToo: !lastTime));
         report.Append("Plugins       : ").Append(_plugins.Isolated
             ? "run in processes of their own"
             : "run inside this one, so a plugin that falls over takes the app with it").Append('\n');
@@ -301,4 +302,56 @@ public static class CrashReport
     /// <summary>Where the note saying this run is under way lives.</summary>
     private static string Marker() =>
         _folder.Length == 0 ? "" : System.IO.Path.Combine(_folder, RunningFile);
+
+    /// <summary>
+    /// What the computer is and where its memory stood, as two lines of the report, or nothing
+    /// where the system would not say.
+    /// </summary>
+    /// <remarks>
+    /// Where the memory stood is the part worth having: a plugin that dies when the computer has
+    /// run out of memory and into swap is a different report from one that dies with room to
+    /// spare. Asked of the system directly rather than of anything the program was keeping, and
+    /// anything that goes wrong asking leaves the lines out rather than the report.
+    ///
+    /// A report written for a run that is already over leaves the memory out: what it stands at
+    /// now is this run's, not the one that stopped.
+    /// </remarks>
+    /// <param name="memoryToo">Whether the memory now is the memory at the moment it stopped.</param>
+    private static string Computer(bool memoryToo)
+    {
+        try
+        {
+            var counters = SystemLoad.CountersForThisMachine();
+
+            if (counters == null) return "";
+
+            var text = new StringBuilder();
+            var memory = counters.Memory();
+
+            text.Append("Computer      : ").Append(counters.ProcessorName() ?? "a processor that does not say")
+                .Append(", ").Append(Environment.ProcessorCount).Append(" threads\n");
+
+            if (memoryToo && memory is { } now)
+            {
+                text.Append("Memory then   : ").Append(Gigabytes(now.Total - now.Available)).Append(" of ")
+                    .Append(Gigabytes(now.Total)).Append(" in use");
+
+                if (now.SwapTotal > 0)
+                    text.Append(", swap ").Append(Gigabytes(now.SwapTotal - now.SwapFree)).Append(" of ")
+                        .Append(Gigabytes(now.SwapTotal));
+
+                text.Append('\n');
+            }
+
+            return text.ToString();
+        }
+        catch (Exception)
+        {
+            return "";
+        }
+    }
+
+    /// <summary>A number of bytes in gigabytes, to one place.</summary>
+    private static string Gigabytes(long bytes) =>
+        (bytes / (double)(1L << 30)).ToString("0.0", CultureInfo.InvariantCulture) + " GB";
 }

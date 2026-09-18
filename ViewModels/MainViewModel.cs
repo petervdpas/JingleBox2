@@ -385,6 +385,12 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     public SoundMachineShelfViewModel MachineShelf { get; }
 
     /// <summary>
+    /// How busy the computer is and how much of it is this program, for SETTINGS, System.
+    /// </summary>
+    /// <remarks>Reads nothing until the card is on screen; see <see cref="SystemLoadViewModel.Watch"/>.</remarks>
+    public SystemLoadViewModel Load { get; } = new(Diagnostics.SystemLoad.ForThisMachine());
+
+    /// <summary>
     /// The same page again for effects, which are imported and thrown out exactly as machines are.
     /// </summary>
     public SoundEffectShelfViewModel EffectShelf { get; }

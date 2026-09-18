@@ -3,6 +3,8 @@
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:sr="clr-namespace:JingleBox2.Shortcuts.Records"
              xmlns:views="clr-namespace:JingleBox2.Views"
+             xmlns:ctl="clr-namespace:JingleBox2.Controls"
+             xmlns:vmr="clr-namespace:JingleBox2.ViewModels.Records"
              xmlns:ui="clr-namespace:JingleBox2.Rack.Controls;assembly=JingleBox2.Rack.Controls"
              x:Class="JingleBox2.Views.SettingsView"
              x:DataType="vm:MainViewModel">
@@ -948,6 +950,130 @@
     <TabItem Header="System">
         <ScrollViewer>
           <StackPanel Spacing="12">
+
+          <!-- How busy the computer is and how much of it is JingleBox2 and its plugins, drawn the
+               way a system monitor draws it and in a system monitor's own colours rather than the
+               theme's, since the charts are read by their lines. It reads only while this card is
+               on screen: see SettingsView.Watching. -->
+          <Border Classes="card" x:Name="LoadCard">
+            <StackPanel Spacing="8">
+              <TextBlock Classes="cardTitle" Text="This computer" />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding Load.ComputerText}" />
+              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding Load.SystemText}" />
+
+              <StackPanel Spacing="8" IsVisible="{Binding Load.Measured}">
+
+                <TextBlock Text="CPU" FontWeight="Bold" Margin="0,8,0,0" />
+
+                <ctl:HistoryChart Height="120" Lines="{Binding Load.CpuLines}" />
+
+                <ItemsControl ItemsSource="{Binding Load.CpuKey}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <UniformGrid Columns="4" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vmr:ChartKey">
+                      <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                        <Border Width="28" Height="16" CornerRadius="2" Background="{Binding Swatch}" />
+                        <TextBlock Text="{Binding Name}" />
+                        <TextBlock Text="{Binding Reading}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding Load.FamilyText}" />
+
+                <TextBlock Text="Memory and Swap" FontWeight="Bold" Margin="0,8,0,0" />
+
+                <ctl:HistoryChart Height="120" Lines="{Binding Load.MemoryLines}" />
+
+                <Grid ColumnDefinitions="*,*">
+                  <StackPanel Orientation="Horizontal" Spacing="12" Margin="36,0,0,0">
+                    <ctl:ShareDisc Width="22" Height="22" VerticalAlignment="Center"
+                                   Share="{Binding Load.MemoryShare}" Colour="{Binding Load.MemoryDisc}" />
+                    <StackPanel>
+                      <TextBlock Text="Memory" />
+                      <TextBlock Text="{Binding Load.MemoryText}" />
+                      <TextBlock Text="{Binding Load.CacheText}" IsVisible="{Binding Load.CacheText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                      <TextBlock Text="{Binding Load.OwnMemoryText}" />
+                    </StackPanel>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" Margin="36,0,0,0"
+                              IsVisible="{Binding Load.HasSwap}">
+                    <ctl:ShareDisc Width="22" Height="22" VerticalAlignment="Center"
+                                   Share="{Binding Load.SwapShare}" Colour="{Binding Load.SwapDisc}" />
+                    <StackPanel>
+                      <TextBlock Text="Swap" />
+                      <TextBlock Text="{Binding Load.SwapText}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="8" IsVisible="{Binding Load.HasNetwork}">
+                  <TextBlock Text="Network" FontWeight="Bold" Margin="0,8,0,0" />
+
+                  <ctl:HistoryChart Height="120" Lines="{Binding Load.NetworkLines}"
+                                    Top="{Binding Load.NetworkTop}" Levels="{Binding Load.NetworkLevels}" />
+
+                <Grid ColumnDefinitions="*,*">
+                  <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" Margin="36,0,0,0">
+                    <Path Data="M5,0 L11,0 L11,8 L16,8 L8,16 L0,8 L5,8 Z" Fill="{Binding Load.InBrush}" Width="16" Height="16" VerticalAlignment="Center" />
+                    <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="18">
+                      <TextBlock Text="Receiving" />
+                      <TextBlock Grid.Column="1" HorizontalAlignment="Right" Text="{Binding Load.Receiving}" />
+                      <TextBlock Grid.Row="1" Text="Total Received" />
+                      <TextBlock Grid.Row="1" Grid.Column="1" HorizontalAlignment="Right" Text="{Binding Load.TotalReceived}" />
+                    </Grid>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" Margin="36,0,0,0">
+                    <Path Data="M8,0 L16,8 L11,8 L11,16 L5,16 L5,8 L0,8 Z" Fill="{Binding Load.OutBrush}" Width="16" Height="16" VerticalAlignment="Center" />
+                    <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="18">
+                      <TextBlock Text="Sending" />
+                      <TextBlock Grid.Column="1" HorizontalAlignment="Right" Text="{Binding Load.Sending}" />
+                      <TextBlock Grid.Row="1" Text="Total Sent" />
+                      <TextBlock Grid.Row="1" Grid.Column="1" HorizontalAlignment="Right" Text="{Binding Load.TotalSent}" />
+                    </Grid>
+                  </StackPanel>
+                </Grid>
+                </StackPanel>
+
+                <StackPanel Spacing="8" IsVisible="{Binding Load.HasDisks}">
+                  <TextBlock Text="Disk" FontWeight="Bold" Margin="0,8,0,0" />
+
+                  <ctl:HistoryChart Height="120" Lines="{Binding Load.DiskLines}"
+                                    Top="{Binding Load.DiskTop}" Levels="{Binding Load.DiskLevels}" />
+
+                <Grid ColumnDefinitions="*,*">
+                  <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" Margin="36,0,0,0">
+                    <Path Data="M8,0 L16,8 L11,8 L11,16 L5,16 L5,8 L0,8 Z" Fill="{Binding Load.InBrush}" Width="16" Height="16" VerticalAlignment="Center" />
+                    <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="18">
+                      <TextBlock Text="Reading" />
+                      <TextBlock Grid.Column="1" HorizontalAlignment="Right" Text="{Binding Load.Reading}" />
+                      <TextBlock Grid.Row="1" Text="Total Read" />
+                      <TextBlock Grid.Row="1" Grid.Column="1" HorizontalAlignment="Right" Text="{Binding Load.TotalRead}" />
+                    </Grid>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" Margin="36,0,0,0">
+                    <Path Data="M5,0 L11,0 L11,8 L16,8 L8,16 L0,8 L5,8 Z" Fill="{Binding Load.OutBrush}" Width="16" Height="16" VerticalAlignment="Center" />
+                    <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="18">
+                      <TextBlock Text="Writing" />
+                      <TextBlock Grid.Column="1" HorizontalAlignment="Right" Text="{Binding Load.Writing}" />
+                      <TextBlock Grid.Row="1" Text="Total Written" />
+                      <TextBlock Grid.Row="1" Grid.Column="1" HorizontalAlignment="Right" Text="{Binding Load.TotalWritten}" />
+                    </Grid>
+                  </StackPanel>
+                </Grid>
+                </StackPanel>
+              </StackPanel>
+
+              <TextBlock Classes="cardHint" IsVisible="{Binding !Load.Measured}"
+                         Text="This system does not say how busy it is." />
+            </StackPanel>
+          </Border>
 
           <!-- Off by default and free when off. On when something has gone wrong and somebody
                wants to know what, including inside the processes plugins run in. -->

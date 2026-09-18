@@ -47,6 +47,30 @@ public partial class SettingsView : UserControl
         AddHandler(KeyDownEvent, Learning, RoutingStrategies.Tunnel);
 
         LostFocus += (_, _) => Shortcuts?.Stop();
+
+        LoadCard.AttachedToVisualTree += (_, _) => Watching(true);
+        LoadCard.DetachedFromVisualTree += (_, _) => Watching(false);
+
+        /* The card can be on screen before the page has its view model, and then it was not
+           there to ask when the card appeared. */
+        DataContextChanged += (_, _) => Watching(TopLevel.GetTopLevel(LoadCard) != null);
+    }
+
+    /// <summary>
+    /// Reads the computer's load while its card is on screen, and stops the moment it is not.
+    /// </summary>
+    /// <remarks>
+    /// On screen is the card being in the visual tree: a page of SETTINGS that is not the one
+    /// showing is taken out of the tree, and so is SETTINGS when another page along the top is
+    /// picked. So nothing is read unless somebody is looking at System.
+    /// </remarks>
+    /// <param name="on">Whether the card has just appeared.</param>
+    private void Watching(bool on)
+    {
+        if (DataContext is not MainViewModel main) return;
+
+        if (on) main.Load.Watch();
+        else main.Load.Stop();
     }
 
     /// <summary>The shortcuts page, when this page has a view model behind it.</summary>
