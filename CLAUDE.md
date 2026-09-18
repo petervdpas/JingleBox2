@@ -133,6 +133,27 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `MidiNoteRouter` (Midi/): Turns keyboard notes into tracker note entry
 - `TrackerPlayer` (Tracker/): Owns the clock and routes each event to a sample channel or a synth voice, through the track's mixer strip
 - `MixLevels` (Tracker/): What the mix adds up to, mute and solo included
+- **A track's two switches are on its tab above the pattern as well as on the desk**, drawn by
+  `PatternHeader` beside the name, which is why the row is taller than its lettering needs. They
+  hold the mixer's own `IStripSwitches` rather than a copy of what it reads, so pressing M here
+  is the press the mixer would have made: the same undo step, the same mark saying there is
+  something unsaved, and the same push at what is already sounding. A hand writing a part wants
+  to hear one track without leaving the page, and the desk is a word along the top. The tab is
+  one thing to a hand, so a press anywhere on it picks that track, the switches included: the
+  same gesture answering two ways depending on which few pixels it landed on is not a rule
+  anybody can hold. It listens to each strip, since a switch thrown on the mixer, by a knob or by
+  a lane has to light here too and a drawn control redraws only when something tells it to
+- **Solo reached our own voices and not a plugin, and that half did nothing for as long as it
+  existed.** A voice of ours is found by track and note column and turned down where it stands;
+  a plugin holds its own voices and its whole track is heard through one level applied to the bus
+  it fills, and that level was written when a note was sent and never again. So a solo or a mute
+  pressed over a plugin that was still ringing was answered at the next note, which from a chair
+  is a solo that does not work. `TrackerPlayer` writes down what each track's plugin was last
+  asked for, before the strip, and `ApplyMix` puts that back through the strip beside everything
+  else. Walked by the song's track count rather than by the note memory's, which is made when a
+  pass starts: a strip can be pressed before one ever has. `Tests/SoloReachesPluginsTests.cs`
+  measures it off the rendered block over a plugin double that fills its bus, and three of its
+  six fail with the one line taken back out
 - The mixer has a master, and it is a strip without being a track: `Song.Master` is a `TrackMix`
   because it is the same handful of settings, but it is not in `Song.Mix`, so nothing that walks
   the tracks reaches it by counting and it does not move when they are reordered. It has a
@@ -4741,6 +4762,17 @@ whole exercise and is worth writing down rather than summarising:
   drag then". Transparent, so it looks exactly as it did. The patchbay's pan was the same
   sentence about a `Panel`, and the ghost's own painting is the same sentence about clearing a
   brush rather than setting it to null
+- **And the pattern grid was the fifth, where it was worst, because the dead parts of it are
+  most of the page.** A drawn control is hit tested against what it drew rather than against the
+  room it was given, and `PatternGrid` paints row shading, lettering and the selected track's
+  tint and nothing else. So a press landed only where something happened to have been painted:
+  the half screen above and below the pattern, the space to the right of the last track, and the
+  gaps between one track's fields and the next were all dead, with nothing anywhere saying why.
+  The tell was that a click on the selected track worked anywhere down its whole height, since
+  its tint is the one thing drawn over the pads, and the identical click one track along did
+  nothing. One transparent fill over the whole content at the head of `Render`: the picture is
+  exactly what it was and the card behind still shows through, and the control answers the mouse
+  everywhere it covers
 - **The picture in the hand is built and never the block itself**, which is not a nicety: a
   control has one parent, so handing the live block to `DragGhost.Show` takes it out of the row
   it is being dragged along and the toolkit refuses it outright, as "The Control already has a
