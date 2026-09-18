@@ -87,7 +87,7 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" Margin="0,4,0,0"
                       IsVisible="{Binding !HasAvailableMachines}">
                   <TextBlock Grid.Column="0" Classes="cardHint" TextWrapping="Wrap"
-                             Text="Every machine you have is on the rack. SETTINGS, System is where machines are added and taken away." />
+                             Text="Every machine you have is on the rack. SETTINGS, Devices is where machines are added and taken away." />
 
                   <!-- The page's own badge. It sits beside the line that already says where a
                        box comes from, since that is where somebody is looking when the list is
@@ -117,7 +117,7 @@
                 <!-- No picker beside this list, unlike the machines'. A machine's box can be
                      taken off the rack and put back because the box is an instrument you own;
                      an effect has nothing of the sort, since one in use is a slot on a track's
-                     chain. Registered and here are the same fact, and SETTINGS, System is where
+                     chain. Registered and here are the same fact, and SETTINGS, Devices is where
                      that changes. -->
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding HasEffects}">
                   <TextBlock Grid.Column="0" Classes="cardHint" TextWrapping="Wrap"

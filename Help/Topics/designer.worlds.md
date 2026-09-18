@@ -11,7 +11,7 @@ has no keyboard, no zones and no pads. In a song it is a slot on a track's chain
 effect on two tracks is two sets of knob positions.
 
 **That is the only difference.** What a song does with it. Everything before that step is one
-thing done twice: made here, registered in SETTINGS, System, put on the rack, drawn from one
+thing done twice: made here, registered in SETTINGS, Devices, put on the rack, drawn from one
 library, carrying presets and a help page, travelling as a zip, and taking a knob pointed at it
 the same way.
 

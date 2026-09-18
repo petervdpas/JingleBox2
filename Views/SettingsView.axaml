@@ -681,6 +681,133 @@
             </StackPanel>
           </Border>
 
+          <!-- Each plugin a song uses is a process of its own, and they go on holding their
+               patches while you work somewhere else. Asked rather than decided, because the
+               cost is on the way back and whether that is worth it depends on the machine. -->
+          <Border Classes="card">
+            <StackPanel Spacing="8">
+              <TextBlock Classes="cardTitle" Text="Plugins in the tracker" />
+
+              <CheckBox Content="Let go of a song's plugins when leaving the tracker"
+                        IsChecked="{Binding FreeTrackerPlugins}" />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                         Text="On, leaving the tracker puts down every plugin the song is holding, and coming back starts them again, which is the few seconds a plugin takes to load, every time you switch. Whatever was turned in a plugin's own window is read back onto the song first, so nothing is lost. A song that is playing is left alone." />
+            </StackPanel>
+          </Border>
+
+          </StackPanel>
+        </ScrollViewer>
+    </TabItem>
+
+    <!-- The machines and effects this installation has, which is what can go on the rack. A
+         page of their own rather than part of System, which is about the program itself. -->
+    <TabItem Header="Devices">
+        <ScrollViewer>
+          <StackPanel Spacing="12">
+
+          <!-- What this installation is made up of. Here rather than on the rack, because
+               adding and removing a machine is done to the installation and not to the song
+               that is open. A machine that ships can always be taken again, so the list shows
+               those it does not have beside those it does. -->
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="cardTitle" Text="Machines" />
+                <views:HelpBadge Topic="settings.registry" />
+              </StackPanel>
+
+              <WrapPanel Orientation="Horizontal">
+                <Button Content="Import a machine..." Click="OnImportMachine"
+                        Margin="0,0,8,4" />
+                <TextBlock Classes="cardHint" VerticalAlignment="Center" Margin="0,0,0,4"
+                           Text="{Binding MachineShelf.Status}" />
+              </WrapPanel>
+
+              <Border Classes="inset">
+                <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                  <ItemsControl ItemsSource="{Binding MachineShelf.Boxes}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,2">
+                          <StackPanel Grid.Column="0" Spacing="1">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
+                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Version}" />
+                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding State}" />
+                            </StackPanel>
+                            <TextBlock Classes="cardHint" Text="{Binding Author}" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Content="Remove" Classes="danger" Padding="8,3"
+                                  IsVisible="{Binding IsInstalled}"
+                                  Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineShelf.RemoveCommand}"
+                                  CommandParameter="{Binding .}" />
+                          <Button Grid.Column="1" Content="Add" Padding="8,3"
+                                  IsVisible="{Binding IsAvailable}"
+                                  Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineShelf.AddCommand}"
+                                  CommandParameter="{Binding .}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </Border>
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding MachineShelf.Hint}" />
+            </StackPanel>
+          </Border>
+
+          <!-- The other half of what this installation is made up of. The same page again,
+               because an effect is imported, added and thrown out exactly as a machine is: both
+               are a folder with a manifest at the top of it. What differs is where one goes
+               afterwards, which is a track's chain rather than a song's instrument list. -->
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="cardTitle" Text="Effects" />
+                <views:HelpBadge Topic="settings.registry" />
+              </StackPanel>
+
+              <WrapPanel Orientation="Horizontal">
+                <Button Content="Import an effect..." Click="OnImportEffect"
+                        Margin="0,0,8,4" />
+                <TextBlock Classes="cardHint" VerticalAlignment="Center" Margin="0,0,0,4"
+                           Text="{Binding EffectShelf.Status}" />
+              </WrapPanel>
+
+              <Border Classes="inset">
+                <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                  <ItemsControl ItemsSource="{Binding EffectShelf.Boxes}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,2">
+                          <StackPanel Grid.Column="0" Spacing="1">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
+                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Version}" />
+                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding State}" />
+                            </StackPanel>
+                            <TextBlock Classes="cardHint" Text="{Binding Author}" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Content="Remove" Classes="danger" Padding="8,3"
+                                  IsVisible="{Binding IsInstalled}"
+                                  Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).EffectShelf.RemoveCommand}"
+                                  CommandParameter="{Binding .}" />
+                          <Button Grid.Column="1" Content="Add" Padding="8,3"
+                                  IsVisible="{Binding IsAvailable}"
+                                  Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).EffectShelf.AddCommand}"
+                                  CommandParameter="{Binding .}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </Border>
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding EffectShelf.Hint}" />
+            </StackPanel>
+          </Border>
+
           </StackPanel>
         </ScrollViewer>
     </TabItem>
@@ -822,125 +949,8 @@
         <ScrollViewer>
           <StackPanel Spacing="12">
 
-          <!-- What this installation is made up of. Here rather than on the rack, because
-               adding and removing a machine is done to the installation and not to the song
-               that is open. A machine that ships can always be taken again, so the list shows
-               those it does not have beside those it does. -->
-          <Border Classes="card">
-            <StackPanel Classes="cardBody">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <TextBlock Classes="cardTitle" Text="Machines" />
-                <views:HelpBadge Topic="settings.registry" />
-              </StackPanel>
-
-              <WrapPanel Orientation="Horizontal">
-                <Button Content="Import a machine..." Click="OnImportMachine"
-                        Margin="0,0,8,4" />
-                <TextBlock Classes="cardHint" VerticalAlignment="Center" Margin="0,0,0,4"
-                           Text="{Binding MachineShelf.Status}" />
-              </WrapPanel>
-
-              <Border Classes="inset">
-                <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
-                  <ItemsControl ItemsSource="{Binding MachineShelf.Boxes}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate>
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,2">
-                          <StackPanel Grid.Column="0" Spacing="1">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
-                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Version}" />
-                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding State}" />
-                            </StackPanel>
-                            <TextBlock Classes="cardHint" Text="{Binding Author}" TextTrimming="CharacterEllipsis" />
-                          </StackPanel>
-                          <Button Grid.Column="1" Content="Remove" Classes="danger" Padding="8,3"
-                                  IsVisible="{Binding IsInstalled}"
-                                  Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineShelf.RemoveCommand}"
-                                  CommandParameter="{Binding .}" />
-                          <Button Grid.Column="1" Content="Add" Padding="8,3"
-                                  IsVisible="{Binding IsAvailable}"
-                                  Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineShelf.AddCommand}"
-                                  CommandParameter="{Binding .}" />
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </ScrollViewer>
-              </Border>
-
-              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding MachineShelf.Hint}" />
-            </StackPanel>
-          </Border>
-
-          <!-- The other half of what this installation is made up of. The same page again,
-               because an effect is imported, added and thrown out exactly as a machine is: both
-               are a folder with a manifest at the top of it. What differs is where one goes
-               afterwards, which is a track's chain rather than a song's instrument list. -->
-          <Border Classes="card">
-            <StackPanel Classes="cardBody">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <TextBlock Classes="cardTitle" Text="Effects" />
-                <views:HelpBadge Topic="settings.registry" />
-              </StackPanel>
-
-              <WrapPanel Orientation="Horizontal">
-                <Button Content="Import an effect..." Click="OnImportEffect"
-                        Margin="0,0,8,4" />
-                <TextBlock Classes="cardHint" VerticalAlignment="Center" Margin="0,0,0,4"
-                           Text="{Binding EffectShelf.Status}" />
-              </WrapPanel>
-
-              <Border Classes="inset">
-                <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
-                  <ItemsControl ItemsSource="{Binding EffectShelf.Boxes}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate>
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,2">
-                          <StackPanel Grid.Column="0" Spacing="1">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
-                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Version}" />
-                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding State}" />
-                            </StackPanel>
-                            <TextBlock Classes="cardHint" Text="{Binding Author}" TextTrimming="CharacterEllipsis" />
-                          </StackPanel>
-                          <Button Grid.Column="1" Content="Remove" Classes="danger" Padding="8,3"
-                                  IsVisible="{Binding IsInstalled}"
-                                  Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).EffectShelf.RemoveCommand}"
-                                  CommandParameter="{Binding .}" />
-                          <Button Grid.Column="1" Content="Add" Padding="8,3"
-                                  IsVisible="{Binding IsAvailable}"
-                                  Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).EffectShelf.AddCommand}"
-                                  CommandParameter="{Binding .}" />
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </ScrollViewer>
-              </Border>
-
-              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding EffectShelf.Hint}" />
-            </StackPanel>
-          </Border>
-
           <!-- Off by default and free when off. On when something has gone wrong and somebody
                wants to know what, including inside the processes plugins run in. -->
-          <!-- Each plugin a song uses is a process of its own, and they go on holding their
-               patches while you work somewhere else. Asked rather than decided, because the
-               cost is on the way back and whether that is worth it depends on the machine. -->
-          <Border Classes="card">
-            <StackPanel Spacing="8">
-              <TextBlock Classes="cardTitle" Text="Plugins in the tracker" />
-
-              <CheckBox Content="Let go of a song's plugins when leaving the tracker"
-                        IsChecked="{Binding FreeTrackerPlugins}" />
-
-              <TextBlock Classes="cardHint" TextWrapping="Wrap"
-                         Text="On, leaving the tracker puts down every plugin the song is holding, and coming back starts them again, which is the few seconds a plugin takes to load, every time you switch. Whatever was turned in a plugin's own window is read back onto the song first, so nothing is lost. A song that is playing is left alone." />
-            </StackPanel>
-          </Border>
-
           <Border Classes="card">
             <StackPanel Spacing="8">
               <StackPanel Orientation="Horizontal" Spacing="8">

@@ -280,7 +280,7 @@ bottom of the knob is for.
    offered, and a folder of one kind refusing to open as the other.
 4. **One engine end to end, which is the delay. Done.** The engine and the face: `SoundDevices/SoundEffects/Delay.cs`, four knobs,
    measured in `Tests/DelayTests.cs`, and `rack/effects/EchoBox/effect.json` on the rack's
-   Effects tab, with its own section in SETTINGS, System: imported from a zip, added back and
+   Effects tab, with its own section in SETTINGS, Devices: imported from a zip, added back and
    thrown out exactly as a machine is, through the same archive and the same page. What is left of
    this step is **done** as well: the plus on a track's chain and on a pad's offers ours first,
    the block reads like any other, its own window draws the face, the song writes down the

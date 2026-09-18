@@ -387,7 +387,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   a real property, read out of every `machine.json`, and passed to nothing. The field decides now,
   both worlds have one, and `SoundEffectProject` grew the matching property
 - **The whole model is four steps and each only sees the one before it: designer, registry, rack,
-  song.** A device is made in DESIGNER or imported as a zip; it is registered in SETTINGS, System,
+  song.** A device is made in DESIGNER or imported as a zip; it is registered in SETTINGS, Devices,
   which is the only list that answers whether this installation has it; a registered device can be
   on the rack; and **a song can only use what is on the rack**. `Tests/DeviceFlowTests.cs` walks
   it, for a soundmachine as far as the track and for an effect one step further onto that track's
@@ -569,13 +569,13 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   usually the same word. The window does not open behind it, since an empty frame with a
   keyboard that cannot sound a note reads as a machine that is broken rather than absent.
 
-  It says **register**, not install, and points at SETTINGS, System without describing it. That
+  It says **register**, not install, and points at SETTINGS, Devices without describing it. That
   page shows the machine either waiting to be added or not there at all, which is itself the
   answer about whether a zip has to be imported, and it shows it while somebody is looking at
   it. A machine's own recordings do travel with it, inside the zip
 
 - A machine is on the rack while it is registered, and gone from the rack when it is unregistered
-  in SETTINGS, System. It used to say always there, which
+  in SETTINGS, Devices. It used to say always there, which
   was written before the registry existed and had been quietly untrue ever since: the registry is
   what this installation has and is the only thing that answers that. `TrackerInstrument`
   is the data type for both a machine and an instrument, but the rack's types say machine
@@ -699,7 +699,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   worked in
 - **An effect is registered, imported, added and thrown out exactly as a machine is**, and it is
   the same code doing it. `IRackArchive<T>` and `RackArchive<T>` are the zip, the staging folder
-  and the swap; `RackShelfViewModel<T>` is the list in SETTINGS, System with its Import, Add and
+  and the swap; `RackShelfViewModel<T>` is the list in SETTINGS, Devices with its Import, Add and
   Remove. What each world supplies is two answers, the name of the file at the top of a folder and
   how a folder is read, so `SoundMachineArchive` and `SoundEffectArchive` are a dozen lines
   apiece. The one thing that differs downstream is where a device goes afterwards: a machine
@@ -1605,7 +1605,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   could not be, on the reasoning that a machine is not something you can be without, and that was
   the wrong shape: a machine you never reach for is one that should not be in the list a song
   picks from. Taking it off is not losing it. The machine stays registered, the picker underneath
-  offers it back, and losing one is unregistering it in SETTINGS, System
+  offers it back, and losing one is unregistering it in SETTINGS, Devices
 - Which means the rack cannot be rebuilt from the registry on every open, or a machine taken off
   would be back the next morning with nothing to say why. `ISoundMachineRack.Shelved` is the record,
   `instruments/shelved.txt`, one id to a line: a machine this rack has never been offered gets

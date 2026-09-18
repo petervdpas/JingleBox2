@@ -145,7 +145,7 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     /// can be without. That was the wrong shape: the rack is which machines a song can be given,
     /// so a machine you never reach for is one you should be able to take off it. The machine
     /// itself stays registered and the picker offers it back, which is what makes taking it off
-    /// safe rather than final. Losing a machine is unregistering it, in SETTINGS, System.
+    /// safe rather than final. Losing a machine is unregistering it, in SETTINGS, Devices.
     /// </remarks>
     public bool CanDelete => Selected != null;
 
@@ -338,12 +338,12 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
 
     /// <summary>What to say when there is nothing to draw, in the words of the tab in front.</summary>
     /// <remarks>
-    /// Two sentences: what is not there, and where it is added. SETTINGS, System is the answer to
+    /// Two sentences: what is not there, and where it is added. SETTINGS, Devices is the answer to
     /// both, since a box on the rack is a box this installation has registered.
     /// </remarks>
     public string NothingSaid => RackTab == EffectsTab
-        ? "No effects registered.\nSETTINGS, System is where effects are added."
-        : "No machines registered.\nSETTINGS, System is where machines are added.";
+        ? "No effects registered.\nSETTINGS, Devices is where effects are added."
+        : "No machines registered.\nSETTINGS, Devices is where machines are added.";
 
     /// <summary>Which tab is which, written out rather than counted at each use.</summary>
     private const int MachinesTab = 0;

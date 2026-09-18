@@ -3,7 +3,7 @@
 What a song is allowed to see: the soundmachines on one tab and the effects on the other.
 
 The rack gets everything from the registry and from nowhere else. A device registered in
-SETTINGS, System can be on the rack; unregister it there and it comes off. What is on the rack is
+SETTINGS, Devices can be on the rack; unregister it there and it comes off. What is on the rack is
 what a song can be given.
 
 A **soundmachine** is played: notes go in and sound comes out, and putting one in a song makes it
@@ -18,7 +18,7 @@ designer and travel as the same sort of zip.
 Picking a row draws that device's face beside the list, in its own colours, with its own menu in
 the corner.
 
-A tab with nothing on it says so and says where devices are added, which is SETTINGS, System. An
+A tab with nothing on it says so and says where devices are added, which is SETTINGS, Devices. An
 empty list is a list, not a fault.
 
 ## The face

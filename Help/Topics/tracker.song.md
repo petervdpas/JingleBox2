@@ -58,4 +58,4 @@ than passed over, and the rest of the song still plays.
 A song carries its instruments but not the machines they are on. One that is not
 registered here makes no sound and has no panel, the status line names it as the song
 opens, and opening that instrument says so rather than showing an empty frame.
-Adding the machine is SETTINGS, System.
+Adding the machine is SETTINGS, Devices.
