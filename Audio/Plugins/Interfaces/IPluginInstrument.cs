@@ -1,4 +1,5 @@
 using System;
+using JingleBox2.Audio.Plugins.Records;
 
 namespace JingleBox2.Audio.Plugins.Interfaces;
 
@@ -36,4 +37,19 @@ public interface IPluginInstrument : IPluginParameters, IDisposable
     /// nothing else in the buffer for it to be mixed with by the time this is called.
     /// </remarks>
     void Render(float[] buffer, int frames);
+
+    /// <summary>
+    /// The notes the plugin played of its own accord during the block just rendered, and how
+    /// many there were.
+    /// </summary>
+    /// <remarks>
+    /// A drum machine running its own pattern, an arpeggiator, a plugin echoing what it was
+    /// sent: each hands these over at the end of a block, so the host can play them on to
+    /// somewhere else. Read straight after <see cref="Render"/> and before the next one, since
+    /// what is kept is one block's worth.
+    ///
+    /// Answers nothing where a plugin plays no notes of its own, which is nearly all of them.
+    /// </remarks>
+    /// <param name="into">Where they go. Nothing past the end of it is written.</param>
+    int Played(Span<PlayedNote> into);
 }

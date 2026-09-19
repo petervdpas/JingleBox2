@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Audio.Plugins.Records;
 using JingleBox2.Audio.Plugins.Bridge.Interfaces;
 using JingleBox2.Rack.SoundDevices.Timing;
 
@@ -845,6 +846,9 @@ public static class PluginHostProcess
 
         var buffer = new float[maxFrames * PluginBridge.Channels];
 
+        /* Room for what the plugin plays of its own, taken once: this loop is the audio thread. */
+        var played = new PlayedNote[PluginBridge.MaxPlayed];
+
         var message = new byte[8];
         var reply = new byte[8];
 
@@ -891,6 +895,8 @@ public static class PluginHostProcess
 
             _blocks++;
 
+            block.WritePlayed(ReadOnlySpan<PlayedNote>.Empty);
+
             long began = System.Diagnostics.Stopwatch.GetTimestamp();
 
             /* Woken, written where the parent will find it, so a late crossing can be told apart:
@@ -912,6 +918,10 @@ public static class PluginHostProcess
             if (asInstrument && instrument != null)
             {
                 instrument.Render(buffer, frames);
+
+                /* What the plugin played of its own this block, sent back with the audio it
+                   belongs to. A plugin that plays nothing writes a count of nought. */
+                block.WritePlayed(played.AsSpan(0, instrument.Played(played)));
             }
             else
             {
@@ -969,6 +979,21 @@ public static class PluginHostProcess
     /// where they were meant to rather than a block late. A note for a plugin that is not an
     /// instrument is dropped, since there is nothing to play it.
     /// </remarks>
+    /// <summary>
+    /// What a note is given to: the instrument, or the plugin itself where it is one loaded as an
+    /// effect and can still take notes.
+    /// </summary>
+    /// <remarks>
+    /// A plugin on a track's chain is loaded as an effect and given audio, and some of them play
+    /// notes as well: a drum machine put in a chain, a plugin that answers a note with a sound
+    /// over what is going past. Nothing is lost by offering, since a plugin that takes no notes
+    /// is not one of these at all.
+    /// </remarks>
+    /// <param name="instrument">The plugin loaded as an instrument, where it was.</param>
+    /// <param name="plugin">The plugin itself, whichever way it was loaded.</param>
+    private static IPluginInstrument? Notes(IPluginInstrument? instrument, IPluginParameters plugin) =>
+        instrument ?? plugin as IPluginInstrument;
+
     private static void Deliver(BridgeBlock block, IPluginInstrument? instrument, IPluginParameters plugin)
     {
         var events = block.Take();
@@ -982,15 +1007,15 @@ public static class PluginHostProcess
                     break;
 
                 case BridgeEvent.NoteOn:
-                    instrument?.NoteOn((int)queued.Id, queued.Value);
+                    Notes(instrument, plugin)?.NoteOn((int)queued.Id, queued.Value);
                     break;
 
                 case BridgeEvent.NoteOff:
-                    instrument?.NoteOff((int)queued.Id);
+                    Notes(instrument, plugin)?.NoteOff((int)queued.Id);
                     break;
 
                 case BridgeEvent.AllNotesOff:
-                    instrument?.AllNotesOff();
+                    Notes(instrument, plugin)?.AllNotesOff();
                     break;
             }
         }

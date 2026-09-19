@@ -83,6 +83,10 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// <inheritdoc/>
     public int SongStream => _synth.Handle;
 
+    /// <inheritdoc/>
+    public Audio.Plugins.Interfaces.IPlayedNotes? PluginNotes =>
+        _synth.HasMixer ? _synth.Mixer.PluginNotes : null;
+
     /// <summary>Guards the song and its sequencer, which are replaced whole when a pass starts.</summary>
     private readonly object _lock = new();
 
@@ -536,6 +540,10 @@ public sealed class TrackerPlayer : ITrackerPlayer
         if (_synth.HasMixer) _synth.Mixer.AllPluginNotesOff();
 
         MidiOut?.AllOff();
+
+        /* And whatever the plugins had played and nobody had taken yet: those notes belong to a
+           moment that has passed. */
+        PluginNotes?.Forget();
 
         cancel?.Dispose();
         StopAllVoices();
@@ -1450,6 +1458,10 @@ public sealed class TrackerPlayer : ITrackerPlayer
         {
             Hushed();
             MidiOut?.AllOff();
+
+        /* And whatever the plugins had played and nobody had taken yet: those notes belong to a
+           moment that has passed. */
+        PluginNotes?.Forget();
             StopAllVoices();
             Position = TrackerPosition.Start;
             SetState(TrackerTransportState.Stopped);

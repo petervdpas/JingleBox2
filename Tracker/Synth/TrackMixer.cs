@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Audio.Plugins;
+using JingleBox2.Audio.Plugins.Records;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Synth.Interfaces;
 using JingleBox2.Tracker.Records;
@@ -27,6 +29,15 @@ public sealed class TrackMixer : ITrackMixer
 {
     /// <summary>Past this, the oldest voice is taken rather than growing the mix forever.</summary>
     public const int MaxVoices = 48;
+
+    /// <summary>How many notes of its own one plugin may hand back in one block.</summary>
+    private const int MostPlayed = 128;
+
+    /// <inheritdoc/>
+    public IPlayedNotes PluginNotes { get; } = new PlayedNotes();
+
+    /// <summary>Where a plugin's own notes are read into before they are put down. Audio thread.</summary>
+    private readonly PlayedNote[] _played = new PlayedNote[MostPlayed];
 
     /// <summary>
     /// The level the whole mix comes out at, applied once to the sum.
@@ -1777,6 +1788,12 @@ public sealed class TrackMixer : ITrackMixer
     /// <param name="instrument">What played, for the log.</param>
     private void Played(int track, float[] bus, int samples, IPluginInstrument instrument)
     {
+        /* Whatever the plugin played of its own this block, put down for whoever is sending it
+           on. Nearly every plugin plays none and this costs a call and a nought. */
+        int many = instrument.Played(_played);
+
+        if (many > 0) PluginNotes.Took(track, _played.AsSpan(0, many));
+
         if (Diagnostics.Log.On(Diagnostics.Enums.LogArea.Audio)) _census[track].Played(Peak(bus, samples), instrument);
 
         Place(bus, samples, _instrumentGain[track], _instrumentPan[track]);

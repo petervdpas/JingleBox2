@@ -296,6 +296,17 @@ public interface ITrackerPlayer : IDisposable
     int SongStream { get; }
 
     /// <summary>
+    /// The notes the tracks' plugins have played of their own accord, waiting to be taken, and
+    /// nothing where there is no mix to play them.
+    /// </summary>
+    /// <remarks>
+    /// A drum machine plugin running its own pattern puts its strokes here as they sound. What
+    /// becomes of them is decided by whoever empties this: a MIDI port, a pattern being
+    /// recorded into, another track's plugin.
+    /// </remarks>
+    Audio.Plugins.Interfaces.IPlayedNotes? PluginNotes { get; }
+
+    /// <summary>
     /// Asks the engine to run at a rate, or at the device's own. Only heard before the first
     /// note, so it comes from settings when the tracker is built.
     /// </summary>

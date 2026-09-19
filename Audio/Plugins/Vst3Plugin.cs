@@ -39,6 +39,16 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// </summary>
     private const int MaxNotesPerBlock = 64;
 
+    /// <summary>What the plugin played of its own during the block just rendered.</summary>
+    /// <remarks>
+    /// Copied out of the outgoing list before that list is emptied for the next block, and into
+    /// an array made once: this is the audio thread, and the caller reads it straight after.
+    /// </remarks>
+    private readonly PlayedNote[] _playedNotes = new PlayedNote[MaxNotesPerBlock];
+
+    /// <inheritdoc cref="_playedNotes"/>
+    private int _playedCount;
+
     /// <summary>The bundle this plugin came out of. Held so the reference can be given back.</summary>
     private readonly Vst3Module _module;
 
@@ -770,6 +780,10 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
         _processor->Vtbl->Process(_processor, _process);
 
+        /* What the plugin played of its own this block, taken before the list is emptied for the
+           next one. See IPluginInstrument.Played. */
+        _playedCount = _played?.Read(_playedNotes) ?? 0;
+
         _changes?.Clear();
         _outgoing?.Clear();
         _notes?.Clear();
@@ -1042,6 +1056,18 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// The same path as an effect's. An instrument has no audio input, so what was in the buffer
     /// goes in and is written over by what comes out, which amounts to replacing it.
     /// </remarks>
+    /// <inheritdoc/>
+    /// <remarks>Read straight after a block, before the next one empties the list.</remarks>
+    public int Played(Span<PlayedNote> into)
+    {
+        int many = Math.Min(_playedCount, into.Length);
+
+        for (int at = 0; at < many; at++) into[at] = _playedNotes[at];
+
+        return many;
+    }
+
+    /// <inheritdoc/>
     public void Render(float[] buffer, int frames)
     {
         if (buffer == null || frames <= 0) return;

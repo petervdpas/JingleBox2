@@ -229,6 +229,9 @@ public class SoloReachesPluginsTests
         public void LoadState(byte[]? state) { }
 
         /// <inheritdoc/>
+/// <summary>Plays no notes of its own, like every plugin but a drum machine or an arpeggiator.</summary>
+        public int Played(Span<JingleBox2.Audio.Plugins.Records.PlayedNote> into) => 0;
+
         public void Render(float[] buffer, int frames)
         {
             for (int sample = 0; sample < frames * 2; sample++) buffer[sample] = at;

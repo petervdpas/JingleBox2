@@ -71,6 +71,15 @@ public interface ITrackMixer
     int VoiceCount { get; }
 
     /// <summary>
+    /// The notes the tracks' plugins have played of their own accord, waiting to be taken.
+    /// </summary>
+    /// <remarks>
+    /// Filled as each block is rendered and emptied by whoever is sending them on: to a MIDI
+    /// port, into a pattern, or to another track's plugin. See <see cref="IPlayedNotes"/>.
+    /// </remarks>
+    IPlayedNotes PluginNotes { get; }
+
+    /// <summary>
     /// How far through its recording the newest sounding sample voice is, or -1 for none.
     /// </summary>
     /// <remarks>

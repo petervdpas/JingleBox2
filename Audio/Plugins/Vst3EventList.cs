@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using JingleBox2.Audio.Plugins.Records;
 
 namespace JingleBox2.Audio.Plugins;
 
@@ -221,11 +222,58 @@ internal sealed unsafe class Vst3EventList : IDisposable
     }
 
     /// <summary>
-    /// A plugin sending an event of its own, which only happens on the outgoing list. Taken
-    /// and dropped, because nothing here listens to a plugin's notes yet.
+    /// A plugin sending an event of its own, which only happens on the outgoing list.
     /// </summary>
+    /// <remarks>
+    /// Kept, so the host can read the plugin's own notes back after the block: a drum machine
+    /// running its pattern, an arpeggiator, anything that plays rather than only answers. A list
+    /// that is full takes no more and says so, which is a plugin sending more notes in one block
+    /// than this host has room for rather than anything being wrong.
+    ///
+    /// On the audio thread, inside the plugin's own process call, so it writes into memory that
+    /// is already there and does nothing else at all.
+    /// </remarks>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static int AddEvent(void* self, Vst3Event* added) => Vst3Abi.ResultOk;
+    private static int AddEvent(void* self, Vst3Event* added)
+    {
+        var list = (List*)self;
+
+        if (list == null || added == null) return Vst3Abi.NoInterface;
+
+        if (list->Count >= list->Capacity) return Vst3Abi.NotImplemented;
+
+        list->Events[list->Count] = *added;
+        list->Count++;
+
+        return Vst3Abi.ResultOk;
+    }
+
+    /// <summary>
+    /// The notes in the list, as the host says them, and how many were written.
+    /// </summary>
+    /// <remarks>
+    /// For the outgoing list, read once the block is over. A note this host cannot make sense of,
+    /// which is anything but a note starting or ending, is passed over rather than guessed at.
+    /// </remarks>
+    /// <param name="into">Where they go. Nothing past the end of it is written.</param>
+    public int Read(Span<PlayedNote> into)
+    {
+        if (_list == null) return 0;
+
+        int many = 0;
+
+        for (int at = 0; at < _list->Count && many < into.Length; at++)
+        {
+            var held = _list->Events[at];
+
+            if (held.Type == Vst3Abi.NoteOnEvent)
+                into[many++] = new PlayedNote(held.SampleOffset, held.OnChannel + 1, held.OnPitch, held.OnVelocity, true);
+            else if (held.Type == Vst3Abi.NoteOffEvent)
+                into[many++] = new PlayedNote(held.SampleOffset, held.OffChannel + 1, held.OffPitch, 0, false);
+        }
+
+        return many;
+    }
 
     /// <summary>
     /// Frees the events and the list. Called with no audio running: a plugin holding this

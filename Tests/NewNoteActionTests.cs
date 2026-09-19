@@ -556,6 +556,9 @@ public class NewNoteActionTests
         public void AllNotesOff() => Said.Add("all off");
 
         /// <inheritdoc/>
+/// <summary>Plays no notes of its own, like every plugin but a drum machine or an arpeggiator.</summary>
+        public int Played(Span<JingleBox2.Audio.Plugins.Records.PlayedNote> into) => 0;
+
         public void Render(float[] buffer, int frames)
         {
         }

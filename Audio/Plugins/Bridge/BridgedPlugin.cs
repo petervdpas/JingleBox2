@@ -587,6 +587,51 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         }
     }
 
+    /// <summary>What the plugin played of its own during the block just rendered.</summary>
+    /// <remarks>
+    /// Copied out of the shared block as the block comes back, since the next crossing writes
+    /// over it. Made once: this is read and written on the audio thread.
+    /// </remarks>
+    private readonly PlayedNote[] _played = new PlayedNote[PluginBridge.MaxPlayed];
+
+    /// <inheritdoc cref="_played"/>
+    private int _playedCount;
+
+    /// <inheritdoc/>
+    public int Played(Span<PlayedNote> into)
+    {
+        int many = Math.Min(_playedCount, into.Length);
+
+        for (int at = 0; at < many; at++) into[at] = _played[at];
+
+        return many;
+    }
+
+    /// <summary>Somewhere to read a crossing's notes into before they are added to the block's.</summary>
+    private readonly PlayedNote[] _arrived = new PlayedNote[PluginBridge.MaxPlayed];
+
+    /// <summary>
+    /// Takes the notes out of a crossing that has just come back and adds them to the block's.
+    /// </summary>
+    /// <remarks>
+    /// Added rather than replacing, because a block longer than the shared one is carried in
+    /// several crossings and the notes of all of them belong to the one block. Each note's frame
+    /// is counted from the start of the block rather than of the crossing it came in on.
+    /// </remarks>
+    /// <param name="process">The process it came from.</param>
+    /// <param name="from">Which frame of the block that crossing started at.</param>
+    private void TookPlayed(PluginProcess process, int from)
+    {
+        int many = process.Block.Played(_arrived);
+
+        for (int at = 0; at < many && _playedCount < _played.Length; at++)
+        {
+            var note = _arrived[at];
+
+            _played[_playedCount++] = note with { Frame = note.Frame + from };
+        }
+    }
+
     /// <inheritdoc/>
     /// <remarks>
     /// Fills the block with what the instrument is playing. A dead plugin fills it with

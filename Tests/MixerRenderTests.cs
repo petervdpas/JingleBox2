@@ -591,6 +591,9 @@ public class MixerRenderTests
         public virtual void AllNotesOff() { }
 
         /// <inheritdoc/>
+/// <summary>Plays no notes of its own, like every plugin but a drum machine or an arpeggiator.</summary>
+        public int Played(Span<JingleBox2.Audio.Plugins.Records.PlayedNote> into) => 0;
+
         public abstract void Render(float[] buffer, int frames);
 
         /// <inheritdoc/>

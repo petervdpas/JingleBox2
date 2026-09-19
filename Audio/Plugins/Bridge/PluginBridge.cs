@@ -91,6 +91,28 @@ internal static class PluginBridge
     /// <summary>Where the audio starts, past the events.</summary>
     public const int AudioOffset = EventsOffset + MaxEvents * EventSize;
 
+    /// <summary>
+    /// How many notes of its own a plugin may hand back in one block, past which they are dropped.
+    /// </summary>
+    /// <remarks>
+    /// A drum machine playing sixteen pads at once is nowhere near this, and a plugin that sends
+    /// more notes in one block than this is sending them faster than anything could play them.
+    /// </remarks>
+    public const int MaxPlayed = 128;
+
+    /// <summary>One note the plugin played: the frame, what it is, and how hard.</summary>
+    /// <remarks>
+    /// Sixteen bytes, the same shape as an event going the other way: the frame it falls on, the
+    /// note packed into one word with its channel and whether it is starting, the velocity, and
+    /// one spare.
+    /// </remarks>
+    public const int PlayedSize = 16;
+
+    /// <summary>
+    /// Where the notes the plugin played are written, past the audio: a count and then the notes.
+    /// </summary>
+    public static int PlayedOffset(int maxFrames) => AudioOffset + maxFrames * Channels * sizeof(float) * 2;
+
     /// <summary>How long the audio thread waits for a block before giving up on the plugin.</summary>
     public const int BlockTimeoutMilliseconds = 1000;
 
@@ -162,7 +184,7 @@ internal static class PluginBridge
     /// since a mapping of nought bytes is not a mapping.
     /// </remarks>
     public static long BlockBytes(int maxFrames) =>
-        AudioOffset + (long)Math.Max(1, maxFrames) * Channels * sizeof(float) * 2;
+        PlayedOffset(Math.Max(1, maxFrames)) + sizeof(int) + (long)MaxPlayed * PlayedSize;
 
     /// <summary>Where the input audio sits inside the block.</summary>
     public const int InputOffset = AudioOffset;
@@ -611,6 +633,64 @@ internal sealed unsafe class BridgeBlock : IDisposable
 
     /// <summary>Where what came out of the plugin is read, in the same shape.</summary>
     public float* Output => (float*)(_base + PluginBridge.OutputOffset(MaxFrames));
+
+    /// <summary>How many notes the plugin played of its own during the block just rendered.</summary>
+    private int* PlayedCount => (int*)(_base + PluginBridge.PlayedOffset(MaxFrames));
+
+    /// <summary>The notes themselves, four words apiece.</summary>
+    private int* PlayedNotes => (int*)(_base + PluginBridge.PlayedOffset(MaxFrames) + sizeof(int));
+
+    /// <summary>
+    /// Writes down what the plugin played this block, for the parent to pick up with the audio.
+    /// </summary>
+    /// <remarks>
+    /// The child's side, called between rendering the block and answering for it, so the notes
+    /// and the audio they belong to cross together.
+    /// </remarks>
+    /// <param name="notes">What it played, and nothing where it played none.</param>
+    public void WritePlayed(ReadOnlySpan<PlayedNote> notes)
+    {
+        int many = Math.Min(notes.Length, PluginBridge.MaxPlayed);
+        int* slot = PlayedNotes;
+
+        for (int at = 0; at < many; at++)
+        {
+            var note = notes[at];
+
+            slot[at * 4] = note.Frame;
+            slot[at * 4 + 1] = (note.Channel & 0xFF) | ((note.Note & 0xFF) << 8) | (note.On ? 1 << 16 : 0);
+            slot[at * 4 + 2] = BitConverter.SingleToInt32Bits(note.Velocity);
+            slot[at * 4 + 3] = 0;
+        }
+
+        *PlayedCount = many;
+    }
+
+    /// <summary>Reads back what the plugin played, and how many there were.</summary>
+    /// <remarks>The parent's side, called once the block has come back.</remarks>
+    /// <param name="into">Where they go. Nothing past the end of it is written.</param>
+    public int Played(Span<PlayedNote> into)
+    {
+        int many = Math.Clamp(*PlayedCount, 0, PluginBridge.MaxPlayed);
+
+        if (many > into.Length) many = into.Length;
+
+        int* slot = PlayedNotes;
+
+        for (int at = 0; at < many; at++)
+        {
+            int packed = slot[at * 4 + 1];
+
+            into[at] = new PlayedNote(
+                slot[at * 4],
+                packed & 0xFF,
+                (packed >> 8) & 0xFF,
+                BitConverter.Int32BitsToSingle(slot[at * 4 + 2]),
+                (packed & (1 << 16)) != 0);
+        }
+
+        return many;
+    }
 
     /// <summary>
     /// How many events have ever been queued, at offset 16. It counts up and is never wrapped:

@@ -657,7 +657,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         {
             MarkDirty(TrackMidiViewModel.Edit);
             MidiPortsMoved?.Invoke();
-        });
+        }, track, Song.TrackCount);
     }
 
     /// <summary>
@@ -2011,9 +2011,70 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// stops itself when everything reads nought. The mixer was never wrong about any of this;
     /// both faults were in what was asking.
     /// </remarks>
+    /// <summary>Somewhere to take the plugins' own notes into, made once.</summary>
+    private readonly Audio.Plugins.Records.TrackPlayedNote[] _fromPlugins =
+        new Audio.Plugins.Records.TrackPlayedNote[128];
+
+    /// <summary>
+    /// Passes on whatever the tracks' plugins have played of their own accord.
+    /// </summary>
+    /// <remarks>
+    /// A plugin that plays its own pattern, a drum machine or an arpeggiator, hands its notes
+    /// back with the audio they belong to. Here they go where a note played by hand on that track
+    /// goes: out of the track's MIDI port where it has one, and into the pattern while the
+    /// tracker is recording.
+    ///
+    /// Taken on the meters' clock rather than in the audio, because what is done with them ends
+    /// in editing a pattern and opening ports, neither of which belongs on the audio thread. So
+    /// they are passed on within a twentieth of a second of being played rather than at the exact
+    /// sample, which is what a note played by hand gets as well.
+    /// </remarks>
+    private void TakePluginNotes()
+    {
+        var waiting = _player.PluginNotes;
+
+        if (waiting == null) return;
+
+        int many = waiting.Take(_fromPlugins);
+
+        for (int at = 0; at < many; at++)
+        {
+            var (track, played) = _fromPlugins[at];
+
+            if (!_wire.TryNote(played.Note, out var note)) continue;
+
+            /* Its own voice, well past the pattern's own columns, so a plugin's notes and the
+               track's own cannot cut each other short. The same trick the live keys use. */
+            int voice = Midi.TrackMidiOut.LiveVoices + played.Note;
+
+            int to = track < Song.Mix.Count ? Song.Mix[track].PluginNotesTo : TrackMix.NoPluginNotes;
+
+            if (played.On)
+            {
+                int volume = _wire.VolumeFor((int)Math.Round(played.Velocity * _wire.MaxVelocity));
+
+                _player.MidiOut?.NoteOn(Song.Mix, track, voice, note, _wire.VelocityFor(volume));
+
+                if (to == TrackMix.PluginNotesToInserts) _player.ChainFor(track).Note(played.Note, played.Velocity);
+                else if (to >= 0) EnterTrackNote(to, note, volume);
+                else if (IsRecording) EnterTrackNote(track, note, volume, play: false);
+            }
+            else
+            {
+                _player.MidiOut?.NoteOff(track, voice);
+
+                if (to == TrackMix.PluginNotesToInserts) _player.ChainFor(track).Note(played.Note, -1);
+                else if (to >= 0) LetTrackNote(to, note);
+                else if (IsRecording) LetTrackNote(track, note);
+            }
+        }
+    }
+
     private void ReadMeters()
     {
         if (_running.IsRunning) Elapsed = _running.Elapsed;
+
+        TakePluginNotes();
 
         float loudest = 0;
 
@@ -3290,7 +3351,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <param name="note">The note.</param>
     /// <param name="volume">The velocity, as the volume column holds it.</param>
     /// <param name="arrived">When the note arrived, as <c>Stopwatch.GetTimestamp</c> gives it; nought for now.</param>
-    internal void EnterTrackNote(int track, Note note, int volume, long arrived = 0)
+    /// <param name="play">
+    /// Whether the note is also sounded on that track and sent out of it. False where whatever
+    /// played it has already made the sound, which is a plugin's own pattern being written down.
+    /// </param>
+    internal void EnterTrackNote(int track, Note note, int volume, long arrived = 0, bool play = true)
     {
         if (track < 0 || track >= Song.TrackCount || !note.IsPlayable) return;
         if (_trackHeld.ContainsKey((track, note.Semitone))) return;
@@ -3310,13 +3375,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             order = was.Order;
         }
 
-        var instrument = Song.InstrumentAt(InstrumentForTrack(track));
+        var instrument = play ? Song.InstrumentAt(InstrumentForTrack(track)) : null;
 
         if (instrument != null)
             _player.Preview(instrument, note, GainFor(volume), track, TrackerPlayer.HeldNoteSeconds);
 
-        _player.MidiOut?.NoteOn(Song.Mix, track, Midi.TrackMidiOut.LiveVoices + note.Semitone, note,
-            _wire.VelocityFor(volume));
+        if (play)
+            _player.MidiOut?.NoteOn(Song.Mix, track, Midi.TrackMidiOut.LiveVoices + note.Semitone, note,
+                _wire.VelocityFor(volume));
 
         bool running = _player.IsPlaying;
         long when = arrived == 0 ? System.Diagnostics.Stopwatch.GetTimestamp() : arrived;

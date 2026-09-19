@@ -30,7 +30,7 @@
           ToolTip.Tip="Which MIDI port and channel this track plays from, and sends its notes to.">
     <!-- The heading shares the row the column names are on, so the block is three rows tall
          rather than four and sits inside the chain's height. -->
-    <Grid Margin="8,5,8,6" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="Auto,Auto,Auto"
+    <Grid Margin="8,5,8,6" RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="Auto,Auto,Auto"
           ColumnSpacing="6" RowSpacing="4">
       <TextBlock Grid.Row="0" Grid.Column="0" Classes="deviceName" Text="MIDI" VerticalAlignment="Bottom" />
       <TextBlock Grid.Row="0" Grid.Column="1" Classes="midiKey" Text="Port" VerticalAlignment="Bottom" />
@@ -51,6 +51,13 @@
       <ComboBox Grid.Row="2" Grid.Column="2" Width="72"
                 ItemsSource="{Binding Channels}" SelectedIndex="{Binding OutChannel}"
                 ToolTip.Tip="The channel this track sends on." />
+
+      <!-- Where a plugin's own notes go, which only a plugin that plays some has anything to
+           say about: a drum machine running its pattern, an arpeggiator. -->
+      <TextBlock Grid.Row="3" Grid.Column="0" Classes="midiKey" Text="Plays" VerticalAlignment="Center" />
+      <ComboBox Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Width="198"
+                ItemsSource="{Binding PluginTargets}" SelectedItem="{Binding PluginNotesTo}"
+                ToolTip.Tip="Where the notes this track's plugin plays by itself go: nowhere, to the effects on this track, or onto another track, where they play that track's instrument and are recorded into it. The track's MIDI out carries them either way." />
     </Grid>
   </Border>
 </UserControl>
