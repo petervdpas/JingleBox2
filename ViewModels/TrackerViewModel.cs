@@ -2040,22 +2040,16 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         int many = waiting.Take(_fromPlugins);
 
-        if (Diagnostics.Log.On(Diagnostics.Enums.LogArea.Tracker)
+        if (many > 0 && Diagnostics.Log.On(Diagnostics.Enums.LogArea.Tracker)
             && Environment.TickCount64 - _saidPlayed > 1000)
         {
             _saidPlayed = Environment.TickCount64;
 
             long counted = waiting.Counted;
 
-            var said = new System.Text.StringBuilder();
-
-            for (int at = 0; at < many && at < 12; at++)
-                said.Append(' ').Append(_fromPlugins[at].Note.On ? "on " : "off ")
-                    .Append(_fromPlugins[at].Note.Note).Append('@').Append(_fromPlugins[at].Note.Frame);
-
             Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Tracker, () =>
-                "plugin notes: " + counted + " played so far, " + many + " taken just now; record is "
-                + (IsRecording ? "armed" : "off") + ";" + said);
+                "plugin notes: " + counted + " played so far; record is "
+                + (IsRecording ? "armed" : "off"));
         }
 
         for (int at = 0; at < many; at++)
