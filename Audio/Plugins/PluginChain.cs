@@ -134,45 +134,6 @@ public sealed class PluginChain : IAudioInsert, IOverlappable
     /// rest of the chain still runs, so one misbehaving plugin makes a track sound wrong rather
     /// than making it silent.
     /// </remarks>
-    /// <summary>
-    /// Offers a note to every device on the chain that can take one.
-    /// </summary>
-    /// <remarks>
-    /// A device on a chain is loaded as an effect and given audio, and some of them answer notes
-    /// as well: a drum machine put on a chain, a plugin that plays over what is going past.
-    /// Offered to all of them rather than to the first, since which of them wants it is the
-    /// plugin's own business and a device that takes no notes is not one of these at all.
-    ///
-    /// A device stepped over is left out: bypassed means bypassed, notes included.
-    /// </remarks>
-    /// <param name="note">The MIDI note number.</param>
-    /// <param name="velocity">How hard, nought to one. Below nought it is a note ending.</param>
-    public void Note(int note, float velocity)
-    {
-        Slot[] chain;
-
-        lock (_lock)
-        {
-            if (_devices.Count == 0) return;
-
-            if (_stale)
-            {
-                _snapshot = _devices.ToArray();
-                _stale = false;
-            }
-
-            chain = _snapshot;
-        }
-
-        foreach (var device in chain)
-        {
-            if (device.Bypassed || device.Insert is not Interfaces.IPluginInstrument takes) continue;
-
-            if (velocity >= 0) takes.NoteOn(note, velocity);
-            else takes.NoteOff(note);
-        }
-    }
-
     /// <inheritdoc/>
     public void Process(float[] buffer, int frames)
     {

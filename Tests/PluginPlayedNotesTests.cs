@@ -1,15 +1,12 @@
 using System;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Audio.Plugins.Records;
-using JingleBox2.Tracker;
-using JingleBox2.ViewModels;
 using Xunit;
 
 namespace JingleBox2.Tests;
 
 /// <summary>
-/// The notes a plugin plays of its own accord: how they are carried off the audio thread, and
-/// where a track says they should go.
+/// The notes a plugin plays of its own accord, on their way off the audio thread.
 /// </summary>
 public class PluginPlayedNotesTests
 {
@@ -93,45 +90,4 @@ public class PluginPlayedNotesTests
         Assert.Equal(0, waiting.Take(new TrackPlayedNote[4]));
     }
 
-    /// <summary>A strip keeps where its plugin's notes go, and a copy of it says the same.</summary>
-    [Fact]
-    public void A_strip_carries_where_its_plugin_plays()
-    {
-        var strip = new TrackMix { PluginNotesTo = 3 };
-
-        Assert.Equal(3, strip.Clone().PluginNotesTo);
-
-        strip.PluginNotesTo = -7;
-        strip.Clamp();
-
-        Assert.Equal(TrackMix.NoPluginNotes, strip.PluginNotesTo);
-    }
-
-    /// <summary>The word picked in the block says which track, and the words come back again.</summary>
-    [Fact]
-    public void The_block_says_where_the_notes_go()
-    {
-        var strip = new TrackMix();
-        var block = new TrackMidiViewModel(strip, Array.Empty<string>(), Array.Empty<string>(),
-                                           _ => { }, () => { }, track: 0, tracks: 3);
-
-        Assert.Equal(TrackMidiViewModel.NoNotes, block.PluginNotesTo);
-        Assert.Equal(new[] { TrackMidiViewModel.NoNotes, TrackMidiViewModel.ToInserts, "Track 2", "Track 3" },
-                     block.PluginTargets);
-
-        block.PluginNotesTo = "Track 3";
-
-        Assert.Equal(2, strip.PluginNotesTo);
-        Assert.Equal("Track 3", block.PluginNotesTo);
-
-        block.PluginNotesTo = TrackMidiViewModel.ToInserts;
-
-        Assert.Equal(TrackMix.PluginNotesToInserts, strip.PluginNotesTo);
-
-        /* Its own track is not offered and is refused if asked for, since a plugin playing its
-           own track would be playing itself. */
-        block.PluginNotesTo = "Track 1";
-
-        Assert.Equal(TrackMix.NoPluginNotes, strip.PluginNotesTo);
-    }
 }

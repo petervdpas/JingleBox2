@@ -65,5 +65,8 @@ public sealed class PlayedNotes : IPlayedNotes
     }
 
     /// <inheritdoc/>
+    public long Counted => Interlocked.Read(ref _in);
+
+    /// <inheritdoc/>
     public void Forget() => Interlocked.Exchange(ref _out, Interlocked.Read(ref _in));
 }

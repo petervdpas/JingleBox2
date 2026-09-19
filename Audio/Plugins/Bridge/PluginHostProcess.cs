@@ -158,6 +158,9 @@ public static class PluginHostProcess
     /// <summary>The loudest sample among them, which is what says whether it is really playing.</summary>
     private static float _loudest;
 
+    /// <summary>How many notes the plugin has played of its own since the last line was written.</summary>
+    private static int _playedNotes;
+
     /// <summary>True when these arguments mean this process is meant to be a plugin's process.</summary>
     public static bool Claims(string[] args) =>
         args != null && args.Length > 0 &&
@@ -467,7 +470,10 @@ public static class PluginHostProcess
                           " ms on this side of the block each, worst " +
                           dearest.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture)
                         : "") +
+                    (_playedNotes > 0 ? "; it played " + _playedNotes + " notes of its own" : "") +
                     ((_plugin as ClapEffect)?.IsWaitingToSpeak == true ? "; the plugin is waiting to say something" : ""));
+
+                _playedNotes = 0;
 
                 counted = blocks;
             }
@@ -921,7 +927,11 @@ public static class PluginHostProcess
 
                 /* What the plugin played of its own this block, sent back with the audio it
                    belongs to. A plugin that plays nothing writes a count of nought. */
-                block.WritePlayed(played.AsSpan(0, instrument.Played(played)));
+                int notes = instrument.Played(played);
+
+                block.WritePlayed(played.AsSpan(0, notes));
+
+                _playedNotes += notes;
             }
             else
             {
@@ -979,21 +989,6 @@ public static class PluginHostProcess
     /// where they were meant to rather than a block late. A note for a plugin that is not an
     /// instrument is dropped, since there is nothing to play it.
     /// </remarks>
-    /// <summary>
-    /// What a note is given to: the instrument, or the plugin itself where it is one loaded as an
-    /// effect and can still take notes.
-    /// </summary>
-    /// <remarks>
-    /// A plugin on a track's chain is loaded as an effect and given audio, and some of them play
-    /// notes as well: a drum machine put in a chain, a plugin that answers a note with a sound
-    /// over what is going past. Nothing is lost by offering, since a plugin that takes no notes
-    /// is not one of these at all.
-    /// </remarks>
-    /// <param name="instrument">The plugin loaded as an instrument, where it was.</param>
-    /// <param name="plugin">The plugin itself, whichever way it was loaded.</param>
-    private static IPluginInstrument? Notes(IPluginInstrument? instrument, IPluginParameters plugin) =>
-        instrument ?? plugin as IPluginInstrument;
-
     private static void Deliver(BridgeBlock block, IPluginInstrument? instrument, IPluginParameters plugin)
     {
         var events = block.Take();
@@ -1007,15 +1002,15 @@ public static class PluginHostProcess
                     break;
 
                 case BridgeEvent.NoteOn:
-                    Notes(instrument, plugin)?.NoteOn((int)queued.Id, queued.Value);
+                    instrument?.NoteOn((int)queued.Id, queued.Value);
                     break;
 
                 case BridgeEvent.NoteOff:
-                    Notes(instrument, plugin)?.NoteOff((int)queued.Id);
+                    instrument?.NoteOff((int)queued.Id);
                     break;
 
                 case BridgeEvent.AllNotesOff:
-                    Notes(instrument, plugin)?.AllNotesOff();
+                    instrument?.AllNotesOff();
                     break;
             }
         }

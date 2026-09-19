@@ -87,25 +87,6 @@ public sealed class TrackMix
     /// </remarks>
     public Records.TrackMidiRoute MidiOut { get; set; } = new();
 
-    /// <summary>Where the notes this track's plugin plays of its own accord go.</summary>
-    /// <remarks>
-    /// A plugin that runs a pattern of its own, a drum machine or an arpeggiator, hands its
-    /// notes back as it plays them. <see cref="NoPluginNotes"/> keeps them to itself,
-    /// <see cref="PluginNotesToInserts"/> gives them to the effects on this same track, and a
-    /// track number plays them on that track's instrument, exactly as a keyboard pointed at that
-    /// track would.
-    ///
-    /// The track's own MIDI out carries them as well wherever it is on, which is a separate
-    /// question from this one.
-    /// </remarks>
-    public int PluginNotesTo { get; set; } = NoPluginNotes;
-
-    /// <summary>The plugin's own notes stay in the plugin.</summary>
-    public const int NoPluginNotes = -1;
-
-    /// <summary>They are given to the effects on this same track.</summary>
-    public const int PluginNotesToInserts = -2;
-
     /// <summary>
     /// A strip of its own with the same settings, chain included.
     /// </summary>
@@ -124,8 +105,7 @@ public sealed class TrackMix
         DuckReleaseMs = DuckReleaseMs,
         Plugins = Plugins?.Clone(),
         MidiIn = MidiIn,
-        MidiOut = MidiOut,
-        PluginNotesTo = PluginNotesTo
+        MidiOut = MidiOut
     };
 
     /// <summary>
@@ -149,8 +129,6 @@ public sealed class TrackMix
 
         MidiIn = Checked(MidiIn);
         MidiOut = Checked(MidiOut);
-
-        if (PluginNotesTo < PluginNotesToInserts) PluginNotesTo = NoPluginNotes;
     }
 
     /// <summary>

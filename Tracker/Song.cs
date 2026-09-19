@@ -785,12 +785,9 @@ public sealed class Song
 
         foreach (var strip in Mix)
         {
-            /* Both of these name a track by its number, so both follow a track that has moved. */
-            if (strip.DuckFrom != TrackMix.NoKey)
-                strip.DuckFrom = WhereTrackWent(strip.DuckFrom, from, to);
+            if (strip.DuckFrom == TrackMix.NoKey) continue;
 
-            if (strip.PluginNotesTo >= 0)
-                strip.PluginNotesTo = WhereTrackWent(strip.PluginNotesTo, from, to);
+            strip.DuckFrom = WhereTrackWent(strip.DuckFrom, from, to);
         }
 
         return true;

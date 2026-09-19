@@ -657,7 +657,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         {
             MarkDirty(TrackMidiViewModel.Edit);
             MidiPortsMoved?.Invoke();
-        }, track, Song.TrackCount);
+        });
     }
 
     /// <summary>
@@ -2011,6 +2011,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// stops itself when everything reads nought. The mixer was never wrong about any of this;
     /// both faults were in what was asking.
     /// </remarks>
+    /// <summary>When the plugins' notes were last written about, so the line is said once a second.</summary>
+    private long _saidPlayed;
+
     /// <summary>Somewhere to take the plugins' own notes into, made once.</summary>
     private readonly Audio.Plugins.Records.TrackPlayedNote[] _fromPlugins =
         new Audio.Plugins.Records.TrackPlayedNote[128];
@@ -2037,35 +2040,53 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         int many = waiting.Take(_fromPlugins);
 
+        if (Diagnostics.Log.On(Diagnostics.Enums.LogArea.Tracker)
+            && Environment.TickCount64 - _saidPlayed > 1000)
+        {
+            _saidPlayed = Environment.TickCount64;
+
+            long counted = waiting.Counted;
+
+            var said = new System.Text.StringBuilder();
+
+            for (int at = 0; at < many && at < 12; at++)
+                said.Append(' ').Append(_fromPlugins[at].Note.On ? "on " : "off ")
+                    .Append(_fromPlugins[at].Note.Note).Append('@').Append(_fromPlugins[at].Note.Frame);
+
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Tracker, () =>
+                "plugin notes: " + counted + " played so far, " + many + " taken just now; record is "
+                + (IsRecording ? "armed" : "off") + ";" + said);
+        }
+
         for (int at = 0; at < many; at++)
         {
             var (track, played) = _fromPlugins[at];
 
-            if (!_wire.TryNote(played.Note, out var note)) continue;
+            /* Two ways of saying the same note, because the two ends of this differ: a plugin is
+               played by a row's own number, and a port is played by that number twelve higher.
+               Writing the port's way into a pattern would hand the plugin a different pad every
+               time the row came round. */
+            var note = new Note(played.Note);
+
+            if (!note.IsPlayable || !_wire.TryNote(played.Note, out var sent)) continue;
 
             /* Its own voice, well past the pattern's own columns, so a plugin's notes and the
                track's own cannot cut each other short. The same trick the live keys use. */
             int voice = Midi.TrackMidiOut.LiveVoices + played.Note;
 
-            int to = track < Song.Mix.Count ? Song.Mix[track].PluginNotesTo : TrackMix.NoPluginNotes;
-
             if (played.On)
             {
                 int volume = _wire.VolumeFor((int)Math.Round(played.Velocity * _wire.MaxVelocity));
 
-                _player.MidiOut?.NoteOn(Song.Mix, track, voice, note, _wire.VelocityFor(volume));
+                _player.MidiOut?.NoteOn(Song.Mix, track, voice, sent, _wire.VelocityFor(volume));
 
-                if (to == TrackMix.PluginNotesToInserts) _player.ChainFor(track).Note(played.Note, played.Velocity);
-                else if (to >= 0) EnterTrackNote(to, note, volume);
-                else if (IsRecording) EnterTrackNote(track, note, volume, play: false);
+                if (IsRecording) EnterTrackNote(track, note, volume, play: false);
             }
             else
             {
                 _player.MidiOut?.NoteOff(track, voice);
 
-                if (to == TrackMix.PluginNotesToInserts) _player.ChainFor(track).Note(played.Note, -1);
-                else if (to >= 0) LetTrackNote(to, note);
-                else if (IsRecording) LetTrackNote(track, note);
+                if (IsRecording) LetTrackNote(track, note);
             }
         }
     }

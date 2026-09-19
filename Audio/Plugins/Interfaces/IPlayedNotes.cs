@@ -29,4 +29,7 @@ public interface IPlayedNotes
 
     /// <summary>Throws away whatever is waiting, for a transport stop or a song being closed.</summary>
     void Forget();
+
+    /// <summary>How many notes have ever been put down here, for a log to read.</summary>
+    long Counted { get; }
 }

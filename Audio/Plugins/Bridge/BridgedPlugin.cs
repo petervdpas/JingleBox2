@@ -541,11 +541,15 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         {
             int samples = frames * PluginBridge.Channels;
 
+            _playedCount = 0;
+
             if (!process.Collect(frames))
             {
                 if (_asInstrument) Array.Clear(buffer, 0, Math.Min(samples, buffer.Length));
                 return false;
             }
+
+            TookPlayed(process, 0);
 
             fixed (float* destination = buffer)
             {
@@ -671,6 +675,8 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
     {
         int done = 0;
 
+        _playedCount = 0;
+
         while (done < frames)
         {
             int chunk = Math.Min(_maxFrames, frames - done);
@@ -685,6 +691,8 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
                 Array.Clear(buffer, done * PluginBridge.Channels, Math.Min(buffer.Length - done * PluginBridge.Channels, (frames - done) * PluginBridge.Channels));
                 return;
             }
+
+            TookPlayed(process, done);
 
             fixed (float* destination = buffer)
             {

@@ -43,84 +43,15 @@ public sealed class TrackMidiViewModel : ObservableObject
     /// <param name="outputs">The output ports there are.</param>
     /// <param name="changing">Told what is about to change, before it does.</param>
     /// <param name="changed">Told once it has.</param>
-    /// <param name="track">Which track this strip is, so it is not offered to itself.</param>
-    /// <param name="tracks">How many tracks the song has, for the list of them.</param>
     public TrackMidiViewModel(TrackMix mix, IEnumerable<string> inputs, IEnumerable<string> outputs,
-                              Action<string> changing, Action changed, int track = 0, int tracks = 0)
+                              Action<string> changing, Action changed)
     {
         _mix = mix;
         _changing = changing;
         _changed = changed;
-        _track = track;
 
         InPorts = Offered(AnyPort, inputs, mix.MidiIn.Port);
         OutPorts = Offered(NoPort, outputs, mix.MidiOut.Port);
-
-        var targets = new List<string> { NoNotes, ToInserts };
-
-        for (int one = 0; one < tracks; one++)
-            if (one != track) targets.Add(TrackWord + (one + 1).ToString(CultureInfo.InvariantCulture));
-
-        PluginTargets = targets;
-    }
-
-    /// <summary>Which track this strip is.</summary>
-    private readonly int _track;
-
-    /// <summary>The word for a plugin keeping its own notes to itself.</summary>
-    public const string NoNotes = "Nowhere";
-
-    /// <summary>The word for giving them to the effects on this same track.</summary>
-    public const string ToInserts = "Effects here";
-
-    /// <summary>What a track is called in that list, before its number.</summary>
-    public const string TrackWord = "Track ";
-
-    /// <summary>Where a plugin's own notes may be sent.</summary>
-    public IReadOnlyList<string> PluginTargets { get; }
-
-    /// <summary>
-    /// Where the notes this track's plugin plays of its own accord go.
-    /// </summary>
-    /// <remarks>
-    /// A drum machine plugin running its own pattern plays notes as well as sound. This says
-    /// what becomes of them inside the song; the track's MIDI out carries them either way.
-    /// </remarks>
-    public string PluginNotesTo
-    {
-        get => _mix.PluginNotesTo switch
-        {
-            TrackMix.PluginNotesToInserts => ToInserts,
-            >= 0 => TrackWord + (_mix.PluginNotesTo + 1).ToString(CultureInfo.InvariantCulture),
-            _ => NoNotes
-        };
-
-        set
-        {
-            int wanted = WhereNotesGo(value);
-
-            if (wanted == _mix.PluginNotesTo) return;
-
-            _changing(Edit);
-            _mix.PluginNotesTo = wanted;
-            _changed();
-
-            OnPropertyChanged();
-        }
-    }
-
-    /// <summary>What one of the words in the list means as a stored value.</summary>
-    /// <param name="said">The word picked.</param>
-    private int WhereNotesGo(string? said)
-    {
-        if (said == ToInserts) return TrackMix.PluginNotesToInserts;
-
-        if (said != null && said.StartsWith(TrackWord, StringComparison.Ordinal)
-            && int.TryParse(said.AsSpan(TrackWord.Length), NumberStyles.None, CultureInfo.InvariantCulture, out int one)
-            && one >= 1 && one - 1 != _track)
-            return one - 1;
-
-        return TrackMix.NoPluginNotes;
     }
 
     /// <summary>Off, then 1 to 16, so a channel's place in the list is its number.</summary>
