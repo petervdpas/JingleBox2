@@ -268,7 +268,7 @@ internal static class Vst3Abi
     /// Asked of the settings half rather than the audio half, which is where a plugin implements
     /// it. A plugin that does not is one with nothing for a wheel to reach, and answers nothing.
     /// </remarks>
-    public static readonly byte[] MidiMappingId = Uid(0xDF0FF9F7, 0x79374A3F, 0x8BF9E1B4, 0x2AE2A4D9);
+    public static readonly byte[] MidiMappingId = Uid(0xDF0FF9F7, 0x49B74669, 0xB63AB732, 0x7ADBF5E5);
 
     /// <summary>The modulation wheel, which VST3 numbers as MIDI does.</summary>
     /// <remarks>

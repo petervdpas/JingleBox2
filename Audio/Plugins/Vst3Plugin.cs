@@ -956,22 +956,62 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// sends everything: this application plays a plugin instrument on one channel and has
     /// nothing else to offer a plugin that wants them apart.
     ///
-    /// A plugin that answers nothing is one the wheel does not reach, which is an ordinary
-    /// answer and is said nowhere: it happens per message and a line per message is a log nobody
-    /// can read.
+    /// A plugin that answers nothing is one the wheel does not reach, and it is **said once**
+    /// per controller rather than never or per message. A wheel that reaches nothing looks
+    /// exactly like a wheel that was never sent, so silence here is the one thing that cannot be
+    /// told apart from the feature not existing; a line per message is a log nobody can read.
     /// </remarks>
     /// <param name="controller">The controller number, as <see cref="Vst3Abi.MidiMappingId"/> numbers them.</param>
     /// <param name="value">Where to put it, nought to one.</param>
     private void Wheel(short controller, double value)
     {
-        if (_disposed || _mapping == null) return;
+        if (_disposed) return;
+
+        if (_mapping == null)
+        {
+            Said(controller, "reaches nothing, since it offers no IMidiMapping at all");
+            return;
+        }
 
         uint id;
 
         if (_mapping->Vtbl->GetMidiControllerAssignment(_mapping, 0, 0, controller, &id) != Vst3Abi.ResultOk)
+        {
+            Said(controller, "reaches nothing, since it maps that controller to no parameter of its own");
             return;
+        }
+
+        Said(controller, "it is parameter " + id);
 
         SetValue(id, value);
+    }
+
+    /// <summary>Which controllers this plugin has already been reported as not taking.</summary>
+    /// <remarks>
+    /// One line apiece and then silence. A wheel sends tens of messages a second, and what is
+    /// worth knowing is that it reaches nothing rather than how often.
+    /// </remarks>
+    private readonly HashSet<short> _saidNoWheel = new();
+
+    /// <summary>Says once where a wheel got to on this plugin.</summary>
+    /// <remarks>
+    /// Both answers and not only the unhappy one. A wheel that reaches nothing and a wheel that
+    /// was never sent look exactly alike from a chair, and so do a wheel that reached a parameter
+    /// and one whose plugin did nothing with it: what tells them apart is this line being there
+    /// and saying which.
+    /// </remarks>
+    /// <param name="controller">Which wheel.</param>
+    /// <param name="what">Where it got to.</param>
+    private void Said(short controller, string what)
+    {
+        lock (_lock)
+        {
+            if (!_saidNoWheel.Add(controller)) return;
+        }
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
+            "plugin: the " + (controller == Vst3Abi.PitchBendController ? "pitch" : "modulation")
+            + " wheel on this plugin: " + what);
     }
 
     /// <inheritdoc/>
