@@ -253,10 +253,14 @@ public class WheelSoundTests
     [Fact]
     public void A_shipped_machine_that_draws_keys_draws_the_wheels()
     {
+        string[] shipped = Directory.GetFiles(
+            Path.Combine(Root(), "rack", "machines"), "machine.json", SearchOption.AllDirectories);
+
+        Assert.True(shipped.Length > 0, "no machine ships at all, so this would be asking nothing");
+
         int drawn = 0;
 
-        foreach (string path in Directory.GetFiles(
-                     Path.Combine(Root(), "rack", "machines"), "machine.json", SearchOption.AllDirectories))
+        foreach (string path in shipped)
         {
             var face = JsonDocument.Parse(File.ReadAllText(path)).RootElement
                 .GetProperty("Panel").GetProperty("Root");
@@ -268,7 +272,10 @@ public class WheelSoundTests
             Assert.True(Has(face, "Wheels"), path + " draws a keyboard and no wheels beside it");
         }
 
-        Assert.Equal(8, drawn);
+        /* Every one of them, counted off the folder rather than written down here: a number
+           would have to be edited whenever a machine arrives or goes, and an edit like that is
+           made by whoever is already sure the test should still pass. */
+        Assert.Equal(shipped.Length, drawn);
     }
 
     /// <summary>Whether a panel has that part anywhere on it.</summary>

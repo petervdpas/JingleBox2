@@ -7,7 +7,6 @@ using JingleBox2.Files.Interfaces;
 using JingleBox2.SoundDevices.SoundMachines;
 using JingleBox2.SoundDevices.SoundMachines.Records;
 using JingleBox2.Tracker;
-using JingleBox2.Tracker.Synth.Enums;
 using JingleBox2.ViewModels;
 using JingleBox2.ViewModels.Interfaces;
 using Xunit;
@@ -18,10 +17,17 @@ namespace JingleBox2.Tests;
 /// Keeping a preset of your own on a soundmachine, and taking one off.
 /// </summary>
 /// <remarks>
-/// Walked over real folders: Lighttower as it ships, copied beside a test's own application
-/// folder and installed by the real registry, so what is yours and what the machine ships with is
-/// answered the way the application answers it. Every unhappy path here is a way of losing a
-/// preset somebody made, or of taking one the machine ships with, so those are most of it.
+/// Walked over real folders and a real registry: a machine of this test's own is written into a
+/// shipped folder of its own, installed the way the application installs one, and worked on from
+/// there, so what is yours and what the machine ships with is answered the way the application
+/// answers it. Every unhappy path here is a way of losing a preset somebody made, or of taking
+/// one the machine ships with, so those are most of it.
+///
+/// **The machine is made here and is not one that ships**, which is the whole reason this file
+/// stopped breaking. What is on the rack is content: a machine can be added, renamed or taken out
+/// of the repository on any afternoon, and a test that leant on one went red for a reason that
+/// had nothing to do with what it was asking. It did: Lighttower was removed and fifteen tests
+/// about preset naming failed. What ships is tested by the files that are about what ships.
 /// </remarks>
 public sealed class PresetKeepingTests : IDisposable
 {
@@ -83,14 +89,14 @@ public sealed class PresetKeepingTests : IDisposable
 
     private readonly SoundMachineProjects _projects = new();
 
-    /// <summary>Ships Lighttower beside a fresh application folder and installs it.</summary>
+    /// <summary>Ships a machine of this test's own beside a fresh application folder, and installs it.</summary>
     public PresetKeepingTests()
     {
         string shipped = Path.Combine(_root, "shipped", "rack", "machines");
         string app = Path.Combine(_root, "app");
 
         Directory.CreateDirectory(app);
-        Copy(Real(), Path.Combine(shipped, "Lighttower"));
+        Write(Path.Combine(shipped, Named));
 
         _registry = new SoundMachineRegistry(folder: new Somewhere(app), shipped: shipped);
         _projects.Keep(_registry.Load());
@@ -104,39 +110,140 @@ public sealed class PresetKeepingTests : IDisposable
         if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);
     }
 
-    /// <summary>The Lighttower that ships with this checkout.</summary>
-    private static string Real()
+    /// <summary>The machine these tests are run over, as its folder and its id are spelled.</summary>
+    private const string Named = "Bench";
+
+    /// <inheritdoc cref="Named"/>
+    private const string Id = "machine.bench";
+
+    /// <summary>
+    /// The sixteen keys a kit's pads sit on, which is the grid a kit machine draws.
+    /// </summary>
+    /// <remarks>
+    /// Sixteen and not two, because a kit instrument has sixteen pads whatever its face shows,
+    /// and a preset only carries the pads the face draws: with a shorter grid the pads past the
+    /// end are quietly dropped, which is a kept preset that has lost half its sounds.
+    /// </remarks>
+    private static readonly string[] PadKeys =
     {
-        var at = new DirectoryInfo(AppContext.BaseDirectory);
+        "C-4", "C#4", "D-4", "D#4", "E-4", "F-4", "F#4", "G-4",
+        "G#4", "A-4", "A#4", "B-4", "C-5", "C#5", "D-5", "D#5",
+    };
 
-        while (at != null && !Directory.Exists(Path.Combine(at.FullName, "rack", "machines", "Lighttower"))) at = at.Parent;
+    /// <summary>The names this machine ships with, which is what a preset of yours may not take.</summary>
+    /// <remarks>
+    /// Three is enough to ask everything here: one to be refused in its own spelling, one to be
+    /// refused in another, and a third so a list has something left in it.
+    /// </remarks>
+    private static readonly string[] Shipping = { "01 Init", "02 Glass", "03 Teeth" };
 
-        return Path.Combine(at!.FullName, "rack", "machines", "Lighttower");
-    }
+    /// <summary>
+    /// Writes a machine into a folder: a manifest, and the presets it is born with.
+    /// </summary>
+    /// <remarks>
+    /// Its own rather than one off the rack. The rules being asked about here are the library's,
+    /// and they are the same whatever machine is under them; leaning on one that ships makes this
+    /// file break whenever somebody edits content, which is not what it is about.
+    ///
+    /// A synth, because the preset it keeps has to carry a patch that can be read back, and the
+    /// engine is compiled in where a face is not.
+    /// </remarks>
+    /// <param name="to">Where the machine goes.</param>
+    private static void Write(string to) => Write(to, Id, Named, "Synth", Shipping);
 
-    /// <summary>A folder and everything in it.</summary>
-    private static void Copy(string from, string to)
+    /// <summary>
+    /// Writes a device into a folder: a manifest, and the presets it is born with.
+    /// </summary>
+    /// <remarks>
+    /// One writer for both worlds, since what differs between them is the name of the file at
+    /// the top of the folder and the word a preset files itself under. See <see cref="Write(string)"/>
+    /// for why these are made here rather than taken off the rack.
+    /// </remarks>
+    /// <param name="to">Where the device goes.</param>
+    /// <param name="id">Its id, which is what a song and a chain write down.</param>
+    /// <param name="name">What it is called.</param>
+    /// <param name="engine">The engine it plays, which this build has to have.</param>
+    /// <param name="presets">The names it ships with.</param>
+    /// <param name="effect">True for an effect, which keeps a different manifest and preset key.</param>
+    /// <param name="pads">True for a kit, whose preset carries a wave per pad off its own grid.</param>
+    private static void Write(string to, string id, string name, string engine,
+                              IReadOnlyList<string> presets, bool effect = false, bool pads = false)
     {
         Directory.CreateDirectory(to);
 
-        foreach (string file in Directory.GetFiles(from)) File.Copy(file, Path.Combine(to, Path.GetFileName(file)));
-        foreach (string folder in Directory.GetDirectories(from)) Copy(folder, Path.Combine(to, Path.GetFileName(folder)));
+        /* The two controls the tests below vary, declared on the face: a preset carries the keys
+           the face names and nothing else, so a machine with no parameters keeps a preset that
+           has forgotten the sound. That is the machine's rule and not a thing to work around. */
+        const string knobs =
+            ",\"Parameters\":[{\"Key\":\"decay\",\"Min\":0,\"Max\":5000,\"Saved\":true},"
+            + "{\"Key\":\"release\",\"Min\":0,\"Max\":5000,\"Saved\":true}]";
+
+        /* And the one an effect's preset is asked to carry below. */
+        const string dials =
+            ",\"Parameters\":[{\"Key\":\"time\",\"Min\":0,\"Max\":2000,\"Saved\":true},"
+            + "{\"Key\":\"mix\",\"Min\":0,\"Max\":1,\"Saved\":true}]";
+
+        /* A kit's preset carries a wave per pad, and which pads there are is read off the grid
+           the face draws: a kit with no Pads part keeps a preset that has forgotten its sounds. */
+        string grid =
+            ",\"Panel\":{\"Root\":{\"Element\":\"Column\",\"Children\":"
+            + "[{\"Element\":\"Pads\",\"Properties\":{\"rows\":\"4\",\"columns\":\"4\"},\"Children\":["
+            + string.Join(",", PadKeys.Select((key, at) =>
+                  "{\"Element\":\"Pad\",\"Parameter\":\"pad" + (at + 1) + "\",\"Properties\":{\"key\":\"" + key + "\"}}"))
+            + "]}]}}";
+
+        File.WriteAllText(Path.Combine(to, effect ? "effect.json" : "machine.json"),
+            "{\"Id\":\"" + id + "\",\"Name\":\"" + name + "\",\"Version\":\"1.0\",\"Engine\":\"" + engine + "\""
+            + (effect ? dials : knobs) + (pads ? grid : "") + "}");
+
+        string folder = Path.Combine(to, SoundMachineProject.PresetsFolder);
+
+        Directory.CreateDirectory(folder);
+
+        foreach (string one in presets)
+        {
+            if (pads)
+            {
+                /* A kit's shipped preset keeps its own sounds in a folder beside it, named from
+                   there, which is how one travels in the machine's zip. */
+                string beside = Path.Combine(folder, one);
+
+                Directory.CreateDirectory(beside);
+                File.WriteAllBytes(Path.Combine(beside, "Kick.wav"), new byte[] { 8, 8 });
+
+                File.WriteAllText(Path.Combine(folder, one + ".json"),
+                    "{\"Name\":\"" + one + "\",\"Machine\":\"" + id + "\","
+                    + "\"C-4\":{\"pad_take\":\"" + one + "/Kick.wav\",\"pad_name\":\"Kick\"}}");
+
+                continue;
+            }
+
+            File.WriteAllText(Path.Combine(folder, one + ".json"),
+                effect
+                    ? "{\"Name\":\"" + one + "\",\"Effect\":\"" + id + "\",\"mix\":0.3}"
+                    : "{\"Name\":\"" + one + "\",\"Kind\":1,\"MachineId\":\"" + id + "\"}");
+        }
     }
 
     /// <summary>A library over the installed machines, answering what ships by the real registry.</summary>
     private SoundMachinePresets Library() => new(_projects, registry: _registry);
 
-    /// <summary>The installed Lighttower's presets folder.</summary>
-    private string Folder => Path.Combine(_projects.For("machine.lighttower")!.Folder, SoundMachineProject.PresetsFolder);
+    /// <summary>The installed machine's presets folder.</summary>
+    private string Folder => Path.Combine(_projects.For(Id)!.Folder, SoundMachineProject.PresetsFolder);
 
-    /// <summary>An instrument on Lighttower, with a sweep nobody ships.</summary>
-    private static TrackerInstrument Sound(double sweep = 1234)
+    /// <summary>An instrument on that machine, with a release nobody ships.</summary>
+    /// <remarks>
+    /// One number out of the patch is varied and read back, which is the whole of what the
+    /// preset has to carry for these: a kept preset that lost the sound would be a preset of
+    /// the machine rather than of what somebody made on it.
+    /// </remarks>
+    private static TrackerInstrument Sound(double release = 1234)
     {
-        var instrument = TrackerInstrument.CreateSegments("Mine");
+        var instrument = TrackerInstrument.CreateSynth("Mine");
 
-        instrument.MachineId = "machine.lighttower";
-        instrument.Segments!.SweepMs = sweep;
-        instrument.Segments.Motion = SegmentMotion.Bounce;
+        instrument.MachineId = Id;
+        instrument.Patch!.ReleaseMs = release;
+        instrument.Patch.DecayMs = 777;
 
         return instrument;
     }
@@ -147,6 +254,9 @@ public sealed class PresetKeepingTests : IDisposable
     {
         var library = Library();
         var sound = Sound();
+
+        /* Counted before anything is kept, since what is kept lands in the same folder. */
+        int shipping = Shipping.Length;
 
         var kept = library.Keep(sound.Machine, sound, "  Teeth of Mine ");
 
@@ -160,9 +270,9 @@ public sealed class PresetKeepingTests : IDisposable
         var listed = library.For(sound.Machine);
 
         Assert.Same(listed[^1], kept);
-        Assert.Equal(22, listed.Count(one => !one.Yours));
-        Assert.Equal(1234, kept.Sound.Segments!.SweepMs);
-        Assert.Equal(SegmentMotion.Bounce, kept.Sound.Segments.Motion);
+        Assert.Equal(shipping, listed.Count(one => !one.Yours));
+        Assert.Equal(1234, kept.Sound.Patch!.ReleaseMs);
+        Assert.Equal(777, kept.Sound.Patch.DecayMs);
 
         var fresh = Library().For(sound.Machine);
 
@@ -177,7 +287,10 @@ public sealed class PresetKeepingTests : IDisposable
         var sound = Sound();
         int before = Directory.GetFiles(Folder).Length;
 
-        foreach (string name in new[] { "", "   ", "a/b", "back\\slash", "what?", ".hidden", "init", "01 Init", "Glass Organ" })
+        /* The last two are the machine's own, in its spelling and in another: a name that ships
+           cannot be taken, whichever way it is typed. */
+        foreach (string name in new[] { "", "   ", "a/b", "back\\slash", "what?", ".hidden",
+                                        Shipping[0], Shipping[1].ToUpperInvariant() })
         {
             Assert.NotEqual("", library.Refusal(sound.Machine, name));
             Assert.Null(library.Keep(sound.Machine, sound, name));
@@ -195,14 +308,14 @@ public sealed class PresetKeepingTests : IDisposable
     {
         var library = Library();
 
-        library.Keep(Sound().Machine, Sound(500), "Pad");
+        library.Keep(Sound().Machine, Sound(500), "Mine Own");
 
-        Assert.NotNull(library.Yours(Sound().Machine, "PAD"));
+        Assert.NotNull(library.Yours(Sound().Machine, "MINE OWN"));
 
-        var again = library.Keep(Sound().Machine, Sound(900), "pad");
+        var again = library.Keep(Sound().Machine, Sound(900), "mine own");
 
         Assert.Single(library.For(Sound().Machine), one => one.Yours);
-        Assert.Equal(900, again!.Sound.Segments!.SweepMs);
+        Assert.Equal(900, again!.Sound.Patch!.ReleaseMs);
     }
 
     /// <summary>Only a preset of yours comes off, and one the machine ships with stays however it is asked.</summary>
@@ -281,7 +394,7 @@ public sealed class PresetKeepingTests : IDisposable
     {
         var sound = Sound();
         var picker = new InstrumentPresets(sound, () => { }, _projects, library: Library());
-        var answers = new Answers { Named = "Init" };
+        var answers = new Answers { Named = Shipping[0] };
         var menu = new PresetMenu(picker, answers);
 
         Assert.True(menu.Read()[0].Live);
@@ -318,12 +431,12 @@ public sealed class PresetKeepingTests : IDisposable
 
         Assert.False(await second.Save());
         Assert.Contains("replace Twice", answers.Said);
-        Assert.Equal(300, Library().Yours(Sound().Machine, "Twice")!.Sound.Segments!.SweepMs);
+        Assert.Equal(300, Library().Yours(Sound().Machine, "Twice")!.Sound.Patch!.ReleaseMs);
 
         answers.Replacing = true;
 
         Assert.True(await second.Save());
-        Assert.Equal(800, Library().Yours(Sound().Machine, "Twice")!.Sound.Segments!.SweepMs);
+        Assert.Equal(800, Library().Yours(Sound().Machine, "Twice")!.Sound.Patch!.ReleaseMs);
     }
 
     /// <summary>Delete is asked about, a no keeps the file, and the sound on the instrument is untouched.</summary>
@@ -349,7 +462,7 @@ public sealed class PresetKeepingTests : IDisposable
         Assert.True(await menu.Delete());
         Assert.False(File.Exists(file));
         Assert.Null(picker.PickedYours);
-        Assert.Equal(4321, sound.Segments!.SweepMs);
+        Assert.Equal(4321, sound.Patch!.ReleaseMs);
         Assert.False(menu.Read()[1].Live);
         Assert.False(await menu.Delete());
     }
@@ -369,9 +482,8 @@ public sealed class PresetKeepingTests : IDisposable
 
     /// <summary>An effect keeps where its controls stand as a preset of yours, from the same Menu lines, and only yours come off.</summary>
     /// <remarks>
-    /// EchoBox as it ships, copied beside a folder of this test's own and installed by the real
-    /// registry, so its nine are the effect's own and a kept one is yours by the same question a
-    /// soundmachine asks.
+    /// An effect of this test's own, installed by the real registry, so what it ships with is
+    /// known here and a kept one is yours by the same question a soundmachine asks.
     /// </remarks>
     [Fact]
     public async Task An_effect_keeps_presets_of_yours_too()
@@ -380,20 +492,20 @@ public sealed class PresetKeepingTests : IDisposable
         string app = Path.Combine(_root, "app-effects");
 
         Directory.CreateDirectory(app);
-        Copy(Path.Combine(Path.GetDirectoryName(Real())!, "..", "effects", "EchoBox"), Path.Combine(shipped, "EchoBox"));
+        Write(Path.Combine(shipped, "Bench"), "effect.bench", "Bench", "Delay", Shipping, effect: true);
 
         var registry = new JingleBox2.SoundDevices.SoundEffects.SoundEffectRegistry(folder: new Somewhere(app), shipped: shipped);
-        var effect = registry.Load().Single(one => one.Name == "EchoBox");
+        var effect = registry.Load().Single(one => one.Name == "Bench");
         var shelf = new JingleBox2.SoundDevices.SoundEffects.SoundEffectPresets(registry: registry);
 
         var values = new JingleBox2.SoundDevices.SoundEffects.SoundEffectValues(
             new JingleBox2.SoundDevices.SoundEffects.Delay(48000, effect.Id));
 
         var picker = new SoundEffectPresetNames(effect, values, shelf);
-        var answers = new Answers { Named = "Slapback" };
+        var answers = new Answers { Named = Shipping[0] };
         var menu = new PresetMenu(picker, answers);
 
-        Assert.Equal(9, picker.Names.Count);
+        Assert.Equal(Shipping.Length, picker.Names.Count);
         Assert.All(shelf.For(effect), one => Assert.False(one.Yours));
 
         Assert.False(await menu.Save());
@@ -408,14 +520,14 @@ public sealed class PresetKeepingTests : IDisposable
 
         Assert.True(await menu.Save());
         Assert.Equal("My Echo", picker.PickedYours);
-        Assert.Equal(10, picker.Names.Count);
+        Assert.Equal(Shipping.Length + 1, picker.Names.Count);
         Assert.Equal(JingleBox2.SoundDevices.SoundEffects.Records.SoundEffectPreset.YoursMark + "My Echo", picker.Names[^1]);
         Assert.Equal(777, shelf.Yours(effect, "my echo")!.Settings["time"]);
         Assert.True(menu.Read()[1].Live);
 
         Assert.True(await menu.Delete());
         Assert.Null(picker.PickedYours);
-        Assert.Equal(9, picker.Names.Count);
+        Assert.Equal(Shipping.Length, picker.Names.Count);
         Assert.Equal(777, values.Get("time"));
         Assert.All(shelf.For(effect), one => Assert.True(File.Exists(one.File)));
     }
@@ -440,7 +552,8 @@ public sealed class PresetKeepingTests : IDisposable
 
         Directory.CreateDirectory(app);
         Directory.CreateDirectory(elsewhere);
-        Copy(Path.Combine(Path.GetDirectoryName(Real())!, "Chopper"), Path.Combine(shipped, "Chopper"));
+        Write(Path.Combine(shipped, "Chopper"), "machine.chopper", "Chopper", "Kit",
+              new[] { "Energy Beat" }, pads: true);
 
         string first = Path.Combine(takes, "loop one", "Kick.wav");
         string second = Path.Combine(takes, "loop two", "Kick.wav");
@@ -527,7 +640,8 @@ public sealed class PresetKeepingTests : IDisposable
         string shelf = Path.Combine(_root, "shelf");
 
         Directory.CreateDirectory(app);
-        Copy(Path.Combine(Path.GetDirectoryName(Real())!, "Chopper"), Path.Combine(shipped, "Chopper"));
+        Write(Path.Combine(shipped, "Chopper"), "machine.chopper", "Chopper", "Kit",
+              new[] { "Energy Beat" }, pads: true);
 
         string loop = Path.Combine(shelf, "loop.wav");
         string kick = Path.Combine(shelf, "chopped", "loop", "Kick.wav");

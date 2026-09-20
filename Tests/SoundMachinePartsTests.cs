@@ -29,6 +29,29 @@ public class SoundMachinePartsTests
     /// The test run's own output folder, which the build copies them into. Read rather than
     /// listed, so a machine added later is checked without anybody remembering to add it here.
     /// </remarks>
+    /// <summary>
+    /// How many machines really ship, counted off the folders rather than written down.
+    /// </summary>
+    /// <remarks>
+    /// What the tests below compare against, so that adding a machine or taking one away needs
+    /// no test edited and a number here cannot go stale. It is still a count and not nothing: a
+    /// manifest that will not read is skipped by <see cref="Shipped"/> in silence, so a walk that
+    /// merely visited what it could parse would pass with half the rack missing.
+    /// </remarks>
+    private static int HowManyShip()
+    {
+        string folder = Path.Combine(AppContext.BaseDirectory, "rack", "machines");
+
+        Assert.True(Directory.Exists(folder), "the machines that ship are not beside the program");
+
+        int found = Directory.GetDirectories(folder)
+            .Count(one => File.Exists(Path.Combine(one, "machine.json")));
+
+        Assert.True(found > 0, "no machine ships at all, so these tests would be asking nothing");
+
+        return found;
+    }
+
     private static IEnumerable<(string Name, Panel Panel)> Shipped()
     {
         string folder = Path.Combine(AppContext.BaseDirectory, "rack", "machines");
@@ -87,7 +110,7 @@ public class SoundMachinePartsTests
                 name + " has no InstrumentName on its face");
         }
 
-        Assert.Equal(8, seen);
+        Assert.Equal(HowManyShip(), seen);
     }
 
     /// <summary>Every machine that ships carries a menu, in the corner every program puts one.</summary>

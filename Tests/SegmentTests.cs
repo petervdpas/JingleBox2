@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Linq;
 using System.Text.Json;
 using JingleBox2.Rack.SoundDevices.Faces;
@@ -14,7 +13,13 @@ using Xunit;
 namespace JingleBox2.Tests;
 
 /// <summary>
-/// Lighttower, measured rather than listened to.
+/// Lighttower's engine, measured rather than listened to.
+///
+/// The engine and not the machine. Lighttower's face stopped shipping, so what was asked of that
+/// face went with it: that its eleven controls each moved the patch, and that its own presets
+/// read back the two drawn waves. Those were about shipped content, and there is none to walk.
+/// Everything here is about <see cref="TrackerInstrumentKind.Segments"/> itself, which is still
+/// compiled in and still what every song that used it names.
 /// </summary>
 /// <remarks>
 /// A drawn wave is arithmetic that can be checked without ears: a flat line is silence, a note
@@ -365,108 +370,5 @@ public sealed class SegmentTests
         mixer.Render(buffer, 256);
 
         Assert.Contains(buffer, sample => sample != 0);
-    }
-
-    /// <summary>Where the machine that ships is, found by walking up from the test's own folder.</summary>
-    private static string Shipped()
-    {
-        var at = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (at != null && !Directory.Exists(Path.Combine(at.FullName, "rack", "machines", "Lighttower"))) at = at.Parent;
-
-        return at is null ? "" : Path.Combine(at.FullName, "rack", "machines", "Lighttower");
-    }
-
-    /// <summary>
-    /// Every control on the shipped face is a key the panel's values answer, and reads back what it
-    /// was set to, and the drawing page names the two words the values keep the lines under.
-    /// </summary>
-    [Fact]
-    public void Every_control_on_the_face_moves_the_patch()
-    {
-        var machine = SoundMachineProject.Open(Shipped());
-
-        Assert.NotNull(machine);
-        Assert.Equal(TrackerInstrumentKind.Segments, JingleBox2.SoundDevices.SoundMachines.Records.SoundMachine.EngineNamed(machine!.Engine));
-
-        var instrument = TrackerInstrument.CreateSegments("Test");
-        var values = new SegmentValues(instrument.Segments!, instrument);
-
-        Assert.Equal(11, machine.Parameters.Count);
-
-        foreach (var parameter in machine.Parameters)
-        {
-            double wanted = parameter.Max;
-
-            values.Set(parameter.Key, wanted);
-
-            Assert.True(Math.Abs(values.Get(parameter.Key) - wanted) < 1e-9,
-                parameter.Key + " was set to " + wanted + " and reads " + values.Get(parameter.Key));
-        }
-
-        var page = Find(machine.Panel.Root, ElementKinds.Segments);
-
-        Assert.NotNull(page);
-        Assert.Equal(SegmentValues.BeginKey, page!.Properties["begin"]);
-        Assert.Equal(SegmentValues.EndKey, page.Properties["end"]);
-
-        static JingleBox2.Rack.SoundDevices.Faces.PanelElement? Find(JingleBox2.Rack.SoundDevices.Faces.PanelElement element, string kind) =>
-            element.Element == kind ? element : element.Children.Select(child => Find(child, kind)).FirstOrDefault(found => found != null);
-    }
-
-    /// <summary>
-    /// A preset written off an instrument and read back is the same drawing, and every shipped
-    /// preset reads as two whole lines.
-    /// </summary>
-    /// <remarks>
-    /// The lines are words, and a word the machine does not declare is dropped as a preset is read,
-    /// silently and correctly. So a face that lost its drawing page, or a writer that forgot the
-    /// words, would load every preset onto a sine and a saw with nothing saying why.
-    /// </remarks>
-    [Fact]
-    public void A_preset_keeps_the_drawing()
-    {
-        var machine = SoundMachineProject.Open(Shipped())!;
-        var files = new SoundMachinePresetFile();
-        var instrument = TrackerInstrument.CreateSegments("Mine");
-
-        instrument.Segments!.Begin = Line(point => point < 40 ? 0.5 : -0.25);
-        instrument.Segments.Motion = SegmentMotion.Loop;
-
-        string path = Path.Combine(Path.GetTempPath(), "lighttower-" + Guid.NewGuid().ToString("N") + ".json");
-
-        try
-        {
-            File.WriteAllText(path, files.Write(instrument, machine));
-
-            var back = files.Read(path, machine)!;
-
-            Assert.Equal(new WaveSegments().Read(new WaveSegments().Spell(instrument.Segments.Begin)), back.Segments!.Begin);
-            Assert.Equal(SegmentPatch.Saw(), back.Segments.End);
-            Assert.Equal(SegmentMotion.Loop, back.Segments.Motion);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
-
-        int read = 0;
-
-        foreach (string file in Directory.GetFiles(Path.Combine(Shipped(), "presets"), "*.json"))
-        {
-            var sound = files.Read(file, machine);
-
-            Assert.NotNull(sound);
-            Assert.Contains("\"begin\"", File.ReadAllText(file));
-            Assert.Equal(new WaveSegments().Read(JsonNodeWord(file, "begin")), sound!.Segments!.Begin);
-            Assert.Equal(new WaveSegments().Read(JsonNodeWord(file, "end")), sound.Segments.End);
-
-            read++;
-        }
-
-        Assert.Equal(22, read);
-
-        static string JsonNodeWord(string file, string key) =>
-            System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(file))![key]!.GetValue<string>();
     }
 }
