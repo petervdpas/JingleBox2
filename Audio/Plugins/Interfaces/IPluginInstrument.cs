@@ -29,6 +29,36 @@ public interface IPluginInstrument : IPluginParameters, IDisposable
     void AllNotesOff();
 
     /// <summary>
+    /// The pitch wheel beside the keys, minus one for all the way down to one for all the way up.
+    /// </summary>
+    /// <remarks>
+    /// **Sent as it arrived, and the range is the plugin's.** How far a wheel bends is a setting
+    /// on the plugin's own face, which is where whoever plays it will look for it, so a host that
+    /// applied a range of its own would be bending twice and neither number would match what is
+    /// on the screen. That is the opposite of what one of our own machines wants, where the range
+    /// is <c>TrackerInstrument.BendSemitones</c> and there is no other face to disagree with.
+    ///
+    /// Nought is the wheel at rest, which is where a plugin is until one moves. Nothing by
+    /// default, so a plugin that has not been told about the wheels leaves its notes at the
+    /// pitch they were played at rather than having a host invent something.
+    /// </remarks>
+    /// <param name="lean">Where the wheel is, -1 to 1.</param>
+    void Bend(double lean)
+    {
+    }
+
+    /// <summary>And the modulation wheel, nought for nothing up to one.</summary>
+    /// <remarks>
+    /// What it modulates is the plugin's own business and nothing a host can ask about: it is
+    /// whichever parameter the plugin says its wheel is, which is the one thing here that is
+    /// genuinely not ours to decide. See <see cref="Bend"/> for why nothing is scaled on the way.
+    /// </remarks>
+    /// <param name="amount">How far up the wheel is, 0 to 1.</param>
+    void Modulate(double amount)
+    {
+    }
+
+    /// <summary>
     /// Fills a block with what the plugin is playing, replacing whatever was in it. Runs on
     /// the audio thread.
     /// </summary>

@@ -22,6 +22,42 @@ public interface IControlTargets
     IControlTarget? Find(ControlMapping mapping);
 
     /// <summary>
+    /// What the modulation wheel drives on the machine a track plays, or nothing where it drives
+    /// nothing.
+    /// </summary>
+    /// <remarks>
+    /// A wheel is not pointed at anything and never has been: which parameter it moves is the
+    /// machine's own declaration, carried in its manifest and travelling in its zip. So the
+    /// machine has to be found before the mapping can be built, which is the one thing
+    /// <see cref="Find"/> cannot do for a caller: it is handed a parameter and this has to go
+    /// and ask for one.
+    ///
+    /// It still comes back as an <see cref="IControlTarget"/> rather than as a write, because
+    /// what a wheel does to a machine parameter is exactly what a knob does to it: through the
+    /// panel's own values, so the picture moves with the sound, in the parameter's own range, and
+    /// answering nothing where the track plays nothing.
+    ///
+    /// Nothing for a plugin, which is sent the wheel as it arrived and decides for itself.
+    ///
+    /// Answers nothing unless a class means it to, the same as <see cref="On"/> and for the same
+    /// reason: every implementation but one here is a test standing in for the program.
+    /// </remarks>
+    /// <param name="track">The track, counted from nought.</param>
+    IControlTarget? Wheel(int track) => null;
+
+    /// <summary>
+    /// The same, for the machine open on the rack, which is what the rack's own keyboard plays.
+    /// </summary>
+    /// <remarks>
+    /// Its own question rather than <see cref="Wheel"/> with a track that means the rack, because
+    /// there is no track: an instrument being built on the rack may be in no song at all, which
+    /// is the same reason its notes go to a bus of their own. What differs is only where the
+    /// values are read and written, and both answers are worked out in one class so the wheel
+    /// cannot mean two things depending on which keyboard is under the hand.
+    /// </remarks>
+    IControlTarget? WheelOnRack() => null;
+
+    /// <summary>
     /// Everything on a track that could be pointed at, and what to call each of them.
     /// </summary>
     /// <remarks>

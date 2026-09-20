@@ -5,6 +5,7 @@
   "Author": "Peter van de Pas",
   "Version": "1.03",
   "Engine": "Recording",
+  "Wheel": "vibrato_depth",
   "Theme": {
     "Accent": "#3FA6A0",
     "Face": 0.68,
@@ -816,13 +817,35 @@
           ]
         },
         {
-          "Element": "Keys",
+          "Element": "Row",
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down, not for as long as what it started goes on sounding. The arrows and the lamps move the three octaves on show."
+            "gap": "14",
+            "heights": "own"
           },
-          "Children": []
+          "Children": [
+            {
+              "Element": "Wheels",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "tip": "The pitch and modulation wheels on your keyboard, shown where they are being held. They report: they are moved from the keyboard rather than from here.",
+                "align": "bottom"
+              },
+              "Children": []
+            },
+            {
+              "Element": "Keys",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down, not for as long as what it started goes on sounding. The arrows and the lamps move the three octaves on show.",
+                "align": "bottom"
+              },
+              "Children": []
+            }
+          ]
         },
         {
           "Element": "Menu",

@@ -151,6 +151,16 @@ public sealed class FmVoice : IVoice
     public float Pan { get; set; }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Read once at the top of a block rather than per sample. A wheel moves tens of times a
+    /// second and a block is a few milliseconds, so reading it again inside the loop buys
+    /// nothing anybody can hear and costs the one thing the loop cannot afford; and a bend that
+    /// changed halfway through a block would be applied to part of it, which is a step in the
+    /// pitch rather than a slide.
+    /// </remarks>
+    public float Bend { get; set; }
+
+    /// <inheritdoc/>
     public float Level { get; private set; }
 
     /// <inheritdoc/>
@@ -214,13 +224,14 @@ public sealed class FmVoice : IVoice
         double share = _patch.Volume / carriers;
         double feedback = _patch.Feedback * FeedbackDepth * 0.5;
         double step = 1.0 / _sampleRate;
+        double wheel = Bend == 0 ? 1.0 : Math.Pow(2.0, Bend / 12.0);
         float loudest = 0;
 
         for (int at = 0; at < FmPatch.Operators; at++)
         {
             var one = Operator(at);
 
-            _steps[at] = _hz * one.Ratio * Math.Pow(2.0, one.FineCents / 1200.0) / _sampleRate;
+            _steps[at] = _hz * wheel * one.Ratio * Math.Pow(2.0, one.FineCents / 1200.0) / _sampleRate;
             _levels[at] = one.Level * one.Level;
         }
 

@@ -258,6 +258,34 @@ internal static class Vst3Abi
     public static readonly byte[] EditControllerId = Uid(0xDCD7BBE3, 0x7742448D, 0xA874AACC, 0x979C759E);
 
     /// <summary>
+    /// What a plugin turns when a wheel moves: which of its parameters each MIDI controller is.
+    /// </summary>
+    /// <remarks>
+    /// VST3 has no event for a controller. A plugin says which parameter each one means and the
+    /// host writes that parameter, so a modulation wheel arrives as an ordinary parameter change
+    /// and needs no new road: it is the road the knobs already take.
+    ///
+    /// Asked of the settings half rather than the audio half, which is where a plugin implements
+    /// it. A plugin that does not is one with nothing for a wheel to reach, and answers nothing.
+    /// </remarks>
+    public static readonly byte[] MidiMappingId = Uid(0xDF0FF9F7, 0x79374A3F, 0x8BF9E1B4, 0x2AE2A4D9);
+
+    /// <summary>The modulation wheel, which VST3 numbers as MIDI does.</summary>
+    /// <remarks>
+    /// The controller numbers a plugin is asked about are MIDI's own for 0 to 127, and then two
+    /// that MIDI sends as messages of their own rather than as controllers. Those two carry on
+    /// from the end: <see cref="AfterTouchController"/> is 128 and
+    /// <see cref="PitchBendController"/> is 129.
+    /// </remarks>
+    public const short ModulationController = 1;
+
+    /// <inheritdoc cref="ModulationController"/>
+    public const short AfterTouchController = 128;
+
+    /// <inheritdoc cref="ModulationController"/>
+    public const short PitchBendController = 129;
+
+    /// <summary>
     /// The door the two halves are wired together through. A host that does not wire them leaves
     /// a plugin whose window and whose sound know nothing about each other.
     /// </summary>
@@ -932,6 +960,36 @@ internal unsafe struct IEditController
 {
     /// <summary>The table of function pointers.</summary>
     public IEditControllerVtbl* Vtbl;
+}
+
+/// <summary>Which parameter each MIDI controller turns. See <see cref="Vst3Abi.MidiMappingId"/>.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct IMidiMappingVtbl
+{
+    /// <summary>The root's three.</summary>
+    public FUnknownVtbl Base;
+
+    /// <summary>
+    /// Which parameter a controller on a bus and a channel means, written into the last argument.
+    /// </summary>
+    /// <remarks>
+    /// The channel and the controller number are sixteen bit, which is what the interface says
+    /// and is worth being exact about: a wider argument here is not a harmless difference, it is
+    /// a different call.
+    ///
+    /// Anything but <see cref="Vst3Abi.ResultOk"/> means this controller turns nothing on this
+    /// plugin, which is an ordinary answer and not a fault. The answer may change when the
+    /// plugin loads a preset, so it is asked for rather than kept.
+    /// </remarks>
+    public delegate* unmanaged[Cdecl]<void*, int, short, short, uint*, int> GetMidiControllerAssignment;
+}
+
+/// <summary>That mapping as an object: one word, pointing at its table.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct IMidiMapping
+{
+    /// <summary>The table of function pointers.</summary>
+    public IMidiMappingVtbl* Vtbl;
 }
 
 /// <summary>One parameter as the settings half describes it.</summary>

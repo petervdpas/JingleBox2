@@ -36,3 +36,32 @@ controller it was learned on, so two desks pointed at one machine do not fight.
 What each controller is pointed at is on MIDI CC, the last word along the top, one
 card per controller per thing. A card is a template: it can be written out to a file
 and read back on another machine.
+
+## The pitch and modulation wheels
+
+They need none of that. Controller one is the modulation wheel in the MIDI
+specification itself and the pitch wheel has a message of its own, so both work the
+moment a keyboard is plugged in and its port is ticked for **Tracker**. There is
+nothing to point, nothing to learn and nothing stored.
+
+A wheel goes where the keys beside it go: the same port, the same half of the
+application, and the same track. A keyboard whose MIDI in is pointed at track three
+bends track three; otherwise the wheels reach whatever the cursor is on, or the rack
+while you are building a sound there.
+
+How far the pitch wheel bends is the instrument's own setting, two semitones unless
+you say otherwise. What the modulation wheel turns is the machine's: OddSkilla gives
+it the vibrato depth, Ouroboros the modulation amount, Operetta the feedback, and a
+machine that names none is left alone by it. A plugin is sent both wheels as they
+arrived and decides for itself, since the range and the destination are settings on
+its own face.
+
+You can still point the modulation wheel at something with `Ctrl+Shift+M`, and that
+link then wins: it stops being a wheel and becomes a knob like any other. The pitch
+wheel cannot be pointed at anything, because it sends no controller number for a link
+to name.
+
+Both are drawn beside the keyboard on an instrument's panel, and they only report.
+They move when the hardware moves and there is nothing on them to drag: a wheel on
+the screen that could be dragged would disagree with the one under your hand the
+moment you touched it.

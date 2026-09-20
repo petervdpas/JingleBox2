@@ -42,7 +42,7 @@
     {
       "name": "Mod strip",
       "cc": 1,
-      "kind": "strip"
+      "kind": "wheel"
     },
     {
       "name": "Main knob",

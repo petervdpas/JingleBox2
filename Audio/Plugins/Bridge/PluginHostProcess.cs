@@ -1012,6 +1012,14 @@ public static class PluginHostProcess
                 case BridgeEvent.AllNotesOff:
                     instrument?.AllNotesOff();
                     break;
+
+                case BridgeEvent.Bend:
+                    instrument?.Bend(queued.Value);
+                    break;
+
+                case BridgeEvent.Modulate:
+                    instrument?.Modulate(queued.Value);
+                    break;
             }
         }
     }

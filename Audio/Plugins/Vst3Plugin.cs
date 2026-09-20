@@ -209,9 +209,24 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         _controller = controller;
         _handler = handler;
         _sharedController = sharedController;
+        _mapping = (IMidiMapping*)Query(controller, Vst3Abi.MidiMappingId);
 
         Info = info;
     }
+
+    /// <summary>
+    /// Which of this plugin's parameters each MIDI controller turns, or null for one that says
+    /// nothing.
+    /// </summary>
+    /// <remarks>
+    /// Asked for once, here, because it is a face of an object that already exists and asking
+    /// again would only raise and drop a reference count. What it answers is asked every time,
+    /// since a plugin may move its own wheel onto another parameter when it loads a preset.
+    ///
+    /// Null is ordinary: a plugin with nothing for a wheel to reach does not implement this, and
+    /// a wheel then does nothing to it, which is what it did before any of this existed.
+    /// </remarks>
+    private IMidiMapping* _mapping;
 
     /// <inheritdoc/>
     public PluginInfo Info { get; }
@@ -920,6 +935,47 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
     /// <inheritdoc/>
     /// <remarks>
+    /// A bend arrives as a parameter, which is what VST3 has instead of a controller event: the
+    /// plugin says which of its own parameters the wheel is and the host writes that. Nought to
+    /// one with the middle at a half, since every VST3 parameter is, and the wheel at rest is
+    /// therefore exactly 0.5 rather than nearly.
+    /// </remarks>
+    public void Bend(double lean) =>
+        Wheel(Vst3Abi.PitchBendController, (Math.Clamp(lean, -1, 1) + 1) / 2);
+
+    /// <inheritdoc/>
+    /// <remarks>Up from nothing, so it goes over unchanged. See <see cref="Bend"/>.</remarks>
+    public void Modulate(double amount) =>
+        Wheel(Vst3Abi.ModulationController, Math.Clamp(amount, 0, 1));
+
+    /// <summary>
+    /// Writes whichever parameter this plugin says that controller is.
+    /// </summary>
+    /// <remarks>
+    /// The first bus and the first channel, which is where a host with one keyboard on one track
+    /// sends everything: this application plays a plugin instrument on one channel and has
+    /// nothing else to offer a plugin that wants them apart.
+    ///
+    /// A plugin that answers nothing is one the wheel does not reach, which is an ordinary
+    /// answer and is said nowhere: it happens per message and a line per message is a log nobody
+    /// can read.
+    /// </remarks>
+    /// <param name="controller">The controller number, as <see cref="Vst3Abi.MidiMappingId"/> numbers them.</param>
+    /// <param name="value">Where to put it, nought to one.</param>
+    private void Wheel(short controller, double value)
+    {
+        if (_disposed || _mapping == null) return;
+
+        uint id;
+
+        if (_mapping->Vtbl->GetMidiControllerAssignment(_mapping, 0, 0, controller, &id) != Vst3Abi.ResultOk)
+            return;
+
+        SetValue(id, value);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
     /// The settings half hears it now, so what is shown is what the plugin believes; the audio
     /// half hears it on its next block, which is the only time VST3 allows. A host that writes
     /// to one and not the other leaves a plugin whose window and whose sound disagree.
@@ -1416,6 +1472,12 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         {
             _component->Vtbl->SetActive(_component, 0);
             _active = false;
+        }
+
+        if (_mapping != null)
+        {
+            Release(_mapping);
+            _mapping = null;
         }
 
         if (_controller != null && !_sharedController)

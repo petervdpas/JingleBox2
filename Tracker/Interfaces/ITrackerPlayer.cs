@@ -140,6 +140,16 @@ public interface ITrackerPlayer : IDisposable
     AutomationPlayer? Automation { get; set; }
 
     /// <summary>
+    /// What a parameter named by a machine reaches, so the modulation wheel can turn it.
+    /// </summary>
+    /// <remarks>
+    /// Handed in after construction, exactly as <see cref="Automation"/> is and for the same
+    /// reason: the one class that can resolve a parameter is built over the tracker, which is
+    /// built over the player. Null means a wheel moves no machine parameter.
+    /// </remarks>
+    Midi.Interfaces.IControlTargets? Controls { get; set; }
+
+    /// <summary>
     /// What this machine puts on the wire when other gear runs on its clock, or nothing.
     /// </summary>
     /// <remarks>
@@ -226,6 +236,49 @@ public interface ITrackerPlayer : IDisposable
     /// instrument wearing another's face. A pattern's notes are untouched.
     /// </remarks>
     void CutPreview(TrackerInstrument? instrument);
+
+    /// <summary>
+    /// Holds everything sounding on a track off its own pitch, as far as its wheel is leaning.
+    /// </summary>
+    /// <remarks>
+    /// A lean rather than a number of semitones, because how far a wheel bends is the
+    /// instrument's own business and the hand that moved it has never heard of an instrument.
+    /// Nought straightens the track, which is where every track is until a wheel moves.
+    ///
+    /// Kept rather than applied and forgotten: a note struck while the wheel is held has to
+    /// arrive already leaning, or the first note of a phrase is the one note in it at the wrong
+    /// pitch.
+    /// </remarks>
+    /// <param name="track">The track, counted from nought.</param>
+    /// <param name="lean">Where the wheel is, -1 to 1.</param>
+    void BendTrack(int track, double lean);
+
+    /// <summary>
+    /// Turns whatever the modulation wheel drives on a track.
+    /// </summary>
+    /// <remarks>
+    /// Which parameter that is belongs to the device and not to the hand: one of ours declares
+    /// it in its manifest, and a plugin is handed the wheel and decides for itself. Nothing at
+    /// all where the device names none, which is every machine that has not said so.
+    /// </remarks>
+    /// <param name="track">The track, counted from nought.</param>
+    /// <param name="amount">How far up the wheel is, 0 to 1.</param>
+    void ModulateTrack(int track, double amount);
+
+    /// <summary>The same as <see cref="BendTrack"/>, for a note played with no track of its own.</summary>
+    /// <remarks>
+    /// What the rack's keyboard plays on, which goes through nobody's fader because the
+    /// instrument under it may be in no song at all. The instrument is handed in rather than
+    /// looked up, since only whoever is holding the keyboard knows which one it is.
+    /// </remarks>
+    /// <param name="instrument">What is being played by hand.</param>
+    /// <param name="lean">Where the wheel is, -1 to 1.</param>
+    void BendPreview(TrackerInstrument? instrument, double lean);
+
+    /// <summary>The same as <see cref="ModulateTrack"/>, for the machine open on the rack.</summary>
+    /// <param name="instrument">What is being played by hand.</param>
+    /// <param name="amount">How far up the wheel is, 0 to 1.</param>
+    void ModulatePreview(TrackerInstrument? instrument, double amount);
 
     /// <summary>
     /// Lets go of one note played by hand, which is what a key coming up means.

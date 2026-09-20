@@ -248,6 +248,16 @@ public sealed class SampleVoice : IVoice
 
     /// <inheritdoc/>
     /// <remarks>
+    /// Read once at the top of a block rather than per sample. A wheel moves tens of times a
+    /// second and a block is a few milliseconds, so reading it again inside the loop buys
+    /// nothing anybody can hear and costs the one thing the loop cannot afford; and a bend that
+    /// changed halfway through a block would be applied to part of it, which is a step in the
+    /// pitch rather than a slide.
+    /// </remarks>
+    public float Bend { get; set; }
+
+    /// <inheritdoc/>
+    /// <remarks>
     /// The loudest sample the file actually produced, not just where the envelope is: a quiet
     /// recording should not light up a meter the way a full scale one does.
     /// </remarks>
@@ -385,6 +395,8 @@ public sealed class SampleVoice : IVoice
 
         Level = 0;
 
+        double wheel = Bend;
+
         for (int frame = 0; frame < frames; frame++)
         {
             if (_holdSeconds > 0 && _time >= _holdSeconds)
@@ -435,7 +447,7 @@ public sealed class SampleVoice : IVoice
             buffer[index] += (float)outLeft;
             buffer[index + 1] += (float)outRight;
 
-            double speed = _rateRatio * _noteRatio * Motion.Ratio(Motion.MotionAt(_patch, _time));
+            double speed = _rateRatio * _noteRatio * Motion.Ratio(Motion.MotionAt(_patch, _time) + wheel);
 
             if (!Windows.Advance(ref _position, ref _direction, speed, _window))
             {

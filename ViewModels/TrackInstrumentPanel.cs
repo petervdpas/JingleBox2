@@ -226,6 +226,13 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
     /// <remarks>Built the first time a machine asks for it, since most panels never do.</remarks>
     public IPanelKeys MachineKeys => _machineKeys ??= new SoundDeviceKeys(this);
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The same monitor the keys are lit from, since where a wheel is and which keys are down
+    /// are one hand's worth of the same question.
+    /// </remarks>
+    public IPanelWheels? MachineWheels => MidiKeys;
+
     /// <summary>Kept so it can be let go of in <see cref="Close"/>.</summary>
     private IPanelKeys? _machineKeys;
 

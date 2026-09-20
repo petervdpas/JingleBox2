@@ -244,6 +244,31 @@ public static class ElementKinds
     public const string Location = "Location";
 
     /// <summary>
+    /// The two wheels beside a keyboard, drawn where they are being held. Properties: face,
+    /// caption, gap.
+    /// </summary>
+    /// <remarks>
+    /// The pair, since on every keyboard ever built they are a pair to the left of the keys and
+    /// a device wanting one of them alone is not a case worth a property. <c>face</c> is how
+    /// tall each wheel is and <c>gap</c> the air between them; <c>caption</c> replaces the two
+    /// words written under them, as one comma separated pair, for a device whose own wording
+    /// differs.
+    ///
+    /// **It turns no parameter and it takes no pointer**, which is the whole of what it is. A
+    /// drawn wheel is a picture of the one under somebody's hand, the way
+    /// <see cref="Keys"/> is a picture of which keys are down, so it comes from whoever is
+    /// showing the panel through
+    /// <see cref="IPanelWheels"/> and there
+    /// is nothing on it to drag. A second wheel that could be moved by a mouse would disagree
+    /// with the first and would jump the moment the hardware moved again.
+    ///
+    /// What the modulation wheel turns on this device is not said here either. That is
+    /// <c>SoundMachineProject.Wheel</c>, which is a fact about the device rather than about its
+    /// face, and a device may name one without drawing either wheel.
+    /// </remarks>
+    public const string Wheels = "Wheels";
+
+    /// <summary>
     /// The keyboard, and the octave it is showing. Properties: keys, caption.
     /// </summary>
     /// <remarks>

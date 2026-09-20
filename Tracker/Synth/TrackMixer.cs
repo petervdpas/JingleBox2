@@ -1260,6 +1260,32 @@ public sealed class TrackMixer : ITrackMixer
 
     /// <inheritdoc/>
     /// <remarks>
+    /// Every voice on the track and not one column of it, unlike a level: a volume column is
+    /// about a column, and a hand on a wheel is about everything that hand is playing, which is
+    /// the whole chord across every column of the track.
+    ///
+    /// Written down as well as pushed out, so a note struck while the wheel is held arrives
+    /// already leaning. Without that the first note of a phrase played into a bent track is the
+    /// one note in it at the wrong pitch, and it straightens itself the moment the wheel moves
+    /// again, which is a fault that comes and goes under the hand.
+    /// </remarks>
+    public void SetBend(int track, float semitones)
+    {
+        lock (_lock)
+        {
+            _bend[Bending(track)] = semitones;
+
+            foreach (var voice in _voices)
+            {
+                if (voice.Track != track) continue;
+
+                voice.Bend = semitones;
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
     /// Every voice in that note column, not the newest, because a kit can have several sounding
     /// at once and a volume column is about the column rather than about one drum.
     /// </remarks>
@@ -2280,9 +2306,28 @@ public sealed class TrackMixer : ITrackMixer
         while (_voices.Count >= MaxVoices)
             _voices.RemoveAt(0);
 
+        voice.Bend = _bend[Bending(voice.Track)];
+
         _voices.Add(voice);
         _snapshotStale = true;
     }
+
+    /// <summary>
+    /// How far each track's pitch wheel is holding its notes, in semitones.
+    /// </summary>
+    /// <remarks>
+    /// One more than there are tracks, because an audition belongs to no track and still has to
+    /// be bendable: the rack's keyboard plays through nobody's fader, so slot nought is that
+    /// loose bus and the tracks are the rest. See <see cref="Bending"/>.
+    ///
+    /// Kept here rather than written onto each voice and forgotten, because a wheel held while a
+    /// phrase is played has to reach the notes that have not been struck yet. Written under the
+    /// lock from whichever thread the wheel arrived on, and read there and in <see cref="Add"/>.
+    /// </remarks>
+    private readonly float[] _bend = new float[MaxTracks + 1];
+
+    /// <summary>Which slot of <see cref="_bend"/> a track number means, the loose bus included.</summary>
+    private static int Bending(int track) => Math.Clamp(track + 1, 0, MaxTracks);
 
     /// <summary>A different seed per voice, so two noise hits are not the same noise.</summary>
     private int NextSeed() => System.Threading.Interlocked.Increment(ref _noiseSeed);

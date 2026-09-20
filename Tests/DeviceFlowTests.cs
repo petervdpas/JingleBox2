@@ -41,6 +41,10 @@ public class DeviceFlowTests
 
         public void Silence(TrackerInstrument instrument) { }
 
+        public void Bend(TrackerInstrument? instrument, double lean) { }
+
+        public void Modulate(TrackerInstrument? instrument, double amount) { }
+
         public double SamplePosition(int track) => 0;
 
         public IPluginParameters? PluginFor(TrackerInstrument instrument) => null;
@@ -61,6 +65,15 @@ public class DeviceFlowTests
         public void Let(TrackerInstrument instrument, Note note) { }
 
         public void Silence(TrackerInstrument instrument) { }
+
+        /// <summary>Every wheel move that reached here, and what it was played on.</summary>
+        public System.Collections.Generic.List<(string Wheel, string? Instrument, double Value)> Wheels { get; } = new();
+
+        public void Bend(TrackerInstrument? instrument, double lean) =>
+            Wheels.Add(("bend", instrument?.Id, lean));
+
+        public void Modulate(TrackerInstrument? instrument, double amount) =>
+            Wheels.Add(("modulate", instrument?.Id, amount));
 
         public double SamplePosition(int track) => 0;
 

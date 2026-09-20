@@ -504,6 +504,25 @@ public interface ITrackMixer
     /// <summary>Follows the volume and pan columns while a note holds.</summary>
     void SetLevels(int track, int column, float gain, float? pan);
 
+    /// <summary>
+    /// Holds every voice on a track off its own pitch by that many semitones, and keeps holding
+    /// the ones struck after it.
+    /// </summary>
+    /// <remarks>
+    /// The pitch wheel, arriving from whichever thread the port delivered it on. Semitones
+    /// rather than the lean the wire sent, because how far a wheel bends is the instrument's to
+    /// say and the mixer is handed a track.
+    ///
+    /// <c>SynthVoice.NoTrack</c> is the loose bus an audition with no track of its own plays on,
+    /// which is what the rack's keyboard uses: it has a wheel like any other keyboard and the
+    /// instrument under it may be in no song at all.
+    ///
+    /// Nought straightens the track, which is where every track is until a wheel moves.
+    /// </remarks>
+    /// <param name="track">The track, or the loose audition bus.</param>
+    /// <param name="semitones">How far off, plus or minus.</param>
+    void SetBend(int track, float semitones);
+
     /// <summary>Silence, now. Used by the transport rather than by a note off.</summary>
     /// <remarks>
     /// Voices are killed rather than released, because pressing stop is a request for silence

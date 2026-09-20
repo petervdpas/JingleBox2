@@ -62,6 +62,27 @@ public interface IVoice
     /// </remarks>
     float Pan { get; set; }
 
+    /// <summary>
+    /// How far off its own pitch this note is being held, in semitones, changeable while it
+    /// sounds.
+    /// </summary>
+    /// <remarks>
+    /// The pitch wheel, and nothing else writes it: the patch's own vibrato and pitch envelope
+    /// are the voice's own business and are worked out inside it. Semitones rather than the lean
+    /// the wire sent, because how far a wheel bends is the instrument's to say and a voice has
+    /// no way of knowing which instrument made it.
+    ///
+    /// Nought is the note at the pitch it was played at, which is what every voice is until a
+    /// wheel moves, so nothing anybody has already made sounds any different for this existing.
+    /// A voice started while a wheel is held is given the bend it is held at, or the first note
+    /// of a phrase played into a bent track would be the one note in it at the wrong pitch.
+    ///
+    /// Written from whichever thread the wheel arrived on and read on the audio thread, which is
+    /// why it is a float: the two never agree about the instant, and the only thing that matters
+    /// is that neither of them ever sees half a number.
+    /// </remarks>
+    float Bend { get; set; }
+
     /// <summary>How loud this voice is right now, 0 to 1. Zero once it has finished.</summary>
     /// <remarks>
     /// What a voice thinks it is worth. No meter reads it: a track's meter is the peak off that

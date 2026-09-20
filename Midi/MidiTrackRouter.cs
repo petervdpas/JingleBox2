@@ -11,12 +11,20 @@ using JingleBox2.Tracker;
 namespace JingleBox2.Midi;
 
 /// <summary>
-/// Hands a note to every track listening on its port and channel, and says whether any was.
+/// Hands a note or a wheel to every track listening on its port and channel, and says whether
+/// any was.
 /// </summary>
 /// <remarks>
 /// The router in front of the keyboard's: a note a track claims belongs to that track, and one
 /// nobody claims goes on to the cursor's track exactly as before. Knows the wire and the rule and
 /// nothing about the application, which is on the far side of <see cref="ITrackNotes"/>.
+///
+/// The wheels are here as well as the keys because they are the same claim. A keyboard pointed
+/// at track three is pointed at track three whole: bending its notes while the wheel beside them
+/// reached the cursor's track instead would be one hand playing two tracks at once. Its own door
+/// rather than a branch inside <see cref="Handle"/>, since what has first refusal differs: a
+/// note is claimed before any job is applied, and a wheel is claimed only where nothing on the
+/// desk was pointed at it.
 ///
 /// The strips are asked for on every message rather than kept, since the song they belong to is
 /// swapped whenever one is opened and a route changed a moment ago has to be in force.
@@ -25,8 +33,13 @@ namespace JingleBox2.Midi;
 /// <param name="mix">The open song's strips, asked for per message.</param>
 /// <param name="routes">The rules, defaulted to the real ones.</param>
 /// <param name="wire">How a number on the wire becomes a note, defaulted to the real reading.</param>
+/// <param name="wheels">Where a claimed wheel goes. Left out, no track hears a wheel.</param>
+/// <param name="turning">How a wheel is read off the wire, defaulted to the real reading.</param>
+/// <param name="jobs">What each control on a desk is for, defaulted to the real rule.</param>
 public sealed class MidiTrackRouter(ITrackNotes notes, Func<IReadOnlyList<TrackMix>?> mix,
-                                    ITrackMidiRoutes? routes = null, IMidiNoteInput? wire = null)
+                                    ITrackMidiRoutes? routes = null, IMidiNoteInput? wire = null,
+                                    ITrackWheels? wheels = null, IMidiWheelInput? turning = null,
+                                    IControlJobs? jobs = null)
 {
     private readonly ITrackNotes _notes = notes;
 
@@ -35,6 +48,12 @@ public sealed class MidiTrackRouter(ITrackNotes notes, Func<IReadOnlyList<TrackM
     private readonly ITrackMidiRoutes _routes = routes ?? new TrackMidiRoutes();
 
     private readonly IMidiNoteInput _wire = wire ?? new MidiNoteInput();
+
+    private readonly ITrackWheels? _wheels = wheels;
+
+    private readonly IMidiWheelInput _turning = turning ?? new MidiWheelInput();
+
+    private readonly IControlJobs _jobs = jobs ?? new ControlJobs();
 
     /// <summary>
     /// Plays or releases the note on every track listening for it, and answers true if there was one.
@@ -66,4 +85,56 @@ public sealed class MidiTrackRouter(ITrackNotes notes, Func<IReadOnlyList<TrackM
 
         return true;
     }
+
+    /// <summary>
+    /// Bends or modulates every track listening for it, and answers true if there was one.
+    /// </summary>
+    /// <remarks>
+    /// A wheel is kept for as long as it is held, so unlike a note there is nothing here that
+    /// can be missed: whatever the last message said is where the track stays until the next one
+    /// says otherwise. Which is also why nothing is reset when a route changes. A track that
+    /// stops listening keeps whatever bend it was last given, exactly as it keeps whatever note
+    /// it was last sounding, and the wheel that put it there is still under the same hand.
+    /// </remarks>
+    /// <param name="msg">What arrived.</param>
+    public bool Wheels(MidiMessage msg)
+    {
+        if (_wheels is null) return false;
+        if (!_jobs.Turns(msg)) return false;
+
+        var tracks = _routes.TracksFor(_mix(), msg.Device, msg.Channel);
+        if (tracks.Count == 0) return false;
+
+        bool bending = msg.Type == MidiMessageType.PitchBend;
+        double value = bending ? _turning.LeanFor(msg.Data) : _turning.AmountFor(msg.Data);
+
+        foreach (int track in tracks)
+        {
+            if (bending) _wheels.BendTrack(track, value);
+            else _wheels.ModulateTrack(track, value);
+        }
+
+        if (Log.On(LogArea.Midi))
+            Log.Write(LogArea.Midi, () =>
+                "track midi in: '" + msg.Device + "' ch" + msg.Channel + " "
+                + (bending ? "bend " : "modulation ") + value.ToString("0.###")
+                + " to track " + string.Join(", ", tracks));
+
+        return true;
+    }
+
+    /// <summary>
+    /// Whether any track took this message at all, whatever kind it was.
+    /// </summary>
+    /// <remarks>
+    /// The one door <see cref="MidiDispatcher"/> asks, so that what a track claims is this
+    /// class's answer rather than a list of kinds kept over there. A keyboard pointed at track
+    /// three is pointed at it whole: its keys and the wheels beside them are one hand, and a
+    /// claim that covered the notes alone would have the wheel reach the cursor's track instead.
+    ///
+    /// Both halves are tried rather than one being chosen by looking at the message, since each
+    /// already refuses what is not its own: a note is not a wheel and a wheel is not a note.
+    /// </remarks>
+    /// <param name="msg">What arrived.</param>
+    public bool Claim(MidiMessage msg) => Handle(msg) || Wheels(msg);
 }

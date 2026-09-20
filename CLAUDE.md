@@ -131,6 +131,149 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   send on channel 10
 - `MidiDispatcher` (Midi/): Sends each message to the pads, the tracker, or both, by the device's role in SETTINGS
 - `MidiNoteRouter` (Midi/): Turns keyboard notes into tracker note entry
+- `MidiWheelRouter` (Midi/): The sixth router. Turns the pitch wheel and controller one into a
+  lean and an amount, and knows nothing about the application
+- **The two wheels beside a keyboard go with the keys and not with the desk**, which is the whole
+  design and is what they are read for. Same port, same half of the application, same track:
+  `IWheels` is the seam, `ITrackWheels` is the same thing for a track whose MIDI in claimed the
+  port, and `TrackerNoteAdapter` sends a wheel to whichever half is holding the keys rather than
+  to whichever page is in front. Asked the other way, opening a window under a held chord sends
+  the bend somewhere the notes are not, and a note left leaning has nothing that can straighten
+  it: the wheel coming back to rest would straighten the other half's notes
+- Nothing is learned and nothing is stored. Controller one is the modulation wheel in the
+  specification and the pitch wheel has a status byte of its own, so both work the moment a
+  keyboard is plugged in and its port is ticked for the keys. No pickup and no parking either,
+  since a wheel is not catching up with a stored value
+- **A link somebody made on the wheel wins, and then the wheel stands down.** A modulation wheel
+  is a continuous controller like any other, so pointing it at a cutoff has always worked and
+  goes on working; what may not happen is both, which would drive the cutoff and bring in vibrato
+  from one gesture. `MidiControlRouter.Handle` answers whether anything was pointed at the
+  control, the layout included, and `MidiDispatcher` reads the wheels only where nothing was. The
+  pitch wheel cannot be pointed at anything and never could: `ControlLink.Handle` refuses
+  anything that is not a note or a controller, which is why `minilab3.lua` turns that device's
+  pitch strip into CC 2
+- **`DefaultLayout` stops claiming controller one, and that took two goes.** A wheel reports a
+  position, so watching it files it with the faders, and a fader with no file is pointed at the
+  first track's level: moving the wheel turned a track down, and `keylab-mkii.json` said
+  `"kind": "fader"` out loud. Refused on the number, since that is what makes it true of a
+  keyboard nobody has described. **Then a file beats the number**, which is the rule this
+  codebase already keeps about every other control: a nanoKONTROL2's second slider *is*
+  controller one, its file says Slider 2, and the first version of this broke it
+- **And then the test for it was narrow and that was wrong too, which the MiniLab found.** Asked
+  whether the file says `wheel`, every profile written before that word existed switches the
+  wheel off by describing itself correctly: a MiniLab 3 and a KeyStep Pro both say `strip`, which
+  is what their modulation wheel physically is. Worse, a profile is copied into the application
+  folder once and **never updated**, so correcting the shipped files reaches nobody who already
+  has them. The question is `DefaultLayout.Drives` now, which is the same list read from the
+  other end: what the desk points links at is a knob, and what it leaves alone is a press or a
+  performance control. A wheel is the second kind and so is a strip. `"kind": "wheel"` still
+  says the device has one and changes nothing
+- **A codec can silence a feature that did not exist when it was written, and one did.**
+  `minilab3.lua` turned that device's pitch bend into controller 2, and its own comment said why:
+  pitch bend reached nothing in this application, so the strip did nothing at all. That stopped
+  being true the day the wheels were read, and the conversion then delivered the strip as a
+  controller nobody is pointed at, which is the thing it was written to prevent. The lines are
+  left in the file commented, since pointing that strip at a knob is still a thing somebody may
+  want and the folder is watched, so putting them back costs a save. **A codec that translates
+  around a gap has to be read again when the gap closes**, and nothing makes that happen: the
+  file is content somebody may have edited, and the installed copy is what runs
+- **Standing the wheels down on a possible Mackie surface was written, measured and taken out
+  again.** Mackie sends its motorised faders as pitch bend, so the guard looks obviously
+  necessary; `IControllerProfiles.SurfaceOn` defaults to **yes** for a device nobody has written
+  a file for, so asking it silenced the wheels on nearly every keyboard there is. The port having
+  been given the keys is the whole gate, and on the hardware read here the two never share a
+  wire: a KeyLab speaks Mackie on its DAW port and carries its keys on the other
+- **A pitch wheel at rest reading anything but nought is the one error here nobody would forgive**,
+  since it is a note sitting permanently off its own pitch with nothing on the screen saying so.
+  Fourteen bits put 8192 steps below the middle and 8191 above, so one divisor cannot give both
+  an exact end and an exact middle: `MidiWheelInput` scales the two halves apart, the middle is
+  exact and each end reaches exactly one. Clamped rather than refused, unlike a note number,
+  because a position past its own end has nothing else it could mean
+- **`IVoice.Bend` is semitones and it is live**, beside `Gain` and `Pan` and for the same reason.
+  All five voices apply it where they already work their pitch out, read once at the top of a
+  block rather than per sample: a wheel moves tens of times a second and a block is a few
+  milliseconds, so reading it in the loop buys nothing anybody can hear and a bend that changed
+  halfway through would be a step rather than a slide. `TrackMixer.SetBend` pushes it onto every
+  voice on the track and **writes it down**, so a note struck while the wheel is held arrives
+  already leaning; without that the first note of a phrase into a bent track is the one note at
+  the wrong pitch, and it straightens itself the moment the wheel moves again
+- How far a wheel bends is `TrackerInstrument.BendSemitones`, two by default, which is MIDI's own
+  and is therefore what every instrument on anybody's disc reads back as. A fact about the sound
+  like `NewNoteAction`, so it travels with a preset. Not asked of a plugin, which is sent the
+  wheel as it arrived: the range is a setting on the plugin's own face and a host that applied
+  one of its own would be bending twice
+- **What the modulation wheel turns is the machine's own declaration**, `SoundMachineProject.Wheel`,
+  a parameter key in `machine.json`. Declared rather than learned per installation is the whole
+  point: it travels in the zip and arrives working on somebody else's computer. Four of the eight
+  that ship name one, and which four is decided by a rule rather than by taste: **the parameter
+  has to be one that means nothing at its minimum**, since a wheel down is that parameter at its
+  bottom. `vib_depth`, `vibrato_depth`, `vco_amount` and `feedback` are nothing at nought; a
+  cutoff would slam shut the moment anybody touched the wheel, which is why Zampler names none
+- It writes the parameter and not an offset on top of it, so a preset that already had vibrato
+  loses that setting the first time the wheel moves. That is what a wheel pointed at a control
+  means everywhere else, and it is why a machine names the control the wheel should *own*
+- **And on one of ours it reaches the next note rather than the one sounding**, which is worth
+  knowing and is not this feature's doing: a voice clones its patch when it starts
+  (`SynthVoice._patch = patch.Clone()`), so no parameter write reaches a ringing voice. A
+  hardware knob pointed at a cutoff has always behaved the same way. The pitch wheel is unaffected,
+  since `IVoice.Bend` is live by construction, and a plugin is unaffected, since it is sent the
+  wheel itself
+- Written through `IControlTarget.Wheeled`, which puts the fraction in the parameter's range and
+  **plays** rather than sets it: a sweep of a wheel would otherwise fill the undo stack and mark
+  the song as having unsaved changes in it because somebody wiggled a wheel.
+  `IControlTargets.Wheel(track)` and `WheelOnRack()` are the two lookups, both through the same
+  `OnMachine`/`OnRackMachine` that a link goes through, so a key the machine no longer has and a
+  track playing nothing come back as nothing in one place
+- **A plugin is reached through `IMidiMapping`, which is VST3's answer to having no controller
+  event**: the plugin says which of its own parameters each MIDI controller is, and the host
+  writes that parameter. Controller one is the wheel and 129 is pitch bend, both nought to one
+  with the wheel at rest at exactly a half. So no new road was needed inside the plugin, only the
+  two events `BridgeEvent.Bend` and `Modulate` to carry the gesture across the process boundary:
+  which parameter it turns is the plugin's own answer and only the process holding the plugin can
+  ask it. CLAP is untouched, since CLAP instruments are not hosted here
+- **The drawn wheels are a monitor and never a control.** `IPanelWheels` is what a face reads and
+  `IMidiMonitor` answers it, the same object the drawn keyboard's lights come off, so a panel
+  opened mid-bend shows the bend and two panels open at once agree. There is nothing on them to
+  drag, deliberately: a wheel on the screen that could be moved by a mouse would disagree with the
+  one under the hand and would jump the moment the hardware moved again. `ElementKinds.Wheels` is
+  the part a machine drops on its own face beside a `Keys`, since nothing is added to a machine's
+  face from code, and the pair beside the shared keyboard on this program's own panel is the one
+  exception the rule already names
+- **Which is why they were invisible the first time they were looked at, and the rule was working
+  rather than failing.** A machine with a described face draws its own `Keys`, so `ShowsSharedKeys`
+  is false and the pair beside the program's own keyboard is hidden with it; no shipped machine
+  had ever asked for a `Wheels`. From a chair that is indistinguishable from the feature not
+  existing, which is the cost of that rule and is worth paying: the answer is content, not code
+- **A machine draws the wheels exactly where it can use them**, which is the four that name a
+  destination: OddSkilla, Recording, Ouroboros and Operetta. Drawn without one, half the pair is
+  dead and the modulation wheel reads as broken; named without the part, the wheel works and
+  nothing on the face says so. `Tests/WheelSoundTests.cs` pins the pair. A kit, a sampler and
+  Lighttower name none and draw none, and their notes still bend, since the pitch wheel reaches
+  every engine whether or not anything is drawn
+- The keyboard is its own row at the foot with the wheels at its left end, which is where a
+  keyboard's wheels are. OddSkilla had its keys tucked into the Amplifier row, which left the
+  wheels nowhere natural to sit
+- **A control's properties belong to the drawing thread in both directions, reading included**,
+  and guarding the write alone is the easy half done twice. `Wheel.Held` posted its write
+  carefully and read `Watching` first to decide whether there was anything to do, which is
+  `AvaloniaObject.GetValue`, which verifies the thread exactly as `SetValue` does. Nothing here
+  reads a property of the control until it is on the thread that owns it
+- **What that cost was not a picture going wrong.** A wheel arrives on the port's thread, so the
+  throw left through the port's own delivery callback and the read loop stopped: not for that
+  message, for the rest of the session. From a chair the whole device died, keys and all, the
+  moment a strip was touched, and it was reported in exactly those words. The tell was that the
+  keys played perfectly until a wheel was touched and never again after
+- **So a port may not be taken down by what is listening to it.** `MidiService.Say` is that
+  guard, and it writes the message and the whole stack, because the listener is several classes
+  away and which one is the entire question. It is the rule the plugin bridge already keeps about
+  a plugin falling over, and a fault in one router must cost that message and nothing else. The
+  fault above was found by reading that line, which named the class, the method and the property
+  in one go after an afternoon of inference had named nothing
+- **And a monitor passes the message on before it tells the onlookers.** Passing it on is the
+  contract; saying so to whatever draws a picture of it is a courtesy, and a courtesy may not
+  cost the thing it is about. Told first, one listener that threw took the sound with it: the
+  note was never bent, so the wheel read as doing nothing rather than as a picture being stale.
+  `Tests/WheelMonitorTests.cs` pins the order with a listener that throws
 - `TrackerPlayer` (Tracker/): Owns the clock and routes each event to a sample channel or a synth voice, through the track's mixer strip
 - `MixLevels` (Tracker/): What the mix adds up to, mute and solo included
 - **A track's two switches are on its tab above the pattern as well as on the desk**, drawn by

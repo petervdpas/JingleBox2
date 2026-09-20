@@ -160,6 +160,41 @@ public sealed class SoundMachineProject : IRackProject, IDesignProject
     /// </remarks>
     public string Engine { get; set; } = "";
 
+    /// <summary>
+    /// Which of this machine's parameters the modulation wheel drives, by key, or empty for a
+    /// machine the wheel does nothing to.
+    /// </summary>
+    /// <remarks>
+    /// **Declared by the machine rather than learned per installation**, which is the whole point
+    /// of it being here: a wheel is a fact about how this machine is played, so it travels in the
+    /// zip and arrives working on somebody else's computer, where a link made by hand would have
+    /// to be made again.
+    ///
+    /// One key and not a list. A machine wanting the wheel to move three things at once wants
+    /// one parameter that moves three things, which a machine can already have; a wheel spread
+    /// over several controls has no honest answer to what the picture should say.
+    ///
+    /// Empty is the default and means the wheel reaches nothing here, which is what every machine
+    /// did before this existed. Naming a key this machine has not got comes to the same thing: a
+    /// knob wired to nothing is worse than no knob, and refusing to read the manifest over it
+    /// would lose the machine entirely.
+    ///
+    /// **The parameter has to be one whose bottom is where it belongs at rest**, which is the one
+    /// rule a machine can get wrong here and the reason the four that ship name what they name.
+    /// A wheel says how far up it is and nothing else, so a wheel down is the parameter at its
+    /// minimum: a vibrato depth, a modulation amount or a feedback is nothing at nought and the
+    /// wheel adds it, where a cutoff would slam shut the moment anybody touched the wheel. And
+    /// what it writes is the parameter, not an offset on top of it, so a preset that already had
+    /// vibrato in it loses it the moment the wheel is first moved. That is what a wheel pointed
+    /// at a control means everywhere else too, and it is why a machine names the control the
+    /// wheel should own rather than one it merely affects.
+    ///
+    /// A plugin has none of this. It is sent the wheel as it arrived and decides for itself,
+    /// which is what every plugin already expects and is the one thing a host must not second
+    /// guess.
+    /// </remarks>
+    public string Wheel { get; set; } = "";
+
     /// <summary>Its colours, which are its own and not the application's.</summary>
     public PanelTheme Theme { get; set; } = new("#7B838C");
 

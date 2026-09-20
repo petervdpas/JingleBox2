@@ -177,6 +177,18 @@ public static class PanelPreview
         /// <inheritdoc/>
         public void Silence(TrackerInstrument instrument) { }
 
+        /// <inheritdoc/>
+        /// <remarks>Nothing is sounding, so there is nothing to hold off its pitch.</remarks>
+        public void Bend(TrackerInstrument? instrument, double lean) { }
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Nothing either, and here the reason is worth saying: this is a picture of a panel
+        /// being looked at rather than a machine being played, so a wheel moving a parameter
+        /// would be the preview quietly editing somebody's machine.
+        /// </remarks>
+        public void Modulate(TrackerInstrument? instrument, double amount) { }
+
         /// <summary>
         /// A cursor walking across the recording, the way Marching walks a playhead down a
         /// pattern. Nothing is sounding; the line is the point.

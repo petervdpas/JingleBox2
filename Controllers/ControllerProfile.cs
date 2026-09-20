@@ -252,7 +252,17 @@ public sealed class ControllerControl
     /// <summary>1 to 16, or nought for any, which is what almost all of them are.</summary>
     public int Channel { get; set; }
 
-    /// <summary>encoder, fader, pad, button, strip. What it is, not what it does.</summary>
+    /// <summary>encoder, fader, pad, button, strip, wheel. What it is, not what it does.</summary>
+    /// <remarks>
+    /// <c>wheel</c> is the one that changes nothing and is worth saying anyway. A modulation
+    /// wheel is read by its number, which the specification fixes at one, so it plays the notes
+    /// beside it whether or not a file mentions it; naming it here says out loud that the device
+    /// has one and keeps it out of the faders, where watching it would otherwise file it and a
+    /// layout would point it at the first track's level.
+    ///
+    /// A pitch wheel is never in this list at all. It sends a message of its own rather than a
+    /// controller, so it has no number to be written down under.
+    /// </remarks>
     public string Kind { get; set; } = "";
 
     /// <summary>

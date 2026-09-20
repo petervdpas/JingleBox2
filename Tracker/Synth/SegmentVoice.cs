@@ -119,6 +119,16 @@ public sealed class SegmentVoice : IVoice
     public float Pan { get; set; }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Read once at the top of a block rather than per sample. A wheel moves tens of times a
+    /// second and a block is a few milliseconds, so reading it again inside the loop buys
+    /// nothing anybody can hear and costs the one thing the loop cannot afford; and a bend that
+    /// changed halfway through a block would be applied to part of it, which is a step in the
+    /// pitch rather than a slide.
+    /// </remarks>
+    public float Bend { get; set; }
+
+    /// <inheritdoc/>
     public float Level { get; private set; }
 
     /// <inheritdoc/>
@@ -189,7 +199,7 @@ public sealed class SegmentVoice : IVoice
         var motion = _patch.Motion;
         double sweep = Finite(_patch.SweepMs, 2000) / 1000;
         double volume = Finite(_patch.Volume, 0.25);
-        double offset = Finite(_patch.TuneSemitones, 0) + (Finite(_patch.FineCents, 0) / 100.0);
+        double offset = Finite(_patch.TuneSemitones, 0) + (Finite(_patch.FineCents, 0) / 100.0) + Bend;
         double step = _noteHz * Math.Pow(2.0, offset / 12.0) / _sampleRate;
         double beginMiddle = Middle(begin);
         double endMiddle = Middle(end);

@@ -593,6 +593,112 @@ public sealed class TrackerPlayer : ITrackerPlayer
         SongClock.Tempo(song.Timing.ClampedBpm);
     }
 
+    /// <summary>
+    /// What a parameter named by a machine reaches, so the modulation wheel can turn it.
+    /// </summary>
+    /// <remarks>
+    /// Handed in rather than reached for, and after construction, exactly as
+    /// <see cref="Automation"/> is: the one class that can resolve a parameter is built over the
+    /// tracker, which is built over this. Null means a wheel moves no machine parameter, which is
+    /// what a player built in a test has and is the truthful answer for it.
+    /// </remarks>
+    public Midi.Interfaces.IControlTargets? Controls { get; set; }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// **Three things can be listening and each is reached differently**, which is the whole of
+    /// why this is one method rather than three calls at whatever happened to have them all in
+    /// hand. Our own voices are held off their pitch where they stand, by a number of semitones
+    /// this works out from the instrument. A plugin is sent the wheel as it arrived, since the
+    /// range is a setting on its own face. And a wheel is kept by the mixer, so a note struck
+    /// while it is held arrives already leaning.
+    ///
+    /// A track with no instrument still bends its voices. Nothing is sounding on it, so the
+    /// write costs a walk and reaches nothing, and refusing would mean the wheel was remembered
+    /// on some tracks and not others.
+    /// </remarks>
+    public void BendTrack(int track, double lean)
+    {
+        var instrument = On(track);
+
+        if (_synth.HasMixer)
+            _synth.Mixer.SetBend(track, (float)(lean * Bending(instrument)));
+
+        if (instrument?.IsPlugin == true) PlayerOn(track)?.Bend(lean);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The two destinations are the two kinds of instrument and nothing is shared between them.
+    /// A plugin is sent the wheel and decides for itself; one of ours turns whichever parameter
+    /// its machine declares, through the panel's own values so the picture moves with the sound.
+    ///
+    /// Nothing at all for a machine that declares none, which is every machine that has not said
+    /// so, and no voice is touched either way: modulation is not a pitch and there is nothing
+    /// general it could mean to a voice.
+    /// </remarks>
+    public void ModulateTrack(int track, double amount)
+    {
+        var instrument = On(track);
+
+        if (instrument?.IsPlugin == true)
+        {
+            PlayerOn(track)?.Modulate(amount);
+            return;
+        }
+
+        Controls?.Wheel(track)?.Wheeled(amount);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The loose bus rather than a track, since the rack's keyboard plays an instrument that may
+    /// be in no song at all. Otherwise the same as <see cref="BendTrack"/>, the instrument being
+    /// handed in rather than looked up because only the rack knows which one is under its hand.
+    /// </remarks>
+    public void BendPreview(TrackerInstrument? instrument, double lean)
+    {
+        if (_synth.HasMixer)
+            _synth.Mixer.SetBend(Synth.SynthVoice.NoTrack, (float)(lean * Bending(instrument)));
+
+        if (instrument?.IsPlugin == true) PreviewPlayerFor(instrument)?.Bend(lean);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The machine open on the rack rather than the one a track plays, which is the one
+    /// difference from <see cref="ModulateTrack"/>. See
+    /// <see cref="Midi.Interfaces.IControlTargets.WheelOnRack"/>.
+    /// </remarks>
+    public void ModulatePreview(TrackerInstrument? instrument, double amount)
+    {
+        if (instrument?.IsPlugin == true)
+        {
+            PreviewPlayerFor(instrument)?.Modulate(amount);
+            return;
+        }
+
+        Controls?.WheelOnRack()?.Wheeled(amount);
+    }
+
+    /// <summary>How far this instrument's pitch wheel bends, in semitones either way.</summary>
+    /// <remarks>
+    /// The instrument's own, and MIDI's two for one that has gone away underneath: a wheel that
+    /// stopped bending because a track was pointed somewhere else mid-phrase would read as the
+    /// wheel having broken.
+    /// </remarks>
+    private static double Bending(TrackerInstrument? instrument) =>
+        instrument?.BendSemitones ?? TrackerInstrument.DefaultBendSemitones;
+
+    /// <summary>What the open song has on that track, or nothing.</summary>
+    private TrackerInstrument? On(int track)
+    {
+        Song? song;
+        lock (_lock) song = _song;
+
+        return song?.InstrumentAt(song.GetTrackInstrument(track));
+    }
+
     /// <inheritdoc/>
     public void CutPreview(TrackerInstrument? instrument)
     {

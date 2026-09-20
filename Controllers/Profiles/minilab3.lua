@@ -40,16 +40,21 @@ controller = {
 
 function midi(m)
 
-  -- The pitch strip. It sends pitch bend, which nothing in this application listens to, so
-  -- until now the left hand strip did nothing at all. Turned into an ordinary controller it
-  -- becomes something you can point at a knob like any other control.
+  -- Nothing, for now, and the reason is worth leaving here because it is what a codec is for.
   --
-  -- 14 bits down to 7, and the bottom half of the strip reads as the bottom half of the range,
-  -- which is not what a pitch wheel wants but is exactly what a fader wants.
-  if m.type == "bend" then
-    return { type = "cc", channel = m.channel, number = 2, value = bit32.rshift(m.value, 7) }
-  end
-
-  -- Everything else is already something the application understands. Saying nothing is how a
-  -- codec stays out of the way, and it is the path almost every message takes.
+  -- This file turned the pitch strip's bend into controller 2, since pitch bend reached nothing
+  -- in the application and the strip did nothing at all. It is the pitch wheel now: it bends the
+  -- notes the keys beside it are playing, with no profile, no link and nothing stored. Converted,
+  -- it would arrive as a controller nobody is pointed at and do nothing again, which is the one
+  -- thing a codec must not quietly cause.
+  --
+  -- Put the two lines below back if you would rather point that strip at a knob than bend with
+  -- it. Save the file and it is reloaded at once, so it costs nothing to try both.
+  --
+  --   if m.type == "bend" then
+  --     return { type = "cc", channel = m.channel, number = 2, value = bit32.rshift(m.value, 7) }
+  --   end
+  --
+  -- Saying nothing is how a codec stays out of the way, and it is the path every message takes
+  -- here. A device with no codec at all behaves exactly as this one now does.
 end

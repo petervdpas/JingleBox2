@@ -4,6 +4,7 @@ using System.Linq;
 using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Midi.Enums;
+using JingleBox2.Midi.Interfaces;
 using JingleBox2.Controllers.Interfaces;
 using JingleBox2.Controllers;
 
@@ -56,7 +57,14 @@ public sealed class DefaultLayout
     /// What is known about the controllers plugged in. Left out, one of its own; the application
     /// hands the same one to everything, since what a device is doing is remembered in it.
     /// </param>
-    public DefaultLayout(IControllerProfiles? profiles = null) => _profiles = profiles ?? new ControllerProfiles();
+    /// <param name="jobs">
+    /// What each kind of control is for, defaulted to the real rule over those same profiles.
+    /// </param>
+    public DefaultLayout(IControllerProfiles? profiles = null, IControlJobs? jobs = null)
+    {
+        _profiles = profiles ?? new ControllerProfiles();
+        _jobs = jobs ?? new ControlJobs(_profiles);
+    }
 
     /// <summary>Whether a controller does anything before it has been pointed at something.</summary>
     public bool On { get; set; } = true;
@@ -116,11 +124,21 @@ public sealed class DefaultLayout
     ///
     /// A pad or a button is not something a layout has an opinion about. Pressing one nobody has
     /// assigned should do nothing rather than something surprising.
+    ///
+    /// **And neither is the modulation wheel, which is refused before anything else is asked.**
+    /// Controller one is the wheel in the specification itself, so it is the one control here
+    /// whose meaning is known without a file, and what it means is playing rather than mixing:
+    /// it is read beside the keys by <see cref="MidiWheelRouter"/>. Asked of the number and not
+    /// of the kind, since that is what makes it true of a keyboard nobody has written a file
+    /// for, which otherwise has its wheel watched, taken for a fader, and pointed at the first
+    /// track's level. A device whose file names that control has said what it is and keeps it: a
+    /// nanoKONTROL2's second slider is controller one.
     /// </remarks>
     public ControlMapping? For(MidiMessage? message)
     {
         if (!On || message is null || message.Type != MidiMessageType.ControlChange) return null;
         if (string.IsNullOrWhiteSpace(message.Device)) return null;
+        if (_jobs.Turns(message)) return null;
 
         lock (_lock)
         {
@@ -144,7 +162,7 @@ public sealed class DefaultLayout
                 device.Seen++;
             }
 
-            if (Job(control.Kind) is not (Mix or Machine)) return null;
+            if (!_jobs.Drives(control.Kind)) return null;
 
             if (control.Mapping is not null && control.Made == device.Seen) return control.Mapping;
 
@@ -156,7 +174,7 @@ public sealed class DefaultLayout
             Log.Write(LogArea.Midi, () =>
                 "layout: " + message.Device + " CC " + control.Cc + " is " + control.Kind + " "
                 + (place + 1) + ", so it drives "
-                + (Job(control.Kind) == Mix ? "track " + (place + 1) + "'s level"
+                + (Job(control.Kind) == _jobs.Mix ? "track " + (place + 1) + "'s level"
                                             : "control " + (place + 1) + " on the machine in front of you"));
 
             return control.Mapping;
@@ -205,42 +223,33 @@ public sealed class DefaultLayout
         };
     }
 
-    /// <summary>The mixer, and the machine in front of you. All a layout has to point at.</summary>
-    private const string Mix = "mix";
-
-    /// <summary>Whatever face is in front of you, which is what a knob follows.</summary>
-    private const string Machine = "machine";
-
     /// <summary>
-    /// What a control of this kind is for here.
+    /// What each kind of control is for, which is the one thing this and the wheels must agree
+    /// about.
     /// </summary>
     /// <remarks>
-    /// A fader belongs to the mixer and a knob belongs to the machine, and that is a statement
-    /// about the desk rather than about the electronics: both of them report a position and are
-    /// picked up identically, so <see cref="ControlSense"/> cannot tell them apart and does not
-    /// try. Only a profile knows which is which, which is the whole of what a profile adds here.
-    /// A device with no file keeps its knobs on the mixer, as it always did.
+    /// Asked rather than answered here. What this points a link at is exactly what
+    /// <see cref="MidiWheelRouter"/> must leave alone, and written out in both they were two
+    /// classes calling into each other with neither owning the answer.
+    /// </remarks>
+    private readonly IControlJobs _jobs;
+
+    /// <summary>
+    /// What a control of this kind is for here, which is the shared rule's answer.
+    /// </summary>
+    /// <remarks>
+    /// Asked rather than answered, because what this points a link at is exactly what the wheels
+    /// must leave alone. See <see cref="IControlJobs.For"/> for what each kind is for and why a
+    /// strip and a wheel get nothing.
     ///
     /// Knobs and encoders share one order rather than having one each, because they are the same
     /// job done two ways. A desk with both would otherwise have two first controls, both pointed
     /// at the same parameter.
-    ///
-    /// A pad and a button get nothing, and so does a modulation strip, which is the one worth
-    /// saying out loud. A strip is picked up exactly as a fader is and it would be easy to file
-    /// it with them, but it is a performance control rather than a mixer one: it springs back, it
-    /// is played while a note sounds, and a track whose level it drove would drop to nothing the
-    /// moment your thumb came off.
     /// </remarks>
-    private static string Job(string kind) => kind switch
-    {
-        "fader" => Mix,
-        "knob" or "encoder" => Machine,
-
-        _ => ""
-    };
+    private string Job(string kind) => _jobs.For(kind);
 
     /// <summary>Where this control stands among the others doing its job, counting from nought.</summary>
-    private static int Place(Controller device, Control control) =>
+    private int Place(Controller device, Control control) =>
         device.Controls.Values
             .Where(one => Job(one.Kind) == Job(control.Kind))
             .OrderBy(one => one.Channel)
@@ -256,8 +265,8 @@ public sealed class DefaultLayout
     /// three is track three whether or not you are looking at it. A knob or an encoder follows
     /// you, because what somebody wants from a bank of knobs is the thing in front of them.
     /// </remarks>
-    private static ControlMapping Made(string device, Control control, int place) =>
-        Job(control.Kind) == Mix
+    private ControlMapping Made(string device, Control control, int place) =>
+        Job(control.Kind) == _jobs.Mix
             ? new ControlMapping
             {
                 Device = device,

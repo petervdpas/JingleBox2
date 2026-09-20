@@ -32,7 +32,7 @@ namespace JingleBox2.ViewModels;
 /// document of its own, and a knob you turned is not a change you should have to remember to
 /// keep. Writes are held back until the turning stops.
 /// </remarks>
-public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel, Midi.Interfaces.IPlaysNotes
+public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel, Midi.Interfaces.IPlaysNotes, Midi.Interfaces.IWheels
 {
     /// <summary>How wide a panel's keyboard is, and where it has to be to show a note.</summary>
     private readonly IPanelKeyboard _keyboard = new PanelKeyboard();
@@ -461,6 +461,23 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     /// <summary>And that key coming up, which lets the note go.</summary>
     public void ReleaseMidiNote(Note note) => Dispatcher.UIThread.Post(() => Let(note));
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// **Not posted to the drawing thread**, unlike a note, because it touches the sounding
+    /// voices and nothing on the screen: posted, a bend would arrive at whatever rate the window
+    /// is being drawn at, which is a slide that steps.
+    ///
+    /// Whatever is picked on the rack, which is what its keyboard is playing. Nothing picked is
+    /// nothing to bend, and the wheel is quietly ignored rather than reaching for some other
+    /// instrument: a note press says so on the status line because silence answering a key is
+    /// worth explaining, and a wheel that moved nothing is not.
+    /// </remarks>
+    public void Bend(double lean) => _audition.Bend(Selected?.Instrument, lean);
+
+    /// <inheritdoc/>
+    /// <remarks>The same instrument and for the same reasons. See <see cref="Bend"/>.</remarks>
+    public void Modulate(double amount) => _audition.Modulate(Selected?.Instrument, amount);
+
     /// <summary>
     /// Somewhere to start: the shelf's other instruments on this same machine.
     /// </summary>
@@ -504,6 +521,13 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
 
     /// <summary>The keyboard a machine draws on its own face, standing on the same two things.</summary>
     public IPanelKeys MachineKeys => _machineKeys ??= new SoundDeviceKeys(this);
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The same monitor the keys are lit from, since where a wheel is and which keys are down
+    /// are one hand's worth of the same question.
+    /// </remarks>
+    public IPanelWheels? MachineWheels => MidiKeys;
 
     /// <inheritdoc cref="MachineKeys"/>
     private IPanelKeys? _machineKeys;

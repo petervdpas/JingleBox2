@@ -52,6 +52,22 @@ public interface IControlTarget
     void Played(double value) => Set(value);
 
     /// <summary>
+    /// Moves it from a wheel, which says how far up it is rather than what the value should be.
+    /// </summary>
+    /// <remarks>
+    /// A wheel knows nothing about the range it is driving, so it sends a fraction and this puts
+    /// it in the range, which is the same arithmetic a knob's pickup already does and is written
+    /// once here rather than at each of the two places a wheel arrives.
+    ///
+    /// Played rather than set, deliberately. A hand on a wheel is playing and not editing: a
+    /// sweep of it would otherwise fill the undo stack with a hundred steps and mark the song as
+    /// having unsaved changes in it because somebody wiggled a wheel, which is the cost
+    /// <see cref="Played"/> was written to avoid for a lane and is the same cost here.
+    /// </remarks>
+    /// <param name="amount">How far up the wheel is, 0 to 1.</param>
+    void Wheeled(double amount) => Played(Min + (System.Math.Clamp(amount, 0, 1) * (Max - Min)));
+
+    /// <summary>
     /// Whether this is a switch: two states, rather than a range with values in between.
     /// </summary>
     /// <remarks>

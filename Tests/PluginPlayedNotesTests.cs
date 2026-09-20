@@ -1,4 +1,3 @@
-using System;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Audio.Plugins.Records;
 using Xunit;

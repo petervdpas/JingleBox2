@@ -506,7 +506,41 @@ public sealed class MidiService : IMidiService
                 "port: '" + device + "' sent " + Said(msg.Bytes) + ": "
                 + Bytes(msg.Bytes, 0, msg.Bytes?.Length ?? 0));
 
-        MessageReceived?.Invoke(this, msg);
+        Say(msg);
+    }
+
+    /// <summary>
+    /// Hands the message to whoever is listening, and survives them.
+    /// </summary>
+    /// <remarks>
+    /// **A port may not be taken down by what is listening to it**, and without this one it was.
+    /// This runs on the port's own delivery, so anything thrown by a listener leaves through the
+    /// driver's callback and the reading stops: not for that message, for the rest of the
+    /// session. From a chair the whole device dies, keys and all, at the moment some unrelated
+    /// thing at the far end of the routing threw once.
+    ///
+    /// It is the same rule the plugin bridge already keeps about a plugin falling over, and it
+    /// is worth as much here: a fault in one router must cost that message and nothing else.
+    ///
+    /// Said in full, with the stack, because the listener is several classes away and the whole
+    /// of what the next reader needs is which one. A message that vanishes into the routing is
+    /// otherwise indistinguishable from a message that was never sent.
+    /// </remarks>
+    /// <param name="msg">What arrived, already read.</param>
+    private void Say(MidiMessage msg)
+    {
+        try
+        {
+            MessageReceived?.Invoke(this, msg);
+        }
+        catch (Exception carrying)
+        {
+            Log.Write(LogArea.Midi, () =>
+                "port: '" + msg.Device + "' sent " + msg.Type + " ch" + msg.Channel
+                + " val=" + msg.Value + " data=" + msg.Data
+                + " AND SOMETHING LISTENING THREW, so this message reached nothing: "
+                + carrying);
+        }
     }
 
     /// <summary>

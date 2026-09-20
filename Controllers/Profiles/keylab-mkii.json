@@ -34,7 +34,7 @@
     {
       "name": "Mod wheel",
       "cc": 1,
-      "kind": "fader"
+      "kind": "wheel"
     },
     {
       "name": "Select 1",

@@ -5,6 +5,7 @@
   "Author": "Peter van de Pas",
   "Version": "1.16",
   "Engine": "Synth",
+  "Wheel": "vib_depth",
   "Theme": {
     "Accent": "#E2A03F",
     "Face": 0.68,
@@ -785,6 +786,27 @@
                   ]
                 }
               ]
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "14",
+            "heights": "own"
+          },
+          "Children": [
+            {
+              "Element": "Wheels",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "tip": "The pitch and modulation wheels on your keyboard, shown where they are being held. They report: they are moved from the keyboard rather than from here.",
+                "align": "bottom"
+              },
+              "Children": []
             },
             {
               "Element": "Keys",

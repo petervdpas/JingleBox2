@@ -414,6 +414,33 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
 
     /// <inheritdoc/>
     /// <remarks>
+    /// Queued like a note and for the same reason, so a wheel and the key it was played under
+    /// land in the same block rather than a block apart, which is what makes a bend follow a
+    /// phrase instead of trailing it.
+    ///
+    /// Nothing is worked out here. Which parameter a wheel turns is the plugin's own answer and
+    /// only the process holding the plugin can ask it.
+    /// </remarks>
+    public void Bend(double lean)
+    {
+        var process = _process;
+        if (process?.Alive != true) return;
+
+        process.Block.Queue(BridgeEvent.Bend, 0, (float)lean);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Queued the same way as the bend beside it. See <see cref="Bend"/>.</remarks>
+    public void Modulate(double amount)
+    {
+        var process = _process;
+        if (process?.Alive != true) return;
+
+        process.Block.Queue(BridgeEvent.Modulate, 0, (float)amount);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
     /// One event rather than one per note, since the plugin knows what it is sounding and this
     /// side does not.
     /// </remarks>

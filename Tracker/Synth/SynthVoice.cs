@@ -227,6 +227,16 @@ public sealed class SynthVoice : IVoice
     public float Pan { get; set; }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Read once at the top of a block rather than per sample. A wheel moves tens of times a
+    /// second and a block is a few milliseconds, so reading it again inside the loop buys
+    /// nothing anybody can hear and costs the one thing the loop cannot afford; and a bend that
+    /// changed halfway through a block would be applied to part of it, which is a step in the
+    /// pitch rather than a slide.
+    /// </remarks>
+    public float Bend { get; set; }
+
+    /// <inheritdoc/>
     /// <remarks>The envelope times the volume column, which is where a generated voice's level is.</remarks>
     public float Level { get; private set; }
 
@@ -280,6 +290,7 @@ public sealed class SynthVoice : IVoice
         double left = Pan <= 0 ? 1.0 : 1.0 - Pan;
         double right = Pan >= 0 ? 1.0 : 1.0 + Pan;
         double step = 1.0 / _sampleRate;
+        double wheel = Bend;
 
         for (int frame = 0; frame < frames; frame++)
         {
@@ -298,7 +309,7 @@ public sealed class SynthVoice : IVoice
 
             Level = (float)(level * Gain);
 
-            double bend = _bends ? Motion.MotionAt(_patch, _time) : 0;
+            double bend = (_bends ? Motion.MotionAt(_patch, _time) : 0) + wheel;
             double frequency = bend == 0 ? _baseFrequency : _baseFrequency * Motion.Ratio(bend);
 
             _phase = Shapes.Wrap(_phase + frequency * step);

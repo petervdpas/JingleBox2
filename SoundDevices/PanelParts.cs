@@ -25,6 +25,7 @@ public sealed class PanelParts : IPanelParts
         ElementKinds.Led,
         ElementKinds.Meter,
         ElementKinds.Keys,
+        ElementKinds.Wheels,
         ElementKinds.Location,
         ElementKinds.Wave,
         ElementKinds.Envelope,
@@ -59,6 +60,7 @@ public sealed class PanelParts : IPanelParts
     public IReadOnlyList<string> NeedNotes { get; } = new[]
     {
         ElementKinds.Keys,
+        ElementKinds.Wheels,
         ElementKinds.Pads,
         ElementKinds.Pad,
         ElementKinds.PadPicker,

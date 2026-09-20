@@ -457,7 +457,7 @@
               </StackPanel>
             </ToggleButton>
 
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
                   IsVisible="{Binding MachineOpen}"
                   ColumnSpacing="10" RowSpacing="8">
               <!-- These write straight into the project, which is a plain object and says
@@ -496,12 +496,26 @@
                          Text="{Binding Project.Id}"
                          ToolTip.Tip="What songs write down. Made once, and never changed." />
 
+              <!-- A keyboard's mod wheel plays the machine rather than the desk, so which control
+                   it owns is the machine's own answer and travels in its zip. Only one, and only
+                   a control that means nothing at its bottom: the wheel says how far up it is, so
+                   a wheel down is that control at its minimum. A vibrato depth is nothing at
+                   nought and a cutoff is shut. -->
+              <TextBlock Grid.Row="5" Grid.Column="0" Classes="label" Text="Mod wheel:"
+                         IsVisible="{Binding ShowsWheel}" />
+              <ComboBox Grid.Row="5" Grid.Column="1" HorizontalAlignment="Left" MinWidth="180"
+                        IsVisible="{Binding ShowsWheel}"
+                        IsEnabled="{Binding HasProject}"
+                        ItemsSource="{Binding WheelKeys}"
+                        SelectedItem="{Binding WheelKey, Mode=TwoWay}"
+                        ToolTip.Tip="What a keyboard's modulation wheel turns on this machine. It travels with the machine, so it works on somebody else's computer without being learned again." />
+
               <!-- Picked off the picture rather than typed, because six hex digits say nothing
                    about whether the thing will look like a rack device. The seven shades the
                    colour is worked into are behind the button: most machines never touch them. -->
-              <TextBlock Grid.Row="5" Grid.Column="0" Classes="label" Text="Colour:"
+              <TextBlock Grid.Row="6" Grid.Column="0" Classes="label" Text="Colour:"
                          VerticalAlignment="Top" Margin="0,3,0,0" />
-              <StackPanel Grid.Row="5" Grid.Column="1" Spacing="6"
+              <StackPanel Grid.Row="6" Grid.Column="1" Spacing="6"
                           IsEnabled="{Binding HasProject}">
                 <views:ColourPicker Height="124" Colour="{Binding Accent, Mode=TwoWay}"
                                     ToolTip.Tip="The colour the machine wears wherever it is shown. It keeps it whichever theme the application is wearing." />

@@ -175,6 +175,16 @@ public sealed partial class DesignerViewModel : ObservableObject
 
         History.Changed += HistoryMoved;
 
+        // The wheel is pointed at one of the machine's own keys, so the list of them moves
+        // whenever a control is added, removed or renamed. Told here rather than at each of the
+        // places that edit the list, since one of those would eventually be forgotten and what
+        // that looks like is a picker offering a control that is no longer there.
+        Parameters.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(WheelKeys));
+            OnPropertyChanged(nameof(WheelKey));
+        };
+
         Values = new PreviewValues(Parameters);
 
         PresetDesk = new SoundMachinePresetDesk(() => Project as SoundMachineProject);
@@ -675,6 +685,75 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// changed. This is filled from the project when one is opened and kept in step with it.
     /// </remarks>
     public ObservableCollection<ParameterViewModel> Parameters { get; } = new();
+
+    /// <summary>Whether this world has a modulation wheel to point at anything.</summary>
+    /// <remarks>
+    /// The played one does and the other does not, which is not an omission: an effect is handed
+    /// a whole track's audio rather than notes, so there is no keyboard beside it and no wheel on
+    /// that keyboard.
+    /// </remarks>
+    public bool ShowsWheel => _world.Played;
+
+    /// <summary>
+    /// What the modulation wheel may be pointed at: nothing, or one of this machine's own keys.
+    /// </summary>
+    /// <remarks>
+    /// Read off the parameters as they stand rather than kept, so a control added or renamed a
+    /// moment ago is in the list. Empty first and named "nothing", because that is what every
+    /// machine is until somebody chooses, and a picker whose first entry is a real control would
+    /// have a machine pick one up by being opened.
+    /// </remarks>
+    public IEnumerable<string> WheelKeys
+    {
+        get
+        {
+            yield return NoWheel;
+
+            foreach (var parameter in Parameters)
+            {
+                if (parameter.Key is { Length: > 0 } key) yield return key;
+            }
+        }
+    }
+
+    /// <summary>What the picker says for a machine whose wheel drives nothing.</summary>
+    /// <remarks>
+    /// A word rather than a blank row, which reads as a list that failed to fill. It is never
+    /// written to the manifest: see <see cref="WheelKey"/>.
+    /// </remarks>
+    public const string NoWheel = "nothing";
+
+    /// <summary>
+    /// Which of them it is pointed at, or <see cref="NoWheel"/>.
+    /// </summary>
+    /// <remarks>
+    /// Written straight into the project like the name and the summary beside it, and the editor
+    /// is told afterwards, since a project is a plain object and says nothing when it moves.
+    ///
+    /// Only a machine has one. Asked of an effect it answers nothing and takes nothing, rather
+    /// than the page having to know which world it is in a second time.
+    /// </remarks>
+    public string WheelKey
+    {
+        get => Project is SoundMachineProject machine && machine.Wheel.Length > 0
+            ? machine.Wheel
+            : NoWheel;
+
+        set
+        {
+            if (Project is not SoundMachineProject machine) return;
+
+            string key = value == NoWheel ? "" : value ?? "";
+
+            if (machine.Wheel == key) return;
+
+            machine.Wheel = key;
+
+            OnPropertyChanged();
+
+            Redraw();
+        }
+    }
 
     /// <summary>What the panel in the editor reads and writes: the parameters, and nothing kept.</summary>
     public IPanelValues Values { get; }
@@ -1998,6 +2077,9 @@ public sealed partial class DesignerViewModel : ObservableObject
         History.Opened(value);
 
         Wrap(value);
+
+        OnPropertyChanged(nameof(WheelKeys));
+        OnPropertyChanged(nameof(WheelKey));
     }
 
     /// <summary>

@@ -82,3 +82,26 @@ looked at, let alone removed.
 A device naming an engine this build has not got is read off disc and left there rather
 than put on the rack, which is what makes a folder from a later version harmless. See
 "Soundmachines and effects" for what an engine, a soundmachine and an effect each are.
+
+## The mod wheel, and the wheels on the face
+
+**Mod wheel** on the device's own card names which of your parameters a keyboard's
+modulation wheel turns. It travels with the device, so it works on somebody else's
+computer without being learned again, and it is one control rather than several: a
+device that wants the wheel to move three things wants one parameter that moves three
+things.
+
+Pick a control that means nothing at its bottom. A wheel says how far up it is and
+nothing else, so a wheel down is that parameter at its minimum: a vibrato depth or a
+modulation amount is nothing at nought and the wheel brings it in, where a cutoff
+would slam shut the moment anybody touched the wheel. What it writes is the parameter
+itself rather than an offset on top of it, so a preset that already had vibrato in it
+loses that setting the first time the wheel is moved.
+
+**Wheels** is a separate thing: the part that draws the two wheels on the face, beside
+a **Keys**. It turns no parameter and takes no pointer, the same way the keyboard part
+shows which keys are down: it is a picture of the wheels under somebody's hand. A
+device can name a mod wheel without drawing either, and draw both without naming one.
+
+An effect has neither, since it is handed a track's audio rather than notes and there
+is no keyboard beside it.

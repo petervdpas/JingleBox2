@@ -208,24 +208,14 @@ public sealed class MidiControlRouter
     /// Nothing is said about a control that reaches nothing. <see cref="ControlTargets"/> says it
     /// already, in the same breath as which track and which machine were asked, which is the half
     /// worth having.
+    ///
     /// </remarks>
     public void Handle(MidiMessage message)
     {
-        if (message is null || message.Type != MidiMessageType.ControlChange) return;
-
-        var mappings = _mappings();
-        if (mappings is null) return;
-
         bool answered = false;
 
-        string desk = _profiles.Called(message.Device);
-
-        foreach (var mapping in mappings)
+        foreach (var mapping in Answering(message))
         {
-            if (mapping.Kind == ControlKind.Pad) continue;
-
-            if (!mapping.Answers(message, desk)) continue;
-
             answered = true;
 
             var target = _targets.Find(mapping);
@@ -234,12 +224,62 @@ public sealed class MidiControlRouter
             Apply(mapping, target, message.Data);
         }
 
-        if (!answered && _layout?.For(message) is { } fallback
-                      && _targets.Find(fallback) is { } waiting)
-        {
-            if (!_hands.TryGetValue(fallback, out _)) Caught(fallback);
+        if (answered) return;
 
-            Apply(fallback, waiting, message.Data);
+        if (_layout?.For(message) is not { } fallback) return;
+        if (_targets.Find(fallback) is not { } waiting) return;
+
+        if (!_hands.TryGetValue(fallback, out _)) Caught(fallback);
+
+        Apply(fallback, waiting, message.Data);
+    }
+
+    /// <summary>
+    /// Whether a link somebody made holds this control.
+    /// </summary>
+    /// <remarks>
+    /// Asked by <see cref="MidiWheelRouter"/>, which must leave alone a controller somebody
+    /// pointed at something: a modulation wheel is a continuous controller like any other, and
+    /// reading it twice would drive a link and bend a track from one gesture.
+    ///
+    /// True even where the thing pointed at is not there this second, because a knob pointed at
+    /// a track this song has not got is still a knob somebody pointed, and having it fall back
+    /// to being a wheel would make it mean two different things depending on which song is open.
+    ///
+    /// The layout is not counted, and does not have to be: it declines a wheel itself, since
+    /// what it points links at is exactly what a wheel is not. See <see cref="IControlJobs"/>.
+    /// </remarks>
+    /// <param name="message">What arrived.</param>
+    public bool Pointed(MidiMessage message)
+    {
+        foreach (var _ in Answering(message)) return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// Every link that answers this message, which is the one walk both doors take.
+    /// </summary>
+    /// <remarks>
+    /// One walk because the two questions are the same question: what is pointed at this
+    /// control. Written out twice they would eventually disagree, and the way that fails is a
+    /// wheel that bends a track the desk is also driving.
+    /// </remarks>
+    /// <param name="message">What arrived.</param>
+    private IEnumerable<ControlMapping> Answering(MidiMessage message)
+    {
+        if (message is null || message.Type != MidiMessageType.ControlChange) yield break;
+
+        var mappings = _mappings();
+        if (mappings is null) yield break;
+
+        string desk = _profiles.Called(message.Device);
+
+        foreach (var mapping in mappings)
+        {
+            if (mapping.Kind == ControlKind.Pad) continue;
+
+            if (mapping.Answers(message, desk)) yield return mapping;
         }
     }
 

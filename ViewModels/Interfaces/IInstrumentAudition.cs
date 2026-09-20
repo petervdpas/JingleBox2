@@ -44,6 +44,26 @@ public interface IInstrumentAudition
     void Silence(TrackerInstrument instrument);
 
     /// <summary>
+    /// The pitch wheel beside the keys, for notes played by hand on this instrument.
+    /// </summary>
+    /// <remarks>
+    /// Borrowed through here like the notes themselves and for the same reason: the tracker owns
+    /// the engine, and a wheel without the notes it is about would be a bend nothing is bending.
+    ///
+    /// The instrument is named because a note played here belongs to no track: what is under the
+    /// hand on the rack may be in no song at all, so there is no track number that could stand
+    /// for it.
+    /// </remarks>
+    /// <param name="instrument">What is being played by hand.</param>
+    /// <param name="lean">Where the wheel is, -1 to 1.</param>
+    void Bend(TrackerInstrument? instrument, double lean);
+
+    /// <summary>And the modulation wheel. See <see cref="Bend"/>.</summary>
+    /// <param name="instrument">What is being played by hand.</param>
+    /// <param name="amount">How far up the wheel is, 0 to 1.</param>
+    void Modulate(TrackerInstrument? instrument, double amount);
+
+    /// <summary>
     /// How far through its recording the sample voice on that track is, as a fraction of the
     /// whole file, or -1 when nothing is playing one.
     /// </summary>

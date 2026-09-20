@@ -158,6 +158,7 @@
                                  Scope="{Binding Editor.MachineScope}"
                                  Slices="{Binding Editor.MachineSlices}"
                                  Keyboard="{Binding MachineKeys}"
+                                 Wheels="{Binding MachineWheels}"
                                  Location="{Binding MachineLocation}"
                                  Menu="{Binding Editor.MachineMenu}"
                                  InstrumentName="{Binding Editor.Named}"
@@ -167,17 +168,36 @@
                                  Trigger="{Binding NoteTrigger}"
                                  HoldSeconds="{Binding HoldSeconds}" />
 
-            <!-- The keyboard, at the foot where a keyboard goes, and the same on every panel.
-                 It plays, it shows what is playing, and it carries its own octave: the lamps
-                 are not a setting beside the keys, they are where the keys are looking. -->
-            <ui:Clavier Octave="{Binding Octave}"
-                           HorizontalAlignment="Left"
-                           Margin="0,14,0,0"
-                           IsVisible="{Binding Editor.ShowsSharedKeys}"
-                           Lit="{Binding MachineKeys.Lit}"
-                           Command="{Binding KeyPressCommand}"
-                           ReleaseCommand="{Binding KeyLetCommand}"
-                           ToolTip.Tip="Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down, not for as long as what it started goes on sounding. The arrows and the lamps move the three octaves on show." />
+            <!-- The keyboard, at the foot where a keyboard goes, and the wheels to the left of
+                 it where a keyboard's wheels are. It plays, it shows what is playing, and it
+                 carries its own octave: the lamps are not a setting beside the keys, they are
+                 where the keys are looking.
+
+                 This is the panel the program draws itself, which is what a plugin instrument
+                 gets, so the keyboard and the wheels are parts of it rather than additions to
+                 somebody's design. A machine that wants either says so with a part. -->
+            <StackPanel Orientation="Horizontal" Spacing="12"
+                        HorizontalAlignment="Left"
+                        Margin="0,14,0,0"
+                        IsVisible="{Binding Editor.ShowsSharedKeys}">
+
+              <!-- They report and are never moved from here. A wheel on the screen is a picture
+                   of the one under a hand, so what it shows comes from the monitor every drawn
+                   keyboard reads, and there is nothing on it to drag. -->
+              <ui:Wheel Reads="Pitch" Label="PITCH" VerticalAlignment="Bottom"
+                        Watching="{Binding MachineWheels}"
+                        ToolTip.Tip="Where the pitch wheel on your keyboard is. It shows, and it is moved from the keyboard rather than from here." />
+
+              <ui:Wheel Reads="Modulation" Label="MOD" VerticalAlignment="Bottom"
+                        Watching="{Binding MachineWheels}"
+                        ToolTip.Tip="Where the modulation wheel on your keyboard is. What it turns is the machine's own answer, and it is moved from the keyboard rather than from here." />
+
+              <ui:Clavier Octave="{Binding Octave}"
+                             Lit="{Binding MachineKeys.Lit}"
+                             Command="{Binding KeyPressCommand}"
+                             ReleaseCommand="{Binding KeyLetCommand}"
+                             ToolTip.Tip="Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down, not for as long as what it started goes on sounding. The arrows and the lamps move the three octaves on show." />
+            </StackPanel>
 
     </StackPanel>
   </ScrollViewer>

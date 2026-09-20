@@ -89,6 +89,27 @@ public sealed class TrackerInstrument
     public VoiceEnding NewNoteAction { get; set; } = VoiceEnding.Cut;
 
     /// <summary>
+    /// How far the pitch wheel bends this instrument, in semitones either way.
+    /// </summary>
+    /// <remarks>
+    /// A fact about the sound and not about the hand, which is why it is here beside
+    /// <see cref="NewNoteAction"/> and travels with a preset: a lead wants a whole tone and a
+    /// guitar part wants a fourth, and both are true wherever either is played.
+    ///
+    /// Two is what MIDI has meant by a wheel at full since it was written, so an instrument
+    /// saved before this existed reads back as two and bends exactly as any other keyboard
+    /// would make it. Nought is a perfectly good answer for a drum kit, whose pitch is the one
+    /// thing nobody wants a wheel anywhere near.
+    ///
+    /// Not asked of a plugin. A plugin is sent the wheel as it arrived and owns its own range,
+    /// which is a setting on its own face and not something a host may quietly double.
+    /// </remarks>
+    public double BendSemitones { get; set; } = DefaultBendSemitones;
+
+    /// <summary>What a pitch wheel bends by where nobody has said otherwise, which is MIDI's own.</summary>
+    public const double DefaultBendSemitones = 2;
+
+    /// <summary>
     /// Which part of the recording plays, and how it repeats. Null on an instrument written
     /// before samples had a shape at all, which is the one reliable sign that its envelope
     /// was never heard: see <see cref="EnsureShape"/>.
@@ -546,6 +567,7 @@ public sealed class TrackerInstrument
         OneVoice = other.OneVoice;
         Gate = other.Gate;
         NewNoteAction = other.NewNoteAction;
+        BendSemitones = other.BendSemitones;
         Shape = other.Shape?.Clone();
 
         PluginPath = other.PluginPath;
@@ -569,15 +591,17 @@ public sealed class TrackerInstrument
     /// A plugin's patch moves only between two instruments on the same plugin. Another
     /// plugin's state is not a preset for this one, it is a file it cannot read.
     ///
-    /// <see cref="NewNoteAction"/> travels with the sound rather than with the machine, since
-    /// it is part of what the sound does: a preset for a pad that overlaps is not that preset
-    /// with the overlap taken off it.
+    /// <see cref="NewNoteAction"/> and <see cref="BendSemitones"/> travel with the sound rather
+    /// than with the machine, since both are part of what the sound does: a preset for a pad
+    /// that overlaps is not that preset with the overlap taken off it, and a lead that bends a
+    /// fourth is not that lead bending a tone.
     /// </remarks>
     public void TakeSoundFrom(TrackerInstrument other)
     {
         if (other is null || ReferenceEquals(other, this) || other.Kind != Kind) return;
 
         NewNoteAction = other.NewNoteAction;
+        BendSemitones = other.BendSemitones;
 
         switch (Kind)
         {
@@ -661,6 +685,7 @@ public sealed class TrackerInstrument
         OneVoice = OneVoice,
         Gate = Gate,
         NewNoteAction = NewNoteAction,
+        BendSemitones = BendSemitones,
         Shape = Shape?.Clone(),
         PluginPath = PluginPath,
         PluginId = PluginId,

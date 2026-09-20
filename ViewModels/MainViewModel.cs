@@ -2557,12 +2557,19 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
         var padTrigger = new PadTriggerAdapter(Pads);
 
-        Keys = new MidiMonitor(new TrackerNoteAdapter(Tracker, Machines));
+        var played = new TrackerNoteAdapter(Tracker, Machines);
+
+        Keys = new MidiMonitor(played, played);
 
         Machines.MidiKeys = Keys;
         Tracker.MidiKeys = Keys;
 
         var noteRouter = new MidiNoteRouter(Keys);
+
+        // What each control on a desk is for. One rule, shared, because what the layout points a
+        // link at is exactly what the wheels must leave alone: written out in both, the two
+        // called into each other and neither owned the answer.
+        var jobs = new Midi.ControlJobs(_profiles);
 
         // What a link stores is the controller by name, which is what its own contract has always
         // said; a file written before that holds the port a message arrived on. Named here rather
@@ -2587,6 +2594,8 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
             padTrigger, () => _cfg.Midi.ToggleMode,
             this);
 
+        var layout = Layout;
+
         var controlRouter = new MidiControlRouter(
             () => ControlLink.Live,
             targets,
@@ -2595,6 +2604,10 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
             _profiles,
             () => _cfg.Midi.InstantPickup);
         ControlLink.UseThis();
+
+        // It asks the control router whether a link holds the control, because that is the one
+        // class that knows how a mapping matches. A wheel a hand was pointed at is a knob.
+        var wheelRouter = new MidiWheelRouter(Keys, jobs, controlRouter.Pointed);
 
         Tracker.UseAutomation(targets);
 
@@ -2629,7 +2642,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
         Tracker.MixShown = surface.Draw;
 
-        var trackNotes = new MidiTrackRouter(Tracker, () => Tracker.Song.Mix);
+        var trackNotes = new MidiTrackRouter(Tracker, () => Tracker.Song.Mix, wheels: Tracker, jobs: jobs);
 
         var dispatcher = new MidiDispatcher(
             _cfg.Midi,
@@ -2639,7 +2652,16 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
                 controlRouter.Pads(msg);
             },
-            msg => { if (SelectedTab != UseTab) noteRouter.Handle(msg); },
+            // The keys and the wheels beside them are one hand and one job: a wheel goes where
+            // the notes from that port go. Through the monitor, like the notes, so a drawn wheel
+            // is a picture of the one under the hand rather than a second wheel beside it.
+            msg =>
+            {
+                if (SelectedTab == UseTab) return;
+
+                noteRouter.Handle(msg);
+                wheelRouter.Handle(msg);
+            },
             msg =>
             {
                 if (ControlLink.Handle(msg) is { } made) controlRouter.Caught(made);
@@ -2654,7 +2676,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
             },
             follow: _clockFollow,
             deck: _clockDeck,
-            tracks: trackNotes.Handle);
+            tracks: trackNotes.Claim);
 
         var screen = new ControllerScreens(
             () => new MidiPortBindings().DevicesWith(_cfg.Midi.Devices, MidiPortBindings.EveryRole),

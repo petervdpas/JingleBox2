@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
+using JingleBox2.Diagnostics;
+using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Midi;
 
 /// <summary>
-/// A monitor of the notes going past: which keys are down, whatever pressed them.
+/// A monitor of what a hand is doing: which keys are down and where the two wheels are held,
+/// whatever is doing it.
 /// </summary>
 /// <remarks>
 /// One of these, wired to the note stream when the application starts and never taken off it.
@@ -20,17 +23,26 @@ namespace JingleBox2.Midi;
 /// keyboard say so themselves through <see cref="Pressed"/>, because the panel they are on sounds
 /// them itself and forwarding those as well would sound everything twice.
 ///
-/// The two halves of a press are all it holds. What a note went on to sound, and for how long, is
-/// a different question with a different answer, and it is not this one.
+/// The wheels go through it the same way and for the same reason: a drawn wheel is a picture of
+/// the one under the hand, so it is watched here and passed on untouched. Nothing on a panel
+/// writes one, which is the difference from a key: a key can be pressed on a drawn keyboard and
+/// a wheel cannot be dragged on a drawn panel.
+///
+/// The two halves of a press and the two wheel positions are all it holds. What a note went on to
+/// sound, and for how long, is a different question with a different answer, and it is not this
+/// one.
 ///
 /// Written from whichever thread the port delivers on and read by the drawing thread, so the set
 /// is locked and handed out as a copy. It is a handful of notes: a copy is cheaper than making
 /// everybody who reads it hold a lock.
 /// </remarks>
-public sealed class MidiMonitor : INoteTrigger, IMidiMonitor
+public sealed class MidiMonitor : INoteTrigger, IWheels, IMidiMonitor
 {
     /// <summary>Whoever really plays the notes. Every one is passed on untouched.</summary>
     private readonly INoteTrigger _next;
+
+    /// <summary>And whoever the wheels were going to, passed on the same way.</summary>
+    private readonly IWheels _turning;
 
     /// <summary>The keys held down now, whatever put them there.</summary>
     private readonly HashSet<int> _down = new();
@@ -42,16 +54,32 @@ public sealed class MidiMonitor : INoteTrigger, IMidiMonitor
     /// Where the notes were going anyway. Left out for a monitor standing on its own, which is
     /// what a test wants and what a keyboard with nothing behind it gets.
     /// </param>
-    public MidiMonitor(INoteTrigger? next = null) => _next = next ?? new Nobody();
+    /// <param name="turning">
+    /// And where the wheels were going. Left out, the wheels are watched and reach nothing,
+    /// which is the same arrangement and is what a monitor on its own has.
+    /// </param>
+    public MidiMonitor(INoteTrigger? next = null, IWheels? turning = null)
+    {
+        var nobody = new Nobody();
 
-    /// <summary>Nowhere for a note to go, for a monitor standing on its own.</summary>
-    private sealed class Nobody : INoteTrigger
+        _next = next ?? nobody;
+        _turning = turning ?? nobody;
+    }
+
+    /// <summary>Nowhere for a note or a wheel to go, for a monitor standing on its own.</summary>
+    private sealed class Nobody : INoteTrigger, IWheels
     {
         /// <inheritdoc/>
         public void TriggerNote(Note note, int volume) { }
 
         /// <inheritdoc/>
         public void ReleaseNote(Note note) { }
+
+        /// <inheritdoc/>
+        public void Bend(double lean) { }
+
+        /// <inheritdoc/>
+        public void Modulate(double amount) { }
     }
 
     /// <inheritdoc/>
@@ -66,6 +94,56 @@ public sealed class MidiMonitor : INoteTrigger, IMidiMonitor
 
     /// <inheritdoc/>
     public event EventHandler? Changed;
+
+    /// <inheritdoc/>
+    public event EventHandler? Moved;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A plain field rather than a locked one. It is a double written by the port's thread and
+    /// read by the drawing thread, and the worst either can see is the position from a
+    /// millisecond ago, which is a wheel arriving one frame late and is exactly what a picture
+    /// of a moving thing is anyway.
+    /// </remarks>
+    public double Lean { get; private set; }
+
+    /// <inheritdoc cref="Lean"/>
+    public double Amount { get; private set; }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// **Passed on before the onlookers are told**, and that order is the whole of what this
+    /// class promises. Passing the message on is the contract; saying so to whatever is drawing
+    /// a picture of it is a courtesy, and a courtesy may not cost the thing it is about. Told
+    /// first, one listener that throws takes the sound with it: the note is not bent, and from a
+    /// chair the wheel simply does nothing.
+    ///
+    /// Said only when something really moved, since a device holding a wheel still sends the
+    /// same value over and over and what listens to this draws.
+    /// </remarks>
+    public void Bend(double lean)
+    {
+        bool moved = Lean != lean;
+
+        Lean = lean;
+
+        _turning.Bend(lean);
+
+        if (moved) Moved?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Passed on before the onlookers are told, for the reason <see cref="Bend"/> gives.</remarks>
+    public void Modulate(double amount)
+    {
+        bool moved = Amount != amount;
+
+        Amount = amount;
+
+        _turning.Modulate(amount);
+
+        if (moved) Moved?.Invoke(this, EventArgs.Empty);
+    }
 
     /// <inheritdoc/>
     /// <remarks>Noted and passed on. Nothing about what gets played goes through here.</remarks>
@@ -85,10 +163,28 @@ public sealed class MidiMonitor : INoteTrigger, IMidiMonitor
     }
 
     /// <inheritdoc/>
-    public void Pressed(int semitone) => Hold(semitone, true);
+    /// <remarks>
+    /// Said out loud, and that is not symmetry for its own sake. A key on the hardware is
+    /// written down twice on its way here, by the wire and by the router; a key pressed on a
+    /// drawn keyboard passes neither, so until this line existed a log taken while somebody was
+    /// clicking keys showed nothing whatever and read as a keyboard that was never touched. The
+    /// two are the commonest thing to have to tell apart.
+    /// </remarks>
+    public void Pressed(int semitone)
+    {
+        Log.Write(LogArea.Midi, () => "panel: key " + semitone + " pressed on a drawn keyboard");
+
+        Hold(semitone, true);
+    }
 
     /// <inheritdoc/>
-    public void Released(int semitone) => Hold(semitone, false);
+    /// <remarks>Both halves, for the reason <see cref="Pressed"/> gives.</remarks>
+    public void Released(int semitone)
+    {
+        Log.Write(LogArea.Midi, () => "panel: key " + semitone + " let go on a drawn keyboard");
+
+        Hold(semitone, false);
+    }
 
     /// <inheritdoc/>
     public bool Holds(int semitone)

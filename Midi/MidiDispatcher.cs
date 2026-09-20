@@ -45,8 +45,9 @@ public sealed class MidiDispatcher
     /// passed anywhere.
     /// </param>
     /// <param name="tracks">
-    /// Asked first about every note, from any open port: true when a track's MIDI in took it, in
-    /// which case the tracker job does not also get it. Left out, no track listens to anything.
+    /// Asked first about every message, from any open port: true when a track's MIDI in took it,
+    /// in which case the tracker job does not also get it. Left out, no track listens to
+    /// anything.
     /// </param>
     public MidiDispatcher(MidiConfig cfg, Action<MidiMessage>? pads, Action<MidiMessage>? tracker,
                           Action<MidiMessage>? controls = null, Action<MidiMessage>? transport = null,
@@ -89,13 +90,18 @@ public sealed class MidiDispatcher
     private readonly IMidiPortBindings _bindings;
 
     /// <summary>
-    /// The open song's tracks, asked whether a note is theirs before any job is.
+    /// The open song's tracks, asked whether a message is theirs before any job is.
     /// </summary>
     /// <remarks>
     /// Before the jobs and regardless of them, because a port is opened for a track that listens
     /// to it whether or not SETTINGS gave it a job, and a note one track claims going on to the
     /// cursor's track as well would be every note played twice. The pads, the knobs and the
     /// transport are left alone: those are jobs somebody gave the port on purpose.
+    ///
+    /// Asked about every message rather than only about notes, and answered by the one class
+    /// that knows what a track listens for. A keyboard pointed at track three is pointed at it
+    /// whole: its keys and the wheels beside them are one hand, and a claim that covered the
+    /// notes alone would have the wheel reach the cursor's track instead.
     /// </remarks>
     private readonly Func<MidiMessage, bool>? _tracks;
 
@@ -107,6 +113,10 @@ public sealed class MidiDispatcher
     /// down in the words of whoever it reached; one dropped here has nobody left to speak for it,
     /// and a controller that does nothing because it was never given a job in SETTINGS is the
     /// single most common thing anybody is looking for in this log.
+    ///
+    /// The wheels are no job of their own. A pitch or modulation wheel goes with the keys
+    /// rather than with the desk, so it arrives wherever the tracker job goes and
+    /// <see cref="MidiWheelRouter"/> decides for itself whether the message was one.
     /// </remarks>
     public void Handle(MidiMessage msg)
     {
@@ -114,7 +124,7 @@ public sealed class MidiDispatcher
 
         if (Followed(msg)) return;
 
-        bool claimed = msg.Type == MidiMessageType.Note && _tracks?.Invoke(msg) == true;
+        bool claimed = _tracks?.Invoke(msg) == true;
 
         var role = _bindings.RoleFor(_cfg.Devices, msg.Device);
 

@@ -422,6 +422,57 @@ public sealed class ControlTargets : IControlTargets
             parameter.Unit);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Built here rather than stored anywhere, because the machine a track plays moves under it
+    /// and the key belongs to that machine: holding the answer across a track being pointed at
+    /// something else would be holding a parameter of a machine that has gone.
+    ///
+    /// It goes through <see cref="OnMachine"/> like every other machine parameter, so a key the
+    /// machine no longer has, a track playing nothing and a machine this installation has not
+    /// registered all come back as nothing, in one place, with the same words.
+    /// </remarks>
+    public IControlTarget? Wheel(int track)
+    {
+        string machine = _tracker.MachineOn(track);
+        if (machine.Length == 0) return null;
+
+        if (_machines.For(machine) is not { Wheel.Length: > 0 } project) return null;
+
+        return OnMachine(
+            new ControlMapping
+            {
+                Kind = ControlKind.SoundDevice,
+                Machine = machine,
+                Key = project.Wheel,
+                Scope = ControlScope.Fixed,
+                Track = track
+            },
+            track);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Through <see cref="OnRackMachine"/> for the same reason <see cref="Wheel"/> goes through
+    /// <see cref="OnMachine"/>: one place decides what a machine parameter is worth reaching and
+    /// what its range is.
+    /// </remarks>
+    public IControlTarget? WheelOnRack()
+    {
+        if (_rack?.Editor is not { } editor) return null;
+        if (editor.MachineId is not { Length: > 0 } machine) return null;
+
+        if (_machines.For(machine) is not { Wheel.Length: > 0 } project) return null;
+
+        return OnRackMachine(new ControlMapping
+        {
+            Kind = ControlKind.SoundDevice,
+            Machine = machine,
+            Key = project.Wheel,
+            Scope = ControlScope.Fixed
+        });
+    }
+
     /// <summary>
     /// A knob on the machine a track plays, when that is the machine the mapping is about.
     /// </summary>

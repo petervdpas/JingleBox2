@@ -396,7 +396,7 @@ public sealed class ControllerProfiles : IControllerProfiles
         return control.Kind switch
         {
             "encoder" when sends == "absolute" => ControlPickup.Endless,
-            "fader" or "strip" => ControlPickup.Takeover,
+            "fader" or "strip" or "wheel" => ControlPickup.Takeover,
             "knob" when sends != "relative" => ControlPickup.Takeover,
             "button" or "pad" => ControlPickup.Jump,
             _ => null

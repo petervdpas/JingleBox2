@@ -31,7 +31,7 @@
     {
       "name": "Mod strip",
       "cc": 1,
-      "kind": "strip"
+      "kind": "wheel"
     }
   ],
   "//programs": "Control is the mode in which the five encoders send controllers. Out of it they edit the sequencer on the device and send nothing. Every encoder read: port All, channel Global, min 0, max 127, mode Absolute. The mode row is left off sysex-controls' Knobs page, commented out by its author as not working, and the device answered it all the same: 0 for all five, which is Absolute and is the manual's default.",

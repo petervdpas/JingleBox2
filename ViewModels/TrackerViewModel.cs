@@ -41,7 +41,7 @@ namespace JingleBox2.ViewModels;
 /// (<see cref="Midi.Interfaces.IPlaysNotes"/>). Each of those says what it is for on itself; what is here
 /// is how this one implementation does it.
 /// </remarks>
-public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Midi.Interfaces.IPlaysNotes, Midi.Interfaces.ITrackNotes, Shortcuts.Interfaces.IShortcutContext
+public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Midi.Interfaces.IPlaysNotes, Midi.Interfaces.ITrackNotes, Midi.Interfaces.IWheels, Midi.Interfaces.ITrackWheels, Shortcuts.Interfaces.IShortcutContext
 {
     /// <summary>What effects of ours this installation has, for the chains under the pattern.</summary>
     /// <remarks>
@@ -231,7 +231,27 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <see cref="FollowCursorTrack"/> does nothing when it has not changed, so a keystroke
     /// that walks down one column costs a comparison.
     /// </remarks>
-    partial void OnCursorChanged(PatternCursor value) => FollowCursorTrack();
+    partial void OnCursorChanged(PatternCursor value)
+    {
+        _cursorTrack = value.Track;
+
+        FollowCursorTrack();
+    }
+
+    /// <summary>
+    /// The cursor's track on its own, for the threads that are not the drawing one.
+    /// </summary>
+    /// <remarks>
+    /// The wheels arrive on whichever thread the port delivered them on and want one number off
+    /// a cursor that belongs to the drawing thread. A cursor is a shape rather than a value, so
+    /// reading it there could read a line from one keystroke against a track from the next, and
+    /// what that costs is a wheel bending a track it was never pointed at and leaving it bent:
+    /// the message after it goes to the right track and nothing ever straightens the wrong one.
+    ///
+    /// Written where the cursor moves and read as a single machine word, which is the shape this
+    /// codebase's own thread contract asks for when what is shared is a value.
+    /// </remarks>
+    private volatile int _cursorTrack;
 
     /// <summary>Which slot of the order is being worked on, which decides the pattern.</summary>
     [ObservableProperty] private int orderIndex;
@@ -344,6 +364,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public void UseAutomation(Midi.Interfaces.IControlTargets targets)
     {
         _player.Automation = new AutomationPlayer(targets);
+        _player.Controls = targets;
 
         Lanes = new AutomationViewModel(
             targets, () => Song, () => CurrentPattern, () => LinesPerBeat, () => PlayingLine)
@@ -3308,6 +3329,50 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Dispatcher.UIThread.Post(() => LetTrackNote(track, note, arrived));
     }
+
+    /// <inheritdoc cref="Midi.Interfaces.IWheels.Bend"/>
+    /// <remarks>
+    /// **Not posted to the drawing thread**, unlike a note, and the difference is what each of
+    /// them touches. A note moves the cursor and writes into the pattern, which are the drawing
+    /// thread's; a wheel touches the sounding voices and nothing on the screen, and the mixer
+    /// takes its own lock. Posted, a bend would arrive at whatever rate the window is being
+    /// drawn at, which is a slide that steps.
+    ///
+    /// The cursor's track, which is the track a key from this keyboard plays: the wheel is on
+    /// the same instrument as the keys and means the notes they are making. Read off
+    /// <see cref="_cursorTrack"/> rather than off the cursor itself, since a cursor is a shape
+    /// and this is not the thread that owns it.
+    /// </remarks>
+    public void Bend(double lean) => _player.BendTrack(_cursorTrack, lean);
+
+    /// <inheritdoc cref="Midi.Interfaces.IWheels.Modulate"/>
+    /// <remarks>The same track and for the same reason. See <see cref="Bend(double)"/>.</remarks>
+    public void Modulate(double amount) => _player.ModulateTrack(_cursorTrack, amount);
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The track that claimed the port rather than the cursor's, which is the whole of what a
+    /// track's MIDI in means: a sequencer feeding four tracks is four hands and each keeps its
+    /// own wheel.
+    /// </remarks>
+    public void BendTrack(int track, double lean) => _player.BendTrack(track, lean);
+
+    /// <inheritdoc/>
+    /// <remarks>The same track and for the same reason. See <see cref="BendTrack"/>.</remarks>
+    public void ModulateTrack(int track, double amount) => _player.ModulateTrack(track, amount);
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The rack borrowing the engine, so it goes to the loose bus a note played by hand goes to
+    /// rather than to any track. See <see cref="Midi.Interfaces.IWheels.Bend"/> for why it is not
+    /// posted.
+    /// </remarks>
+    public void Bend(TrackerInstrument? instrument, double lean) =>
+        _player.BendPreview(instrument, lean);
+
+    /// <inheritdoc/>
+    public void Modulate(TrackerInstrument? instrument, double amount) =>
+        _player.ModulatePreview(instrument, amount);
 
     /// <summary>
     /// Every key held on a track through its MIDI in: the instrument it sounded on, the column it

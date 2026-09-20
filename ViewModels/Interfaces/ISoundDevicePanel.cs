@@ -100,6 +100,22 @@ public interface ISoundDevicePanel
     IPanelKeys MachineKeys { get; }
 
     /// <summary>
+    /// Where the two wheels beside that keyboard are being held, or nothing where nobody is
+    /// watching them.
+    /// </summary>
+    /// <remarks>
+    /// The application's one monitor, which is also what the keyboard's lights come off. A wheel
+    /// on the screen is a picture of the one under somebody's hand rather than a control beside
+    /// it, so there is nothing here to write and no command to go with it, which is the whole
+    /// difference from <see cref="MachineKeys"/>: a drawn key can be pressed and a drawn wheel
+    /// cannot be dragged.
+    ///
+    /// Nothing by default, which is what a panel being previewed with no hardware behind it has.
+    /// The wheels are then drawn at rest, which is where they would be anyway.
+    /// </remarks>
+    IPanelWheels? MachineWheels => null;
+
+    /// <summary>
     /// Which keys are down, from every producer, or nothing for a panel standing on its own.
     /// </summary>
     /// <remarks>

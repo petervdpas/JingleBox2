@@ -132,6 +132,10 @@ public class PanelView : Decorator
     public static readonly StyledProperty<IPanelKeys?> KeyboardProperty =
         AvaloniaProperty.Register<PanelView, IPanelKeys?>(nameof(Keyboard));
 
+    /// <summary>Where the two wheels beside that keyboard are being held.</summary>
+    public static readonly StyledProperty<IPanelWheels?> WheelsProperty =
+        AvaloniaProperty.Register<PanelView, IPanelWheels?>(nameof(Wheels));
+
     /// <summary>Where the track playing this instrument has got to.</summary>
     public static readonly StyledProperty<IPanelLocation?> LocationProperty =
         AvaloniaProperty.Register<PanelView, IPanelLocation?>(nameof(Location));
@@ -481,6 +485,13 @@ public class PanelView : Decorator
         set => SetValue(KeyboardProperty, value);
     }
 
+    /// <inheritdoc cref="WheelsProperty"/>
+    public IPanelWheels? Wheels
+    {
+        get => GetValue(WheelsProperty);
+        set => SetValue(WheelsProperty, value);
+    }
+
     /// <inheritdoc cref="LocationProperty"/>
     public IPanelLocation? Location
     {
@@ -647,6 +658,7 @@ public class PanelView : Decorator
             change.Property == PadsProperty ||
             change.Property == SlicesProperty ||
             change.Property == KeyboardProperty ||
+            change.Property == WheelsProperty ||
             change.Property == LocationProperty ||
             change.Property == MenuProperty ||
             change.Property == InstrumentNameProperty ||
@@ -814,6 +826,7 @@ public class PanelView : Decorator
             ElementKinds.Meter => BuildMeter(element, parameters),
             ElementKinds.Choice => BuildChoice(element, parameters),
             ElementKinds.Keys => BuildKeys(element, parameters),
+            ElementKinds.Wheels => BuildWheels(element),
             ElementKinds.Location => BuildLocation(element),
             ElementKinds.Wave => BuildWave(element, parameters),
             ElementKinds.Envelope => BuildEnvelope(element, parameters),
@@ -1965,6 +1978,66 @@ public class PanelView : Decorator
     /// gap. The pad in hand and the set of keys with something on them both move without the
     /// panel being touched, so both are said again rather than bound to.
     /// </remarks>
+    /// <summary>
+    /// The pitch and modulation wheels, drawn where they are being held.
+    /// </summary>
+    /// <remarks>
+    /// They turn nothing and take no pointer: a drawn wheel is a picture of the one under
+    /// somebody's hand, exactly as the drawn keyboard is a picture of which keys are down. So
+    /// this only listens, and a panel shown with nobody behind it draws two wheels at rest
+    /// rather than nothing, which is what they would look like anyway.
+    ///
+    /// Each wheel follows the monitor itself rather than being fed from here, which is
+    /// <see cref="Wheel.Watching"/>: a panel is rebuilt whenever anything it is drawn from
+    /// moves, so a listener held by the builder would have to be taken off in as many places as
+    /// a panel can be thrown away, and the control knows exactly when it leaves the tree.
+    /// </remarks>
+    private Control? BuildWheels(PanelElement element)
+    {
+        double face = Number(element, "face", 0) is var asked and > 0 ? asked : DefaultWheelFace;
+
+        var words = Text(element, "caption") is { Length: > 0 } caption
+            ? caption.Split(',')
+            : new[] { "PITCH", "MOD" };
+
+        var pitch = new Wheel
+        {
+            Reads = Enums.WheelKind.Pitch,
+            Watching = Wheels,
+            Face = face,
+            Label = words.Length > 0 ? words[0].Trim() : ""
+        };
+
+        var modulation = new Wheel
+        {
+            Reads = Enums.WheelKind.Modulation,
+            Watching = Wheels,
+            Face = face,
+            Label = words.Length > 1 ? words[1].Trim() : ""
+        };
+
+        var pair = new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            Spacing = Number(element, "gap", 0) is var air and > 0 ? air : DefaultWheelGap
+        };
+
+        pair.Children.Add(pitch);
+        pair.Children.Add(modulation);
+
+        return pair;
+    }
+
+    /// <summary>How tall a wheel is where the device has not said.</summary>
+    /// <remarks>
+    /// A little shorter than the drawn keyboard beside it, which is what a keyboard's own wheels
+    /// are: they sit inside the cheek to the left of the keys rather than standing over them.
+    /// </remarks>
+    private const double DefaultWheelFace = 72;
+
+    /// <summary>And the air between the two of them.</summary>
+    private const double DefaultWheelGap = 6;
+
     private Control? BuildKeys(PanelElement element, Dictionary<string, Parameter> parameters)
     {
         if (Missing(element, parameters)) return null;
