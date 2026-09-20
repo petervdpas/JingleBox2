@@ -3052,13 +3052,16 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         var instrument = Song.InstrumentAt(InstrumentForTrack(Cursor.Track));
         if (instrument == null) return;
 
-        _player.Preview(instrument, note, GainFor(volume), Cursor.Track, TrackerPlayer.HeldNoteSeconds);
+        double held = _player.Preview(instrument, note, GainFor(volume), Cursor.Track, TrackerPlayer.HeldNoteSeconds);
 
         _sounding[note.Semitone] = instrument;
 
         Meters();
 
-        Played(Cursor.Track, note, 0d);
+        /* How long it will sound rather than nought, which is what a panel needs to run a
+           playhead across a recording for the length of the take: told nought, it falls back to
+           the short moment a generated sound is held for and the picture stops in the middle. */
+        Played(Cursor.Track, note, held);
     }
 
     /// <summary>
@@ -3551,9 +3554,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
 
         var instrument = play ? Song.InstrumentAt(InstrumentForTrack(track)) : null;
+        double sounds = 0d;
 
         if (instrument != null)
-            _player.Preview(instrument, note, GainFor(volume), track, TrackerPlayer.HeldNoteSeconds);
+            sounds = _player.Preview(instrument, note, GainFor(volume), track, TrackerPlayer.HeldNoteSeconds);
 
         bool running = _player.IsPlaying;
         long when = arrived == 0 ? System.Diagnostics.Stopwatch.GetTimestamp() : arrived;
@@ -3595,7 +3599,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _trackHeld[(track, note.Semitone)] = (instrument, column, line, order);
 
         Meters();
-        Played(track, note, 0d);
+
+        /* How long it will sound. See PreviewNote for what nought costs a recording's playhead. */
+        Played(track, note, sounds);
 
         var pattern = running ? Song.PatternAt(order) : CurrentPattern;
 

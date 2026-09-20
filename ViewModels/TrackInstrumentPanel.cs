@@ -156,7 +156,16 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
     }
 
     /// <inheritdoc cref="ISoundDevicePanel.NoteTrigger"/>
-    /// <remarks>Moved on by every note this panel plays, and by nothing else.</remarks>
+    /// <remarks>
+    /// Moved on by every note that lands on this panel's track, whatever played it: a key
+    /// clicked here, a letter typed, a key on the hardware, or the pattern.
+    ///
+    /// It was moved on only by this panel's own keys, which is why the shape and the envelope
+    /// followed a mouse and sat still under a MIDI keyboard. The lights did not have that fault,
+    /// since they come off the monitor every keyboard reads, so from a chair the keys worked and
+    /// the two pictures beside them did not: one gesture answering two ways depending on what
+    /// made it, which is the fault the one road exists to end.
+    /// </remarks>
     [ObservableProperty] private int noteTrigger;
 
     /// <inheritdoc cref="ISoundDevicePanel.ScopeCycles"/>
@@ -260,7 +269,7 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
 
 
     /// <summary>
-    /// A note went to a track. If it went to this one, the keyboard shows it.
+    /// A note went to a track. If it went to this one, the keyboard and the scopes show it.
     /// </summary>
     /// <remarks>
     /// Every track's notes come through here, which is why the first thing it does is throw
@@ -276,6 +285,11 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
 
         Sounding.Struck(e.Note, e.Seconds > 0 ? e.Seconds : HoldSeconds, alone: true);
         Reveal(e.Note);
+
+        /* The scopes draw themselves from this, so a note that reached the keyboard's lights and
+           not this left the shape and the envelope standing still. A note off carries no sound to
+           trace and must not restart them: the pattern says one at the end of every note. */
+        if (e.Note.IsPlayable) NoteTrigger++;
     }
 
     /// <summary>

@@ -1,15 +1,13 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
-
     <!-- The CLAP plugin ABI is C function pointers: hosting one means unmanaged pointers. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-
     <!--
       Background collection is on by default and is written down here because this application
       cannot survive it being off, and a default is not a decision anybody can see.
@@ -31,7 +29,6 @@
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <Version>0.0.0-local</Version>
     <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64</RuntimeIdentifiers>
-
     <!-- The documentation is an artefact of the build, not a comment nobody reads. Every seam
          in this application is an interface and the prose lives on it; this is what turns that
          into a file, and what makes the compiler say which public thing is still undocumented.
@@ -82,7 +79,6 @@
     <AvaloniaResource Remove="Rack.Controls\**" />
     <AvaloniaXaml Remove="Rack.SoundDevices\**" />
     <AvaloniaXaml Remove="Rack.Controls\**" />
-
     <!-- And the tests, for the same reason: a project inside this one's folder is swallowed by
          this one's own globs, which compiles its sources here as well and duplicates everything
          the build generates. -->
@@ -91,7 +87,6 @@
     <None Remove="Tests\**" />
     <AvaloniaResource Remove="Tests\**" />
     <AvaloniaXaml Remove="Tests\**" />
-
     <!-- And the tools beside it, which are projects of their own for the same reason again. One
          of them references this project, so swallowing its sources here would be this project
          compiling something that is built on top of it. -->
@@ -106,7 +101,6 @@
     <PackageReference Include="Avalonia.Desktop" Version="12.1.1" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.1" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.1" />
-
     <!-- The colour picker a pad is given its colour with: the toolkit's own, at the toolkit's
          own version, rather than a spectrum drawn here. What this application draws itself is
          what a machine's face is made of, because an outside machine has to be able to draw
@@ -217,5 +211,4 @@
       <_Parameter1>JingleBox2.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
-
 </Project>
