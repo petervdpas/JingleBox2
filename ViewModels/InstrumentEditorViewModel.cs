@@ -181,12 +181,17 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
         History.Opened(instrument);
         _changed = changed;
 
+        Wheel = new InstrumentWheel(instrument, () => _machines.For(MachineId), changed);
+
         MachineMenu = new SoundDeviceMenu(
             new Midi.ControlMenu(() => MachineId, () => MachineName),
             () => _machines.For(MachineId),
-            presets: () => PresetLines);
+            presets: () => PresetLines,
+            wheel: () => new WheelMenu(Wheel));
 
         Named = new InstrumentName(this);
+
+
 
         Action<Note> tap = play ?? (note => audition?.Audition(instrument, note, TrackerCell.NoVolume));
 
@@ -812,6 +817,17 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// the name on the front is not it: that can be reworded, and the id never is.
     /// </remarks>
     public string MachineId => _instrument.Machine.SlotId;
+
+    /// <summary>
+    /// What this instrument's modulation wheel may turn, and what it does turn.
+    /// </summary>
+    /// <remarks>
+    /// Made once and kept, since it holds nothing of its own: it reads the instrument and the
+    /// machine each time it is asked, so a machine edited between two openings offers what it
+    /// has now. The edit is announced the way every other edit to this instrument is, so a song
+    /// whose wheel has been moved says it has something unsaved in it.
+    /// </remarks>
+    public Interfaces.IInstrumentWheel Wheel { get; }
 
     /// <summary>Whether that wave is kept in a preset of yours on this machine, and so can be edited in place.</summary>
     /// <param name="path">The wave.</param>

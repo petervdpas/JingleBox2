@@ -233,44 +233,54 @@ public class WheelSoundTests
     }
 
     /// <summary>
-    /// A shipped machine draws the wheels exactly where it can use them.
+    /// A shipped machine that draws a keyboard draws the wheels beside it.
     /// </summary>
     /// <remarks>
-    /// The part and the destination are two separate things a machine says, and either without
-    /// the other is a face that lies. Drawn without a destination, half the pair is dead and the
-    /// modulation wheel reads as broken; named without the part, the wheel works and nothing on
-    /// the face says the machine has one.
+    /// **The wheels go with the keys**, which is where they are on every keyboard ever built and
+    /// is now the whole rule. It was narrower: only the four that name a control for the
+    /// modulation wheel drew them, on the reasoning that drawn without a destination half the
+    /// pair is dead and the modulation wheel reads as broken.
     ///
-    /// A rule about what ships rather than about what a machine may do. A device somebody writes
-    /// is free to draw a pitch wheel alone and name nothing, which is a perfectly good kit: the
-    /// pitch wheel bends every engine here whether or not anything is drawn.
+    /// Two things were wrong with that. The pitch wheel reaches every engine here whether or not
+    /// anything is named, so half the pair was always live and four faces said nothing about it;
+    /// and what the modulation wheel turns is chosen per instrument from the device's own Menu
+    /// now, so a machine that names none is a machine with no opinion rather than one with
+    /// nothing to offer.
+    ///
+    /// A rule about what ships rather than about what a machine may do: a device somebody writes
+    /// is free to draw keys and no wheels, and its notes still bend.
     /// </remarks>
     [Fact]
-    public void A_shipped_machine_draws_the_wheels_where_it_can_use_them()
+    public void A_shipped_machine_that_draws_keys_draws_the_wheels()
     {
+        int drawn = 0;
+
         foreach (string path in Directory.GetFiles(
                      Path.Combine(Root(), "rack", "machines"), "machine.json", SearchOption.AllDirectories))
         {
-            using var file = JsonDocument.Parse(File.ReadAllText(path));
-            var root = file.RootElement;
+            var face = JsonDocument.Parse(File.ReadAllText(path)).RootElement
+                .GetProperty("Panel").GetProperty("Root");
 
-            bool named = root.TryGetProperty("Wheel", out var wheel)
-                         && wheel.GetString() is { Length: > 0 };
+            if (!Has(face, "Keys")) continue;
 
-            Assert.Equal(named, Draws(root.GetProperty("Panel").GetProperty("Root")));
+            drawn++;
+
+            Assert.True(Has(face, "Wheels"), path + " draws a keyboard and no wheels beside it");
         }
+
+        Assert.Equal(8, drawn);
     }
 
-    /// <summary>Whether a panel has a Wheels part anywhere on it.</summary>
-    private static bool Draws(JsonElement element)
+    /// <summary>Whether a panel has that part anywhere on it.</summary>
+    private static bool Has(JsonElement element, string part)
     {
-        if (element.TryGetProperty("Element", out var kind) && kind.GetString() == "Wheels") return true;
+        if (element.TryGetProperty("Element", out var kind) && kind.GetString() == part) return true;
 
         if (!element.TryGetProperty("Children", out var children)) return false;
 
         foreach (var child in children.EnumerateArray())
         {
-            if (Draws(child)) return true;
+            if (Has(child, part)) return true;
         }
 
         return false;

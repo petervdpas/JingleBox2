@@ -110,6 +110,32 @@ public sealed class TrackerInstrument
     public const double DefaultBendSemitones = 2;
 
     /// <summary>
+    /// Which of the machine's controls the modulation wheel turns on this instrument, or nothing
+    /// for whichever the machine itself names.
+    /// </summary>
+    /// <remarks>
+    /// **The machine's declaration is the default and this is the exception**, which is the same
+    /// arrangement <see cref="BendSemitones"/> has with MIDI's own two: a machine says what its
+    /// wheel is for, in its own manifest, so it arrives working on somebody else's computer, and
+    /// an instrument may want it somewhere else for this part. Empty means the machine's, so
+    /// every instrument already on anybody's disc reads back as what it was.
+    ///
+    /// A fact about the sound, so it travels with a preset and with the song beside
+    /// <see cref="NewNoteAction"/>, and it is a key on the machine rather than a number: a
+    /// machine edited to have another control in the middle of its face still means the same
+    /// thing by the key it was given.
+    ///
+    /// **A link somebody made on the wheel still beats it**, exactly as one beats the machine's
+    /// own declaration. What may not happen is one gesture driving two controls, and which of
+    /// the three layers answers is decided in one place.
+    ///
+    /// A key the machine has not got reaches nothing, in the one place every machine parameter
+    /// is looked up, so a preset carried to a machine that has since been edited is silent about
+    /// its wheel rather than wrong about it.
+    /// </remarks>
+    public string WheelKey { get; set; } = "";
+
+    /// <summary>
     /// Which part of the recording plays, and how it repeats. Null on an instrument written
     /// before samples had a shape at all, which is the one reliable sign that its envelope
     /// was never heard: see <see cref="EnsureShape"/>.
@@ -568,6 +594,7 @@ public sealed class TrackerInstrument
         Gate = other.Gate;
         NewNoteAction = other.NewNoteAction;
         BendSemitones = other.BendSemitones;
+        WheelKey = other.WheelKey;
         Shape = other.Shape?.Clone();
 
         PluginPath = other.PluginPath;
@@ -591,10 +618,11 @@ public sealed class TrackerInstrument
     /// A plugin's patch moves only between two instruments on the same plugin. Another
     /// plugin's state is not a preset for this one, it is a file it cannot read.
     ///
-    /// <see cref="NewNoteAction"/> and <see cref="BendSemitones"/> travel with the sound rather
-    /// than with the machine, since both are part of what the sound does: a preset for a pad
-    /// that overlaps is not that preset with the overlap taken off it, and a lead that bends a
-    /// fourth is not that lead bending a tone.
+    /// <see cref="NewNoteAction"/>, <see cref="BendSemitones"/> and <see cref="WheelKey"/>
+    /// travel with the sound rather than with the machine, since all three are part of what the
+    /// sound does: a preset for a pad that overlaps is not that preset with the overlap taken
+    /// off it, a lead that bends a fourth is not that lead bending a tone, and a patch whose
+    /// wheel opens the filter is not that patch with the wheel back on the vibrato.
     /// </remarks>
     public void TakeSoundFrom(TrackerInstrument other)
     {
@@ -602,6 +630,7 @@ public sealed class TrackerInstrument
 
         NewNoteAction = other.NewNoteAction;
         BendSemitones = other.BendSemitones;
+        WheelKey = other.WheelKey;
 
         switch (Kind)
         {
@@ -686,6 +715,7 @@ public sealed class TrackerInstrument
         Gate = Gate,
         NewNoteAction = NewNoteAction,
         BendSemitones = BendSemitones,
+        WheelKey = WheelKey,
         Shape = Shape?.Clone(),
         PluginPath = PluginPath,
         PluginId = PluginId,

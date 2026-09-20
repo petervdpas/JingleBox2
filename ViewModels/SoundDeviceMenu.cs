@@ -47,6 +47,13 @@ public sealed class SoundDeviceMenu : IPanelMenu
     /// <summary>The lines that keep a preset of your own, asked each time, or nothing on a device with none.</summary>
     private readonly Func<IPanelMenu?> _presets;
 
+    /// <summary>What the modulation wheel turns, for a device that is played.</summary>
+    /// <remarks>
+    /// Nothing for an effect, which has no wheel and no instrument to hold a choice, so the line
+    /// is simply not among the ones offered rather than being offered and refusing.
+    /// </remarks>
+    private readonly Func<IPanelMenu?> _wheel;
+
     /// <summary>Wraps a menu so the device's own page is the first thing on it.</summary>
     /// <param name="inner">What the host was already offering, drawn under the page.</param>
     /// <param name="device">Which device this is about, or nothing where none is open.</param>
@@ -58,12 +65,18 @@ public sealed class SoundDeviceMenu : IPanelMenu
     /// The lines that keep and take off a preset of your own, drawn under the page, asked each
     /// time since the picker they work on is made after this menu. Left out, none.
     /// </param>
+    /// <param name="wheel">
+    /// The line saying what the modulation wheel turns, and the device's controls under it,
+    /// asked each time for the same reason the presets are. Left out, none, which is an effect:
+    /// it has no wheel and no instrument to hold a choice.
+    /// </param>
     public SoundDeviceMenu(IPanelMenu inner, Func<IRackProject?> device, Action<IRackProject>? open = null,
-                           Func<IPanelMenu?>? presets = null)
+                           Func<IPanelMenu?>? presets = null, Func<IPanelMenu?>? wheel = null)
     {
         _inner = inner;
         _device = device;
         _presets = presets ?? (() => null);
+        _wheel = wheel ?? (() => null);
         _open = open ?? (box => Views.SoundDeviceHelpWindow.Show(box, Views.ActiveWindow.Now));
     }
 
@@ -75,6 +88,8 @@ public sealed class SoundDeviceMenu : IPanelMenu
         var lines = new List<PanelMenuItem> { Page(box) };
 
         if (_presets() is { } kept) lines.AddRange(kept.Read());
+
+        if (_wheel() is { } turning) lines.AddRange(turning.Read());
 
         lines.AddRange(_inner.Read());
 

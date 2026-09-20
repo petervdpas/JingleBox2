@@ -1654,6 +1654,18 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (_panelTrack == track) _panelTrack = null;
     }
 
+    /// <summary>
+    /// Which instrument a track plays, or nothing where it plays none.
+    /// </summary>
+    /// <remarks>
+    /// Beside <see cref="MachineOn"/> rather than folded into it, because the two answer
+    /// different questions: which machine decides what a parameter means, and the instrument is
+    /// what may have said something about it of its own.
+    /// </remarks>
+    /// <param name="track">The track, counted from nought.</param>
+    public TrackerInstrument? InstrumentOn(int track) =>
+        Song.InstrumentAt(Song.GetTrackInstrument(track));
+
     /// <summary>Which machine a track plays, by its slot id, or nothing when it plays a plugin.</summary>
     public string MachineOn(int track)
     {

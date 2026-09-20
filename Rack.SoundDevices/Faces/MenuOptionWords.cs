@@ -51,12 +51,20 @@ public static class MenuOptionWords
     /// </remarks>
     public const string Presets = "presets";
 
+    /// <summary>Which of the device's controls the modulation wheel turns.</summary>
+    /// <remarks>
+    /// Offered by a device that is played and names a control for its wheel, and dead on one
+    /// that does not: what it opens onto is that device's own controls, and a device with no
+    /// wheel to point has nothing to offer.
+    /// </remarks>
+    public const string Wheel = "wheel";
+
     /// <summary>What a Menu carries when it names no options, which is all of them.</summary>
     /// <remarks>
     /// In the order they are offered, so a designer listing them and a panel drawing them agree
     /// without either being told about the other.
     /// </remarks>
-    public static readonly IReadOnlyList<string> All = new[] { Help, Presets, Surfaces, Learn };
+    public static readonly IReadOnlyList<string> All = new[] { Help, Presets, Wheel, Surfaces, Learn };
 
     /// <summary>What the property naming them is called in a sound device's file.</summary>
     public const string Property = "options";

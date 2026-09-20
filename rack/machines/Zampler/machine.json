@@ -856,13 +856,35 @@
           ]
         },
         {
-          "Element": "Keys",
+          "Element": "Row",
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down, not for as long as what it started goes on sounding. The arrows and the lamps move the three octaves on show."
+            "gap": "14",
+            "heights": "own"
           },
-          "Children": []
+          "Children": [
+            {
+              "Element": "Wheels",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "tip": "The pitch and modulation wheels on your keyboard, shown where they are being held. Drag one, roll the scroll wheel over it, or click it to put it back: these and the ones on your keyboard are one pair. What the modulation wheel turns is on the Menu.",
+                "align": "bottom"
+              },
+              "Children": []
+            },
+            {
+              "Element": "Keys",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down, not for as long as what it started goes on sounding. The arrows and the lamps move the three octaves on show.",
+                "align": "bottom"
+              },
+              "Children": []
+            }
+          ]
         },
         {
           "Element": "Menu",

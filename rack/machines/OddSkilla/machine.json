@@ -803,7 +803,7 @@
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "tip": "The pitch and modulation wheels on your keyboard, shown where they are being held. They report: they are moved from the keyboard rather than from here.",
+                "tip": "The pitch and modulation wheels on your keyboard, shown where they are being held. Drag one, roll the scroll wheel over it, or click it to put it back: these and the ones on your keyboard are one pair. What the modulation wheel turns is on the Menu.",
                 "align": "bottom"
               },
               "Children": []

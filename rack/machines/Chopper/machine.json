@@ -432,15 +432,38 @@
                       ]
                     }
                   ]
-                },
-                {
-                  "Element": "Keys",
-                  "Parameter": "",
-                  "Label": "",
-                  "Properties": {},
-                  "Children": []
                 }
               ]
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "14",
+            "heights": "own"
+          },
+          "Children": [
+            {
+              "Element": "Wheels",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "tip": "The pitch and modulation wheels on your keyboard, shown where they are being held. Drag one, roll the scroll wheel over it, or click it to put it back: these and the ones on your keyboard are one pair. What the modulation wheel turns is on the Menu.",
+                "align": "bottom"
+              },
+              "Children": []
+            },
+            {
+              "Element": "Keys",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "align": "bottom"
+              },
+              "Children": []
             }
           ]
         },

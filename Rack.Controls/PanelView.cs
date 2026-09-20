@@ -1999,15 +1999,22 @@ public class PanelView : Decorator
     /// The pitch and modulation wheels, drawn where they are being held.
     /// </summary>
     /// <remarks>
-    /// They turn nothing and take no pointer: a drawn wheel is a picture of the one under
-    /// somebody's hand, exactly as the drawn keyboard is a picture of which keys are down. So
-    /// this only listens, and a panel shown with nobody behind it draws two wheels at rest
-    /// rather than nothing, which is what they would look like anyway.
+    /// A drawn wheel is one wheel with the hardware's rather than a picture of it: what it shows
+    /// comes from the monitor every drawn keyboard reads, and a hand on the picture goes back out
+    /// through <see cref="Turning"/> to that same monitor, so neither can disagree with the
+    /// other. A panel shown with nobody behind it draws two wheels at rest rather than nothing,
+    /// which is what they would look like anyway.
     ///
     /// Each wheel follows the monitor itself rather than being fed from here, which is
     /// <see cref="Wheel.Watching"/>: a panel is rebuilt whenever anything it is drawn from
     /// moves, so a listener held by the builder would have to be taken off in as many places as
     /// a panel can be thrown away, and the control knows exactly when it leaves the tree.
+    ///
+    /// **Which control the modulation wheel turns is not offered here**, and that is a decision
+    /// about room rather than about where the answer lives: a picker in front of the wheels is a
+    /// box as wide as the longest control name, on the one row of a face that is already the
+    /// keyboard, and it drops a list as tall as the machine has controls over the panel behind
+    /// it. It is a line on the device's own Menu instead.
     /// </remarks>
     private Control? BuildWheels(PanelElement element)
     {
@@ -2048,6 +2055,7 @@ public class PanelView : Decorator
 
         return pair;
     }
+
 
     /// <summary>How tall a wheel is where the device has not said.</summary>
     /// <remarks>

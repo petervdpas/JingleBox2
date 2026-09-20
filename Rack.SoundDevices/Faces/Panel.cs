@@ -254,17 +254,24 @@ public static class ElementKinds
     /// words written under them, as one comma separated pair, for a device whose own wording
     /// differs.
     ///
-    /// **It turns no parameter and it takes no pointer**, which is the whole of what it is. A
-    /// drawn wheel is a picture of the one under somebody's hand, the way
-    /// <see cref="Keys"/> is a picture of which keys are down, so it comes from whoever is
-    /// showing the panel through
-    /// <see cref="IPanelWheels"/> and there
-    /// is nothing on it to drag. A second wheel that could be moved by a mouse would disagree
-    /// with the first and would jump the moment the hardware moved again.
+    /// **It turns no parameter and it is one wheel with the hardware's rather than a picture of
+    /// one.** What it shows comes from whoever is showing the panel, through
+    /// <see cref="IPanelWheels"/>, the way <see cref="Keys"/> shows which keys are down; a hand
+    /// that drags, scrolls or clicks it goes back out to that same place, so the drawn one and
+    /// the one under somebody's hand cannot disagree. A drawn key has always been a source and
+    /// a drawn wheel is the same sentence.
     ///
-    /// What the modulation wheel turns on this device is not said here either. That is
+    /// **Which control the modulation wheel turns is declared rather than laid out**, in
     /// <c>SoundMachineProject.Wheel</c>, which is a fact about the device rather than about its
-    /// face, and a device may name one without drawing either wheel.
+    /// face: a device may name one without drawing either wheel, and naming one is what makes
+    /// the wheel worth drawing at all.
+    ///
+    /// Whoever is playing it may want it elsewhere for this part, which is an instrument saying
+    /// otherwise rather than the device changing its mind, and that choice is a line on the
+    /// device's own Menu rather than anything on this part. A picker in front of the wheels was
+    /// drawn and taken out again: it is a box as wide as the longest control name, on the one
+    /// row of a face that is already the keyboard, dropping a list as tall as the device has
+    /// controls over the panel behind it.
     /// </remarks>
     public const string Wheels = "Wheels";
 

@@ -287,6 +287,49 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - It writes the parameter and not an offset on top of it, so a preset that already had vibrato
   loses that setting the first time the wheel moves. That is what a wheel pointed at a control
   means everywhere else, and it is why a machine names the control the wheel should *own*
+- **And whoever is playing it can move it, which is `TrackerInstrument.WheelKey` and a picker in
+  front of the drawn wheels.** The gap it closes is that a link is filled in from a MIDI message,
+  so a drawn wheel, which sends none, could never be pointed at anything: with no keyboard on the
+  desk the machine's declaration was the only answer there was. What is chosen is a fact about
+  the sound, so it sits beside `BendSemitones` and `NewNoteAction`, travels with the preset and
+  the song, and empty means the machine's own, which is what every instrument already on
+  anybody's disc reads back as
+- **`IWheelChoice` is the three layers said once**, and it is a rule of its own rather than three
+  lines inside `ControlTargets` for two reasons that agree: the whole design was otherwise only
+  visible by reading two classes, and it could only be tested through a window. A machine
+  declares, an instrument may say otherwise, and a link somebody pointed at the wheel beats both,
+  the last of those further out in `MidiControlRouter` since it is not decided per machine. Each
+  layer is narrower than the one under it and each has one storage, so nothing answers the same
+  question twice. It hands back a **key** and never a control: whether the machine still has that
+  control is settled where every machine parameter is
+- **The parameter route was the obvious one and could not be used**, which is worth keeping since
+  it is what this file says to do everywhere else: `new_note` is a reserved key each values
+  adapter maps onto the instrument, so it gets undo, automation and pointing for free. A wheel's
+  destination is a **key**, and that machinery carries numbers. A number would be a place in a
+  list, and a machine that grew a control in the middle of its face would quietly move every
+  song's wheel onto its neighbour, which is the fault `ControlMapping` avoids by naming keys
+- **The choice is a line on the device's own Menu, and a picker on the face was drawn and taken
+  out again.** It was a box as wide as the longest control name, sitting on the one row of a face
+  that is already the keyboard, dropping a list as tall as the machine has controls over the
+  panel behind it. Reported in four words, that it is too intrusive, and the screenshot settled
+  it: twenty five rows over half of OddSkilla
+- So `WheelMenu` is one line that opens onto the list, `MenuOptionWords.Wheel` is the option, and
+  `PanelMenuItem` gained `Lines` and `Ticked`: the lines under a line, and the mark on the one in
+  force, which is how a menu has always said which. Twenty five lines on the top level would have
+  been the same fault said again, with whatever somebody opened the Menu for three screens down.
+  **No shipped face had to be edited for it**, which is the rule about options working: a Menu
+  naming no options carries all of them, and not one of the eight names any
+- The first row is the machine's own, named as a sentence rather than left blank, since it is the
+  row somebody picks to put the wheel back where the machine meant it. A control the machine has
+  since lost marks nothing rather than marking the first row, which would be a lie about what the
+  wheel is doing
+- **The rows are read off the face and not off the manifest's list**, which is the walk
+  `IControlTargets.On` already makes for the automation picker and has both answers in it. The
+  order a machine happens to declare its parameters in is not an order anybody sees, where the
+  face is: the third row is the third control your eye lands on. And a parameter no control draws
+  is plumbing rather than a choice, so it is not offered, along with one that is not kept: a wheel
+  writes a value, and a value that is not written down has gone by the next time the song is
+  opened
 - **And on one of ours it reaches the next note rather than the one sounding**, which is worth
   knowing and is not this feature's doing: a voice clones its patch when it starts
   (`SynthVoice._patch = patch.Clone()`), so no parameter write reaches a ringing voice. A
@@ -314,12 +357,20 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   `ElementKinds.Wheels` is the part a machine drops on its own face beside a `Keys`, since nothing
   is added to a machine's face from code, and the pair beside the shared keyboard on this
   program's own panel is the one exception the rule already names
-- **A pitch wheel springs back to the middle when a drag is let go and a scroll parks it**, which
-  is the sprung thing on a keyboard and is also the guard against the worst thing a wheel can do:
-  one left leaning holds every note on the track off its own pitch with nothing anywhere to
-  straighten it. A scroll has no letting go, so springing back there would make it impossible to
-  hold a bend at all, and the click a press and release amounts to is the way back. A modulation
-  wheel stays where it is put, which is equally what the real one does
+- **A pitch wheel always springs back to the middle**, whichever gesture moved it, which is the
+  sprung thing on a keyboard and is also the guard against the worst thing a wheel can do: one
+  left leaning holds every note on the track off its own pitch with nothing anywhere to straighten
+  it. A drag springs back when it is let go, and a scroll springs back `Wheel.SpringMs` after the
+  notches stop, since that is what letting go of a scroll looks like: a hand rolling one sends a
+  notch every few hundredths of a second, so 250 ms is past any gap inside one roll and short
+  enough to read as the hand coming off. A modulation wheel stays where it is put by either
+  gesture, which is equally what the real one does
+- **It parked instead, and the reasoning was about a control that does not exist.** A scroll has
+  no letting go, so springing back looked as though it would make holding a bend impossible, with
+  a click as the way back. That preserved something the thing being drawn cannot do, since a pitch
+  wheel is sprung and a held bend is not a position it has, and it cost the one error nobody would
+  forgive: every note off its pitch with nothing on the screen saying why, until somebody happened
+  to click the wheel. Reported in four words, that the scroll does not jump back
 - It was built read only first, on the reasoning that a wheel a mouse could drag would be a second
   wheel disagreeing with the one under the hand. That was wrong about where the disagreement would
   come from: both write to the one monitor, so there is nothing to disagree. **A drawn key has
@@ -332,15 +383,21 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   is false and the pair beside the program's own keyboard is hidden with it; no shipped machine
   had ever asked for a `Wheels`. From a chair that is indistinguishable from the feature not
   existing, which is the cost of that rule and is worth paying: the answer is content, not code
-- **A machine draws the wheels exactly where it can use them**, which is the four that name a
-  destination: OddSkilla, Recording, Ouroboros and Operetta. Drawn without one, half the pair is
-  dead and the modulation wheel reads as broken; named without the part, the wheel works and
-  nothing on the face says so. `Tests/WheelSoundTests.cs` pins the pair. A kit, a sampler and
-  Lighttower name none and draw none, and their notes still bend, since the pitch wheel reaches
-  every engine whether or not anything is drawn
+- **The wheels go where the keys go, which is every machine that ships.** It was the four that
+  name a control for the modulation wheel, on the reasoning that drawn without one half the pair
+  is dead and the wheel reads as broken. Two things were wrong with that, and the second only
+  became wrong today: the pitch wheel reaches every engine whether or not anything is named, so
+  half the pair was always live and four faces said nothing about it; and what the modulation
+  wheel turns is chosen per instrument from the Menu now, so a machine naming none is one with no
+  opinion rather than one with nothing to offer. BongaBong, Chopper, Lighttower and Zampler draw
+  them too, and `Tests/WheelSoundTests.cs` asks it of the keyboard: a shipped face that draws keys
+  draws the wheels beside them
 - The keyboard is its own row at the foot with the wheels at its left end, which is where a
-  keyboard's wheels are. OddSkilla had its keys tucked into the Amplifier row, which left the
-  wheels nowhere natural to sit
+  keyboard's wheels are, and on all eight it is a row of the face's own column so it starts at
+  the panel's left edge. OddSkilla had its keys tucked into the Amplifier row, which left the
+  wheels nowhere natural to sit; Chopper had them in the column beside its pad grid, so the pair
+  began halfway across the panel with the whole left half of that row empty. A keyboard indented
+  under whatever happens to sit above it reads as a keyboard belonging to that thing
 - **A control's properties belong to the drawing thread in both directions, reading included**,
   and guarding the write alone is the easy half done twice. `Wheel.Held` posted its write
   carefully and read `Watching` first to decide whether there was anything to do, which is

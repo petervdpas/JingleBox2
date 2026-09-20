@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace JingleBox2.Rack.SoundDevices.Faces.Records;
 
@@ -58,4 +59,29 @@ public sealed record PanelMenuItem(string Said)
 
     /// <summary>What was said about the part, or nothing for the line's own option.</summary>
     private readonly string? _section;
+
+    /// <summary>
+    /// The lines under this one, where it opens onto more rather than doing something.
+    /// </summary>
+    /// <remarks>
+    /// A list of choices long enough to be worth a menu is too long to be that menu: twenty five
+    /// controls on the top level is a wall, and the thing somebody came to the Menu for is three
+    /// screens down. So a line may hold its own, and a line holding some does nothing itself.
+    ///
+    /// Empty on every line that is one thing, which is nearly all of them.
+    /// </remarks>
+    public IReadOnlyList<PanelMenuItem> Lines { get; init; } = System.Array.Empty<PanelMenuItem>();
+
+    /// <summary>
+    /// Whether this line is the one in force, for a set of them where exactly one is.
+    /// </summary>
+    /// <remarks>
+    /// Null on a line that is an act rather than a choice, which is what leaves it undrawn: a
+    /// mark beside something you press is a promise that pressing it again would take the mark
+    /// off, and that is not what most lines do.
+    ///
+    /// Said rather than worked out from the list, since which one is in force is the business of
+    /// whoever built the lines and cannot be read off their words.
+    /// </remarks>
+    public bool? Ticked { get; init; }
 }

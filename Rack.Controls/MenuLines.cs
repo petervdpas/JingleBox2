@@ -22,6 +22,14 @@ public sealed class MenuLines : IMenuLines
 
             var item = new MenuItem { Header = offer.Said, IsEnabled = offer.Live };
 
+            if (offer.Lines.Count > 0) item.ItemsSource = Listed(offer.Lines);
+
+            if (offer.Ticked is { } ticked)
+            {
+                item.ToggleType = MenuItemToggleType.Radio;
+                item.IsChecked = ticked;
+            }
+
             if (offer.Chosen is { } chosen) item.Click += (_, _) => chosen();
 
             if (offer.Tip.Length > 0) ToolTip.SetTip(item, offer.Tip);

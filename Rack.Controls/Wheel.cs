@@ -20,11 +20,13 @@ namespace JingleBox2.Rack.Controls;
 /// to that same monitor. So neither can disagree with the other: there is one wheel and two ways
 /// of reaching it, exactly as a drawn key and a real key are one keyboard.
 ///
-/// Dragged, scrolled, or clicked to put it back where it rests. A pitch wheel springs back to the
-/// middle when a drag is let go, because that is what the sprung thing on a keyboard does and
-/// because a wheel left leaning holds every note on the track off its pitch with nothing to
-/// straighten it. A scroll parks it instead, which is what a scroll is for, and a plain click is
-/// the way back.
+/// Dragged, scrolled, or clicked to put it back where it rests. **A pitch wheel always springs
+/// back**, because that is what the sprung thing on a keyboard does and because a wheel left
+/// leaning holds every note on the track off its own pitch with nothing anywhere to straighten
+/// it. A drag springs back when it is let go; a scroll has no letting go, so it springs back a
+/// moment after the notches stop, and a flick of the scroll wheel is a flick of the pitch wheel.
+/// A modulation wheel stays where it is put by either gesture, which is equally what the real one
+/// does.
 ///
 /// A pitch wheel rests in the middle and a modulation wheel rests at the bottom, which is
 /// <see cref="Reads"/>, and it is the only difference between the two.
@@ -213,6 +215,8 @@ public class Wheel : ThemedControl
     {
         base.OnDetachedFromVisualTree(e);
 
+        Springing(false);
+
         if (Watching is { } wheels) wheels.Moved -= Held;
     }
 
@@ -286,6 +290,8 @@ public class Wheel : ThemedControl
 
         _held = true;
 
+        Springing(false);
+
         e.Pointer.Capture(this);
 
         Put(At(e));
@@ -341,6 +347,25 @@ public class Wheel : ThemedControl
     /// the travel a notch, which is about what a hand expects of a wheel and is fine enough to
     /// find a semitone on a two semitone range.
     /// </remarks>
+    /// <summary>
+    /// A notch of the scroll wheel moves it, and on a pitch wheel the hand coming off it puts it
+    /// back.
+    /// </summary>
+    /// <remarks>
+    /// **There is no letting go of a scroll**, which is the whole difficulty. Leaving the wheel
+    /// parked where the notches left it, with a click as the way back, preserves something the
+    /// thing being drawn cannot do: a pitch wheel is sprung, so a held bend is not a position it
+    /// has. What that costs is the one error on a wheel nobody would forgive, which is every note
+    /// on the track sitting off its own pitch with nothing on the screen saying why, until
+    /// somebody happens to click the wheel.
+    ///
+    /// So the notches stopping is the letting go. A hand rolling a scroll wheel sends a notch
+    /// every few hundredths of a second, so a quiet <see cref="SpringMs"/> after the last one is
+    /// past any gap inside one roll and short enough to read as the hand coming off.
+    ///
+    /// A modulation wheel is untouched: it is not sprung, and staying where it is put is the
+    /// point of it.
+    /// </remarks>
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
@@ -349,11 +374,56 @@ public class Wheel : ThemedControl
 
         Put(Value + step);
 
+        if (Reads == WheelKind.Pitch) Springing(true);
+
         e.Handled = true;
     }
 
     /// <summary>How many steps of the wheel cross the whole travel.</summary>
     private const double Notches = 20;
+
+    /// <summary>How long after the last notch a scrolled pitch wheel is let go of.</summary>
+    /// <remarks>
+    /// Long enough that a gap inside one roll of the wheel is not read as the hand coming off,
+    /// and short enough that the note straightens while the ear still joins the two.
+    /// </remarks>
+    private const int SpringMs = 250;
+
+    /// <summary>The wait for the notches to stop, made on the first scroll and kept after it.</summary>
+    private Avalonia.Threading.DispatcherTimer? _spring;
+
+    /// <summary>
+    /// Starts the wait for the notches to stop, or calls it off.
+    /// </summary>
+    /// <remarks>
+    /// Started again from the beginning on every notch, so a roll of twenty is one gesture and
+    /// springs back once, when it is over. Called off by a drag taking the wheel, which has a
+    /// letting go of its own, and by the control leaving the tree.
+    /// </remarks>
+    /// <param name="waiting">Whether to wait for the notches to stop.</param>
+    private void Springing(bool waiting)
+    {
+        _spring?.Stop();
+
+        if (!waiting) return;
+
+        if (_spring is null)
+        {
+            _spring = new Avalonia.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(SpringMs)
+            };
+
+            _spring.Tick += (_, _) =>
+            {
+                Springing(false);
+
+                if (!_held) Put(Rest);
+            };
+        }
+
+        _spring.Start();
+    }
 
     /// <summary>Where on the face the pointer is, as this wheel's own value.</summary>
     /// <remarks>

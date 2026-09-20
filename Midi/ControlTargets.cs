@@ -437,14 +437,16 @@ public sealed class ControlTargets : IControlTargets
         string machine = _tracker.MachineOn(track);
         if (machine.Length == 0) return null;
 
-        if (_machines.For(machine) is not { Wheel.Length: > 0 } project) return null;
+        if (_machines.For(machine) is not { } project) return null;
+
+        if (_wheel.Turns(_tracker.InstrumentOn(track), project) is not { Length: > 0 } key) return null;
 
         return OnMachine(
             new ControlMapping
             {
                 Kind = ControlKind.SoundDevice,
                 Machine = machine,
-                Key = project.Wheel,
+                Key = key,
                 Scope = ControlScope.Fixed,
                 Track = track
             },
@@ -462,13 +464,15 @@ public sealed class ControlTargets : IControlTargets
         if (_rack?.Editor is not { } editor) return null;
         if (editor.MachineId is not { Length: > 0 } machine) return null;
 
-        if (_machines.For(machine) is not { Wheel.Length: > 0 } project) return null;
+        if (_machines.For(machine) is not { } project) return null;
+
+        if (_wheel.Turns(editor.Instrument, project) is not { Length: > 0 } key) return null;
 
         return OnRackMachine(new ControlMapping
         {
             Kind = ControlKind.SoundDevice,
             Machine = machine,
-            Key = project.Wheel,
+            Key = key,
             Scope = ControlScope.Fixed
         });
     }
@@ -490,6 +494,10 @@ public sealed class ControlTargets : IControlTargets
 
         return track >= 0 ? Wheel(track) : WheelOnRack();
     }
+
+    /// <summary>Which control the modulation wheel turns, which is a rule of its own.</summary>
+    /// <remarks>See <see cref="IWheelChoice"/> for the three layers and why they cannot disagree.</remarks>
+    private readonly IWheelChoice _wheel = new WheelChoice();
 
     /// <summary>
     /// A knob on the machine a track plays, when that is the machine the mapping is about.

@@ -6,9 +6,16 @@
         x:DataType="vm:TrackInstrumentPanel"
         Title="{Binding Title}"
         SizeToContent="WidthAndHeight"
-        MinWidth="680"
         WindowStartupLocation="CenterOwner">
 
+  <!-- No minimum width, deliberately: the window is as wide as the panel it holds and no wider.
+       It kept a floor of 680, and a panel narrower than that left every pixel of the slack on one
+       side, since the face inside is pinned left so that a front panel is never stretched to the
+       room it happens to be in. From a chair a grey band down one edge reads as a window that
+       failed to draw, which is how it was reported. A floor is the wrong shape for it either way:
+       it is a guess at how wide the narrowest reasonable panel is, written where no panel can be
+       measured, and the answer it gets wrong is invisible until somebody opens the one device it
+       is wrong about. -->
   <!-- The same panel the rack shows, over this track's own instrument. A machine's front panel,
        in the rack it is standing in.
 
