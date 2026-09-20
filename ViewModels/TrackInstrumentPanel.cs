@@ -223,6 +223,17 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
     public void Let(Note note) => _audition.Let(_instrument, note);
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// The same instrument the keys on this panel play, which is what makes the wheel and the
+    /// keys beside it one hand rather than two.
+    /// </remarks>
+    public void Bend(double lean) => _audition.Bend(_instrument, lean);
+
+    /// <inheritdoc/>
+    /// <remarks>See <see cref="Bend"/>.</remarks>
+    public void Modulate(double amount) => _audition.Modulate(_instrument, amount);
+
+    /// <inheritdoc/>
     /// <remarks>Built the first time a machine asks for it, since most panels never do.</remarks>
     public IPanelKeys MachineKeys => _machineKeys ??= new SoundDeviceKeys(this);
 

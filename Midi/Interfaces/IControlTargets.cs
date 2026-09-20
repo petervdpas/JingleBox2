@@ -58,6 +58,23 @@ public interface IControlTargets
     IControlTarget? WheelOnRack() => null;
 
     /// <summary>
+    /// The same, for whichever instrument is being played by hand.
+    /// </summary>
+    /// <remarks>
+    /// **Found by the instrument rather than by where a cursor is**, which is the whole reason
+    /// this exists beside the other two. A panel is about one instrument and a hand on its wheels
+    /// means that one, wherever the pattern happens to be pointing: a track's instrument window
+    /// resolved against the rack turned a knob on a machine nobody was looking at, and one
+    /// resolved against the cursor turned a knob on whichever track an arrow key last landed on.
+    ///
+    /// A song's own instrument is reached through the track that plays it, so the values written
+    /// are the ones that panel is drawn from and the picture moves with the sound. One that is in
+    /// no song is the rack's, which is the only other place an instrument can be played by hand.
+    /// </remarks>
+    /// <param name="instrument">What is under the hand.</param>
+    IControlTarget? WheelFor(Tracker.TrackerInstrument? instrument) => null;
+
+    /// <summary>
     /// Everything on a track that could be pointed at, and what to call each of them.
     /// </summary>
     /// <remarks>

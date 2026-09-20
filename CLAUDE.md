@@ -133,6 +133,52 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `MidiNoteRouter` (Midi/): Turns keyboard notes into tracker note entry
 - `MidiWheelRouter` (Midi/): The sixth router. Turns the pitch wheel and controller one into a
   lean and an amount, and knows nothing about the application
+- **`MidiRouter` (Midi/) is the one place everything a hand does to a note arrives and from which
+  everything listening is told**, and `IPlays` is the contract at both ends: a source and a sink
+  are the same shape, which is what lets one stand in front of another and a test hand it a list
+  and read what came out. Every event names where it is going, either a track or
+  `MidiRouter.TheHand`, which is the half of the application in front and the cursor's track
+  within it. It decides nothing about sound. `docs/midi-router.md` is the design and the order of
+  work: the contract, then the drawn keyboard, then the letter rows, then the wheels, then the
+  MIDI out and the plugins as sinks. **Each step deletes a path rather than adding one**, since
+  the fault it exists for is that a key on the hardware and the same key clicked on the screen
+  take different code to the same sound: either can break while the other works, and neither can
+  be read out of one log
+- A listener that falls over costs itself and nothing else, and the rest are still told. Written
+  knowing the price: a drawn wheel reading one of its own properties from the port's thread threw,
+  the exception left through the port's own delivery, and the device was dead for the session.
+  Said in full with the stack, since swallowing it quietly would be worse than the crash
+- **A drawn keyboard made two calls for one press and that was the second path.** The monitor was
+  told so the key would light and the panel was told so the note would sound, and the two could
+  disagree about where the note went: these keys play on the panel's own instrument, and a wheel
+  moved beside them was resolved against whichever half of the application was in front. So the
+  notes landed on the loose audition bus and a bend was applied to the cursor's track, and a pitch
+  wheel bent nothing whatever while a modulation wheel appeared to work, since that one writes a
+  parameter on the machine and does not care which bus its voices are on
+- `ISoundDevicePanel.Plays` is the one road now: `PanelPlays` sounds it on that panel's own
+  instrument and the monitor is told in the same breath, so `SoundDeviceKeys.Play` is one call and
+  the wheels beside it go the same way. A panel has its own `Bend` and `Modulate` for exactly that
+  reason: **a panel is about one instrument and knows which**, and the router's track is read and
+  never used there
+- **The letter rows were already half of one road and half of another.** A letter typed on a
+  machine's panel goes through `MachineKeys.Play`, so step 2 carried it along with the mouse; a
+  letter typed into the pattern sounded on the cursor's track and said so to nothing, so a
+  machine's window open beside the pattern sat dark while somebody wrote a part into it, and the
+  hardware was the only keyboard that lit anything. `TrackerViewModel` is an `IPlays` now and
+  `Plays` is its road, so typing lights the drawn keyboards exactly as the hardware does.
+  `Tests/TypedNoteLightsTests.cs` pins both halves of the press over a real tracker with a silent
+  engine
+- What it means by `MidiRouter.TheHand` is the cursor's track, and a track named outright is a
+  track's own MIDI in naming itself: one member answering both, where there used to be
+  `IPlaysNotes` and `ITrackNotes` side by side saying the same thing about two destinations
+- **Which made the modulation wheel ask the wrong machine, and the fix is the same sentence said
+  once more.** A hand on a panel's wheel went to `ModulatePreview`, which was written for the
+  rack's keyboard and resolved against the machine open on the rack: from a track's instrument
+  window that is a knob turned on a machine nobody is looking at. `IControlTargets.WheelFor` finds
+  it by the instrument instead, through the track that plays it where a song has one and the rack
+  otherwise, so the values written are the ones that panel is drawn from and the picture moves
+  with the sound. **The two wrong answers are the two ways of not asking the instrument**: the
+  rack's machine, and whichever track an arrow key last landed on
 - **The two wheels beside a keyboard go with the keys and not with the desk**, which is the whole
   design and is what they are read for. Same port, same half of the application, same track:
   `IWheels` is the seam, `ITrackWheels` is the same thing for a track whose MIDI in claimed the
@@ -231,14 +277,27 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   two events `BridgeEvent.Bend` and `Modulate` to carry the gesture across the process boundary:
   which parameter it turns is the plugin's own answer and only the process holding the plugin can
   ask it. CLAP is untouched, since CLAP instruments are not hosted here
-- **The drawn wheels are a monitor and never a control.** `IPanelWheels` is what a face reads and
-  `IMidiMonitor` answers it, the same object the drawn keyboard's lights come off, so a panel
-  opened mid-bend shows the bend and two panels open at once agree. There is nothing on them to
-  drag, deliberately: a wheel on the screen that could be moved by a mouse would disagree with the
-  one under the hand and would jump the moment the hardware moved again. `ElementKinds.Wheels` is
-  the part a machine drops on its own face beside a `Keys`, since nothing is added to a machine's
-  face from code, and the pair beside the shared keyboard on this program's own panel is the one
-  exception the rule already names
+- **The drawn wheels are one wheel with the hardware's, not a picture of it.** `IPanelWheels` is
+  what a face reads and `IMidiMonitor` answers it, the same object the drawn keyboard's lights
+  come off, so a panel opened mid-bend shows the bend and two panels open at once agree. And a
+  hand on the drawn one goes through that same monitor, which is the door the hardware uses, so
+  neither can disagree with the other. Dragged, scrolled, or clicked to put it back.
+  `ElementKinds.Wheels` is the part a machine drops on its own face beside a `Keys`, since nothing
+  is added to a machine's face from code, and the pair beside the shared keyboard on this
+  program's own panel is the one exception the rule already names
+- **A pitch wheel springs back to the middle when a drag is let go and a scroll parks it**, which
+  is the sprung thing on a keyboard and is also the guard against the worst thing a wheel can do:
+  one left leaning holds every note on the track off its own pitch with nothing anywhere to
+  straighten it. A scroll has no letting go, so springing back there would make it impossible to
+  hold a bend at all, and the click a press and release amounts to is the way back. A modulation
+  wheel stays where it is put, which is equally what the real one does
+- It was built read only first, on the reasoning that a wheel a mouse could drag would be a second
+  wheel disagreeing with the one under the hand. That was wrong about where the disagreement would
+  come from: both write to the one monitor, so there is nothing to disagree. **A drawn key has
+  always been a source, and a drawn wheel is the same sentence.** `Wheel.Command` is how it says
+  so, which is the arrangement `Clavier.Command` already keeps for a key, and `Turned` is its
+  command beside `Struck`: the published assembly hands the move back and what it means is the
+  host's business
 - **Which is why they were invisible the first time they were looked at, and the rule was working
   rather than failing.** A machine with a described face draws its own `Keys`, so `ShowsSharedKeys`
   is false and the pair beside the program's own keyboard is hidden with it; no shipped machine

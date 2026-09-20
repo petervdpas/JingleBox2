@@ -953,7 +953,7 @@ public partial class TrackerView : UserControl
     {
         if (!_typed.Remove(e.Key, out var note)) return;
 
-        ViewModel?.LetNote(note);
+        ViewModel?.Plays.Let(JingleBox2.Midi.MidiRouter.TheHand, note);
     }
 
     /// <summary>

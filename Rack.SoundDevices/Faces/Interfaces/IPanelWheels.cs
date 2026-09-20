@@ -7,14 +7,14 @@ namespace JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 /// </summary>
 /// <remarks>
 /// Beside <see cref="IPanelKeys"/> and supplied the same way, because a drawn wheel is the same
-/// kind of thing a drawn keyboard is: a picture of what a hand is doing to the device, rather
-/// than a control on its face. Which is why there is nothing here to write. A wheel on the
-/// screen that could be dragged would be a second wheel disagreeing with the one under the hand,
-/// and it would jump as soon as the hardware moved again.
+/// kind of thing a drawn keyboard is: where a hand has left something on the device.
 ///
-/// So it is read only in the sense that matters, and that makes a described panel's wheels
-/// exactly as true as the keyboard's: they follow whatever is playing the device, wherever the
-/// page it is on happens to be.
+/// **This half is the reading and nothing else**, which is not the same as the wheel being read
+/// only: a hand on a drawn wheel says so through the command the control carries, and the host
+/// takes that to the same place the hardware's goes. So what is read here is wherever the last
+/// hand to touch either of them left it, and a described panel's wheels are exactly as true as
+/// its keyboard's: they follow whatever is playing the device, wherever the page it is on
+/// happens to be.
 ///
 /// Whoever is showing the panel answers it. A device has no way of knowing what is plugged in,
 /// and a wheel is a fact about the room rather than about the device.

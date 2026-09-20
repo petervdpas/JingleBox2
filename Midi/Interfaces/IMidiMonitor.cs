@@ -12,10 +12,11 @@ namespace JingleBox2.Midi.Interfaces;
 /// have to know where notes come from, and because a keyboard can then be put a question to
 /// without a port, a window or a hand: press a key on one of these and read what lit.
 ///
-/// The wheels are here for the same reason the keys are, which is that a drawn one is a picture
-/// of the thing under somebody's hand rather than a second control beside it. **They are read
-/// and never written from a panel**: a wheel on the screen that could be dragged would be a
-/// second wheel disagreeing with the first, and it would jump the moment the hardware moved.
+/// The wheels are here for the same reason the keys are, and they are written the same way. A
+/// drawn keyboard says its own presses through <see cref="Pressed"/> and a drawn wheel says its
+/// own moves through <see cref="IWheels.Bend"/>, which is the door the hardware uses: **one wheel
+/// with two ways of reaching it**, so neither can disagree with the other. What a panel reads
+/// back is whatever the last hand to touch either of them left.
 ///
 /// The two halves of a press and the two wheel positions are all it holds. What a note went on
 /// to sound, and for how long, is a different question with a different answer, and it is not
@@ -25,7 +26,7 @@ namespace JingleBox2.Midi.Interfaces;
 /// panel reads them through that and this is where they are answered from: two contracts saying
 /// the same two numbers would be two things to keep in step for no gain.
 /// </remarks>
-public interface IMidiMonitor : IPanelWheels
+public interface IMidiMonitor : IPanelWheels, IWheels, IPlays
 {
     /// <summary>The semitones held down now.</summary>
     IReadOnlyCollection<int> Down { get; }

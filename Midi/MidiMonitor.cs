@@ -36,7 +36,7 @@ namespace JingleBox2.Midi;
 /// is locked and handed out as a copy. It is a handful of notes: a copy is cheaper than making
 /// everybody who reads it hold a lock.
 /// </remarks>
-public sealed class MidiMonitor : INoteTrigger, IWheels, IMidiMonitor
+public sealed class MidiMonitor : INoteTrigger, IWheels, IPlays, IMidiMonitor
 {
     /// <summary>Whoever really plays the notes. Every one is passed on untouched.</summary>
     private readonly INoteTrigger _next;
@@ -133,7 +133,7 @@ public sealed class MidiMonitor : INoteTrigger, IWheels, IMidiMonitor
     }
 
     /// <inheritdoc/>
-    /// <remarks>Passed on before the onlookers are told, for the reason <see cref="Bend"/> gives.</remarks>
+    /// <remarks>Passed on before the onlookers are told, for the reason <see cref="Bend(double)"/> gives.</remarks>
     public void Modulate(double amount)
     {
         bool moved = Amount != amount;
@@ -160,6 +160,41 @@ public sealed class MidiMonitor : INoteTrigger, IWheels, IMidiMonitor
         Hold(note.Semitone, false);
 
         _next.ReleaseNote(note);
+    }
+
+    /// <inheritdoc cref="IPlays.Press"/>
+    /// <remarks>
+    /// The lights' face on the router, and a thin one: a light is a light whatever track the
+    /// note was going to, so the track is read and not kept. What it is told is what somebody's
+    /// hand is doing, which is the one thing a drawn keyboard draws.
+    ///
+    /// Nothing is passed on from here. A sink on the router is told by the router, and the
+    /// router is what tells the others: passing it on as well would sound everything twice,
+    /// which is the very fault the one road exists to end.
+    /// </remarks>
+    public void Press(int track, Note note, int volume) => Pressed(note.Semitone);
+
+    /// <inheritdoc cref="IPlays.Let"/>
+    /// <remarks>Both halves, for the reason <see cref="Press"/> gives.</remarks>
+    public void Let(int track, Note note) => Released(note.Semitone);
+
+    /// <inheritdoc cref="IPlays.Bend"/>
+    /// <remarks>Where the wheel is, which is all a picture of one needs. See <see cref="Press"/>.</remarks>
+    public void Bend(int track, double lean) => Turned(lean, Amount);
+
+    /// <inheritdoc cref="IPlays.Modulate"/>
+    /// <remarks>See <see cref="Bend(int, double)"/>.</remarks>
+    public void Modulate(int track, double amount) => Turned(Lean, amount);
+
+    /// <summary>Writes both wheels down and says so once if either moved.</summary>
+    private void Turned(double lean, double amount)
+    {
+        bool moved = Lean != lean || Amount != amount;
+
+        Lean = lean;
+        Amount = amount;
+
+        if (moved) Moved?.Invoke(this, EventArgs.Empty);
     }
 
     /// <inheritdoc/>

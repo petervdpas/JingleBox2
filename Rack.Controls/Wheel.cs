@@ -1,5 +1,7 @@
 using Avalonia;
+using Avalonia.Input;
 using Avalonia.Media;
+using System.Windows.Input;
 using System;
 using System.Globalization;
 using JingleBox2.Rack.Controls.Enums;
@@ -12,16 +14,20 @@ namespace JingleBox2.Rack.Controls;
 /// One of the two wheels beside a keyboard, drawn where it is being held.
 /// </summary>
 /// <remarks>
-/// **It reports and never moves anything**, which is the whole of what it is for and is not a
-/// limitation. A wheel on the screen is a picture of the wheel under somebody's hand, the way
-/// the drawn keyboard is a picture of which keys are down: a mouse dragging it would be a second
-/// wheel disagreeing with the first, and the moment the hardware moved again the picture would
-/// jump. So it takes no pointer, and what it shows comes from the monitor every keyboard here
-/// reads.
+/// **It shows where the wheel is and it can be played, and both are one wheel rather than two.**
+/// What it draws comes from the monitor every drawn keyboard reads, so the hardware moving moves
+/// the picture; a hand on the picture says so through <see cref="Command"/>, which the host takes
+/// to that same monitor. So neither can disagree with the other: there is one wheel and two ways
+/// of reaching it, exactly as a drawn key and a real key are one keyboard.
+///
+/// Dragged, scrolled, or clicked to put it back where it rests. A pitch wheel springs back to the
+/// middle when a drag is let go, because that is what the sprung thing on a keyboard does and
+/// because a wheel left leaning holds every note on the track off its pitch with nothing to
+/// straighten it. A scroll parks it instead, which is what a scroll is for, and a plain click is
+/// the way back.
 ///
 /// A pitch wheel rests in the middle and a modulation wheel rests at the bottom, which is
-/// <see cref="Reads"/>, and it is the only difference between the two: both are a position on a
-/// vertical face and neither is a control.
+/// <see cref="Reads"/>, and it is the only difference between the two.
 ///
 /// Drawn rather than templated for the reason every other control in here is: what it looks like
 /// is a rounded face with a mark on it, and a value that moves tens of times a second has no
@@ -40,6 +46,19 @@ public class Wheel : ThemedControl
     /// <summary>Backs <see cref="Watching"/>: where the wheels are being held.</summary>
     public static readonly StyledProperty<IPanelWheels?> WatchingProperty =
         AvaloniaProperty.Register<Wheel, IPanelWheels?>(nameof(Watching));
+
+    /// <summary>
+    /// Backs <see cref="Command"/>: told where a hand has put the wheel, nought to one for a
+    /// modulation wheel and minus one to one for a pitch wheel.
+    /// </summary>
+    /// <remarks>
+    /// A command rather than the monitor itself, because this is the published assembly and what
+    /// a wheel move means is the host's business: a machine somebody else writes draws the same
+    /// control and the host wires it to the same place. It is the arrangement
+    /// <see cref="Clavier.Command"/> already keeps for a drawn key.
+    /// </remarks>
+    public static readonly StyledProperty<ICommand?> CommandProperty =
+        AvaloniaProperty.Register<Wheel, ICommand?>(nameof(Command));
 
     /// <summary>Backs <see cref="Label"/>, written under the wheel.</summary>
     public static readonly StyledProperty<string?> LabelProperty =
@@ -210,6 +229,23 @@ public class Wheel : ThemedControl
         Held(this, EventArgs.Empty);
     }
 
+    /// <inheritdoc cref="CommandProperty"/>
+    public ICommand? Command
+    {
+        get => GetValue(CommandProperty);
+        set => SetValue(CommandProperty, value);
+    }
+
+    /// <summary>
+    /// Where a wheel rests when nobody is touching it, which is nought for both of them.
+    /// </summary>
+    /// <remarks>
+    /// The same number and two different places, which is what <see cref="Reads"/> means: a pitch
+    /// wheel reads minus one to one so nought is the middle, and a modulation wheel reads nought
+    /// to one so nought is the bottom. Both are where the thing sits with no hand on it.
+    /// </remarks>
+    private const double Rest = 0;
+
     /// <summary>What is written under it.</summary>
     public string? Label
     {
@@ -229,6 +265,130 @@ public class Wheel : ThemedControl
     {
         get => GetValue(FontSizeProperty);
         set => SetValue(FontSizeProperty, value);
+    }
+
+    /// <summary>Whether a hand has hold of the face.</summary>
+    private bool _held;
+
+    /// <summary>
+    /// Takes hold, and puts the wheel where the pointer is.
+    /// </summary>
+    /// <remarks>
+    /// The pointer is captured, so a drag that leaves the face keeps moving the wheel: a strip
+    /// twenty pixels wide that stopped answering the moment a hand wandered off it would be
+    /// unusable, which is true of the real one as well.
+    /// </remarks>
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        _held = true;
+
+        e.Pointer.Capture(this);
+
+        Put(At(e));
+
+        e.Handled = true;
+    }
+
+    /// <summary>Follows the hand while it has hold.</summary>
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+
+        if (!_held) return;
+
+        Put(At(e));
+
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// Lets go, and a pitch wheel springs back to the middle.
+    /// </summary>
+    /// <remarks>
+    /// Because that is what the sprung thing on a keyboard does, and because a wheel left
+    /// leaning holds every note on the track off its own pitch with nothing anywhere to
+    /// straighten it. A modulation wheel stays where it was put, which is equally what the real
+    /// one does.
+    ///
+    /// A press that never moved is a click, and a click on a pitch wheel is how you put it back
+    /// after a scroll has parked it.
+    /// </remarks>
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+
+        if (!_held) return;
+
+        _held = false;
+
+        e.Pointer.Capture(null);
+
+        if (Reads == WheelKind.Pitch) Put(Rest);
+
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// Steps it, which parks a pitch wheel rather than springing it back.
+    /// </summary>
+    /// <remarks>
+    /// A scroll has no letting go, so springing back would make it impossible to hold a bend at
+    /// all; parked, the click that a press and release amounts to is the way back. A twentieth of
+    /// the travel a notch, which is about what a hand expects of a wheel and is fine enough to
+    /// find a semitone on a two semitone range.
+    /// </remarks>
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+
+        double step = Math.Sign(e.Delta.Y) * (Reads == WheelKind.Pitch ? 2.0 : 1.0) / Notches;
+
+        Put(Value + step);
+
+        e.Handled = true;
+    }
+
+    /// <summary>How many steps of the wheel cross the whole travel.</summary>
+    private const double Notches = 20;
+
+    /// <summary>Where on the face the pointer is, as this wheel's own value.</summary>
+    /// <remarks>
+    /// Up is more, which is what a wheel does under a thumb and the opposite of what a coordinate
+    /// does on a screen, so the face is read from the bottom.
+    /// </remarks>
+    private double At(PointerEventArgs e)
+    {
+        double down = e.GetPosition(this).Y;
+        double travel = Math.Max(1, Face - (Inset * 2));
+        double up = Math.Clamp((Face - Inset - down) / travel, 0, 1);
+
+        return Reads == WheelKind.Pitch ? (up * 2) - 1 : up;
+    }
+
+    /// <summary>
+    /// Puts the wheel there and tells whoever is listening, if it really moved.
+    /// </summary>
+    /// <remarks>
+    /// The value is written here as well as sent, so the picture follows the hand even where
+    /// nothing is wired to the command. Where something is, what comes back through
+    /// <see cref="Watching"/> is the same number and moves nothing again.
+    /// </remarks>
+    /// <param name="wanted">Where the hand has put it.</param>
+    private void Put(double wanted)
+    {
+        double held = Reads == WheelKind.Pitch
+            ? Math.Clamp(wanted, -1, 1)
+            : Math.Clamp(wanted, 0, 1);
+
+        if (Value == held) return;
+
+        Value = held;
+
+        if (Command is { } told && told.CanExecute(held)) told.Execute(held);
     }
 
     /// <summary>Room for the face, and for the label under it where there is one.</summary>

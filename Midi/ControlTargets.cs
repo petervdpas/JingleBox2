@@ -473,6 +473,24 @@ public sealed class ControlTargets : IControlTargets
         });
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The track that plays it decides, since that is what gives the values the open panel is
+    /// drawn from. An instrument in no song is one on the rack, which is the only other place a
+    /// hand can play one.
+    /// </remarks>
+    public IControlTarget? WheelFor(Tracker.TrackerInstrument? instrument)
+    {
+        if (instrument is null) return null;
+
+        var song = _tracker.Song;
+
+        int at = song.Instruments.IndexOf(instrument);
+        int track = at >= 0 ? song.GetInstrumentTrack(at) : -1;
+
+        return track >= 0 ? Wheel(track) : WheelOnRack();
+    }
+
     /// <summary>
     /// A knob on the machine a track plays, when that is the machine the mapping is about.
     /// </summary>

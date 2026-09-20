@@ -41,7 +41,7 @@ namespace JingleBox2.ViewModels;
 /// (<see cref="Midi.Interfaces.IPlaysNotes"/>). Each of those says what it is for on itself; what is here
 /// is how this one implementation does it.
 /// </remarks>
-public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Midi.Interfaces.IPlaysNotes, Midi.Interfaces.ITrackNotes, Midi.Interfaces.IWheels, Midi.Interfaces.ITrackWheels, Shortcuts.Interfaces.IShortcutContext
+public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Midi.Interfaces.IPlaysNotes, Midi.Interfaces.ITrackNotes, Midi.Interfaces.IWheels, Midi.Interfaces.ITrackWheels, Midi.Interfaces.IPlays, Shortcuts.Interfaces.IShortcutContext
 {
     /// <summary>What effects of ours this installation has, for the chains under the pattern.</summary>
     /// <remarks>
@@ -3136,7 +3136,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         bool together = _holding.Count > 0 && !again;
 
-        if (wanted == Tracker.Enums.NoteWant.SoundAndWrite) PreviewNote(note, volume);
+        if (wanted == Tracker.Enums.NoteWant.SoundAndWrite)
+            Plays.Press(Midi.MidiRouter.TheHand, note, volume);
 
         _holding.Add(note.Semitone);
 
@@ -3329,6 +3330,51 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Dispatcher.UIThread.Post(() => LetTrackNote(track, note, arrived));
     }
+
+    /// <summary>
+    /// Everything a hand does on this half of the application, told once.
+    /// </summary>
+    /// <remarks>
+    /// The tracker's own road, the same shape a panel's is: what it hears it sounds on the track
+    /// the hand is on, and the monitor is told in the same breath so a drawn keyboard lights for
+    /// a letter typed into the pattern. It never used to, since typing sounded a note and said so
+    /// to nothing, and a keyboard open beside the pattern sat dark while a part was being written
+    /// into it.
+    ///
+    /// Built per ask, which costs an array: what it holds are two objects this already has.
+    /// </remarks>
+    public Midi.Interfaces.IPlays Plays => MidiKeys is { } watching
+        ? new Midi.MidiRouter(this, watching)
+        : new Midi.MidiRouter(this);
+
+    /// <inheritdoc cref="Midi.Interfaces.IPlays.Press"/>
+    /// <remarks>
+    /// The hand is the cursor's track here, which is what this half of the application means by
+    /// it, and a track named outright is a track's own MIDI in naming itself.
+    /// </remarks>
+    public void Press(int track, Note note, int volume)
+    {
+        if (track == Midi.MidiRouter.TheHand) PreviewNote(note, volume);
+        else PressOnTrack(track, note, volume);
+    }
+
+    /// <inheritdoc cref="Midi.Interfaces.IPlays.Let"/>
+    /// <remarks>To wherever the press went. See <see cref="Press"/>.</remarks>
+    public void Let(int track, Note note)
+    {
+        if (track == Midi.MidiRouter.TheHand) LetNote(note);
+        else ReleaseOnTrack(track, note);
+    }
+
+    /// <inheritdoc cref="Midi.Interfaces.IPlays.Bend"/>
+    /// <remarks>See <see cref="Press"/> for what the hand means here.</remarks>
+    public void Bend(int track, double lean) =>
+        _player.BendTrack(track == Midi.MidiRouter.TheHand ? _cursorTrack : track, lean);
+
+    /// <inheritdoc cref="Midi.Interfaces.IPlays.Modulate"/>
+    /// <remarks>See <see cref="Press"/> for what the hand means here.</remarks>
+    public void Modulate(int track, double amount) =>
+        _player.ModulateTrack(track == Midi.MidiRouter.TheHand ? _cursorTrack : track, amount);
 
     /// <inheritdoc cref="Midi.Interfaces.IWheels.Bend"/>
     /// <remarks>

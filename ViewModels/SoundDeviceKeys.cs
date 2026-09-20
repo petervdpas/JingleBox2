@@ -153,8 +153,20 @@ public sealed class SoundDeviceKeys : IPanelKeys, IDisposable
         }
     }
 
-    /// <summary>Plays it, and says so, which is what clicking a key has always done.</summary>
+    /// <summary>Plays it, which is what clicking a key has always done.</summary>
     /// <remarks>
+    /// **One call, and that is the whole of what changed here.** It used to be two: the monitor
+    /// was told so the key would light, and the panel was told so the note would sound. Two
+    /// calls for one press is two paths, and the way that failed is the way two paths always
+    /// fail: the drawn wheels beside this keyboard went off to be resolved against whichever
+    /// half of the application was in front, which is a different destination from the one these
+    /// keys play on, so the notes landed on one bus and a bend was applied to another.
+    ///
+    /// The road is <see cref="ISoundDevicePanel.Plays"/>, which sounds it on this panel's own
+    /// instrument and tells the monitor in the same breath. Asked for per press rather than
+    /// held, since what it is made of is two objects the panel already has and a press is a rare
+    /// thing.
+    ///
     /// A key already down is not played again. Holding one on the computer keyboard repeats it
     /// for as long as it is held, and a machine retriggered forty times a second is not what
     /// anybody meant by leaning on a key.
@@ -163,9 +175,7 @@ public sealed class SoundDeviceKeys : IPanelKeys, IDisposable
     {
         if (_keys.Holds(semitone)) return;
 
-        _keys.Pressed(semitone);
-
-        _designer.Play(new Note(semitone), TrackerCell.NoVolume);
+        _designer.Plays.Press(MidiRouter.TheHand, new Note(semitone), TrackerCell.NoVolume);
     }
 
     /// <summary>
@@ -173,15 +183,14 @@ public sealed class SoundDeviceKeys : IPanelKeys, IDisposable
     /// </summary>
     /// <remarks>
     /// The release and not a stop: what was started goes into its release the way it does when a
-    /// pattern reaches an OFF, so a sound with a long tail keeps its tail.
+    /// pattern reaches an OFF, so a sound with a long tail keeps its tail. Down the same one road
+    /// the press went, for the reason <see cref="Play"/> gives.
     /// </remarks>
     public void Let(int semitone)
     {
         if (!_keys.Holds(semitone)) return;
 
-        _keys.Released(semitone);
-
-        _designer.Let(new Note(semitone));
+        _designer.Plays.Let(MidiRouter.TheHand, new Note(semitone));
     }
 
     /// <summary>Raised when anything the keyboard draws itself from moved.</summary>

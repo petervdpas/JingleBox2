@@ -74,3 +74,31 @@ track, or the loose bus a note played by hand goes onto.
 5. `TrackMidiOut` and the plugins as sinks rather than as separate calls from the player.
 
 Each step leaves the program working, and each one deletes a path rather than adding one.
+
+## Where it has got to
+
+Step 1 is in: `IPlays` and `MidiRouter`, with `Tests/MidiRouterTests.cs` over them. Nothing is
+wired to it yet, which is the point of the step: the contract can be read and argued with before
+any path moves onto it.
+
+Step 2 is under way, and step 4 arrived with it. The drawn wheels are sources now: `Wheel` takes
+a drag, a scroll and a click, hands the new position back through its own command, and the host
+takes that to the monitor, which is the door the hardware's wheel already goes through. A drawn
+key was always a source; a drawn wheel is the same sentence, which is what settled it.
+
+Step 2 is in. `SoundDeviceKeys` makes one call where it made two, through
+`ISoundDevicePanel.Plays`: `PanelPlays` sounds the note on that panel's own instrument and the
+monitor is told in the same breath. The drawn wheels beside the keyboard go down the same road, so
+the keys and the wheels on a panel can no longer disagree about where they are going, which is
+what they were doing.
+
+What is left of the plan is steps 3 and 5: the letter rows, and `TrackMidiOut` and the plugins as
+sinks rather than as separate calls from the player.
+
+Step 3 is in, and half of it was already done by step 2: a letter typed on a machine's panel goes
+through `MachineKeys.Play`, so it moved with the mouse. What was left was the pattern's own letter
+rows, which sounded a note and told nothing, so a drawn keyboard stayed dark while a part was
+typed into it. `TrackerViewModel` is an `IPlays` now and `Plays` is its road.
+
+Step 5 is what remains: `TrackMidiOut` and the plugins as sinks rather than as separate calls from
+the player.

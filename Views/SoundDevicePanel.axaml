@@ -159,6 +159,7 @@
                                  Slices="{Binding Editor.MachineSlices}"
                                  Keyboard="{Binding MachineKeys}"
                                  Wheels="{Binding MachineWheels}"
+                                 Turning="{Binding WheelTurned}"
                                  Location="{Binding MachineLocation}"
                                  Menu="{Binding Editor.MachineMenu}"
                                  InstrumentName="{Binding Editor.Named}"
@@ -181,16 +182,19 @@
                         Margin="0,14,0,0"
                         IsVisible="{Binding Editor.ShowsSharedKeys}">
 
-              <!-- They report and are never moved from here. A wheel on the screen is a picture
-                   of the one under a hand, so what it shows comes from the monitor every drawn
-                   keyboard reads, and there is nothing on it to drag. -->
+              <!-- One wheel with two ways of reaching it. What they draw comes from the monitor
+                   every drawn keyboard reads, so the hardware moving moves the picture; a hand on
+                   the picture goes to that same monitor, so neither can disagree with the other.
+                   A drawn key has always been a source and a drawn wheel is no different. -->
               <ui:Wheel Reads="Pitch" Label="PITCH" VerticalAlignment="Bottom"
                         Watching="{Binding MachineWheels}"
-                        ToolTip.Tip="Where the pitch wheel on your keyboard is. It shows, and it is moved from the keyboard rather than from here." />
+                        Command="{Binding BendCommand}"
+                        ToolTip.Tip="The pitch wheel. Drag it or scroll it, and it springs back to the middle when you let go of a drag. It shows where your keyboard's wheel is too: there is one wheel and two ways of reaching it." />
 
               <ui:Wheel Reads="Modulation" Label="MOD" VerticalAlignment="Bottom"
                         Watching="{Binding MachineWheels}"
-                        ToolTip.Tip="Where the modulation wheel on your keyboard is. What it turns is the machine's own answer, and it is moved from the keyboard rather than from here." />
+                        Command="{Binding ModulateCommand}"
+                        ToolTip.Tip="The modulation wheel. Drag it or scroll it, and it stays where you leave it. What it turns is the machine's own answer. It shows where your keyboard's wheel is too." />
 
               <ui:Clavier Octave="{Binding Octave}"
                              Lit="{Binding MachineKeys.Lit}"

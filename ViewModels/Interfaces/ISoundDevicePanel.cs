@@ -1,4 +1,7 @@
+using System;
 using CommunityToolkit.Mvvm.Input;
+using JingleBox2.Midi;
+using JingleBox2.Midi.Interfaces;
 using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.Tracker.Records;
 
@@ -114,6 +117,73 @@ public interface ISoundDevicePanel
     /// The wheels are then drawn at rest, which is where they would be anyway.
     /// </remarks>
     IPanelWheels? MachineWheels => null;
+
+    /// <summary>
+    /// Holds this panel's own notes off their pitch, which is what its drawn pitch wheel does.
+    /// </summary>
+    /// <remarks>
+    /// **The panel's own instrument and not whatever half of the application is in front**, which
+    /// is the whole of what was wrong. A key clicked here sounds on this panel's instrument, so a
+    /// wheel moved beside it has to reach the same place; resolved the other way the notes landed
+    /// on one bus and the bend was applied to another, and a pitch wheel bent nothing at all.
+    ///
+    /// Nothing by default, which is what a panel with no instrument behind it has: a preview
+    /// being looked at rather than a machine being played.
+    /// </remarks>
+    /// <param name="lean">Where the wheel is, -1 to 1.</param>
+    void Bend(double lean)
+    {
+    }
+
+    /// <summary>And its modulation wheel. See <see cref="Bend"/>.</summary>
+    /// <param name="amount">How far up the wheel is, 0 to 1.</param>
+    void Modulate(double amount)
+    {
+    }
+
+    /// <summary>
+    /// Everything a hand does on this panel, told once.
+    /// </summary>
+    /// <remarks>
+    /// The panel's own road: what it hears it sounds on its own instrument, and the monitor is
+    /// told in the same breath so the keys light and the wheels follow. One call rather than the
+    /// two a drawn key used to make, which is what let the light and the sound drift apart.
+    ///
+    /// Built per ask, which costs an array: what it holds are two objects the panel already has,
+    /// and a field on an interface is not a thing.
+    /// </remarks>
+    IPlays Plays => MidiKeys is { } watching
+        ? new MidiRouter(new PanelPlays(this), watching)
+        : new MidiRouter(new PanelPlays(this));
+
+    /// <summary>What a hand on the drawn pitch wheel does.</summary>
+    /// <remarks>
+    /// The same door the hardware's wheel goes through, which is what makes the two one wheel
+    /// rather than two: the monitor records where it is and passes it on to whatever is playing.
+    /// Beside <see cref="KeyPressCommand"/> and for the same reason, since a drawn key has
+    /// always been a source and a drawn wheel is no different.
+    /// </remarks>
+    IRelayCommand<double> BendCommand =>
+        new RelayCommand<double>(lean => Plays.Bend(MidiRouter.TheHand, lean));
+
+    /// <summary>And on the drawn modulation wheel. See <see cref="BendCommand"/>.</summary>
+    IRelayCommand<double> ModulateCommand =>
+        new RelayCommand<double>(amount => Plays.Modulate(MidiRouter.TheHand, amount));
+
+    /// <summary>
+    /// The same two, for a face drawn from a machine's own description rather than from XAML.
+    /// </summary>
+    /// <remarks>
+    /// A described panel has no bindings, so it is told rather than bound: which of the two
+    /// wheels moved, and where to. One member rather than two commands, since the panel builds
+    /// both wheels in one place and a pair of properties would only be the same thing said twice.
+    /// </remarks>
+    Action<bool, double>? WheelTurned =>
+        (pitch, where) =>
+        {
+            if (pitch) Plays.Bend(MidiRouter.TheHand, where);
+            else Plays.Modulate(MidiRouter.TheHand, where);
+        };
 
     /// <summary>
     /// Which keys are down, from every producer, or nothing for a panel standing on its own.

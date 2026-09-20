@@ -666,9 +666,10 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
     /// <inheritdoc/>
     /// <remarks>
-    /// The machine open on the rack rather than the one a track plays, which is the one
-    /// difference from <see cref="ModulateTrack"/>. See
-    /// <see cref="Midi.Interfaces.IControlTargets.WheelOnRack"/>.
+    /// **The machine the instrument in hand is on**, found by the instrument rather than by where
+    /// a cursor is, which is the one difference from <see cref="ModulateTrack"/>: this is a hand
+    /// on a panel and that panel is about one instrument. See
+    /// <see cref="Midi.Interfaces.IControlTargets.WheelFor"/>.
     /// </remarks>
     public void ModulatePreview(TrackerInstrument? instrument, double amount)
     {
@@ -678,7 +679,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             return;
         }
 
-        Controls?.WheelOnRack()?.Wheeled(amount);
+        Controls?.WheelFor(instrument)?.Wheeled(amount);
     }
 
     /// <summary>How far this instrument's pitch wheel bends, in semitones either way.</summary>

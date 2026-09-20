@@ -136,6 +136,15 @@ public class PanelView : Decorator
     public static readonly StyledProperty<IPanelWheels?> WheelsProperty =
         AvaloniaProperty.Register<PanelView, IPanelWheels?>(nameof(Wheels));
 
+    /// <summary>What a hand on one of those drawn wheels does.</summary>
+    /// <remarks>
+    /// The other half of <see cref="WheelsProperty"/>: that one is where the wheels are and this
+    /// is where a hand on the picture goes. Both ends of one wheel, so a drawn one and the one on
+    /// somebody's keyboard cannot disagree.
+    /// </remarks>
+    public static readonly StyledProperty<Action<bool, double>?> TurningProperty =
+        AvaloniaProperty.Register<PanelView, Action<bool, double>?>(nameof(Turning));
+
     /// <summary>Where the track playing this instrument has got to.</summary>
     public static readonly StyledProperty<IPanelLocation?> LocationProperty =
         AvaloniaProperty.Register<PanelView, IPanelLocation?>(nameof(Location));
@@ -492,6 +501,13 @@ public class PanelView : Decorator
         set => SetValue(WheelsProperty, value);
     }
 
+    /// <inheritdoc cref="TurningProperty"/>
+    public Action<bool, double>? Turning
+    {
+        get => GetValue(TurningProperty);
+        set => SetValue(TurningProperty, value);
+    }
+
     /// <inheritdoc cref="LocationProperty"/>
     public IPanelLocation? Location
     {
@@ -659,6 +675,7 @@ public class PanelView : Decorator
             change.Property == SlicesProperty ||
             change.Property == KeyboardProperty ||
             change.Property == WheelsProperty ||
+            change.Property == TurningProperty ||
             change.Property == LocationProperty ||
             change.Property == MenuProperty ||
             change.Property == InstrumentNameProperty ||
@@ -2000,12 +2017,15 @@ public class PanelView : Decorator
             ? caption.Split(',')
             : new[] { "PITCH", "MOD" };
 
+        var turning = Turning;
+
         var pitch = new Wheel
         {
             Reads = Enums.WheelKind.Pitch,
             Watching = Wheels,
             Face = face,
-            Label = words.Length > 0 ? words[0].Trim() : ""
+            Label = words.Length > 0 ? words[0].Trim() : "",
+            Command = turning is null ? null : new Turned(lean => turning(true, lean))
         };
 
         var modulation = new Wheel
@@ -2013,7 +2033,8 @@ public class PanelView : Decorator
             Reads = Enums.WheelKind.Modulation,
             Watching = Wheels,
             Face = face,
-            Label = words.Length > 1 ? words[1].Trim() : ""
+            Label = words.Length > 1 ? words[1].Trim() : "",
+            Command = turning is null ? null : new Turned(amount => turning(false, amount))
         };
 
         var pair = new StackPanel
