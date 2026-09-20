@@ -4,6 +4,7 @@ using JingleBox2.Controllers.Interfaces;
 using JingleBox2.Midi;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Midi.Interfaces;
+using JingleBox2.Tracker.Records;
 using JingleBox2.Music;
 using Xunit;
 
@@ -361,15 +362,26 @@ public class WheelWireTests
     }
 
     /// <summary>Somewhere for the wheels to land, in the order they landed.</summary>
-    private sealed class Wheels : IWheels
+    private sealed class Wheels : IPlays
     {
         /// <summary>Each move, in the order it arrived.</summary>
         public List<string> Said { get; } = new();
 
         /// <inheritdoc/>
-        public void Bend(double lean) => Said.Add("bend " + lean.ToString("0.###"));
+        public void Press(int track, Note note, int volume)
+        {
+        }
 
         /// <inheritdoc/>
-        public void Modulate(double amount) => Said.Add("modulate " + amount.ToString("0.###"));
+        public void Let(int track, Note note)
+        {
+        }
+
+        /// <inheritdoc/>
+        public void Bend(int track, double lean) => Said.Add("bend " + lean.ToString("0.###"));
+
+        /// <inheritdoc/>
+        public void Modulate(int track, double amount) =>
+            Said.Add("modulate " + amount.ToString("0.###"));
     }
 }

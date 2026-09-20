@@ -169,8 +169,37 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   `Tests/TypedNoteLightsTests.cs` pins both halves of the press over a real tracker with a silent
   engine
 - What it means by `MidiRouter.TheHand` is the cursor's track, and a track named outright is a
-  track's own MIDI in naming itself: one member answering both, where there used to be
-  `IPlaysNotes` and `ITrackNotes` side by side saying the same thing about two destinations
+  track's own MIDI in naming itself: one member answering both, where there used to be a contract
+  apiece for the two destinations. `MidiTrackRouter` takes an `IPlays` and names the track, so
+  `ITrackNotes` and `ITrackWheels` are gone and a key played into track three lights the drawn
+  keyboards exactly as one played on the cursor's track does. It could not before: that half went
+  straight to the tracker and the monitor never heard it
+- **The out half is `PortPlays`, and putting it on the road closed a hole rather than tidying
+  one.** A note in the pattern goes out of the track's MIDI out, and so does one arriving on that
+  track's own MIDI in, and a key played on the keyboard under somebody's hand did not: the
+  cursor's track sounded its instrument and the port heard nothing whatever, so a track with a
+  hardware synth on its out and no instrument of its own was silent under the hands and played
+  perfectly from the pattern. One gesture answering two ways depending on what made it, which is
+  the fault the whole road exists for
+- **A release is sent where its press went.** The hand names no track and the cursor moves, so a
+  note-off aimed at wherever the cursor has got to reaches a track holding nothing and leaves a
+  synth holding that key for ever. Where each of the hand's notes went is written down and the
+  release follows it; a track names itself and needs no such memory. It is one `PortPlays` for the
+  tracker rather than one per ask for exactly that reason, unlike everything else the road is made
+  of: a press and the release after it are two events
+- The port is fed on the thread the key arrived on, where writing that note into the pattern is
+  the drawing thread's and waits for a post. What leaves the port is no longer waiting on a frame
+- **A plugin is not a listener beside our own voices, and thinking it should be is what made the
+  last step look bigger than it is.** It is reached through the mixer, which is the one door
+  `TrackerPlayer.Preview` and `Trigger` both go through, so what decides whether a note lands on a
+  plugin or on a voice of ours is the instrument. The router deciding that would be the router
+  becoming the sequencer, and the pattern is deliberately not on the road at all: it runs on the
+  clock thread, it already reaches the mixer directly, and it carries a note column, an instrument,
+  a gain and a pan that `IPlays` has no business learning
+- **A wheel is deliberately not sent out of a track's port.** A note has an end and a wheel does
+  not, so a port left holding a bend is a synth holding every note off its own pitch with nothing
+  anywhere to straighten it, and who straightens it when a route changes or a song is opened has
+  to be settled first
 - **Which made the modulation wheel ask the wrong machine, and the fix is the same sentence said
   once more.** A hand on a panel's wheel went to `ModulatePreview`, which was written for the
   rack's keyboard and resolved against the machine open on the rack: from a track's instrument
@@ -181,8 +210,8 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   rack's machine, and whichever track an arrow key last landed on
 - **The two wheels beside a keyboard go with the keys and not with the desk**, which is the whole
   design and is what they are read for. Same port, same half of the application, same track:
-  `IWheels` is the seam, `ITrackWheels` is the same thing for a track whose MIDI in claimed the
-  port, and `TrackerNoteAdapter` sends a wheel to whichever half is holding the keys rather than
+  `IPlays` is the seam at both ends, a track whose MIDI in claimed the port names that track on
+  it, and `TrackerNoteAdapter` sends a wheel to whichever half is holding the keys rather than
   to whichever page is in front. Asked the other way, opening a window under a held chord sends
   the bend somewhere the notes are not, and a note left leaning has nothing that can straighten
   it: the wheel coming back to rest would straighten the other half's notes

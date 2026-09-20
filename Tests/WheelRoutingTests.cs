@@ -128,8 +128,8 @@ public class WheelRoutingTests
         var mix = new List<TrackMix> { new(), new() };
         mix[0].MidiIn = new TrackMidiRoute { Channel = 3 };
 
-        var heard = new TrackWheels();
-        var router = new MidiTrackRouter(new NoNotes(), () => mix, wheels: heard);
+        var heard = new TrackRoad();
+        var router = new MidiTrackRouter(() => heard, () => mix);
 
         Assert.True(router.Wheels(Bend("keyboard", 16383, channel: 3)));
         Assert.True(router.Wheels(Modulation("keyboard", 127, channel: 3)));
@@ -140,20 +140,31 @@ public class WheelRoutingTests
         Assert.Equal(new[] { "bend 0 1", "modulate 0 1" }, heard.Said);
     }
 
-    /// <summary>A router given no wheels at all claims none, rather than claiming and dropping them.</summary>
+    /// <summary>The keys a track claims and the wheels beside them go down one road.</summary>
     /// <remarks>
-    /// The difference matters: claiming it would stop the keys' half hearing it, so a wheel
-    /// would reach nothing anywhere and the fault would look like the wire.
+    /// The whole of what a claim means: a keyboard pointed at track three is pointed at it
+    /// whole. It used to be two contracts and two constructor arguments, so a router could be
+    /// built that took the notes and dropped the wheels, and a wheel that was claimed and
+    /// dropped reached nothing anywhere while looking exactly like a fault in the wire. There is
+    /// no way to build that now, which is what the one road buys.
     /// </remarks>
     [Fact]
-    public void A_track_router_with_nowhere_to_send_a_wheel_claims_nothing()
+    public void A_tracks_keys_and_its_wheels_go_down_one_road()
     {
         var mix = new List<TrackMix> { new() };
         mix[0].MidiIn = new TrackMidiRoute { Channel = 1 };
 
-        var router = new MidiTrackRouter(new NoNotes(), () => mix);
+        var heard = new TrackRoad();
+        var router = new MidiTrackRouter(() => heard, () => mix);
 
-        Assert.False(router.Wheels(Bend("keyboard", 16383)));
+        Assert.True(router.Claim(new MidiMessage
+        {
+            Device = "keyboard", Type = MidiMessageType.Note, Channel = 1, Value = 60, Data = 100, IsOn = true
+        }));
+        Assert.True(router.Claim(Bend("keyboard", 16383)));
+        Assert.True(router.Claim(Modulation("keyboard", 127)));
+
+        Assert.Equal(new[] { "down 0 C-4", "bend 0 1", "modulate 0 1" }, heard.Said);
     }
 
     /// <summary>
@@ -276,45 +287,49 @@ public class WheelRoutingTests
         public void Modulate(double amount) => Said.Add("modulate " + amount.ToString("0.###"));
     }
 
-    /// <summary>Somewhere for a claimed wheel to land, naming the track it was claimed for.</summary>
     /// <summary>Somewhere for a wheel to land, in the order it landed.</summary>
-    private sealed class Wheels : IWheels
+    private sealed class Wheels : IPlays
     {
         /// <summary>Each move, in the order it arrived.</summary>
         public List<string> Said { get; } = new();
 
         /// <inheritdoc/>
-        public void Bend(double lean) => Said.Add("bend " + lean.ToString("0.###"));
+        public void Press(int track, Note note, int volume)
+        {
+        }
 
         /// <inheritdoc/>
-        public void Modulate(double amount) => Said.Add("modulate " + amount.ToString("0.###"));
+        public void Let(int track, Note note)
+        {
+        }
+
+        /// <inheritdoc/>
+        public void Bend(int track, double lean) => Said.Add("bend " + lean.ToString("0.###"));
+
+        /// <inheritdoc/>
+        public void Modulate(int track, double amount) =>
+            Said.Add("modulate " + amount.ToString("0.###"));
     }
 
-    private sealed class TrackWheels : ITrackWheels
+    /// <summary>The road a track's MIDI in goes down, keys and wheels alike, each naming its track.</summary>
+    private sealed class TrackRoad : IPlays
     {
-        /// <summary>Each move, with its track, in the order it arrived.</summary>
+        /// <summary>Everything that went down it, with its track, in order.</summary>
         public List<string> Said { get; } = new();
 
         /// <inheritdoc/>
-        public void BendTrack(int track, double lean) =>
+        public void Press(int track, Note note, int volume) =>
+            Said.Add("down " + track + " " + note);
+
+        /// <inheritdoc/>
+        public void Let(int track, Note note) => Said.Add("up " + track + " " + note);
+
+        /// <inheritdoc/>
+        public void Bend(int track, double lean) =>
             Said.Add("bend " + track + " " + lean.ToString("0.###"));
 
         /// <inheritdoc/>
-        public void ModulateTrack(int track, double amount) =>
+        public void Modulate(int track, double amount) =>
             Said.Add("modulate " + track + " " + amount.ToString("0.###"));
-    }
-
-    /// <summary>A track that takes notes and does nothing with them, since these are about wheels.</summary>
-    private sealed class NoNotes : ITrackNotes
-    {
-        /// <inheritdoc/>
-        public void PressOnTrack(int track, Note note, int volume)
-        {
-        }
-
-        /// <inheritdoc/>
-        public void ReleaseOnTrack(int track, Note note)
-        {
-        }
     }
 }

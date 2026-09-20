@@ -21,7 +21,7 @@ namespace JingleBox2.Midi;
 /// finger still on a key, opening a song mid-chord, a device already holding a note when the
 /// program starts. <c>Tests/NoteAdapterTests.cs</c> is that.
 /// </remarks>
-public sealed class TrackerNoteAdapter : INoteTrigger, IWheels
+public sealed class TrackerNoteAdapter : INoteTrigger, IWheels, IPlays
 {
     private readonly IPlaysNotes _tracker;
     private readonly IPlaysNotes _rack;
@@ -122,8 +122,29 @@ public sealed class TrackerNoteAdapter : INoteTrigger, IWheels
     public void Bend(double lean) => Wheels().Bend(lean);
 
     /// <inheritdoc/>
-    /// <remarks>To the same half, and for the same reasons. See <see cref="Bend"/>.</remarks>
+    /// <remarks>To the same half, and for the same reasons. See <see cref="Bend(double)"/>.</remarks>
     public void Modulate(double amount) => Wheels().Modulate(amount);
+
+    /// <inheritdoc cref="IPlays.Press"/>
+    /// <remarks>
+    /// The router's face on this, and the whole of what it adds is that one thing now decides
+    /// where a key and the wheel beside it both go. The track is read and not used: which half
+    /// of the application a hand is playing on is this class's question, and a half resolves the
+    /// track itself.
+    /// </remarks>
+    public void Press(int track, Note note, int volume) => TriggerNote(note, volume);
+
+    /// <inheritdoc cref="IPlays.Let"/>
+    /// <remarks>To the half that took the press. See <see cref="ReleaseNote"/>.</remarks>
+    public void Let(int track, Note note) => ReleaseNote(note);
+
+    /// <inheritdoc cref="IPlays.Bend"/>
+    /// <remarks>To the half the keys went to, which is what <see cref="Bend(double)"/> answers.</remarks>
+    public void Bend(int track, double lean) => Bend(lean);
+
+    /// <inheritdoc cref="IPlays.Modulate"/>
+    /// <remarks>See <see cref="Bend(int, double)"/>.</remarks>
+    public void Modulate(int track, double amount) => Modulate(amount);
 
     /// <summary>Which half is in front, asked at the moment it is needed and never cached.</summary>
     private IPlaysNotes Half() => _rackHasIt() ? _rack : _tracker;

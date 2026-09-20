@@ -115,6 +115,11 @@ public class TrackMidiPlayTests
     }
 
     /// <summary>A played note goes out of the track's port too, and letting go of it ends it there.</summary>
+    /// <remarks>
+    /// Down the road rather than by a call of its own, which is what put the port on it: the
+    /// sending is <c>PortPlays</c>'s and happens on the thread the key arrived on, where writing
+    /// the note into the pattern is the drawing thread's and waits for it.
+    /// </remarks>
     [Fact]
     public void A_note_played_in_goes_out_of_the_track()
     {
@@ -122,14 +127,77 @@ public class TrackMidiPlayTests
         var out_ = new Heard();
         tracker.Player.MidiOut = out_;
 
-        tracker.EnterTrackNote(1, new Note(48), 100);
-        tracker.LetTrackNote(1, new Note(48));
+        tracker.Plays.Press(1, new Note(48), 100);
+        tracker.Plays.Let(1, new Note(48));
 
         Assert.Equal(2, out_.Did.Count);
         Assert.StartsWith("on 1 ", out_.Did[0]);
         Assert.EndsWith(" C-4 100", out_.Did[0]);
         Assert.StartsWith("off 1 ", out_.Did[1]);
         Assert.NotEqual("on 1 0 C-4 100", out_.Did[0]);
+
+        tracker.Finished();
+    }
+
+    /// <summary>
+    /// A key played on the cursor's track goes out of that track's port, which it never used to.
+    /// </summary>
+    /// <remarks>
+    /// The hole the out half of the road was built to close. The pattern fed a track's MIDI out
+    /// and a note arriving on that track's own MIDI in fed it, and the keyboard under somebody's
+    /// hand did not, so a track with a hardware synth on its out and no instrument of its own was
+    /// silent under the hands and played perfectly from the pattern: one gesture answering two
+    /// ways depending on what made it.
+    ///
+    /// No instrument is put on the track here deliberately, since that is the case that was
+    /// wholly silent.
+    /// </remarks>
+    [Fact]
+    public void A_key_on_the_cursors_track_goes_out_of_that_track()
+    {
+        var tracker = Tracker();
+        var out_ = new Heard();
+        tracker.Player.MidiOut = out_;
+
+        tracker.Cursor = new PatternCursor(0, 2, CellColumn.Note, 0);
+
+        tracker.Plays.Press(JingleBox2.Midi.MidiRouter.TheHand, new Note(48), 100);
+        tracker.Plays.Let(JingleBox2.Midi.MidiRouter.TheHand, new Note(48));
+
+        Assert.Equal(2, out_.Did.Count);
+        Assert.StartsWith("on 2 ", out_.Did[0]);
+        Assert.EndsWith(" C-4 100", out_.Did[0]);
+        Assert.StartsWith("off 2 ", out_.Did[1]);
+
+        tracker.Finished();
+    }
+
+    /// <summary>
+    /// And its release goes where the press went, although the cursor has moved since.
+    /// </summary>
+    /// <remarks>
+    /// The hand names no track, so where a note went is a question with a moving answer: aimed at
+    /// wherever the cursor has got to, the note-off reaches a track that is holding nothing and
+    /// the synth on the track the note really started on holds that key for ever. So where each
+    /// of the hand's notes went is written down and the release follows it.
+    /// </remarks>
+    [Fact]
+    public void A_hands_release_goes_where_its_press_went()
+    {
+        var tracker = Tracker();
+        var out_ = new Heard();
+        tracker.Player.MidiOut = out_;
+
+        tracker.Cursor = new PatternCursor(0, 1, CellColumn.Note, 0);
+        tracker.Plays.Press(JingleBox2.Midi.MidiRouter.TheHand, new Note(48), 100);
+
+        tracker.Cursor = new PatternCursor(0, 3, CellColumn.Note, 0);
+        tracker.Plays.Let(JingleBox2.Midi.MidiRouter.TheHand, new Note(48));
+
+        Assert.Equal(2, out_.Did.Count);
+        Assert.StartsWith("on 1 ", out_.Did[0]);
+        Assert.StartsWith("off 1 ", out_.Did[1]);
+        Assert.Equal(out_.Did[0].Split(' ')[2], out_.Did[1].Split(' ')[2]);
 
         tracker.Finished();
     }

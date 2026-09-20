@@ -41,7 +41,7 @@ namespace JingleBox2.ViewModels;
 /// (<see cref="Midi.Interfaces.IPlaysNotes"/>). Each of those says what it is for on itself; what is here
 /// is how this one implementation does it.
 /// </remarks>
-public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Midi.Interfaces.IPlaysNotes, Midi.Interfaces.ITrackNotes, Midi.Interfaces.IWheels, Midi.Interfaces.ITrackWheels, Midi.Interfaces.IPlays, Shortcuts.Interfaces.IShortcutContext
+public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Midi.Interfaces.IPlaysNotes, Midi.Interfaces.IWheels, Midi.Interfaces.IPlays, Shortcuts.Interfaces.IShortcutContext
 {
     /// <summary>What effects of ours this installation has, for the chains under the pattern.</summary>
     /// <remarks>
@@ -1196,6 +1196,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         recordNoteOffs = config?.RecordNoteOffs ?? false;
 
         _player = new TrackerPlayer(audio, machines, effects);
+
+        _out = new Midi.PortPlays(() => _player.MidiOut, () => Song.Mix, () => _cursorTrack);
+
         _player.UseSampleRate(config?.EngineSampleRate ?? Audio.TrackerOutput.FollowDevice);
 
         _player.UseSizes(new Audio.AudioDefaults().Chosen(new Audio.Records.AudioSizes(
@@ -3310,12 +3313,19 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (_sounding.Remove(note.Semitone, out var instrument)) _player.LetPreview(instrument, note);
     }
 
-    /// <inheritdoc/>
+    /// <summary>A key went down on a channel this track listens to.</summary>
     /// <remarks>
     /// It arrives on the MIDI thread, and the pattern and the cursor belong to the drawing thread.
     /// The moment is taken here as it arrives rather than when the drawing thread gets round to
     /// it, since that is the moment the note belongs to.
+    ///
+    /// What it does not do is send the note out of the track's port. That is the road's, through
+    /// <see cref="Midi.PortPlays"/>, and it happens on the thread the key arrived on rather than
+    /// after this post: a note handed to the drawing thread first is a note that leaves late.
     /// </remarks>
+    /// <param name="track">The track, counted from nought.</param>
+    /// <param name="note">The note.</param>
+    /// <param name="volume">The velocity, as the volume column holds it.</param>
     public void PressOnTrack(int track, Note note, int volume)
     {
         long arrived = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -3323,7 +3333,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Dispatcher.UIThread.Post(() => EnterTrackNote(track, note, volume, arrived));
     }
 
-    /// <inheritdoc/>
+    /// <summary>That key came up.</summary>
+    /// <remarks>Both halves, for the reason <see cref="PressOnTrack"/> gives.</remarks>
+    /// <param name="track">The track, counted from nought.</param>
+    /// <param name="note">The note.</param>
     public void ReleaseOnTrack(int track, Note note)
     {
         long arrived = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -3341,11 +3354,29 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// to nothing, and a keyboard open beside the pattern sat dark while a part was being written
     /// into it.
     ///
-    /// Built per ask, which costs an array: what it holds are two objects this already has.
+    /// The port is on it beside the engine, which is what closes the last hole in the out half:
+    /// the pattern fed a track's MIDI out and a track's own MIDI in fed it, and the keyboard
+    /// under somebody's hand did not, so a track with a hardware synth on its out and no
+    /// instrument of its own was silent under the hands and played perfectly from the pattern.
+    /// The engine is first, since a port can block and the sound may not wait on a device.
+    ///
+    /// Built per ask, which costs an array: what it holds are three objects this already has, and
+    /// two of them are settled after this is constructed.
     /// </remarks>
     public Midi.Interfaces.IPlays Plays => MidiKeys is { } watching
-        ? new Midi.MidiRouter(this, watching)
-        : new Midi.MidiRouter(this);
+        ? new Midi.MidiRouter(this, _out, watching)
+        : new Midi.MidiRouter(this, _out);
+
+    /// <summary>
+    /// The track's MIDI out standing on the road.
+    /// </summary>
+    /// <remarks>
+    /// One of these rather than one per ask, unlike everything else the road is made of, and the
+    /// memory is what forces it: a release is sent where its press went, and a press and the
+    /// release after it are two events. It reads the port per event, since that is set after this
+    /// is built and a track with none simply sends nothing.
+    /// </remarks>
+    private readonly Midi.PortPlays _out;
 
     /// <inheritdoc cref="Midi.Interfaces.IPlays.Press"/>
     /// <remarks>
@@ -3395,16 +3426,20 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <remarks>The same track and for the same reason. See <see cref="Bend(double)"/>.</remarks>
     public void Modulate(double amount) => _player.ModulateTrack(_cursorTrack, amount);
 
-    /// <inheritdoc/>
+    /// <summary>Holds one track's notes off their pitch, for a wheel that named its track.</summary>
     /// <remarks>
     /// The track that claimed the port rather than the cursor's, which is the whole of what a
     /// track's MIDI in means: a sequencer feeding four tracks is four hands and each keeps its
     /// own wheel.
     /// </remarks>
+    /// <param name="track">The track, counted from nought.</param>
+    /// <param name="lean">Where the wheel is, -1 to 1.</param>
     public void BendTrack(int track, double lean) => _player.BendTrack(track, lean);
 
-    /// <inheritdoc/>
+    /// <summary>And its modulation wheel.</summary>
     /// <remarks>The same track and for the same reason. See <see cref="BendTrack"/>.</remarks>
+    /// <param name="track">The track, counted from nought.</param>
+    /// <param name="amount">How far up the wheel is, 0 to 1.</param>
     public void ModulateTrack(int track, double amount) => _player.ModulateTrack(track, amount);
 
     /// <inheritdoc/>
@@ -3478,8 +3513,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <param name="volume">The velocity, as the volume column holds it.</param>
     /// <param name="arrived">When the note arrived, as <c>Stopwatch.GetTimestamp</c> gives it; nought for now.</param>
     /// <param name="play">
-    /// Whether the note is also sounded on that track and sent out of it. False where whatever
-    /// played it has already made the sound, which is a plugin's own pattern being written down.
+    /// Whether the note is also sounded on that track. False where whatever played it has already
+    /// made the sound, which is a plugin's own pattern being written down. What goes out of the
+    /// track's port is not decided here at all: that is the road's, through
+    /// <see cref="Midi.PortPlays"/>, so this is the writing down and nothing else.
     /// </param>
     internal void EnterTrackNote(int track, Note note, int volume, long arrived = 0, bool play = true)
     {
@@ -3505,10 +3542,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         if (instrument != null)
             _player.Preview(instrument, note, GainFor(volume), track, TrackerPlayer.HeldNoteSeconds);
-
-        if (play)
-            _player.MidiOut?.NoteOn(Song.Mix, track, Midi.TrackMidiOut.LiveVoices + note.Semitone, note,
-                _wire.VelocityFor(volume));
 
         bool running = _player.IsPlaying;
         long when = arrived == 0 ? System.Diagnostics.Stopwatch.GetTimestamp() : arrived;
@@ -3570,7 +3603,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>
-    /// Lets go of a note a track's MIDI in played, where it was sounded and where it was sent.
+    /// Lets go of a note a track's MIDI in played, where it was sounded.
     /// </summary>
     /// <remarks>
     /// A note-off is written into the column it went into, on the line nearest the moment it
@@ -3585,8 +3618,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (!_trackHeld.Remove((track, note.Semitone), out var was)) return;
 
         if (was.Instrument != null) _player.LetPreview(was.Instrument, note);
-
-        _player.MidiOut?.NoteOff(track, Midi.TrackMidiOut.LiveVoices + note.Semitone);
 
         if (!RecordNoteOffs || !IsRecording || !_player.IsPlaying) return;
 
@@ -3629,16 +3660,22 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Here it writes a note-off into the pattern, and only when
+    /// **Down the road, because the press went down the road**, which is what
+    /// <see cref="EnterNote(Note, int, long)"/> does with it: the two halves of one key press have to reach the
+    /// same listeners or one of them is left holding it. The half that would be left is the
+    /// track's MIDI out, and what it holds is a note, so a synth on the other end of the port
+    /// would have held that key for as long as the application ran.
+    ///
+    /// Here it also writes a note-off into the pattern, and only when
     /// <see cref="RecordNoteOffs"/> has asked for that.
     ///
-    /// The note is not looked at. A note-off ends whatever that track is sounding rather than
-    /// one particular note, so which key was let go of does not change what gets written; it
-    /// is here because the caller has it and a later reading of this may want it.
+    /// The note is not looked at for the writing. A note-off ends whatever that track is
+    /// sounding rather than one particular note, so which key was let go of does not change what
+    /// gets written; it is here because the caller has it and the road needs it.
     /// </remarks>
     public void ReleaseMidiNote(Note note)
     {
-        Dispatcher.UIThread.Post(() => LetNote(note));
+        Dispatcher.UIThread.Post(() => Plays.Let(Midi.MidiRouter.TheHand, note));
 
         if (!RecordNoteOffs) return;
 

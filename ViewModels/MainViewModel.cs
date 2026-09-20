@@ -2557,9 +2557,9 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
         var padTrigger = new PadTriggerAdapter(Pads);
 
-        var played = new TrackerNoteAdapter(Tracker, Machines);
+        var keys = new TrackerNoteAdapter(Tracker, Machines);
 
-        Keys = new MidiMonitor(played, played);
+        Keys = new MidiMonitor(keys, keys);
 
         Machines.MidiKeys = Keys;
         Tracker.MidiKeys = Keys;
@@ -2607,7 +2607,12 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
         // It asks the control router whether a link holds the control, because that is the one
         // class that knows how a mapping matches. A wheel a hand was pointed at is a knob.
-        var wheelRouter = new MidiWheelRouter(Keys, jobs, controlRouter.Pointed);
+        // The application's one road for what a hand does: the half the keys are going to, and
+        // the monitor told in the same breath so the drawn keyboards and wheels follow it. The
+        // engine is first, since what has to be right on time is the sound.
+        var played = new MidiRouter(keys, Keys);
+
+        var wheelRouter = new MidiWheelRouter(played, jobs, controlRouter.Pointed);
 
         Tracker.UseAutomation(targets);
 
@@ -2642,7 +2647,11 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
         Tracker.MixShown = surface.Draw;
 
-        var trackNotes = new MidiTrackRouter(Tracker, () => Tracker.Song.Mix, wheels: Tracker, jobs: jobs);
+        // A track's own MIDI in goes down the same road the cursor's keyboard does, naming its
+        // track instead of the hand: so a key played into track three lights the drawn keyboards
+        // and leaves that track's MIDI out exactly as one played on the cursor's track does. The
+        // road is asked for per message, since what is on it is settled after this is built.
+        var trackNotes = new MidiTrackRouter(() => Tracker.Plays, () => Tracker.Song.Mix, jobs: jobs);
 
         var dispatcher = new MidiDispatcher(
             _cfg.Midi,

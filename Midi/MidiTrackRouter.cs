@@ -17,7 +17,12 @@ namespace JingleBox2.Midi;
 /// <remarks>
 /// The router in front of the keyboard's: a note a track claims belongs to that track, and one
 /// nobody claims goes on to the cursor's track exactly as before. Knows the wire and the rule and
-/// nothing about the application, which is on the far side of <see cref="ITrackNotes"/>.
+/// nothing about the application, which is on the far side of <see cref="IPlays"/>.
+///
+/// **A track names itself**, which is the whole of what this adds to the road: every other source
+/// says <see cref="MidiRouter.TheHand"/> and means wherever the hand is, and a keyboard pointed at
+/// track three means track three whatever the cursor is doing. One member answers both, where
+/// there used to be a contract apiece for the two destinations.
 ///
 /// The wheels are here as well as the keys because they are the same claim. A keyboard pointed
 /// at track three is pointed at track three whole: bending its notes while the wheel beside them
@@ -26,30 +31,27 @@ namespace JingleBox2.Midi;
 /// note is claimed before any job is applied, and a wheel is claimed only where nothing on the
 /// desk was pointed at it.
 ///
-/// The strips are asked for on every message rather than kept, since the song they belong to is
-/// swapped whenever one is opened and a route changed a moment ago has to be in force.
+/// The road and the strips are asked for on every message rather than kept, since the song they
+/// belong to is swapped whenever one is opened and a route changed a moment ago has to be in
+/// force, and what is on the road is settled after the window this runs in was built.
 /// </remarks>
-/// <param name="notes">Where a claimed note goes.</param>
+/// <param name="road">Where a claimed note or wheel goes, asked for per message.</param>
 /// <param name="mix">The open song's strips, asked for per message.</param>
 /// <param name="routes">The rules, defaulted to the real ones.</param>
 /// <param name="wire">How a number on the wire becomes a note, defaulted to the real reading.</param>
-/// <param name="wheels">Where a claimed wheel goes. Left out, no track hears a wheel.</param>
 /// <param name="turning">How a wheel is read off the wire, defaulted to the real reading.</param>
 /// <param name="jobs">What each control on a desk is for, defaulted to the real rule.</param>
-public sealed class MidiTrackRouter(ITrackNotes notes, Func<IReadOnlyList<TrackMix>?> mix,
+public sealed class MidiTrackRouter(Func<IPlays> road, Func<IReadOnlyList<TrackMix>?> mix,
                                     ITrackMidiRoutes? routes = null, IMidiNoteInput? wire = null,
-                                    ITrackWheels? wheels = null, IMidiWheelInput? turning = null,
-                                    IControlJobs? jobs = null)
+                                    IMidiWheelInput? turning = null, IControlJobs? jobs = null)
 {
-    private readonly ITrackNotes _notes = notes;
+    private readonly Func<IPlays> _road = road;
 
     private readonly Func<IReadOnlyList<TrackMix>?> _mix = mix;
 
     private readonly ITrackMidiRoutes _routes = routes ?? new TrackMidiRoutes();
 
     private readonly IMidiNoteInput _wire = wire ?? new MidiNoteInput();
-
-    private readonly ITrackWheels? _wheels = wheels;
 
     private readonly IMidiWheelInput _turning = turning ?? new MidiWheelInput();
 
@@ -72,10 +74,12 @@ public sealed class MidiTrackRouter(ITrackNotes notes, Func<IReadOnlyList<TrackM
 
         if (!_wire.TryNote(msg.Value, out var note)) return false;
 
+        var road = _road();
+
         foreach (int track in tracks)
         {
-            if (msg.IsOn) _notes.PressOnTrack(track, note, _wire.VolumeFor(msg.Data));
-            else _notes.ReleaseOnTrack(track, note);
+            if (msg.IsOn) road.Press(track, note, _wire.VolumeFor(msg.Data));
+            else road.Let(track, note);
         }
 
         if (Log.On(LogArea.Midi))
@@ -99,7 +103,6 @@ public sealed class MidiTrackRouter(ITrackNotes notes, Func<IReadOnlyList<TrackM
     /// <param name="msg">What arrived.</param>
     public bool Wheels(MidiMessage msg)
     {
-        if (_wheels is null) return false;
         if (!_jobs.Turns(msg)) return false;
 
         var tracks = _routes.TracksFor(_mix(), msg.Device, msg.Channel);
@@ -108,10 +111,12 @@ public sealed class MidiTrackRouter(ITrackNotes notes, Func<IReadOnlyList<TrackM
         bool bending = msg.Type == MidiMessageType.PitchBend;
         double value = bending ? _turning.LeanFor(msg.Data) : _turning.AmountFor(msg.Data);
 
+        var road = _road();
+
         foreach (int track in tracks)
         {
-            if (bending) _wheels.BendTrack(track, value);
-            else _wheels.ModulateTrack(track, value);
+            if (bending) road.Bend(track, value);
+            else road.Modulate(track, value);
         }
 
         if (Log.On(LogArea.Midi))

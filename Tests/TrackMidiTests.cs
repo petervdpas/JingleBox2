@@ -301,7 +301,7 @@ public class TrackMidiTests
         var mix = Mix(4);
         mix[3].MidiIn = new TrackMidiRoute { Channel = 10 };
         var notes = new TrackNotes();
-        var router = new MidiTrackRouter(notes, () => mix);
+        var router = new MidiTrackRouter(() => notes, () => mix);
 
         Assert.True(router.Handle(NoteMessage("KeyStep Pro MIDI 1", 10, 36, 100, on: true)));
         Assert.True(router.Handle(NoteMessage("KeyStep Pro MIDI 1", 10, 36, 0, on: false)));
@@ -316,7 +316,7 @@ public class TrackMidiTests
         var mix = Mix(2);
         mix[0].MidiIn = new TrackMidiRoute { Channel = 1 };
         var notes = new TrackNotes();
-        var router = new MidiTrackRouter(notes, () => mix);
+        var router = new MidiTrackRouter(() => notes, () => mix);
 
         Assert.False(router.Handle(NoteMessage("KeyStep Pro MIDI 1", 2, 60, 100, on: true)));
         Assert.False(router.Handle(new MidiMessage
@@ -325,7 +325,7 @@ public class TrackMidiTests
         }));
         Assert.False(router.Handle(NoteMessage("KeyStep Pro MIDI 1", 1, 200, 100, on: true)));
         Assert.False(router.Handle(null!));
-        Assert.False(new MidiTrackRouter(notes, () => null).Handle(NoteMessage("x", 1, 60, 1, on: true)));
+        Assert.False(new MidiTrackRouter(() => notes, () => null).Handle(NoteMessage("x", 1, 60, 1, on: true)));
 
         Assert.Empty(notes.Did);
     }
@@ -400,17 +400,24 @@ public class TrackMidiTests
         Device = device, Type = MidiMessageType.Note, Channel = channel, Value = note, Data = velocity, IsOn = on
     };
 
-    /// <summary>Where claimed notes land, written down as words.</summary>
-    private sealed class TrackNotes : ITrackNotes
+    /// <summary>The road a claimed note goes down, written down as words.</summary>
+    private sealed class TrackNotes : IPlays
     {
         public readonly List<string> Did = new();
 
         /// <inheritdoc/>
-        public void PressOnTrack(int track, Note note, int volume) =>
+        public void Press(int track, Note note, int volume) =>
             Did.Add("down " + track + " " + note + " " + volume);
 
         /// <inheritdoc/>
-        public void ReleaseOnTrack(int track, Note note) => Did.Add("up " + track + " " + note);
+        public void Let(int track, Note note) => Did.Add("up " + track + " " + note);
+
+        /// <inheritdoc/>
+        public void Bend(int track, double lean) => Did.Add("bend " + track + " " + lean.ToString("0.###"));
+
+        /// <inheritdoc/>
+        public void Modulate(int track, double amount) =>
+            Did.Add("modulate " + track + " " + amount.ToString("0.###"));
     }
 
     /// <summary>A MIDI service that opens anything and writes every message down as hex.</summary>

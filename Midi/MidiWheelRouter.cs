@@ -16,6 +16,11 @@ namespace JingleBox2.Midi;
 /// nothing about the application, and an adapter on the far side of <see cref="IWheels"/> knows
 /// where a wheel goes. See <see cref="MidiNoteRouter"/> for the keys beside it.
 ///
+/// **What it tells is the router**, which is the one place everything a hand does arrives: the
+/// half of the application the keys are going to, and the monitor, told in the same breath. A
+/// wheel moved on the screen goes down that same road, so the two cannot disagree about where
+/// they are going, which is what they were doing.
+///
 /// **A wheel is a performance control and not a knob on a desk**, which is the whole reason it is
 /// read here rather than through <see cref="MidiControlRouter"/>. It springs back, it is played
 /// while a note sounds, and it belongs to the notes the same hand is playing. It goes to the
@@ -35,7 +40,7 @@ namespace JingleBox2.Midi;
 /// </remarks>
 public sealed class MidiWheelRouter
 {
-    private readonly IWheels _wheels;
+    private readonly IPlays _wheels;
 
     /// <summary>How the two wheels are read off the wire.</summary>
     private readonly IMidiWheelInput _wire;
@@ -58,7 +63,10 @@ public sealed class MidiWheelRouter
     /// </remarks>
     private readonly Func<MidiMessage, bool>? _pointed;
 
-    /// <param name="wheels">Where a wheel goes. Not a view model, so this can be tested.</param>
+    /// <param name="wheels">
+    /// Where a wheel goes, which is the road everything a hand does goes down. Not a view model,
+    /// so this can be tested.
+    /// </param>
     /// <param name="jobs">What each control is for, defaulted to the real rule.</param>
     /// <param name="pointed">
     /// Whether a link holds this control. Left out, nothing is pointed at anything, which is
@@ -68,7 +76,7 @@ public sealed class MidiWheelRouter
     /// How a wheel is read off the wire. Left out, the real reading; given, whatever a test
     /// wants the wire to have meant.
     /// </param>
-    public MidiWheelRouter(IWheels wheels, IControlJobs? jobs = null,
+    public MidiWheelRouter(IPlays wheels, IControlJobs? jobs = null,
                            Func<MidiMessage, bool>? pointed = null, IMidiWheelInput? wire = null)
     {
         _wheels = wheels;
@@ -106,7 +114,7 @@ public sealed class MidiWheelRouter
                     "wheel: '" + msg.Device + "' ch" + msg.Channel + " bend " + msg.Data
                     + " leaning " + lean.ToString("0.###"));
 
-            _wheels.Bend(lean);
+            _wheels.Bend(MidiRouter.TheHand, lean);
             return true;
         }
 
@@ -117,7 +125,7 @@ public sealed class MidiWheelRouter
                 "wheel: '" + msg.Device + "' ch" + msg.Channel + " modulation " + msg.Data
                 + " at " + amount.ToString("0.###"));
 
-        _wheels.Modulate(amount);
+        _wheels.Modulate(MidiRouter.TheHand, amount);
         return true;
     }
 }

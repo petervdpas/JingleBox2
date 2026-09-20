@@ -27,35 +27,82 @@ public class ControllerCodecTests
     };
 
     /// <summary>
-    /// The shipped codec turns the MiniLab's pitch strip into CC 2, so a control that could
-    /// never be pointed at anything becomes linkable.
+    /// The shipped codec leaves the MiniLab's pitch strip alone, at both ends and in the middle.
     /// </summary>
     /// <remarks>
-    /// Fourteen bits down to seven: the middle of the strip is the middle of the range.
+    /// **A codec that translates around a gap has to be read again when the gap closes.** This
+    /// file turned that strip's bend into controller 2, and its own comment said why: pitch bend
+    /// reached nothing in this application, so the strip did nothing at all. It is the pitch
+    /// wheel now, with no profile, no link and nothing stored, and the conversion would deliver
+    /// the strip as a controller nobody is pointed at, which is the thing it was written to
+    /// prevent. The lines are left in the file commented, since pointing that strip at a knob is
+    /// still a thing somebody may want.
+    ///
+    /// Three positions rather than one, because a conversion put back would be caught by any of
+    /// them and the middle is the one that reads as working when it is not: 8192 in and 64 out
+    /// are both the middle of their own range.
     /// </remarks>
-    [Fact]
-    public void The_shipped_codec_turns_a_pitch_strip_into_a_controller()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(8192)]
+    [InlineData(16383)]
+    public void The_shipped_codec_leaves_the_pitch_strip_alone(int bend)
     {
         using var codecs = new ControllerCodecs(new NoMidi());
 
-        var read = codecs.Read(Bend("Minilab3 MIDI", 8192));
+        var read = codecs.Read(Bend("Minilab3 MIDI", bend));
+
+        Assert.NotNull(read);
+        Assert.Equal(MidiMessageType.PitchBend, read!.Type);
+        Assert.Equal(bend, read.Data);
+    }
+
+    /// <summary>
+    /// A codec can still turn a bend into a controller, which is the whole reason for the
+    /// language.
+    /// </summary>
+    /// <remarks>
+    /// Written here rather than read off the shipped file, and that is the point: what the
+    /// MiniLab's own file does is a decision about that device and may change again, where this
+    /// is the mechanism. It is dropped into the folder before the codecs are read, so nothing
+    /// here waits on the watcher.
+    ///
+    /// The device is a made-up one, so it cannot collide with a real file and every other test in
+    /// this class goes on seeing what it saw.
+    /// </remarks>
+    [Fact]
+    public void A_codec_can_turn_a_bend_into_a_controller()
+    {
+        Written("testbox", """
+            controller = { name = "TestBox", matches = "TestBox*" }
+
+            function midi(m)
+              if m.type == "bend" then
+                return { type = "cc", channel = m.channel, number = 2, value = bit32.rshift(m.value, 7) }
+              end
+            end
+            """);
+
+        using var codecs = new ControllerCodecs(new NoMidi());
+
+        var read = codecs.Read(Bend("TestBox MIDI", 8192));
 
         Assert.NotNull(read);
         Assert.Equal(MidiMessageType.ControlChange, read!.Type);
         Assert.Equal(2, read.Value);
-
         Assert.Equal(64, read.Data);
     }
 
-    /// <summary>Both ends of the strip land on both ends of the controller's range.</summary>
-    [Theory]
-    [InlineData(0, 0)]
-    [InlineData(16383, 127)]
-    public void And_scales_it_across_the_whole_range(int bend, int wanted)
+    /// <summary>Puts a codec in the folder the application reads them from.</summary>
+    /// <param name="name">What to call the file, without its extension.</param>
+    /// <param name="lua">What is in it.</param>
+    private static void Written(string name, string lua)
     {
-        using var codecs = new ControllerCodecs(new NoMidi());
+        var folder = new ControllerFolder();
 
-        Assert.Equal(wanted, codecs.Read(Bend("Minilab3 MIDI", bend))!.Data);
+        folder.FirstRun();
+
+        System.IO.File.WriteAllText(System.IO.Path.Combine(folder.Installed, name + ".lua"), lua);
     }
 
     /// <summary>
