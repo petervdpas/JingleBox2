@@ -14,14 +14,38 @@ public interface IMeterScale
     /// <summary>Quiet enough to be the bottom of the meter without hiding a soft take.</summary>
     const double DefaultMinimumDecibels = -60;
 
-    /// <summary>Amplitude at or above this is at the top, and worth a warning.</summary>
+    /// <summary>Amplitude at or above this is at full scale, and worth a warning.</summary>
     const double ClipAmplitude = 0.999;
 
-    /// <summary>Amplitude as decibels below full scale. Silence is treated as the floor.</summary>
-    double Decibels(double amplitude, double minimumDecibels = DefaultMinimumDecibels);
+    /// <summary>
+    /// The top of a scale that stops at full scale, which is what every call means unless told otherwise.
+    /// </summary>
+    /// <remarks>
+    /// A scale can be asked to run past full scale instead, which is how a desk meter reads: 0 is
+    /// the reference and the scale carries on above it, so a level that has gone over has
+    /// somewhere to be shown rather than piling up against the top.
+    /// </remarks>
+    const double FullScaleDecibels = 0;
+
+    /// <summary>
+    /// Amplitude as decibels relative to full scale, held between the floor and the top.
+    /// Silence is treated as the floor.
+    /// </summary>
+    /// <param name="amplitude">The reading, where 1 is full scale.</param>
+    /// <param name="minimumDecibels">The bottom of the scale.</param>
+    /// <param name="maximumDecibels">The top of the scale, 0 for full scale.</param>
+    /// <returns>The decibels.</returns>
+    double Decibels(double amplitude, double minimumDecibels = DefaultMinimumDecibels,
+                    double maximumDecibels = FullScaleDecibels);
 
     /// <summary>How far up the meter a level reaches, 0 to 1.</summary>
-    double Position(double amplitude, double minimumDecibels = DefaultMinimumDecibels, bool decibels = true);
+    /// <param name="amplitude">The reading, where 1 is full scale.</param>
+    /// <param name="minimumDecibels">The bottom of the scale.</param>
+    /// <param name="decibels">False to plot the amplitude straight, which ignores both ends.</param>
+    /// <param name="maximumDecibels">The top of the scale, 0 for full scale.</param>
+    /// <returns>The fraction of the meter.</returns>
+    double Position(double amplitude, double minimumDecibels = DefaultMinimumDecibels, bool decibels = true,
+                    double maximumDecibels = FullScaleDecibels);
 
     /// <summary>
     /// Which pixel along a meter of that length a reading lands on.
@@ -39,17 +63,26 @@ public interface IMeterScale
     /// <param name="amplitude">The reading.</param>
     /// <param name="minimumDecibels">The bottom of this meter's scale.</param>
     /// <param name="pixels">How long the bar is, in pixels.</param>
+    /// <param name="maximumDecibels">The top of this meter's scale, 0 for full scale.</param>
     /// <returns>The pixel it fills to, which is nought for a meter with no room.</returns>
-    int Step(double amplitude, double minimumDecibels, double pixels);
+    int Step(double amplitude, double minimumDecibels, double pixels, double maximumDecibels = FullScaleDecibels);
 
     /// <summary>
     /// A peak mark that falls back at a steady rate rather than sticking. Held for a moment
     /// first, so a transient is readable before it starts to drop.
     /// </summary>
+    /// <param name="peak">Where the mark is.</param>
+    /// <param name="level">Where the reading is.</param>
+    /// <param name="secondsSincePeak">How long since the mark was last pushed up.</param>
+    /// <param name="holdSeconds">How long it sits still first.</param>
+    /// <param name="decibelsPerSecond">How fast it falls after that.</param>
+    /// <param name="maximumDecibels">The top of the scale, 0 for full scale.</param>
+    /// <returns>Where the mark is now.</returns>
     double DecayPeak(
     double peak,
     double level,
     double secondsSincePeak,
     double holdSeconds,
-    double decibelsPerSecond);
+    double decibelsPerSecond,
+    double maximumDecibels = FullScaleDecibels);
 }

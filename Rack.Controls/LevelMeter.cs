@@ -29,11 +29,23 @@ public class LevelMeter : ThemedControl
     /// <summary>Where a level sits on a meter, which is decibels rather than amplitude.</summary>
     private readonly IMeterScale _scale = new MeterScale();
 
-    /// <summary>Minus six decibels, above which the signal is close enough to the ceiling to warn about.</summary>
-    private const double WarnAmplitude = 0.5;
+    /// <summary>
+    /// How far above 0 dB the scale runs unless a panel says otherwise.
+    /// </summary>
+    /// <remarks>
+    /// **A desk meter's scale carries on past 0**, and every meter here is one. 0 is the
+    /// reference, green up to it; what has gone over it has somewhere to be shown, orange
+    /// deepening to red, rather than piling up against the top of the bar. Six decibels, which
+    /// is the fader's own top, so a strip's meter and its fader agree about how much room there
+    /// is above unity. A track can really be there, since tracks are summed in floating point
+    /// before the master; the master itself cannot, and simply never reaches that part.
+    /// </remarks>
+    public const double DeskHeadroomDecibels = 6;
 
-    /// <summary>Minus one decibel: near enough to the top that the next transient will be over it.</summary>
-    private const double HotAmplitude = 0.89;
+    /// <summary>
+    /// Half way up the part over 0, where the peak mark stops being orange and starts being red.
+    /// </summary>
+    private const double RedAmplitude = 1.4125;
 
     /// <summary>
     /// How long the peak mark sits still before it starts to come down.
@@ -78,6 +90,16 @@ public class LevelMeter : ThemedControl
     /// </remarks>
     public static readonly StyledProperty<double> MinimumDecibelsProperty =
         AvaloniaProperty.Register<LevelMeter, double>(nameof(MinimumDecibels), MeterScale.DefaultMinimumDecibels);
+
+    /// <summary>
+    /// Backs <see cref="MaximumDecibels"/>, the top of the scale, above 0 dB.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="DeskHeadroomDecibels"/> unless a panel says otherwise; 0 makes a meter that
+    /// stops at full scale, and then the whole bar is green.
+    /// </remarks>
+    public static readonly StyledProperty<double> MaximumDecibelsProperty =
+        AvaloniaProperty.Register<LevelMeter, double>(nameof(MaximumDecibels), DeskHeadroomDecibels);
 
     /// <summary>
     /// Whether the meter carries a clip light: a small mark at the loud end, lit when what it
@@ -153,6 +175,12 @@ public class LevelMeter : ThemedControl
     /// <summary>The meter colours the kept brushes were built from.</summary>
     private MeterColours? _paintedMeter;
 
+    /// <summary>Which way up the kept gradient was built for.</summary>
+    private Orientation? _paintedOrientation;
+
+    /// <summary>The part of the scale over 0 dB: orange at 0, red at the top.</summary>
+    private IBrush? _overZone;
+
     /// <summary>The trough a bar is drawn in, and the line round it.</summary>
     private IBrush? _trough;
 
@@ -181,7 +209,7 @@ public class LevelMeter : ThemedControl
     {
         AffectsRender<LevelMeter>(
             StereoProperty, OrientationProperty, ShowClipProperty,
-            MinimumDecibelsProperty, ShowPeakProperty);
+            MinimumDecibelsProperty, MaximumDecibelsProperty, ShowPeakProperty);
     }
 
     /// <summary>Which pixel each bar was last drawn to, so a reading that moves none is dropped.</summary>
@@ -223,8 +251,8 @@ public class LevelMeter : ThemedControl
             return;
         }
 
-        int left = _scale.Step(Left, MinimumDecibels, along);
-        int right = Stereo ? _scale.Step(Right, MinimumDecibels, along) : 0;
+        int left = _scale.Step(Left, MinimumDecibels, along, MaximumDecibels);
+        int right = Stereo ? _scale.Step(Right, MinimumDecibels, along, MaximumDecibels) : 0;
 
         if (left == _shownLeft && right == _shownRight) return;
 
@@ -302,6 +330,16 @@ public class LevelMeter : ThemedControl
         set => SetValue(OrientationProperty, value);
     }
 
+    /// <inheritdoc cref="MaximumDecibelsProperty"/>
+    public double MaximumDecibels
+    {
+        get => GetValue(MaximumDecibelsProperty);
+        set => SetValue(MaximumDecibelsProperty, value);
+    }
+
+    /// <summary>The amplitude the top of the bar stands for.</summary>
+    private double Ceiling => Math.Pow(10, Math.Max(0, MaximumDecibels) / 20);
+
     /// <inheritdoc cref="MinimumDecibelsProperty"/>
     public double MinimumDecibels
     {
@@ -335,8 +373,9 @@ public class LevelMeter : ThemedControl
 
         bool over = ShowClip && _clip.Saw(Loudest(), now);
 
-        double left = Math.Clamp(double.IsNaN(Left) ? 0 : Left, 0, 1);
-        double right = Stereo ? Math.Clamp(double.IsNaN(Right) ? 0 : Right, 0, 1) : 0;
+        double top = Ceiling;
+        double left = Math.Clamp(double.IsNaN(Left) ? 0 : Left, 0, top);
+        double right = Stereo ? Math.Clamp(double.IsNaN(Right) ? 0 : Right, 0, top) : 0;
 
         _leftPeak = Track(left, ref _leftPeak, ref _leftPeakAt, now);
         if (Stereo) _rightPeak = Track(right, ref _rightPeak, ref _rightPeakAt, now);
@@ -454,7 +493,13 @@ public class LevelMeter : ThemedControl
     /// <summary>Whether the mark is above the bar, and so has somewhere left to fall to.</summary>
     private bool Falling(double level, double peak) =>
         ShowPeak
-        && _scale.Position(peak, MinimumDecibels) > _scale.Position(level, MinimumDecibels);
+        && At(peak) > At(level);
+
+    /// <summary>How far up this meter's own scale a reading reaches, nought to one.</summary>
+    /// <param name="amplitude">The reading, where 1 is 0 dB.</param>
+    /// <returns>The fraction of the bar.</returns>
+    private double At(double amplitude) =>
+        _scale.Position(amplitude, MinimumDecibels, true, MaximumDecibels);
 
     /// <summary>
     /// Asks to be drawn once more, because the mark is still coming down.
@@ -517,7 +562,7 @@ public class LevelMeter : ThemedControl
     {
         if (level >= peak) peakAt = now;
 
-        return _scale.DecayPeak(peak, level, now - peakAt, PeakHoldSeconds, PeakFallDecibelsPerSecond);
+        return _scale.DecayPeak(peak, level, now - peakAt, PeakHoldSeconds, PeakFallDecibelsPerSecond, MaximumDecibels);
     }
 
     /// <summary>One bar: its trough, the part of it that is lit, and the mark over that.</summary>
@@ -529,22 +574,25 @@ public class LevelMeter : ThemedControl
 
         context.DrawRectangle(_trough, _rim, new RoundedRect(area, radius));
 
-        double filled = _scale.Position(level, MinimumDecibels);
+        double filled = At(level);
         if (filled > 0)
             DrawZones(context, area, filled, radius);
 
         if (!ShowPeak || peak <= 0) return;
 
-        double at = _scale.Position(peak, MinimumDecibels);
+        double at = At(peak);
         DrawPeakMark(context, palette, area, at, peak);
     }
 
     /// <summary>
-    /// The lit part of a bar, in the zones it has reached: green, then orange, then red.
+    /// The lit part of a bar, in the zones it has reached: green up to 0 dB, then orange
+    /// deepening to red above it.
     /// </summary>
     /// <remarks>
-    /// Three plain rectangles clipped to the lit part rather than a gradient, because a gradient
-    /// blends where the zones meet and a meter's zones do not: a lamp is one colour or the next.
+    /// Each zone is painted whole and clipped to the lit part, so a colour belongs to a place on
+    /// the scale rather than to the level: a bar that reaches +2 is orange at +2 because that is
+    /// where +2 is, and red appears only once it climbs to where red is. The two meet with a
+    /// hard edge at 0, which is the line that matters; the blend is only inside the part over it.
     /// Clipped rather than cut, so the rounded end of the lit part is the rounding of the bar.
     /// </remarks>
     /// <param name="context">What is drawn on.</param>
@@ -553,18 +601,14 @@ public class LevelMeter : ThemedControl
     /// <param name="radius">The bar's corner rounding.</param>
     private void DrawZones(DrawingContext context, Rect area, double filled, double radius)
     {
-        double warm = _scale.Position(WarnAmplitude, MinimumDecibels);
-        double over = _scale.Position(HotAmplitude, MinimumDecibels);
+        double zero = At(1);
 
         using (context.PushClip(new RoundedRect(Portion(area, filled), radius)))
         {
-            context.FillRectangle(_quiet!, Span(area, 0, Math.Min(filled, warm)));
+            context.FillRectangle(_quiet!, Span(area, 0, zero));
 
-            if (filled > warm)
-                context.FillRectangle(_warm!, Span(area, warm, Math.Min(filled, over)));
-
-            if (filled > over)
-                context.FillRectangle(_over!, Span(area, over, filled));
+            if (filled > zero && zero < 1)
+                context.FillRectangle(_overZone!, Span(area, zero, 1));
         }
     }
 
@@ -617,12 +661,12 @@ public class LevelMeter : ThemedControl
         context.FillRectangle(brush, new Rect(x, area.Y, 2, area.Height));
     }
 
-    /// <summary>Which of the three kept brushes a level is worth.</summary>
-    /// <param name="level">The reading, nought to one.</param>
+    /// <summary>Which of the three kept brushes a level is worth, for the peak mark.</summary>
+    /// <param name="level">The reading, where 1 is 0 dB.</param>
     /// <returns>The brush, or nothing before the first painting.</returns>
     private IBrush? Worth(double level) =>
-        level >= MeterScale.ClipAmplitude || level >= HotAmplitude ? _over
-        : level >= WarnAmplitude ? _warm
+        level >= RedAmplitude ? _over
+        : level >= MeterScale.ClipAmplitude ? _warm
         : _quiet;
 
     /// <summary>
@@ -639,12 +683,13 @@ public class LevelMeter : ThemedControl
         var meter = MeterColours.From(this);
 
         if (_painted is { } was && was.Equals(palette) && _paintedMeter == meter
-            && Math.Abs(_paintedFloor - MinimumDecibels) < 0.001)
+            && Math.Abs(_paintedFloor - MinimumDecibels) < 0.001 && _paintedOrientation == Orientation)
             return palette;
 
         _painted = palette;
         _paintedMeter = meter;
         _paintedFloor = MinimumDecibels;
+        _paintedOrientation = Orientation;
 
         _trough = new SolidColorBrush(palette.Background);
         _rim = new Pen(new SolidColorBrush(palette.Border), 1);
@@ -652,6 +697,22 @@ public class LevelMeter : ThemedControl
         _quiet = new SolidColorBrush(meter.Safe);
         _warm = new SolidColorBrush(meter.Warn);
         _over = new SolidColorBrush(meter.Hot);
+
+
+        _overZone = new LinearGradientBrush
+        {
+            StartPoint = Orientation == Orientation.Vertical
+                ? new RelativePoint(0.5, 1, RelativeUnit.Relative)
+                : new RelativePoint(0, 0.5, RelativeUnit.Relative),
+            EndPoint = Orientation == Orientation.Vertical
+                ? new RelativePoint(0.5, 0, RelativeUnit.Relative)
+                : new RelativePoint(1, 0.5, RelativeUnit.Relative),
+            GradientStops =
+            {
+                new GradientStop(meter.Warn, 0),
+                new GradientStop(meter.Hot, 1)
+            }
+        };
 
         return palette;
     }

@@ -15,18 +15,25 @@ namespace JingleBox2.Audio.Interfaces;
 public interface IStereoPeak
 {
     /// <summary>
-    /// The loudest sample a side, as a magnitude from nought to one.
+    /// The loudest sample a side, as a magnitude where one is full scale.
     /// </summary>
     /// <remarks>
     /// **A sample that is not a number is passed over rather than becoming the peak.** Every
     /// comparison against NaN is false, so it loses each one it is in, which is what is wanted:
     /// one bad sample must not pin a meter at the top for the rest of the session.
     ///
-    /// Held to one at the top, since what is above full scale is still full scale to a meter, and
-    /// a bar is drawn from nought to one. A float on the end with nothing to pair with is left,
+    /// **Past full scale is reported as it is**, since a meter here is a desk meter whose scale
+    /// runs above 0 dB, and a bus summed in floating point really can be there. Held only at
+    /// <see cref="Loudest"/>, so an infinite sample reads as very loud rather than as infinity.
+    /// A float on the end with nothing to pair with is left,
     /// since half a frame is not one, and a count past the end of the block is held to the block.
     /// </remarks>
     /// <param name="block">Interleaved stereo floats, left then right.</param>
     /// <param name="floats">How many entries of it are real.</param>
     (float Left, float Right) Of(float[]? block, int floats);
+
+    /// <summary>
+    /// The most a reading says, +24 dB, which is further past full scale than any meter's top.
+    /// </summary>
+    const float Loudest = 16f;
 }

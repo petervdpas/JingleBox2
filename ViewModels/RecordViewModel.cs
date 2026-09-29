@@ -2908,11 +2908,13 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             var captured = _levelMeter.GetStereoFromBytes(recentData, _recordingService.Channels);
 
             var stereo = _recordingService.Arriving is { } bus
-                ? new StereoLevel(Math.Clamp(bus.Left, 0, 1), Math.Clamp(bus.Right, 0, 1))
+                ? new StereoLevel(Math.Max(bus.Left, 0), Math.Max(bus.Right, 0))
                 : captured;
 
             bool clipping = _recordingService.IsClipping || stereo.Peak >= FullScale;
             bool recording = _recordingService.IsRecording;
+
+            SayLevels(stereo.Peak, captured.Peak, _recordingService.Arriving != null);
 
             Dispatcher.UIThread.Post(() =>
             {
@@ -2929,6 +2931,65 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         _levelUpdateTimer.Start();
     }
+
+    /// <summary>The loudest the meter was shown since the last line, and the capture alone.</summary>
+    private float _saidLoudest, _saidCapture;
+
+    /// <summary>When the last line was written.</summary>
+    private readonly Stopwatch _saidAt = Stopwatch.StartNew();
+
+    /// <summary>How often the meter says what it has been showing.</summary>
+    private static readonly TimeSpan SayEvery = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// Writes down, every two seconds, the loudest reading the meter was shown and the loudest
+    /// the capture alone reached, in decibels.
+    /// </summary>
+    /// <remarks>
+    /// **A meter is a picture, and a picture can be argued with; a number cannot.** What the
+    /// recorder's input really reached is otherwise only visible as how high a bar went beside a
+    /// scale that may not be its own. Only while something is sounding, so a quiet page writes
+    /// nothing.
+    /// </remarks>
+    /// <param name="shown">What the meter was shown, where 1 is 0 dB.</param>
+    /// <param name="capture">What the capture alone read.</param>
+    /// <param name="offBus">Whether the reading came off the recorder's bus rather than the capture.</param>
+    private void SayLevels(float shown, float capture, bool offBus)
+    {
+        if (shown > _saidLoudest) _saidLoudest = shown;
+        if (capture > _saidCapture) _saidCapture = capture;
+
+        if (_saidAt.Elapsed < SayEvery) return;
+
+        _saidAt.Restart();
+
+        float loudest = _saidLoudest;
+        float alone = _saidCapture;
+
+        _saidLoudest = 0;
+        _saidCapture = 0;
+
+        if (loudest <= 0 || !Diagnostics.Log.On(Diagnostics.Enums.LogArea.Audio)) return;
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
+            "record: the input meter reached " + Decibels(loudest)
+            + (offBus ? " off the recorder's bus" : " off the capture")
+            + ", the capture alone " + Decibels(alone));
+    }
+
+    /// <summary>A reading as decibels, for a line in the log, by the same rule the meter reads it with.</summary>
+    /// <remarks>
+    /// The floor and the top are far past any meter's so the line says the number itself, where
+    /// a meter would say only where its bar stops.
+    /// </remarks>
+    private string Decibels(float amplitude) =>
+        amplitude <= 0
+            ? "silence"
+            : _meterScale.Decibels(amplitude, -120, 24)
+                .ToString("+0.0;-0.0;0.0", System.Globalization.CultureInfo.InvariantCulture) + " dB";
+
+    /// <summary>The meter's own rule for what a reading is in decibels.</summary>
+    private readonly Rack.Controls.Interfaces.IMeterScale _meterScale = new Rack.Controls.MeterScale();
 
     /// <summary>Stops the poll and lets its timer go, for a page that is no longer listening.</summary>
     private void StopLevelPolling()

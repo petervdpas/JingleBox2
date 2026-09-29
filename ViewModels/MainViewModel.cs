@@ -1316,12 +1316,51 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         var table = new UI.SignalTable(Points.At);
 
         table.Watch(ArrivingPoint, Onto(RecorderInput));
+        table.Watch(ArrivingPoint, Heard);
         table.Watch(TakesPoint, Onto(RecorderPlay));
         table.Watch(PadsPoint, Onto(PadsStrip));
 
         table.Watch(MasterPoint, Onto(DeskMaster));
 
         return table;
+    }
+
+    /// <summary>The meter's own rule for what a reading is in decibels.</summary>
+    private readonly Rack.Controls.Interfaces.IMeterScale _meterScale = new Rack.Controls.MeterScale();
+
+    /// <summary>The loudest the IN strip was told since the last line, and when that line was.</summary>
+    private float _heardLoudest;
+
+    /// <inheritdoc cref="_heardLoudest"/>
+    private readonly System.Diagnostics.Stopwatch _heardAt = System.Diagnostics.Stopwatch.StartNew();
+
+    /// <summary>
+    /// Writes down, every two seconds, the loudest reading the IN strip's meter was handed, in
+    /// decibels, beside the line RECORD writes about the same bus.
+    /// </summary>
+    /// <remarks>
+    /// Two lines about one bus from two readers, so a meter that disagrees with the other one
+    /// can be told apart from a meter that is drawing what it was given.
+    /// </remarks>
+    /// <param name="level">The reading the strip was just handed.</param>
+    private void Heard(UI.Records.PatchLevel level)
+    {
+        float loudest = Math.Max(level.Left, level.Right);
+
+        if (loudest > _heardLoudest) _heardLoudest = loudest;
+
+        if (_heardAt.Elapsed < TimeSpan.FromSeconds(2)) return;
+
+        _heardAt.Restart();
+
+        float said = _heardLoudest;
+        _heardLoudest = 0;
+
+        if (said <= 0) return;
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
+            "mixer: the IN strip was handed " + _meterScale.Decibels(said, -120, 24).ToString("+0.0;-0.0;0.0", System.Globalization.CultureInfo.InvariantCulture)
+            + " dB at its loudest, on a scale of " + RecorderInput.Minimum + " to " + RecorderInput.Maximum + " dB");
     }
 
     /// <summary>Puts a reading onto one strip's meter.</summary>

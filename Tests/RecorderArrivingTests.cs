@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using JingleBox2.Audio;
 using JingleBox2.Audio.Interfaces;
@@ -38,6 +39,44 @@ public sealed class RecorderArrivingTests
     [Fact]
     public void No_bus_answers_nothing() => Assert.Null(new RecordingService().Arriving);
 
+    /// <summary>The recorder's bus carries the input gain as its trim, for everything arriving.</summary>
+    [Fact]
+    public void The_bus_carries_the_gain()
+    {
+        var bus = new Bus { IsOpen = true };
+        var service = new RecordingService { GainDb = 12 };
+
+        service.TakeFrom(bus);
+
+        Assert.Equal(Math.Pow(10, 12 / 20.0), bus.Gain, 4);
+    }
+
+    /// <summary>Moving the gain moves the bus's trim with it.</summary>
+    [Fact]
+    public void The_trim_follows_the_gain()
+    {
+        var bus = new Bus { IsOpen = true };
+        var service = new RecordingService();
+        service.TakeFrom(bus);
+
+        service.GainDb = -6;
+
+        Assert.Equal(Math.Pow(10, -6 / 20.0), bus.Gain, 4);
+    }
+
+    /// <summary>At 0 dB the bus trims nothing.</summary>
+    [Fact]
+    public void Unity_trims_nothing()
+    {
+        var bus = new Bus { IsOpen = true };
+        var service = new RecordingService { GainDb = 12 };
+        service.TakeFrom(bus);
+
+        service.GainDb = 0;
+
+        Assert.Equal(1f, bus.Gain);
+    }
+
     /// <summary>A bus that says what it is told to.</summary>
     private sealed class Bus : IOutputBus
     {
@@ -57,6 +96,8 @@ public sealed class RecorderArrivingTests
         public bool IsOpen { get; set; }
         /// <inheritdoc/>
         public float Level { get; set; } = 1f;
+        /// <inheritdoc/>
+        public float Gain { get; set; } = 1f;
         /// <inheritdoc/>
         public bool Open(int rate, int channels, bool pulled) => false;
         /// <inheritdoc/>

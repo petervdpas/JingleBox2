@@ -1,4 +1,5 @@
 using JingleBox2.Audio;
+using JingleBox2.Audio.Interfaces;
 using Xunit;
 
 namespace JingleBox2.Tests;
@@ -37,16 +38,30 @@ public class StereoPeakTests
         Assert.Equal(0.4f, right);
     }
 
-    /// <summary>Past full scale is still full scale, since a bar runs from nought to one.</summary>
+    /// <summary>
+    /// Past full scale is reported as it is, since the meters run above 0 dB.
+    /// </summary>
     [Fact]
-    public void Past_full_scale_reads_full_scale()
+    public void Past_full_scale_reads_what_it_was()
     {
         var peak = new StereoPeak();
 
-        var (left, right) = peak.Of(new[] { 4.2f, -9f }, 2);
+        var (left, right) = peak.Of(new[] { 1.4f, -1.9f }, 2);
 
-        Assert.Equal(1f, left);
-        Assert.Equal(1f, right);
+        Assert.Equal(1.4f, left);
+        Assert.Equal(1.9f, right);
+    }
+
+    /// <summary>But not without end: a reading stops at the loudest a reading says.</summary>
+    [Fact]
+    public void Far_past_full_scale_stops_at_the_loudest()
+    {
+        var peak = new StereoPeak();
+
+        var (left, right) = peak.Of(new[] { 400f, -9000f }, 2);
+
+        Assert.Equal(IStereoPeak.Loudest, left);
+        Assert.Equal(IStereoPeak.Loudest, right);
     }
 
     /// <summary>
@@ -72,7 +87,7 @@ public class StereoPeakTests
         var (left, right) = peak.Of(new[] { float.NaN, float.PositiveInfinity }, 2);
 
         Assert.Equal(0f, left);
-        Assert.Equal(1f, right);
+        Assert.Equal(IStereoPeak.Loudest, right);
     }
 
     /// <summary>A float on the end with nothing to pair with is left, since half a frame is not one.</summary>

@@ -73,14 +73,74 @@ public class StatusBar : ThemedControl
     /// <summary>Between the lamp and the words.</summary>
     private const double Gap = 8;
 
-    /// <summary>The meters' colours: amber where a level is warm and red where it is clipped.</summary>
-    private static readonly Color Amber = Color.FromRgb(0xF5, 0xA6, 0x23);
+    /// <summary>What everything is painted with, built once for a theme and kept.</summary>
+    /// <param name="Palette">The theme colours it was built from.</param>
+    /// <param name="Meter">The meter colours it was built from, which are the theme's own.</param>
+    /// <param name="Ground">The bar's own fill.</param>
+    /// <param name="Edge">The line round it.</param>
+    /// <param name="Trough">An unlit meter column.</param>
+    /// <param name="Safe">A column with room left in it.</param>
+    /// <param name="Warn">A column that is warm.</param>
+    /// <param name="Over">A column that is at the top.</param>
+    /// <param name="Word">The small words beside the columns.</param>
+    /// <param name="Quiet">The message, when it is only saying where you are.</param>
+    /// <param name="Loud">The message, when it is saying something happened.</param>
+    private sealed record BarPaint(
+        ThemePalette Palette, MeterColours Meter, IBrush Ground, IPen Edge, IBrush Trough,
+        IBrush Safe, IBrush Warn, IBrush Over, IBrush Word, IBrush Quiet, IBrush Loud);
 
-    /// <inheritdoc cref="Amber"/>
-    private static readonly Color Red = Color.FromRgb(0xE5, 0x39, 0x35);
+    /// <summary>The paint in use, or nothing before the first frame and after a theme swap.</summary>
+    /// <remarks>
+    /// **The bar repaints every time a level moves, which is many times a second**, and it used
+    /// to build every brush and lay every piece of lettering out again each time. The brushes
+    /// only change with the theme and the lettering only with what it says, so both are kept and
+    /// a repaint for a level is a handful of rectangles.
+    /// </remarks>
+    private BarPaint? _paint;
 
-    /// <summary>And green, a meter with room left in it.</summary>
-    private static readonly Color Green = Color.FromRgb(0x4C, 0xAF, 0x50);
+    /// <summary>The three small words, laid out once for the paint they were laid out in.</summary>
+    private FormattedText? _io, _mem, _cpu;
+
+    /// <summary>The message as last laid out, and what it was laid out from.</summary>
+    private FormattedText? _message;
+
+    /// <summary>What <see cref="_message"/> was laid out from: text, kind, size, room and paint.</summary>
+    private (string Text, StatusKind Kind, double Size, double Room, BarPaint Paint)? _messageFrom;
+
+    /// <summary>The paint for the theme the bar is under, built again only when that moves.</summary>
+    /// <returns>The paint.</returns>
+    private BarPaint Paint()
+    {
+        var palette = ThemePalette.From(this);
+        var meter = MeterColours.From(this);
+
+        if (_paint is { } kept && kept.Palette.Equals(palette) && kept.Meter == meter) return kept;
+
+        _paint = new BarPaint(
+            palette,
+            meter,
+            new SolidColorBrush(palette.Surface, 0.55).ToImmutable(),
+            new Pen(new SolidColorBrush(palette.Border, 0.8).ToImmutable(), 1).ToImmutable(),
+            new SolidColorBrush(palette.Border, 0.7).ToImmutable(),
+            new SolidColorBrush(meter.Safe, 0.95).ToImmutable(),
+            new SolidColorBrush(meter.Warn, 0.95).ToImmutable(),
+            new SolidColorBrush(meter.Hot, 0.95).ToImmutable(),
+            new SolidColorBrush(palette.Muted, 0.8).ToImmutable(),
+            new SolidColorBrush(palette.Muted).ToImmutable(),
+            new SolidColorBrush(palette.Text).ToImmutable());
+
+        _io = _mem = _cpu = null;
+        _message = null;
+
+        return _paint;
+    }
+
+    /// <summary>One of the small words, laid out in the paint's colour.</summary>
+    /// <param name="word">The word.</param>
+    /// <param name="paint">What it is painted with.</param>
+    /// <returns>The lettering.</returns>
+    private static FormattedText SmallWord(string word, BarPaint paint) => new(
+        word, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Typeface.Default, 9, paint.Word);
 
     /// <summary>Everything drawn is a render; only the height is a measurement.</summary>
     static StatusBar()
@@ -260,12 +320,13 @@ public class StatusBar : ThemedControl
 
         if (width <= 1 || height <= 1) return;
 
-        var palette = ThemePalette.From(this);
+        var paint = Paint();
+        var palette = paint.Palette;
         var area = new Rect(0, 0, width, height);
 
         context.DrawRectangle(
-            new SolidColorBrush(palette.Surface, 0.55),
-            new Pen(new SolidColorBrush(palette.Border, 0.8), 1),
+            paint.Ground,
+            paint.Edge,
             new RoundedRect(new Rect(0.5, 0.5, width - 1, height - 1), 4));
 
         var lamp = Lamp(palette);
@@ -273,29 +334,35 @@ public class StatusBar : ThemedControl
         Led.DrawLamp(context, new Point(Inset + LampSize / 2, height / 2), LampSize / 2, lamp,
                      Kind != StatusKind.Context);
 
-        DrawMeters(context, palette, area);
+        DrawMeters(context, paint, area);
 
         if (Text.Length == 0) return;
-
-        var ink = Kind == StatusKind.Context
-            ? new SolidColorBrush(palette.Muted)
-            : new SolidColorBrush(palette.Text);
 
         double meters = (ShowLevels ? MeterWidth * 2 + MeterGap + Inset + LabelRoom : 0)
                         + (ShowLoad ? LoadRoom + (ShowLevels ? 0 : Inset) : 0);
 
-        var text = new FormattedText(
-            Text,
-            CultureInfo.CurrentCulture,
-            FlowDirection.LeftToRight,
-            Typeface.Default,
-            FontSize,
-            ink)
+        double room = Math.Max(0, width - Inset * 2 - LampSize - Gap - meters);
+        var from = (Text, Kind, FontSize, room, paint);
+
+        if (_message == null || _messageFrom != from)
         {
-            MaxTextWidth = Math.Max(0, width - Inset * 2 - LampSize - Gap - meters),
-            MaxLineCount = 1,
-            Trimming = TextTrimming.CharacterEllipsis
-        };
+            _message = new FormattedText(
+                Text,
+                CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                Typeface.Default,
+                FontSize,
+                Kind == StatusKind.Context ? paint.Quiet : paint.Loud)
+            {
+                MaxTextWidth = room,
+                MaxLineCount = 1,
+                Trimming = TextTrimming.CharacterEllipsis
+            };
+
+            _messageFrom = from;
+        }
+
+        var text = _message;
 
         context.DrawText(text, new Point(Inset + LampSize + Gap, (height - text.Height) / 2));
     }
@@ -324,7 +391,7 @@ public class StatusBar : ThemedControl
     /// across it: the whole use of a meter this size is to be read without being looked at, and
     /// a colour is the only thing that can be.
     /// </remarks>
-    private void DrawMeters(DrawingContext context, ThemePalette palette, Rect area)
+    private void DrawMeters(DrawingContext context, BarPaint paint, Rect area)
     {
         _levelsArea = default;
         _loadArea = default;
@@ -345,7 +412,7 @@ public class StatusBar : ThemedControl
             Draw(inputX, InputLevel);
             Draw(outputX, OutputLevel);
 
-            Word("io", inputX - LabelRoom + 2);
+            Word(_io ??= SmallWord("io", paint), inputX - LabelRoom + 2);
 
             _levelsArea = new Rect(inputX - LabelRoom, 0, right - inputX + LabelRoom, area.Height);
 
@@ -359,49 +426,35 @@ public class StatusBar : ThemedControl
         double memoryX = right - MeterWidth;
         Draw(memoryX, MemoryLoad);
 
-        double memoryWord = memoryX - WordGap - Words("mem").Width;
-        Word("mem", memoryWord);
+        var mem = _mem ??= SmallWord("mem", paint);
+        double memoryWord = memoryX - WordGap - mem.Width;
+        Word(mem, memoryWord);
 
         double cpuX = memoryWord - PairGap - MeterWidth;
         Draw(cpuX, CpuLoad);
 
-        double cpuWord = cpuX - WordGap - Words("cpu").Width;
-        Word("cpu", cpuWord);
+        var cpu = _cpu ??= SmallWord("cpu", paint);
+        double cpuWord = cpuX - WordGap - cpu.Width;
+        Word(cpu, cpuWord);
 
         _loadArea = new Rect(cpuWord - 2, 0, memoryX + MeterWidth - cpuWord + 4, area.Height);
 
-        FormattedText Words(string word) => new(
-            word,
-            CultureInfo.CurrentCulture,
-            FlowDirection.LeftToRight,
-            Typeface.Default,
-            9,
-            new SolidColorBrush(palette.Muted, 0.8));
-
-        void Word(string word, double x)
-        {
-            var letters = Words(word);
-
+        void Word(FormattedText letters, double x) =>
             context.DrawText(letters, new Point(x, (area.Height - letters.Height) / 2));
-        }
 
         void Draw(double x, double level)
         {
             level = double.IsNaN(level) ? 0 : Math.Clamp(level, 0, 1);
 
-            context.FillRectangle(
-                new SolidColorBrush(palette.Border, 0.7),
-                new Rect(x, top, MeterWidth, tall));
+            context.FillRectangle(paint.Trough, new Rect(x, top, MeterWidth, tall));
 
             if (level <= 0) return;
 
             double lit = tall * level;
 
-            var colour = level >= Hot ? Red : level >= Warm ? Amber : Green;
+            var colour = level >= Hot ? paint.Over : level >= Warm ? paint.Warn : paint.Safe;
 
-            context.FillRectangle(
-                new SolidColorBrush(colour, 0.95),
-                new Rect(x, bottom - lit, MeterWidth, lit));
+            context.FillRectangle(colour, new Rect(x, bottom - lit, MeterWidth, lit));
         }
     }
 

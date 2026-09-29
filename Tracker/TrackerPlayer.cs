@@ -869,7 +869,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         var (left, right) = _synth.Mixer.LevelFor(track);
 
-        return (Math.Clamp(left, 0f, 1f), Math.Clamp(right, 0f, 1f));
+        return (Math.Max(left, 0f), Math.Max(right, 0f));
     }
 
     /// <summary>

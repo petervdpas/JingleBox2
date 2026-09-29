@@ -25,6 +25,7 @@ public sealed class StereoPeak : IStereoPeak
             if (r > right) right = r;
         }
 
-        return (left > 1f ? 1f : left, right > 1f ? 1f : right);
+        return (left > IStereoPeak.Loudest ? IStereoPeak.Loudest : left,
+                right > IStereoPeak.Loudest ? IStereoPeak.Loudest : right);
     }
 }

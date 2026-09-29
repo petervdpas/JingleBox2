@@ -2241,7 +2241,7 @@ public sealed class TrackMixer : ITrackMixer
     {
         if (track < 0 || track >= MaxTracks) return (0, 0);
 
-        float level = Math.Clamp(_trackLevels[track] * MasterGain, 0f, 1f);
+        float level = Math.Max(_trackLevels[track] * MasterGain, 0f);
 
         return (level, level);
     }

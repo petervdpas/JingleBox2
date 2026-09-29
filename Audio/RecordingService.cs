@@ -200,6 +200,8 @@ public sealed class RecordingService : IRecordingService, IDisposable
         {
             _gainDb = Math.Clamp(value, MinGainDb, MaxGainDb);
             _gainFactor = (float)Math.Pow(10, _gainDb / 20.0);
+
+            TrimBus();
         }
     }
 
@@ -498,6 +500,20 @@ public sealed class RecordingService : IRecordingService, IDisposable
     {
         _bus = bus;
         _tap.Follow(bus);
+
+        TrimBus();
+    }
+
+    /// <summary>Tells the recorder's bus to carry the input gain as its trim.</summary>
+    /// <remarks>
+    /// **The input gain is at the head of the recorder's bus**, the way a desk channel's gain is at
+    /// the head of the channel: everything arriving goes through it, the sound card's input and a
+    /// song or the pads patched across alike, so the meter, the clip light and the take all see
+    /// the same trimmed sum.
+    /// </remarks>
+    private void TrimBus()
+    {
+        if (_bus is { } bus) bus.Gain = _gainFactor;
     }
 
     /// <summary>The recorder's own bus, once it has been said.</summary>
@@ -743,7 +759,24 @@ public sealed class RecordingService : IRecordingService, IDisposable
     {
         if (data.Length == 0) return;
 
+        Arrived(data);
+    }
+
+    /// <summary>
+    /// One block off the input: trimmed, kept for the take and the meter, and put on the bus.
+    /// </summary>
+    /// <remarks>
+    /// The block goes onto the bus as it came, since the bus carries the gain for everything on it
+    /// (<see cref="TrimBus"/>) and trimming it here as well would be the gain twice. It is trimmed
+    /// for what this keeps, since a take written from the capture alone has to be the same take
+    /// the bus would have given.
+    /// </remarks>
+    /// <param name="data">The block, which is trimmed where it stands.</param>
+    private void Arrived(byte[] data)
+    {
         _lastDataTick = Environment.TickCount64;
+
+        _monitor?.Push(data, data.Length);
 
         if (ApplyGainAndDetectClipping(data))
         {
@@ -752,8 +785,6 @@ public sealed class RecordingService : IRecordingService, IDisposable
         }
 
         _heard.Add(data);
-
-        _monitor?.Push(data, data.Length);
     }
 
     /// <summary>Audio from a capture device, on BASS's own thread.</summary>
@@ -770,20 +801,10 @@ public sealed class RecordingService : IRecordingService, IDisposable
     {
         if (buffer != IntPtr.Zero && length > 0)
         {
-            _lastDataTick = Environment.TickCount64;
-
             byte[] data = new byte[length];
             System.Runtime.InteropServices.Marshal.Copy(buffer, data, 0, length);
 
-            if (ApplyGainAndDetectClipping(data))
-            {
-                _lastClipTick = Environment.TickCount64;
-                _clippedDuringTake = true;
-            }
-
-            _heard.Add(data);
-
-            _monitor?.Push(data, data.Length);
+            Arrived(data);
         }
         return true;
     }

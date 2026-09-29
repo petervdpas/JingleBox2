@@ -256,34 +256,84 @@ public class Led : ThemedControl
     /// </remarks>
     public static void DrawLamp(DrawingContext context, Point centre, double radius, Color colour, bool lit)
     {
+        var paint = PaintFor(colour, lit);
+
         if (lit)
         {
-            context.DrawEllipse(new SolidColorBrush(colour, 0.20), null, centre, radius * 2.2, radius * 2.2);
-            context.DrawEllipse(new SolidColorBrush(colour, 0.32), null, centre, radius * 1.5, radius * 1.5);
+            context.DrawEllipse(paint.OuterHalo, null, centre, radius * 2.2, radius * 2.2);
+            context.DrawEllipse(paint.InnerHalo, null, centre, radius * 1.5, radius * 1.5);
         }
 
-        var body = lit ? colour : Lighten(colour, -0.55);
-
-        var dome = new RadialGradientBrush
-        {
-            GradientOrigin = new RelativePoint(0.34, 0.28, RelativeUnit.Relative),
-            Center = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
-            RadiusX = new RelativeScalar(0.72, RelativeUnit.Relative),
-            RadiusY = new RelativeScalar(0.72, RelativeUnit.Relative),
-            GradientStops =
-            {
-                new GradientStop(Lighten(body, lit ? 0.60 : 0.28), 0),
-                new GradientStop(body, 0.55),
-                new GradientStop(Lighten(body, -0.45), 1)
-            }
-        };
-
-        context.DrawEllipse(dome, new Pen(new SolidColorBrush(Lighten(body, -0.7)), 1), centre, radius, radius);
+        context.DrawEllipse(paint.Dome, paint.Rim, centre, radius, radius);
 
         double gloss = radius * 0.34;
         context.DrawEllipse(
-            new SolidColorBrush(Colors.White, lit ? 0.55 : 0.22), null,
+            paint.Gloss, null,
             new Point(centre.X - radius * 0.3, centre.Y - radius * 0.32), gloss, gloss * 0.8);
+    }
+
+    /// <summary>What one lamp is painted with, built once for a colour and a state.</summary>
+    /// <param name="OuterHalo">The wide spill round a lit lamp.</param>
+    /// <param name="InnerHalo">The close spill round a lit lamp.</param>
+    /// <param name="Dome">The body, lit from up and to the left.</param>
+    /// <param name="Rim">The dark ring it sits in.</param>
+    /// <param name="Gloss">The catchlight.</param>
+    private sealed record LampPaint(IBrush OuterHalo, IBrush InnerHalo, IBrush Dome, IPen Rim, IBrush Gloss);
+
+    /// <summary>The paints already built, by colour and whether lit.</summary>
+    /// <remarks>
+    /// **A lamp is drawn on every repaint of whatever carries it, and a level meter carries one
+    /// and repaints many times a second.** Built per call, that was five brushes, a gradient and a
+    /// pen per meter per frame: on the mixer the largest single thing the drawing thread
+    /// allocated. Everything in a paint is relative to the lamp's own bounds, so one paint serves
+    /// every size. The colours a lamp is asked for are a theme's handful, so the table stays
+    /// small; it is emptied if it ever passes <see cref="MostPaints"/>, which would be something
+    /// walking through colours and would otherwise grow for ever.
+    /// </remarks>
+    private static readonly System.Collections.Generic.Dictionary<(Color, bool), LampPaint> Paints = new();
+
+    /// <summary>How many paints are kept before the table is emptied.</summary>
+    private const int MostPaints = 256;
+
+    /// <summary>The paint for a colour and a state, built the first time it is asked for.</summary>
+    /// <param name="colour">What the lamp is lit in.</param>
+    /// <param name="lit">Whether it is on.</param>
+    /// <returns>The paint.</returns>
+    private static LampPaint PaintFor(Color colour, bool lit)
+    {
+        lock (Paints)
+        {
+            if (Paints.TryGetValue((colour, lit), out var kept)) return kept;
+
+            if (Paints.Count >= MostPaints) Paints.Clear();
+
+            var body = lit ? colour : Lighten(colour, -0.55);
+
+            var dome = new RadialGradientBrush
+            {
+                GradientOrigin = new RelativePoint(0.34, 0.28, RelativeUnit.Relative),
+                Center = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
+                RadiusX = new RelativeScalar(0.72, RelativeUnit.Relative),
+                RadiusY = new RelativeScalar(0.72, RelativeUnit.Relative),
+                GradientStops =
+                {
+                    new GradientStop(Lighten(body, lit ? 0.60 : 0.28), 0),
+                    new GradientStop(body, 0.55),
+                    new GradientStop(Lighten(body, -0.45), 1)
+                }
+            };
+
+            var paint = new LampPaint(
+                new SolidColorBrush(colour, 0.20).ToImmutable(),
+                new SolidColorBrush(colour, 0.32).ToImmutable(),
+                dome.ToImmutable(),
+                new Pen(new SolidColorBrush(Lighten(body, -0.7)).ToImmutable(), 1).ToImmutable(),
+                new SolidColorBrush(Colors.White, lit ? 0.55 : 0.22).ToImmutable());
+
+            Paints[(colour, lit)] = paint;
+
+            return paint;
+        }
     }
 
 

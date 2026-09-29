@@ -69,10 +69,15 @@
                       ToolTip.Tip="{Binding Tip}"
                       Value="{Binding VolumeDecibels}" />
 
+            <!-- On the fader's own range, so the fader's numbers are the meter's: the input's
+                 gain runs from -24 to +12 where PLAY and PADS run from -60 to +6, and a meter
+                 on any other scale beside it would be read against numbers that are not its. -->
             <ui:LevelMeter Width="22"
                            VerticalAlignment="Stretch"
-                           Margin="0,0,0,7"
+                           Margin="0,11,0,7"
                            Stereo="True"
+                           MinimumDecibels="{Binding Minimum}"
+                           MaximumDecibels="{Binding Maximum}"
                            Left="{Binding Left}"
                            Right="{Binding Right}" />
           </StackPanel>
@@ -338,7 +343,7 @@
                              strip, which has its own meter. -->
                         <ui:LevelMeter Width="22"
                                           VerticalAlignment="Stretch"
-                                          Margin="0,0,0,7"
+                                          Margin="0,11,0,7"
                                           Stereo="True"
                                           Left="{Binding Left}"
                                           Right="{Binding Right}"
@@ -500,13 +505,17 @@
                                        ToolTip.Tip="Unity is 0 dB. Double click to go back to it."
                                        Value="{Binding VolumeDecibels}" />
 
-                          <!-- The lamp takes the top of the meter, so the bars start below it. The
-                               fader is pushed down by the same amount and the two travels line up;
-                               doing it the other way, by pulling the meter up, put the lamp through
-                               the mute and solo buttons above. -->
+                          <!-- The fader's numbers are the meter's numbers: both run from -60 to
+                               +6 dB, evenly, so a bar level with the fader's 0 mark is at 0 dB.
+                               That only holds if the two travels start and end on the same lines.
+                               The lamp takes the top of the meter, so the bars start 13 below it,
+                               and the fader is pushed down by the same 13; the fader's own travel
+                               then starts 11 further in (4 under its label and half its 14 pixel
+                               cap), which is the 11 on top of the meter. The 7 at the foot is that
+                               same half cap at the bottom. -->
                           <ui:LevelMeter Width="22"
                                             VerticalAlignment="Stretch"
-                                            Margin="0,0,0,7"
+                                            Margin="0,11,0,7"
                                             Stereo="True"
                                             Left="{Binding Left}"
                                             Right="{Binding Right}"

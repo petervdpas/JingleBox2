@@ -56,6 +56,22 @@ public sealed class OutputBus : IOutputBus
     /// </remarks>
     private readonly DSPProcedure _peakProcedure;
 
+    /// <summary>The trim, applied as the bus's first step; see <see cref="IOutputBus.Gain"/>.</summary>
+    /// <remarks>Kept for the same reason as <see cref="_peakProcedure"/>: BASS holds only a pointer to it.</remarks>
+    private readonly DSPProcedure _gainProcedure;
+
+    /// <summary>The handle of the trim on the bus, or nought while it is not on.</summary>
+    private int _gainDsp;
+
+    /// <summary>The trim as a factor, read on whatever thread pulls the bus.</summary>
+    private volatile float _gain = 1f;
+
+    /// <summary>
+    /// Ahead of the meter and of anything else reading the bus. BASS calls a higher priority first,
+    /// and everything else here goes on at nought.
+    /// </summary>
+    private const int GainPriority = 1;
+
     /// <summary>The peak reader's own handle, or nought while the bus is not open.</summary>
     private int _peak;
 
@@ -77,6 +93,7 @@ public sealed class OutputBus : IOutputBus
     {
         _peaks = peaks ?? new StereoPeak();
         _peakProcedure = ReadPeak;
+        _gainProcedure = Trim;
     }
 
     /// <inheritdoc/>
@@ -334,6 +351,11 @@ public sealed class OutputBus : IOutputBus
         _left = 0;
         _right = 0;
 
+        _gainDsp = Bass.ChannelSetDSP(_handle, _gainProcedure, IntPtr.Zero, GainPriority);
+
+        if (_gainDsp == 0)
+            Log.Write(LogArea.Audio, () => "bus: the trim would not go on the bus: " + Bass.LastError);
+
         _peak = Bass.ChannelSetDSP(_handle, _peakProcedure);
 
         if (_peak == 0)
@@ -349,11 +371,49 @@ public sealed class OutputBus : IOutputBus
     private void UnwatchLocked()
     {
         if (_handle != 0 && _peak != 0) Bass.ChannelRemoveDSP(_handle, _peak);
+        if (_handle != 0 && _gainDsp != 0) Bass.ChannelRemoveDSP(_handle, _gainDsp);
+
+        _gainDsp = 0;
 
         _peak = 0;
 
         _left = 0;
         _right = 0;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Kept across the bus being opened again, like <see cref="Level"/>, since the trim is put
+    /// back on the new stream with the meter. Something that is not a number, or below nought,
+    /// is refused rather than written into every sample that passes.
+    /// </remarks>
+    public float Gain
+    {
+        get => _gain;
+        set
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value) || value < 0) return;
+
+            _gain = value;
+        }
+    }
+
+    /// <summary>Multiplies the block by the trim, where the trim is anything but one.</summary>
+    /// <remarks>Floats, since every bus here is opened with them.</remarks>
+    /// <param name="handle">The trim's own handle, which is not used.</param>
+    /// <param name="channel">The bus, which is not used.</param>
+    /// <param name="buffer">The block, changed where it stands.</param>
+    /// <param name="length">How many bytes of it there are.</param>
+    /// <param name="user">Nothing was handed over.</param>
+    private unsafe void Trim(int handle, int channel, IntPtr buffer, int length, IntPtr user)
+    {
+        float gain = _gain;
+
+        if (gain == 1f || buffer == IntPtr.Zero || length <= 0) return;
+
+        var samples = new Span<float>((void*)buffer, length / sizeof(float));
+
+        for (int i = 0; i < samples.Length; i++) samples[i] *= gain;
     }
 
     /// <summary>One block on its way through, measured and left exactly as it was.</summary>

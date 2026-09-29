@@ -115,6 +115,25 @@ public interface IOutputBus : IDisposable
     float Level { get; set; }
 
     /// <summary>
+    /// The input trim at the head of the bus, as a factor, 1 until something says otherwise.
+    /// </summary>
+    /// <remarks>
+    /// **The first thing that happens to what arrives, before the bus is measured and before
+    /// anything reads it.** A desk channel's gain is at the top of the channel and everything
+    /// plugged into that channel goes through it; this is that, for a bus. So a meter reading the
+    /// bus and a take written off it both see the trimmed sum, and <see cref="Level"/>, which
+    /// comes after, is still only what the desk hears. Unlike <see cref="Level"/> it may be
+    /// above one, which is the whole point of a trim.
+    ///
+    /// Answered by default as a bus with no trim, so a bus that has none needs to say nothing.
+    /// </remarks>
+    float Gain
+    {
+        get => 1f;
+        set { }
+    }
+
+    /// <summary>
     /// Opens the bus at a rate and a width.
     /// </summary>
     /// <remarks>

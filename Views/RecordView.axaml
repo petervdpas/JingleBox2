@@ -95,11 +95,13 @@
             </StackPanel>
 
             <ui:LevelMeter Width="26" Height="150"
+                              MinimumDecibels="{Binding MinGainDb}"
+                              MaximumDecibels="{Binding MaxGainDb}"
                               Stereo="{Binding IsStereoInput}"
                               Left="{Binding LevelLeft}"
                               Right="{Binding LevelRight}"
                               HorizontalAlignment="Center"
-                              ToolTip.Tip="Peak level, left and right. Accent to -6 dB, amber to -1, red above." />
+                              ToolTip.Tip="What reaches the take, left and right, on the gain's own scale: green up to 0 dB, orange to red above it." />
           </StackPanel>
         </StackPanel>
         </Grid>
