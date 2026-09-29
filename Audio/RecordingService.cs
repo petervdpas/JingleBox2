@@ -494,7 +494,18 @@ public sealed class RecordingService : IRecordingService, IDisposable
     private Interfaces.IMonitorFeed? _monitor;
 
     /// <inheritdoc/>
-    public void TakeFrom(Interfaces.IOutputBus bus) => _tap.Follow(bus);
+    public void TakeFrom(Interfaces.IOutputBus bus)
+    {
+        _bus = bus;
+        _tap.Follow(bus);
+    }
+
+    /// <summary>The recorder's own bus, once it has been said.</summary>
+    private Interfaces.IOutputBus? _bus;
+
+    /// <inheritdoc/>
+    public (float Left, float Right)? Arriving =>
+        _bus is { IsOpen: true } bus ? bus.Reading : null;
 
     /// <inheritdoc/>
     /// <inheritdoc/>

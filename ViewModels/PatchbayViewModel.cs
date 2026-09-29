@@ -371,7 +371,7 @@ public sealed partial class PatchbayViewModel : ObservableObject
         else kept.Remove(node);
 
         Says = recorder
-            ? $"{Named(node)} goes to the recorder and no longer to the desk. Hear it plays it; it is not in the take file yet."
+            ? $"{Named(node)} goes to the recorder and no longer to the desk. Hear it plays it, and a take records it."
             : $"{Named(node)} goes to the desk again.";
 
         Read();

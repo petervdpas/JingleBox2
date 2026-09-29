@@ -116,6 +116,9 @@ public class ProgramCaptureTests
         public void TakeFrom(JingleBox2.Audio.Interfaces.IOutputBus bus) { }
 
         /// <inheritdoc/>
+        public (float Left, float Right)? Arriving { get; set; }
+
+        /// <inheritdoc/>
         public bool Hearing { get; set; }
 
         /// <inheritdoc/>

@@ -220,6 +220,22 @@ public interface IRecordingService
     void TakeFrom(IOutputBus bus);
 
     /// <summary>
+    /// What is arriving at the recorder, per side, 0 to 1, or nothing where there is no bus to read.
+    /// </summary>
+    /// <remarks>
+    /// **The bus and not the capture, because the bus is what a take is written from.** The
+    /// capture after the input gain is one source on it, and a song or the pads patched across are
+    /// others, so a meter reading the capture alone shows a take being made out of silence while
+    /// the file fills with the song. Read before the bus's own fader, so Hear it being off leaves
+    /// the reading alone: whether the desk hears the input and what reaches the take are two
+    /// questions.
+    ///
+    /// Nothing is answered where the bus is not open, and a caller then reads the capture instead,
+    /// which is what the bus would have been carrying.
+    /// </remarks>
+    (float Left, float Right)? Arriving { get; }
+
+    /// <summary>
     /// Whether what is coming in is played out of the desk while it comes in.
     /// </summary>
     /// <remarks>

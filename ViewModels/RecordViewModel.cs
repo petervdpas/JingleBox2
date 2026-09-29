@@ -580,6 +580,20 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// <summary>The right side, which reads the same as the left on a mono input.</summary>
     [ObservableProperty] private float levelRight;
 
+    /// <summary>The capture's own left side, before anything patched across is added to it.</summary>
+    /// <remarks>
+    /// Kept beside <see cref="LevelLeft"/> because the two are different points: the meters on
+    /// the page and on the desk read what reaches the take, which is the recorder's bus, and the
+    /// patchbay's capture port reads what the sound card is handing over and nothing else.
+    /// </remarks>
+    public float CaptureLeft { get; private set; }
+
+    /// <summary>The capture's own right side; see <see cref="CaptureLeft"/>.</summary>
+    public float CaptureRight { get; private set; }
+
+    /// <summary>A reading at or past which the take is clipping, read off the bus.</summary>
+    private const float FullScale = 0.999f;
+
     /// <summary>The picture of the take that is picked, or null while there is none to show.</summary>
     [ObservableProperty] private WaveformData? currentWaveform;
 
@@ -2790,6 +2804,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         Level = 0;
         LevelLeft = 0;
         LevelRight = 0;
+        CaptureLeft = 0;
+        CaptureRight = 0;
         IsClipping = false;
     }
 
@@ -2889,13 +2905,19 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         _levelUpdateTimer.Elapsed += (_, _) =>
         {
             var recentData = _recordingService.GetRecentRecordingData(4410);
-            var stereo = _levelMeter.GetStereoFromBytes(recentData, _recordingService.Channels);
+            var captured = _levelMeter.GetStereoFromBytes(recentData, _recordingService.Channels);
 
-            bool clipping = _recordingService.IsClipping;
+            var stereo = _recordingService.Arriving is { } bus
+                ? new StereoLevel(Math.Clamp(bus.Left, 0, 1), Math.Clamp(bus.Right, 0, 1))
+                : captured;
+
+            bool clipping = _recordingService.IsClipping || stereo.Peak >= FullScale;
             bool recording = _recordingService.IsRecording;
 
             Dispatcher.UIThread.Post(() =>
             {
+                CaptureLeft = captured.Left;
+                CaptureRight = captured.Right;
                 Level = stereo.Peak;
                 LevelLeft = stereo.Left;
                 LevelRight = stereo.Right;

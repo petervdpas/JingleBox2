@@ -27,6 +27,12 @@
   <!-- And the button that throws that same work away. Warm rather than alarming: it is
        a caution and not a fault, which is why it is not the danger colour. -->
   <Color x:Key="Color.Discard">#E08A3C</Color>
+  <!-- A level meter lit from the bottom: room, close to the ceiling, and over. What each
+       means is fixed and so is the family, green, orange and red; the exact shade is this
+       theme's, never its accent, or the meter reads as the accent at ordinary levels. -->
+  <Color x:Key="Color.MeterSafe">#5AD18A</Color>
+  <Color x:Key="Color.MeterWarn">#FFA24C</Color>
+  <Color x:Key="Color.MeterHot">#FF3B5C</Color>
 
   <Color x:Key="SystemAccentColor">#C77DFF</Color>
   <Color x:Key="SystemAccentColorLight1">#DCA8FF</Color>

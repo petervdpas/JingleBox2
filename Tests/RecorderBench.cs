@@ -260,6 +260,9 @@ public sealed class RecorderBench
         /// <inheritdoc/>
         public void TakeFrom(IOutputBus bus) { }
 
+        /// <inheritdoc/>
+        public (float Left, float Right)? Arriving { get; set; }
+
         /// <summary>The path it was told about, so a test can say it was told once.</summary>
         public IMonitorFeed? Told { get; private set; }
 

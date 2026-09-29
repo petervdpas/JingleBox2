@@ -15,9 +15,14 @@ namespace JingleBox2.Rack.Controls;
 /// </summary>
 /// <remarks>
 /// The bar is on a decibel scale, because a linear one spends most of its length on the top
-/// few decibels. The colours are the meter convention rather than the theme's: green, amber
-/// and red mean the same thing in every studio, and a theme should not be able to say
-/// otherwise. Only the quiet end follows the accent.
+/// few decibels. What the three colours mean is the meter convention, room, close, and over,
+/// and which colours say it is the theme's, through <see cref="MeterColours"/>: green, orange
+/// and red unless a theme says otherwise.
+///
+/// **Each colour has its own place on the scale and a level uncovers them**, which is what a
+/// hardware meter is: a column of green lamps, then orange, then red, lit from the bottom. So a
+/// loud bar is green at its foot and red at its head, and the orange zone is always at the same
+/// height whatever is being shown, which is what lets the eye read a level off the colour alone.
 /// </remarks>
 public class LevelMeter : ThemedControl
 {
@@ -41,18 +46,6 @@ public class LevelMeter : ThemedControl
 
     /// <summary>How fast the mark falls once the hold is over.</summary>
     private const double PeakFallDecibelsPerSecond = 20;
-
-    /// <summary>
-    /// The two warning colours, fixed rather than taken from the theme.
-    /// </summary>
-    /// <remarks>
-    /// Amber and red mean the same thing on every meter in every studio, and a theme should not
-    /// be able to say otherwise. Only the quiet end of the bar follows the accent.
-    /// </remarks>
-    private static readonly Color Warn = Color.FromRgb(0xFD, 0xD8, 0x35);
-
-    /// <inheritdoc cref="Warn"/>
-    private static readonly Color Hot = Color.FromRgb(0xE5, 0x39, 0x35);
 
     /// <summary>Backs <see cref="Left"/>, and is the only bar a mono meter draws.</summary>
     public static readonly StyledProperty<double> LeftProperty =
@@ -157,6 +150,9 @@ public class LevelMeter : ThemedControl
     /// </remarks>
     private double _paintedFloor;
 
+    /// <summary>The meter colours the kept brushes were built from.</summary>
+    private MeterColours? _paintedMeter;
+
     /// <summary>The trough a bar is drawn in, and the line round it.</summary>
     private IBrush? _trough;
 
@@ -171,12 +167,6 @@ public class LevelMeter : ThemedControl
 
     /// <inheritdoc cref="_quiet"/>
     private IBrush? _over;
-
-    /// <summary>The two gradients a bar is filled with once it is past the warning level.</summary>
-    private IBrush? _warmFill;
-
-    /// <inheritdoc cref="_warmFill"/>
-    private IBrush? _overFill;
 
     /// <summary>
     /// Says which properties change the picture. None of them changes the size.
@@ -541,12 +531,56 @@ public class LevelMeter : ThemedControl
 
         double filled = _scale.Position(level, MinimumDecibels);
         if (filled > 0)
-            context.DrawRectangle(Fill(level), null, new RoundedRect(Portion(area, filled), radius));
+            DrawZones(context, area, filled, radius);
 
         if (!ShowPeak || peak <= 0) return;
 
         double at = _scale.Position(peak, MinimumDecibels);
         DrawPeakMark(context, palette, area, at, peak);
+    }
+
+    /// <summary>
+    /// The lit part of a bar, in the zones it has reached: green, then orange, then red.
+    /// </summary>
+    /// <remarks>
+    /// Three plain rectangles clipped to the lit part rather than a gradient, because a gradient
+    /// blends where the zones meet and a meter's zones do not: a lamp is one colour or the next.
+    /// Clipped rather than cut, so the rounded end of the lit part is the rounding of the bar.
+    /// </remarks>
+    /// <param name="context">What is drawn on.</param>
+    /// <param name="area">The whole bar.</param>
+    /// <param name="filled">How much of it is lit, nought to one from the quiet end.</param>
+    /// <param name="radius">The bar's corner rounding.</param>
+    private void DrawZones(DrawingContext context, Rect area, double filled, double radius)
+    {
+        double warm = _scale.Position(WarnAmplitude, MinimumDecibels);
+        double over = _scale.Position(HotAmplitude, MinimumDecibels);
+
+        using (context.PushClip(new RoundedRect(Portion(area, filled), radius)))
+        {
+            context.FillRectangle(_quiet!, Span(area, 0, Math.Min(filled, warm)));
+
+            if (filled > warm)
+                context.FillRectangle(_warm!, Span(area, warm, Math.Min(filled, over)));
+
+            if (filled > over)
+                context.FillRectangle(_over!, Span(area, over, filled));
+        }
+    }
+
+    /// <summary>The stretch of a bar between two fractions of it, measured from the quiet end.</summary>
+    /// <param name="area">The whole bar.</param>
+    /// <param name="from">Where the stretch starts, nought to one.</param>
+    /// <param name="to">Where it ends, nought to one.</param>
+    /// <returns>The rectangle.</returns>
+    private Rect Span(Rect area, double from, double to)
+    {
+        var upTo = Portion(area, to);
+        var below = Portion(area, from);
+
+        return Orientation == Orientation.Vertical
+            ? new Rect(area.X, upTo.Y, area.Width, Math.Max(0, upTo.Height - below.Height))
+            : new Rect(below.Right, area.Y, Math.Max(0, upTo.Width - below.Width), area.Height);
     }
 
     /// <summary>The part of the bar that is lit, measured from the quiet end.</summary>
@@ -583,14 +617,6 @@ public class LevelMeter : ThemedControl
         context.FillRectangle(brush, new Rect(x, area.Y, 2, area.Height));
     }
 
-    /// <summary>Which of the kept fills a level is worth.</summary>
-    /// <param name="level">The reading, nought to one.</param>
-    /// <returns>The brush, or nothing before the first painting.</returns>
-    private IBrush? Fill(double level) =>
-        level < WarnAmplitude ? _quiet
-        : level >= MeterScale.ClipAmplitude || level >= HotAmplitude ? _overFill
-        : _warmFill;
-
     /// <summary>Which of the three kept brushes a level is worth.</summary>
     /// <param name="level">The reading, nought to one.</param>
     /// <returns>The brush, or nothing before the first painting.</returns>
@@ -603,30 +629,29 @@ public class LevelMeter : ThemedControl
     /// The colours this is drawn in, built once and kept until the theme moves.
     /// </summary>
     /// <remarks>
-    /// The gradient is the expensive one and is the reason this exists: three stops and a brush
-    /// object per bar per frame, where the only thing that actually changes between frames is
-    /// how much of the bar is filled in.
+    /// Brush objects per bar per frame would be allocation where the only thing that actually
+    /// changes between frames is how much of the bar is filled in.
     /// </remarks>
     /// <returns>The palette, which the drawing still reads colours out of directly.</returns>
     private ThemePalette Paint()
     {
         var palette = ThemePalette.From(this);
+        var meter = MeterColours.From(this);
 
-        if (_painted is { } was && was.Equals(palette) && Math.Abs(_paintedFloor - MinimumDecibels) < 0.001)
+        if (_painted is { } was && was.Equals(palette) && _paintedMeter == meter
+            && Math.Abs(_paintedFloor - MinimumDecibels) < 0.001)
             return palette;
 
         _painted = palette;
+        _paintedMeter = meter;
         _paintedFloor = MinimumDecibels;
 
         _trough = new SolidColorBrush(palette.Background);
         _rim = new Pen(new SolidColorBrush(palette.Border), 1);
 
-        _quiet = new SolidColorBrush(palette.Accent);
-        _warm = new SolidColorBrush(Warn);
-        _over = new SolidColorBrush(Hot);
-
-        _warmFill = Gradient(palette, Warn);
-        _overFill = Gradient(palette, Hot);
+        _quiet = new SolidColorBrush(meter.Safe);
+        _warm = new SolidColorBrush(meter.Warn);
+        _over = new SolidColorBrush(meter.Hot);
 
         return palette;
     }
@@ -642,40 +667,4 @@ public class LevelMeter : ThemedControl
 
         _painted = null;
     }
-
-    /// <summary>
-    /// A gradient rather than one flat colour, so the top of a loud bar reddens while the
-    /// quiet part stays where it was: the eye reads the change, not just the height.
-    /// </summary>
-    /// <param name="palette">The theme's colours.</param>
-    /// <param name="top">What the loud end of the bar goes.</param>
-    /// <returns>The brush.</returns>
-    private IBrush Gradient(ThemePalette palette, Color top)
-    {
-        var start = Orientation == Orientation.Vertical
-            ? new RelativePoint(0.5, 1, RelativeUnit.Relative)
-            : new RelativePoint(0, 0.5, RelativeUnit.Relative);
-
-        var end = Orientation == Orientation.Vertical
-            ? new RelativePoint(0.5, 0, RelativeUnit.Relative)
-            : new RelativePoint(1, 0.5, RelativeUnit.Relative);
-
-        return new LinearGradientBrush
-        {
-            StartPoint = start,
-            EndPoint = end,
-            GradientStops =
-            {
-                new GradientStop(palette.Accent, 0),
-                new GradientStop(palette.Accent, _scale.Position(WarnAmplitude, MinimumDecibels)),
-                new GradientStop(top, 1)
-            }
-        };
-    }
-
-    /// <summary>What a level is worth: the accent while it is quiet, then amber, then red.</summary>
-    private static Color ColourFor(ThemePalette palette, double level) =>
-        level >= MeterScale.ClipAmplitude || level >= HotAmplitude
-            ? Hot
-            : level >= WarnAmplitude ? Warn : palette.Accent;
 }

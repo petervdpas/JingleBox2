@@ -1286,7 +1286,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     /// is worked out from the voices sounding on it and nothing else can see that.
     /// </remarks>
     public UI.Interfaces.ISignalPoints Points => points ??= new UI.SignalPoints(
-        capture: () => new UI.Records.PatchLevel(true, Record.LevelLeft, Record.LevelRight),
+        capture: () => new UI.Records.PatchLevel(true, Record.CaptureLeft, Record.CaptureRight),
         heard: () => Reading(_audio.MonitorBus),
         takes: () => Reading(_audio.TakeBus),
         pads: () => Reading(_audio.PadBus),
@@ -1315,7 +1315,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     {
         var table = new UI.SignalTable(Points.At);
 
-        table.Watch(CapturePoint, Onto(RecorderInput));
+        table.Watch(ArrivingPoint, Onto(RecorderInput));
         table.Watch(TakesPoint, Onto(RecorderPlay));
         table.Watch(PadsPoint, Onto(PadsStrip));
 
@@ -1328,9 +1328,14 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     private static Action<UI.Records.PatchLevel> Onto(SourceStripViewModel strip) =>
         level => strip.Show(level.Left, level.Right);
 
-    /// <summary>Where the input is listening, which is what the IN strip shows.</summary>
-    private static readonly UI.Records.SignalPoint CapturePoint =
-        new(UI.PatchNodes.Record, UI.PatchPorts.Capture);
+    /// <summary>The recorder's bus, which is what the IN strip shows.</summary>
+    /// <remarks>
+    /// The bus and not the capture, because the bus is what a take is written from: the capture
+    /// after the gain, and anything patched across to RECORD. A strip reading the capture alone
+    /// sat dark while a song patched into the recorder was being written into the take.
+    /// </remarks>
+    private static readonly UI.Records.SignalPoint ArrivingPoint =
+        new(UI.PatchNodes.Record, UI.PatchPorts.Input);
 
     /// <summary>The take bus, which is what the PLAY strip shows.</summary>
     private static readonly UI.Records.SignalPoint TakesPoint =

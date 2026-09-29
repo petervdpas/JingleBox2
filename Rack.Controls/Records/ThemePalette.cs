@@ -85,7 +85,7 @@ public readonly record struct ThemePalette(
     /// own indirection hands back in the moment after a swap when it has not resolved yet, and
     /// a control painted with it disappears.
     /// </remarks>
-    private static Color Resolve(StyledElement element, string key, Color fallback)
+    internal static Color Resolve(StyledElement element, string key, Color fallback)
     {
         if (element.TryFindResource(key, out var value))
         {
