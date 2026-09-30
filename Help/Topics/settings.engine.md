@@ -44,9 +44,18 @@ them, so the right value can be found by listening rather than by restarting bet
 guesses.
 
 Two switches sit under them and neither is about how much audio is held.
-**Real-time audio** asks the machine to let the threads that must not be late take
-their turn ahead of everything else, so a browser laying out a page cannot delay the
-sound.
+**Real-time audio** decides whether JingleBox2 moves its own audio threads onto the
+machine's real-time scheduler: the mixing thread, and one audio thread for every plugin,
+since each plugin runs in a process of its own. It does not say whether the machine
+allows real time, and it changes nothing for other audio programs, which keep their own
+permission whichever way this is set.
+
+Leave it off. With a dozen plugins, switched on, plugins woke 50 to 185 ms late while
+plugin windows opened and whole blocks were played as silence; switched off, the same
+song and the same windows stayed under 10 ms. All those threads sit at one priority and
+the mix waits for every one of them each block, so one of them held up holds up the
+lot. A plugin already loaded keeps what it started with, so restart the application
+after changing it.
 
 **Fast drive curve** is the third, and it is the only setting here that is about
 arithmetic. Every drive in this application, on a machine and inside an effect, bends

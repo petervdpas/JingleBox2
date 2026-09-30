@@ -147,4 +147,35 @@ public sealed class PlayheadFlowTests
             "tracker: the picture stepped 8 time(s), mean 125.0 ms, 125.0 to 125.0, worst 0.0 ms out",
             second);
     }
+
+    /// <summary>
+    /// A stall says when it ended, counted back from the line that reports it, so it can be found
+    /// among the other lines of the log.
+    /// </summary>
+    /// <remarks>
+    /// A worst over five seconds says how bad a stall was and not when, and five seconds of a log
+    /// is a window opening, a handover, several resizes and a close. Only a gap more than 50 ms off
+    /// is placed, so the ordinary line reads as it always has.
+    /// </remarks>
+    [Fact]
+    public void A_stall_says_when_it_ended()
+    {
+        var flow = new PlayheadFlow(Window);
+
+        double[] gaps = { 125, 125, 609, 125, 125, 125, 125 };
+
+        double at = 0;
+        string? said = flow.Stepped(At(at));
+
+        foreach (double gap in gaps)
+        {
+            at += gap;
+            said ??= flow.Stepped(At(at));
+        }
+
+        Assert.Equal(
+            "tracker: the picture stepped 5 time(s), mean 221.8 ms, 125.0 to 609.0, worst 387.2 ms out, "
+            + "the longest gap ending 250 ms before this line",
+            said);
+    }
 }

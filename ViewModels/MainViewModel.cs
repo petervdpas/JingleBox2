@@ -1703,14 +1703,17 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
               "Audio class, which hands back a share of every interval rather than the machine " +
               "and needs nobody's permission. The log says which of the two you got."
             : _cfg.RealtimeAudio
-                ? "The mixing thread and each plugin's own audio thread run ahead of everything " +
-                  "else on the machine, which is what every serious audio application here does. " +
-                  "The system may refuse it, in which case the log says so and nothing breaks. A " +
-                  "plugin already loaded keeps what it started with; the next one gets this."
-                : "The threads that must not be late take their turn like everything else, so a " +
-                  "browser laying out a page can delay the sound. Switch it on if plugins break " +
-                  "up, and listen: it is the one setting here that changes how the machine treats " +
-                  "this application rather than how much audio is held.";
+                ? "On: the mixing thread and one audio thread per plugin run on the real-time " +
+                  "scheduler, all at the same priority, and the mix waits for every one of them " +
+                  "each block. With a dozen plugins that was measured breaking up while plugin " +
+                  "windows opened: plugins woke 50 to 185 ms late and blocks were played as " +
+                  "silence. A plugin already loaded keeps what it started with; restart the " +
+                  "application after changing this."
+                : "Off, and off is what was measured clean with a dozen plugins. Nothing about " +
+                  "the machine changes either way: other audio programs keep their own real-time " +
+                  "permission. This only decides whether JingleBox2 moves its own audio threads " +
+                  "onto the real-time scheduler, and switched on it made plugins break up while " +
+                  "their windows opened.";
 
     /// <summary>
     /// Puts the sizes on the running output, so a change is heard now rather than next time.

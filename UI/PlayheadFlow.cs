@@ -38,12 +38,18 @@ public sealed class PlayheadFlow : IPlayheadFlow
 
     /// <summary>Builds one over a window of its own.</summary>
     /// <param name="window">How long to gather for, or nothing for <see cref="DefaultWindow"/>.</param>
+    /// <summary>How far off the mean the longest gap has to be before the line says when it ended.</summary>
+    public const double PlacedMilliseconds = 50;
+
+    /// <summary>When the longest gap of the window ended.</summary>
+    private TimeSpan _mostEnded;
+
     public PlayheadFlow(TimeSpan? window = null) => _window = window ?? DefaultWindow;
 
     /// <inheritdoc/>
     public string? Stepped(TimeSpan at)
     {
-        if (_last is { } last) Count((at - last).TotalMilliseconds);
+        if (_last is { } last) Count((at - last).TotalMilliseconds, at);
 
         _last = at;
         _opened ??= at;
@@ -72,9 +78,11 @@ public sealed class PlayheadFlow : IPlayheadFlow
     /// early: it is dropped rather than reported, since one of those would drag the least and the
     /// spread with it for the whole window.
     /// </remarks>
-    private void Count(double milliseconds)
+    private void Count(double milliseconds, TimeSpan at)
     {
         if (milliseconds < 0) return;
+
+        if (_count == 0 || milliseconds > _most) _mostEnded = at;
 
         if (_count == 0)
         {
@@ -119,6 +127,9 @@ public sealed class PlayheadFlow : IPlayheadFlow
             " ms, " + Ms(_least) + " to " + Ms(_most) +
             ", worst " + Ms(spread) + " ms out";
 
+        if (_most - mean > PlacedMilliseconds && _last is { } now)
+            line += ", the longest gap ending " + Ms0((now - _mostEnded).TotalMilliseconds) + " ms before this line";
+
         _count = 0;
         _total = 0;
         _least = 0;
@@ -130,4 +141,8 @@ public sealed class PlayheadFlow : IPlayheadFlow
     /// <summary>A length of time as the line prints it.</summary>
     private static string Ms(double milliseconds) =>
         milliseconds.ToString("0.0", CultureInfo.InvariantCulture);
+
+    /// <summary>A number of milliseconds as the log writes a moment, to the millisecond.</summary>
+    private static string Ms0(double milliseconds) =>
+        milliseconds.ToString("0", CultureInfo.InvariantCulture);
 }
