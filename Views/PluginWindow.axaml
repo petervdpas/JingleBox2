@@ -10,7 +10,7 @@
         WindowStartupLocation="CenterOwner">
 
   <!-- Sized to what the plugin actually has: a two-knob effect gets a small window and a
-       thirty-knob one gets a wide one, rather than both getting the same half-empty box.
+       thirty-knob one gets a wide one, rather than both getting the same half-empty window.
 
        The room round it is set in the code behind, since the two things this window can hold want
        different amounts: a plugin's own face is a picture at a size the plugin chose and goes edge
