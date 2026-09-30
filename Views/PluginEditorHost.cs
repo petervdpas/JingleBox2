@@ -254,6 +254,12 @@ public sealed class PluginEditorHost : NativeControlHost
 
         Said("the plugin asked to be " + width + " by " + height + ", and has been told it is");
 
+        if (_handover is { IsCompleted: false })
+        {
+            Said("the plugin is still being put in its window, so its size is passed on once it is in");
+            return;
+        }
+
         try
         {
             Editor?.Resized(width, height);
@@ -473,11 +479,12 @@ public sealed class PluginEditorHost : NativeControlHost
     {
         var editor = Editor;
 
-        if (editor == null || _handle == 0 || _attached)
+        if (editor == null || _handle == 0 || _attached || _handover is { IsCompleted: false })
         {
             Said(editor == null ? "there is no editor to show"
                 : _handle == 0 ? "there is no window to show it in"
-                : "it is already showing");
+                : _attached ? "it is already showing"
+                : "it is already being handed over");
             return;
         }
 
@@ -495,21 +502,101 @@ public sealed class PluginEditorHost : NativeControlHost
                 "the plugin threw while being told the screen's scaling", ex);
         }
 
+        nint handle = _handle;
+        int handing = ++_handing;
+
+        if (editor.AttachesOffTheDrawingThread)
+        {
+            Said("handing it over from another thread, so this one goes on drawing");
+
+            var handover = System.Threading.Tasks.Task.Run(() => Hand(editor, handle));
+            _handover = handover;
+
+            handover.ContinueWith(
+                taken => Dispatcher.UIThread.Post(() => Handed(handing, editor, handle, taken.Result)),
+                System.Threading.Tasks.TaskScheduler.Default);
+
+            return;
+        }
+
+        Handed(handing, editor, handle, Hand(editor, handle));
+    }
+
+    /// <summary>
+    /// Which handover is the current one, moved on by every handover and by the window going.
+    /// </summary>
+    /// <remarks>
+    /// An answer arriving under an old number is for a window that has gone or an interface that
+    /// has been replaced, and nothing is done with it here: the window going waits for it first,
+    /// see <see cref="DestroyNativeControlCore"/>, and a replaced interface is closed by whoever
+    /// replaced it.
+    /// </remarks>
+    private int _handing;
+
+    /// <summary>The handover still out on another thread, or nothing.</summary>
+    private System.Threading.Tasks.Task<bool>? _handover;
+
+    /// <summary>
+    /// Gives the plugin the window, on whichever thread this is called from, and says whether it
+    /// took it.
+    /// </summary>
+    /// <remarks>
+    /// Never throws: a plugin that falls over on being handed its window is a plugin without an
+    /// interface, and the log says so.
+    /// </remarks>
+    /// <param name="editor">The interface being put in.</param>
+    /// <param name="handle">The window it goes into.</param>
+    /// <returns>Whether the plugin is now in the window.</returns>
+    private static bool Hand(IPluginEditor editor, nint handle)
+    {
         try
         {
             Said("calling attach on " + editor.GetType().Name);
 
-            _attached = editor.Attach(_handle);
+            bool taken = editor.Attach(handle);
 
-            Said("attach came back " + _attached);
+            Said("attach came back " + taken);
+
+            return taken;
         }
         catch (Exception ex)
         {
-            _attached = false;
-
             Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Plugins,
                 "the plugin threw while being given its window", ex);
+
+            return false;
         }
+    }
+
+    /// <summary>
+    /// Finishes a handover on the drawing thread: the window is told it is active and the plugin
+    /// is told its size.
+    /// </summary>
+    /// <remarks>
+    /// An old handover coming back into the same window means the interface was replaced while it
+    /// was out, and the one refused while it was out is handed over now.
+    /// </remarks>
+    /// <param name="handing">The handover's number, see <see cref="_handing"/>.</param>
+    /// <param name="editor">The interface that was put in.</param>
+    /// <param name="handle">The window it was put into.</param>
+    /// <param name="taken">Whether the plugin took it.</param>
+    private void Handed(int handing, IPluginEditor editor, nint handle, bool taken)
+    {
+        if (handing != _handing || handle != _handle || !ReferenceEquals(editor, Editor))
+        {
+            Said("a handover finished for a window or an interface that has since gone");
+
+            if (handle != _handle) return;
+
+            _handover = null;
+
+            if (_handle != 0 && Editor != null && !_attached) Settle();
+
+            return;
+        }
+
+        _handover = null;
+        _attached = taken;
 
         if (!_attached)
         {
@@ -543,7 +630,10 @@ public sealed class PluginEditorHost : NativeControlHost
     /// </summary>
     /// <remarks>
     /// That order is the whole of it: a plugin still drawing into a window that has been
-    /// destroyed is a crash inside its own toolkit.
+    /// destroyed is a crash inside its own toolkit. So a handover still out on another thread is
+    /// waited for before anything else, since a plugin halfway into the window is a plugin that
+    /// will be drawing into it a moment later; the wait only happens when a window is closed
+    /// while it is still opening.
     /// </remarks>
     protected override void DestroyNativeControlCore(IPlatformHandle control)
     {
@@ -554,12 +644,27 @@ public sealed class PluginEditorHost : NativeControlHost
         _watching = null;
 
         _handle = 0;
+        _handing++;
 
-        if (_attached)
+        var handover = _handover;
+        _handover = null;
+
+        bool inside = _attached;
+
+        if (handover != null && !handover.IsCompleted)
         {
-            _attached = false;
-            Editor?.Detach();
+            Said("the window is going while the plugin is still being put in it, so that is waited for first");
+
+            inside = handover.Wait(Audio.Plugins.Bridge.PluginBridge.WindowTimeoutMilliseconds) && handover.Result;
         }
+        else if (handover != null)
+        {
+            inside |= handover.Result;
+        }
+
+        _attached = false;
+
+        if (inside) Editor?.Detach();
 
         base.DestroyNativeControlCore(control);
     }

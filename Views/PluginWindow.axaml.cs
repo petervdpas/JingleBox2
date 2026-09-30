@@ -183,10 +183,17 @@ public partial class PluginWindow : Window
     /// a size it chose, so it is let out of the caps that keep a wall of host-drawn knobs from
     /// filling the screen: see <see cref="Cap"/>.
     ///
+    /// A plugin in a process of its own is asked for its interface on another thread and the window
+    /// is put up once it has answered, at the size it gave and with its face already in it, so the
+    /// rest of the application goes on while the plugin builds its picture and there is never an
+    /// empty window waiting to be filled.
+    ///
     /// The plugin is taken out of its window on the way out rather than after: letting the window
     /// go first leaves the plugin drawing into something that is not there, which is a crash on
-    /// closing rather than on opening. Only the picture is put away; the plugin itself carries on
-    /// playing.
+    /// closing rather than on opening. For a plugin in its own process the window is hidden at
+    /// once and only destroyed once the plugin has let go, so the order is kept and only the wait
+    /// has moved off the drawing thread. Only the picture is put away; the plugin itself carries
+    /// on playing.
     /// </remarks>
     /// <param name="key">What owns the window, which is what finds it again.</param>
     /// <param name="panel">The plugin's controls, already built.</param>
@@ -204,8 +211,48 @@ public partial class PluginWindow : Window
             return;
         }
 
-        panel.Prepare();
+        if (!Opening.Add(key)) return;
 
+        var ready = panel.PrepareAway();
+
+        if (ready.IsCompleted)
+        {
+            Opening.Remove(key);
+            Put(key, panel, title, owner, closed);
+            return;
+        }
+
+        ready.ContinueWith(_ => Dispatcher.UIThread.Post(() =>
+        {
+            if (Opening.Remove(key))
+            {
+                Put(key, panel, title, owner, closed);
+                return;
+            }
+
+            panel.CloseAway();
+            closed?.Invoke();
+        }), System.Threading.Tasks.TaskScheduler.Default);
+    }
+
+    /// <summary>
+    /// What is waiting for its plugin to answer before its window is put up, so a second press
+    /// does not ask twice and a close before the answer means the window is never put up.
+    /// </summary>
+    private static readonly HashSet<object> Opening = new();
+
+    /// <summary>
+    /// Puts the window up over a panel that is ready, so it opens once, at the plugin's own size,
+    /// with the face already in it.
+    /// </summary>
+    /// <param name="key">What owns the window, which is what finds it again.</param>
+    /// <param name="panel">The plugin's controls, ready to be shown.</param>
+    /// <param name="title">What the title bar and the header say.</param>
+    /// <param name="owner">The main window, which this one is centred on and capped against.</param>
+    /// <param name="closed">Told once the window has gone, or nothing.</param>
+    private static void Put(
+        object key, PluginControlsViewModel panel, string title, Window owner, Action? closed)
+    {
         var window = new PluginWindow
         {
             DataContext = new PluginWindowViewModel(panel, title),
@@ -216,7 +263,7 @@ public partial class PluginWindow : Window
 
         panel.PropertyChanged += (_, changed) =>
         {
-            if (changed.PropertyName != nameof(panel.ShowsKnobs)) return;
+            if (changed.PropertyName is not (nameof(panel.ShowsKnobs) or nameof(panel.ShowsFace))) return;
 
             Cap(window, panel, owner);
 
@@ -225,9 +272,24 @@ public partial class PluginWindow : Window
 
         Open[key] = window;
 
-        window.Closing += (_, _) =>
+        bool letGo = false;
+
+        window.Closing += (_, closing) =>
         {
-            panel.Close();
+            if (letGo) return;
+
+            var gone = panel.CloseAway();
+
+            if (gone.IsCompleted) return;
+
+            closing.Cancel = true;
+            window.Hide();
+
+            gone.ContinueWith(_ => Dispatcher.UIThread.Post(() =>
+            {
+                letGo = true;
+                window.Close();
+            }), System.Threading.Tasks.TaskScheduler.Default);
         };
 
         window.Closed += (_, _) =>
@@ -280,6 +342,12 @@ public partial class PluginWindow : Window
     /// </summary>
     public static void CloseFor(object key)
     {
+        if (key != null && Opening.Remove(key))
+        {
+            if (key is PluginSlotViewModel opening) opening.IsOpen = false;
+            return;
+        }
+
         if (key == null || !Open.TryGetValue(key, out var window)) return;
 
         Open.Remove(key);

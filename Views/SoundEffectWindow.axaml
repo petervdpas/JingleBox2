@@ -6,8 +6,7 @@
         x:DataType="vm:SoundEffectViewModel"
         Title="{Binding Name}"
         SizeToContent="WidthAndHeight"
-        MaxWidth="1400"
-        MaxHeight="1000"
+        CanResize="False"
         WindowStartupLocation="CenterOwner">
 
   <!-- One of our effects, off a chain, in a window of its own. The same face the rack draws and

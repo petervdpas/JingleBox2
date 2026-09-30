@@ -6,9 +6,7 @@
         x:DataType="vm:PluginWindowViewModel"
         Title="{Binding Name}"
         SizeToContent="WidthAndHeight"
-        MinWidth="320"
-        MaxWidth="900"
-        MaxHeight="720"
+        CanResize="False"
         WindowStartupLocation="CenterOwner">
 
   <!-- Sized to what the plugin actually has: a two-knob effect gets a small window and a

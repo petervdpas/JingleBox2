@@ -731,6 +731,10 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
     }
 
     /// <inheritdoc/>
+    /// <remarks>Yes: the window is opened over in the plugin's own process and this only waits for the answer.</remarks>
+    public bool OpensOffTheDrawingThread => true;
+
+    /// <inheritdoc/>
     /// <remarks>
     /// Opens the plugin's own interface over in the process where the plugin is, and hands back
     /// something that speaks to it. Null for a plugin that draws no window of its own, which is
@@ -945,6 +949,10 @@ public sealed class BridgedEditor : IPluginEditor
 
         ResizeRequested?.Invoke(width, height);
     }
+
+    /// <inheritdoc/>
+    /// <remarks>Yes: the plugin takes the window in its own process and this only waits for the answer.</remarks>
+    public bool AttachesOffTheDrawingThread => true;
 
     /// <inheritdoc/>
     /// <remarks>

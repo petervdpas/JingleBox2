@@ -65,17 +65,44 @@ public sealed partial class PluginControlsViewModel : ObservableObject
     /// </remarks>
     /// <param name="plugin">The running plugin, which is the only thing that knows its own knobs.</param>
     /// <param name="changed">Told when a value moves, so whoever holds the patch can write it down.</param>
-    public PluginControlsViewModel(IPluginParameters plugin, Action? changed = null)
+    /// <param name="post">How work is put onto the drawing thread, the dispatcher's own where nothing is said.</param>
+    public PluginControlsViewModel(IPluginParameters plugin, Action? changed = null, Action<Action>? post = null)
     {
         Plugin = plugin;
         _changed = changed;
+        _post = post ?? (job => Dispatcher.UIThread.Post(job));
 
-        if (plugin is BridgedPlugin bridged) bridged.Stopped += () => Dispatcher.UIThread.Post(Fell);
+        if (plugin is BridgedPlugin bridged) bridged.Stopped += () => _post(Fell);
 
-        plugin.Edited += (id, value) => Dispatcher.UIThread.Post(() => Moved(id, value));
+        plugin.Edited += (id, value) => _post(() => Moved(id, value));
 
-        plugin.Reloaded += () => Dispatcher.UIThread.Post(Reloaded);
+        plugin.Reloaded += () => _post(Reloaded);
     }
+
+    /// <summary>
+    /// How work arriving from another thread is put onto the drawing thread.
+    /// </summary>
+    /// <remarks>
+    /// The dispatcher's own post unless a caller hands in another, which is what lets a test run
+    /// what would have been posted at a moment of its own choosing, with no window and no loop.
+    /// </remarks>
+    private readonly Action<Action> _post;
+
+    /// <summary>
+    /// Which asking for the window is the current one, moved on by every ask and every close.
+    /// </summary>
+    /// <remarks>
+    /// An answer carries the number it was asked under, and one that arrives under an old number
+    /// belongs to a panel that has since been put away: it is put away too rather than shown, so
+    /// a plugin is never left holding an interface nothing here knows about.
+    /// </remarks>
+    private int _asking;
+
+    /// <summary>
+    /// Done once the panel is ready to be shown, with the face in it where the plugin has one.
+    /// Already done when nothing is out.
+    /// </summary>
+    private System.Threading.Tasks.Task _ready = System.Threading.Tasks.Task.CompletedTask;
 
     /// <summary>The plugin loaded a whole new sound.</summary>
     /// <remarks>
@@ -349,7 +376,43 @@ public sealed partial class PluginControlsViewModel : ObservableObject
     /// </remarks>
     public void Prepare()
     {
-        if (_prepared) return;
+        if (Begin()) Settled(Ask());
+    }
+
+    /// <summary>
+    /// Gets the panel ready as <see cref="Prepare"/> does, without the drawing thread waiting for
+    /// the plugin, and hands back what is done once it is ready to be shown.
+    /// </summary>
+    /// <remarks>
+    /// A plugin in a process of its own is asked on another thread and the panel settles on the
+    /// drawing thread once it has answered: done means the face is in the panel, or the knobs are
+    /// where there is none, so whoever puts a window up can make it at the plugin's own size with
+    /// the face already in it. Anything that needs the drawing thread is asked there as before and
+    /// is done at once. Asked again while an ask is out, the same wait comes back.
+    /// </remarks>
+    /// <returns>Done once the panel is ready to be shown.</returns>
+    public System.Threading.Tasks.Task PrepareAway()
+    {
+        if (!Begin()) return _ready;
+
+        if (!IsBlocked && Plugin is IPluginWindowSource { OpensOffTheDrawingThread: true } source)
+        {
+            AskAway(source);
+            return _ready;
+        }
+
+        Settled(Ask());
+        return _ready;
+    }
+
+    /// <summary>
+    /// Marks the panel as being got ready and says whether it was not already, with what the log
+    /// wants to know about why a plugin will not be asked.
+    /// </summary>
+    /// <returns>True when there is getting ready to do.</returns>
+    private bool Begin()
+    {
+        if (_prepared) return false;
         _prepared = true;
 
         IsBlocked = PluginCrashGuard.IsBlocked(Plugin.Info);
@@ -361,7 +424,72 @@ public sealed partial class PluginControlsViewModel : ObservableObject
             Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
                 "editor: " + Plugin.Info.Name + " is not a thing that can be asked for a window");
 
-        if (Ask())
+        return true;
+    }
+
+    /// <summary>
+    /// Asks for the plugin's window on another thread and settles the panel when it answers.
+    /// </summary>
+    /// <remarks>
+    /// The answer is posted back, since everything it changes is bound to the page, and the panel
+    /// is ready once it has been settled there.
+    /// </remarks>
+    /// <param name="source">What to ask.</param>
+    private void AskAway(IPluginWindowSource source)
+    {
+        int asking = ++_asking;
+        var ready = new System.Threading.Tasks.TaskCompletionSource();
+        _ready = ready.Task;
+
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            var editor = Open(source);
+
+            _post(() =>
+            {
+                try
+                {
+                    Arrived(asking, editor);
+                }
+                finally
+                {
+                    ready.TrySetResult();
+                }
+            });
+        });
+    }
+
+    /// <summary>
+    /// Takes the answer to <see cref="AskAway"/> on the drawing thread.
+    /// </summary>
+    /// <remarks>
+    /// An answer for a panel that has been put away since is put away too: see <see cref="_asking"/>.
+    /// </remarks>
+    /// <param name="asking">The number it was asked under.</param>
+    /// <param name="editor">What came back, nothing where the plugin has no window.</param>
+    private void Arrived(int asking, IPluginEditor? editor)
+    {
+        if (asking != _asking || !_prepared)
+        {
+            if (editor == null) return;
+
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
+                "editor: " + Plugin.Info.Name + " answered for a window that has since gone, so it is put away");
+
+            PutAway(editor);
+            return;
+        }
+
+        Settled(Took(editor));
+    }
+
+    /// <summary>
+    /// Shows whichever the panel has now: the face where the plugin gave one, the knobs where not.
+    /// </summary>
+    /// <param name="face">Whether an interface came back.</param>
+    private void Settled(bool face)
+    {
+        if (face)
         {
             OnPropertyChanged(nameof(Editor));
             OnPropertyChanged(nameof(HasOwnWindow));
@@ -407,6 +535,20 @@ public sealed partial class PluginControlsViewModel : ObservableObject
     {
         if (IsBlocked || Plugin is not IPluginWindowSource source) return false;
 
+        return Took(Open(source));
+    }
+
+    /// <summary>
+    /// Asks the plugin for its own interface on whichever thread this is called from.
+    /// </summary>
+    /// <remarks>
+    /// Never throws: a plugin that falls over on being asked is a plugin with no window here, and
+    /// the log says which of the two it was.
+    /// </remarks>
+    /// <param name="source">What to ask.</param>
+    /// <returns>The interface, or nothing.</returns>
+    private IPluginEditor? Open(IPluginWindowSource source)
+    {
         PluginCrashGuard.Risky(Plugin.Info, PluginStage.Window);
 
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
@@ -414,17 +556,25 @@ public sealed partial class PluginControlsViewModel : ObservableObject
 
         try
         {
-            Editor = source.OpenEditor();
+            return source.OpenEditor();
         }
         catch (Exception ex)
         {
             Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
                 "editor: " + Plugin.Info.Name + " threw on being asked: " + ex.Message);
 
-            Editor = null;
+            return null;
         }
+    }
 
-        if (Editor == null)
+    /// <summary>Keeps what the plugin answered as this panel's interface.</summary>
+    /// <param name="editor">The interface, or nothing.</param>
+    /// <returns>True when there is now an interface.</returns>
+    private bool Took(IPluginEditor? editor)
+    {
+        Editor = editor;
+
+        if (editor == null)
         {
             PluginCrashGuard.Survived(Plugin.Info);
 
@@ -434,6 +584,17 @@ public sealed partial class PluginControlsViewModel : ObservableObject
         Watch();
 
         return true;
+    }
+
+    /// <summary>Closes an interface the plugin opened, under the same watch every close is under.</summary>
+    /// <param name="editor">What to close.</param>
+    private void PutAway(IPluginEditor editor)
+    {
+        PluginCrashGuard.Risky(Plugin.Info, PluginStage.Window);
+
+        editor.Dispose();
+
+        PluginCrashGuard.Survived(Plugin.Info);
     }
 
     /// <summary>
@@ -557,25 +718,63 @@ public sealed partial class PluginControlsViewModel : ObservableObject
     /// </remarks>
     public void Close()
     {
+        var editor = Release();
+
+        if (editor == null) return;
+
+        PutAway(editor);
+
+        OnPropertyChanged(nameof(Editor));
+        OnPropertyChanged(nameof(HasOwnWindow));
+    }
+
+    /// <summary>
+    /// Puts the plugin's interface away without the drawing thread waiting for the plugin to let
+    /// go of its window, and hands back what finishes once it has.
+    /// </summary>
+    /// <remarks>
+    /// Letting go was measured at 105 ms, and a window closing is not a reason for the rest of the
+    /// application to stand still. It still has to be finished before the window is destroyed,
+    /// since a plugin drawing into a window that has gone is a crash inside its own toolkit, so
+    /// whoever holds the window waits for what is handed back and nothing else does. An interface
+    /// that needs the drawing thread is put away here and now, as <see cref="Close"/> does.
+    /// </remarks>
+    /// <returns>Done once the plugin has let go, already done where there was nothing to let go of.</returns>
+    public System.Threading.Tasks.Task CloseAway()
+    {
+        var editor = Release();
+
+        if (editor == null) return System.Threading.Tasks.Task.CompletedTask;
+
+        OnPropertyChanged(nameof(Editor));
+        OnPropertyChanged(nameof(HasOwnWindow));
+
+        if (!editor.AttachesOffTheDrawingThread)
+        {
+            PutAway(editor);
+            return System.Threading.Tasks.Task.CompletedTask;
+        }
+
+        return System.Threading.Tasks.Task.Run(() => PutAway(editor));
+    }
+
+    /// <summary>
+    /// Makes the panel ready to be got ready again and hands back the interface it was showing.
+    /// </summary>
+    /// <returns>The interface to put away, or nothing.</returns>
+    private IPluginEditor? Release()
+    {
         _settle?.Dispose();
         _settle = null;
 
         _prepared = false;
         _knobs = false;
+        _asking++;
 
         var editor = Editor;
         Editor = null;
 
-        if (editor == null) return;
-
-        PluginCrashGuard.Risky(Plugin.Info, PluginStage.Window);
-
-        editor.Dispose();
-
-        PluginCrashGuard.Survived(Plugin.Info);
-
-        OnPropertyChanged(nameof(Editor));
-        OnPropertyChanged(nameof(HasOwnWindow));
+        return editor;
     }
 
     /// <summary>

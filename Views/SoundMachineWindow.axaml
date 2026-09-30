@@ -6,6 +6,7 @@
         x:DataType="vm:RackViewModel"
         Title="{Binding Selected.Name}"
         SizeToContent="WidthAndHeight"
+        CanResize="False"
         WindowStartupLocation="CenterOwner">
 
   <!-- No minimum width, deliberately: the window is as wide as the panel it holds and no wider.

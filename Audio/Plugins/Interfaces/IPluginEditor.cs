@@ -58,6 +58,21 @@ public interface IPluginEditor : IDisposable
     /// <param name="window">The window to draw into.</param>
     bool Attach(nint window);
 
+    /// <summary>
+    /// Whether <see cref="Attach"/> may be called from a thread other than the one that draws, and
+    /// whether putting the interface away may finish there too.
+    /// </summary>
+    /// <remarks>
+    /// Handing a window over is where a plugin builds its interface into it, which was measured at
+    /// about a second and is paid again every time the window is opened, and letting go of it at
+    /// 105 ms. An interface in a process of its own is answered over a socket, so the wait can be
+    /// anywhere; an interface in this process wants the thread its window lives on, so no unless
+    /// it says otherwise. Either way the plugin is out of the window before the window is
+    /// destroyed: a plugin still drawing into a window that has gone is a crash inside its
+    /// toolkit, so what moves off the drawing thread is the wait, never the order.
+    /// </remarks>
+    bool AttachesOffTheDrawingThread => false;
+
     /// <summary>Takes it back out, before the window goes away.</summary>
     void Detach();
 
