@@ -36,14 +36,14 @@ public sealed class PlayheadFlow : IPlayheadFlow
     /// <summary>And the longest.</summary>
     private double _most;
 
-    /// <summary>Builds one over a window of its own.</summary>
-    /// <param name="window">How long to gather for, or nothing for <see cref="DefaultWindow"/>.</param>
     /// <summary>How far off the mean the longest gap has to be before the line says when it ended.</summary>
     public const double PlacedMilliseconds = 50;
 
     /// <summary>When the longest gap of the window ended.</summary>
     private TimeSpan _mostEnded;
 
+    /// <summary>Builds one over a window of its own.</summary>
+    /// <param name="window">How long to gather for, or nothing for <see cref="DefaultWindow"/>.</param>
     public PlayheadFlow(TimeSpan? window = null) => _window = window ?? DefaultWindow;
 
     /// <inheritdoc/>
