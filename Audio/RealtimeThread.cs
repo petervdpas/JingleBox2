@@ -55,6 +55,19 @@ public sealed partial class RealtimeThread : IRealtimeThread
     private const int SchedFifo = 1;
 
     /// <summary>
+    /// Asked for with the policy, so a thread started from this one begins on the ordinary
+    /// scheduler instead of inheriting this one's.
+    /// </summary>
+    /// <remarks>
+    /// Linux hands a new thread its creator's scheduling, and the runtime starts threads of its own
+    /// from whichever thread happens to need one: the background compiler was found running at the
+    /// audio thread's priority in a plugin's process, with every plugin window opened costing a
+    /// plugin's audio thread 50 to 185 ms waiting for a core. Real time is for the threads this
+    /// application promotes on purpose and nothing else.
+    /// </remarks>
+    private const int ResetOnFork = 0x40000000;
+
+    /// <summary>
     /// Where in that scheduler to sit.
     /// </summary>
     /// <remarks>
@@ -72,17 +85,29 @@ public sealed partial class RealtimeThread : IRealtimeThread
         public int SchedPriority;
     }
 
-    /// <summary>The calling thread, as the threads library knows it.</summary>
-    [LibraryImport("libc", EntryPoint = "pthread_self")]
-    private static partial IntPtr Self();
+    /// <summary>
+    /// Sets the calling thread's policy and its place in it, nought meaning the calling thread.
+    /// </summary>
+    /// <remarks>
+    /// The kernel's own call rather than the threads library's, because only the kernel's takes
+    /// <see cref="ResetOnFork"/> with the policy.
+    /// </remarks>
+    [LibraryImport("libc", EntryPoint = "sched_setscheduler")]
+    private static partial int SetSchedule(int thread, int policy, ref SchedParam param);
 
-    /// <summary>Sets a thread's policy and its place in it.</summary>
-    [LibraryImport("libc", EntryPoint = "pthread_setschedparam")]
-    private static partial int SetSchedule(IntPtr thread, int policy, ref SchedParam param);
+    /// <summary>
+    /// Reads back the calling thread's policy from the kernel, nought meaning the calling thread.
+    /// </summary>
+    /// <remarks>
+    /// The kernel's and not the threads library's, since the library answers from what it last set
+    /// itself and <see cref="SetSchedule"/> goes past it. May carry <see cref="ResetOnFork"/>.
+    /// </remarks>
+    [LibraryImport("libc", EntryPoint = "sched_getscheduler")]
+    private static partial int GetPolicy(int thread);
 
-    /// <summary>Reads back what a thread is really scheduled as.</summary>
-    [LibraryImport("libc", EntryPoint = "pthread_getschedparam")]
-    private static partial int GetSchedule(IntPtr thread, out int policy, out SchedParam param);
+    /// <summary>Reads back the calling thread's place in its policy from the kernel.</summary>
+    [LibraryImport("libc", EntryPoint = "sched_getparam")]
+    private static partial int GetParam(int thread, out SchedParam param);
 
     /// <summary>
     /// The switch that turns the Windows half off, which is a different mechanism and so a
@@ -180,7 +205,7 @@ public sealed partial class RealtimeThread : IRealtimeThread
         {
             var param = new SchedParam { SchedPriority = Priority };
 
-            return SetSchedule(Self(), SchedFifo, ref param) == 0;
+            return SetSchedule(0, SchedFifo | ResetOnFork, ref param) == 0;
         }
         catch (Exception)
         {
@@ -208,9 +233,11 @@ public sealed partial class RealtimeThread : IRealtimeThread
 
         try
         {
-            if (GetSchedule(Self(), out int policy, out var param) != 0) return "unknown";
+            int policy = GetPolicy(0);
 
-            return policy == SchedFifo
+            if (policy < 0 || GetParam(0, out var param) != 0) return "unknown";
+
+            return (policy & ~ResetOnFork) == SchedFifo
                 ? "real time, priority " + param.SchedPriority
                 : "the ordinary scheduler";
         }

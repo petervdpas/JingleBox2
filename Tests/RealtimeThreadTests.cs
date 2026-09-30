@@ -96,6 +96,50 @@ public class RealtimeThreadTests : IDisposable
     }
 
     /// <summary>
+    /// A thread started from a real-time thread is an ordinary thread, and the one that asked
+    /// still says it is real time.
+    /// </summary>
+    /// <remarks>
+    /// Linux hands a new thread its creator's scheduling, so without the reset every thread the
+    /// runtime makes from an audio thread is real time too: the background compiler was found at
+    /// the audio thread's own priority in a plugin's process, and with it switched on every plugin
+    /// window opened cost 50 to 185 ms of a plugin's audio thread waiting for a core. Only a
+    /// machine that grants the scheduler can say anything here, so where it is refused nothing is
+    /// claimed.
+    /// </remarks>
+    [Fact]
+    public void A_thread_started_from_a_real_time_thread_is_ordinary()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+
+        Environment.SetEnvironmentVariable(RealtimeThread.Variable, "1");
+
+        IRealtimeThread realtime = new RealtimeThread();
+
+        bool taken = false;
+        string asker = "";
+        string child = "";
+
+        var parent = new System.Threading.Thread(() =>
+        {
+            taken = realtime.Take();
+            asker = realtime.Said();
+
+            var started = new System.Threading.Thread(() => child = realtime.Said());
+            started.Start();
+            started.Join();
+        });
+
+        parent.Start();
+        parent.Join();
+
+        if (!taken) return;
+
+        Assert.StartsWith("real time", asker);
+        Assert.Equal("the ordinary scheduler", child);
+    }
+
+    /// <summary>
     /// Both platforms are answered, whichever one is running the tests.
     /// </summary>
     /// <remarks>
