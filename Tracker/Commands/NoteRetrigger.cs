@@ -11,10 +11,10 @@ namespace JingleBox2.Tracker.Commands;
 /// time before; x of nought keeps the level.
 /// </summary>
 /// <remarks>
-/// On a line with no note it plays the one still ringing again, which is how a roll is written
-/// across several lines under one note. Every y ticks counting from the start of the line, so
-/// <c>R04</c> plays at nought, four and eight. A y of nought is no retrigger, and a column
-/// sounding nothing has nothing to play again.
+/// On a line with no note it plays the one still ringing again, at the pitch it is heard at, which
+/// is how a roll is written across several lines under one note. Every y ticks counting from the
+/// start of the line, so <c>R04</c> plays at nought, four and eight. A y of nought is no
+/// retrigger, and a column sounding nothing has nothing to play again.
 /// </remarks>
 public sealed class NoteRetrigger : ITickCommand
 {
@@ -22,14 +22,17 @@ public sealed class NoteRetrigger : ITickCommand
     public char Letter => TrackerCommand.Retrigger;
 
     /// <inheritdoc/>
-    public void Spread(TrackerEvent cell, Note sounding, int ticks, ICollection<TickEvent> into)
+    public void Spread(TrackerEvent cell, VoiceState voice, int ticks, ICollection<TickEvent> into)
     {
+        voice.Take(cell);
+
         into.Add(new TickEvent(0, cell));
 
         int every = cell.Effect.Parameter & 0x0F;
         int fall = (cell.Effect.Parameter >> 4) & 0x0F;
+        var note = voice.Sounding;
 
-        if (every == 0 || !sounding.IsPlayable) return;
+        if (every == 0 || !note.IsPlayable || every >= ticks) return;
 
         float gain = cell.Gain ?? 1f;
         float step = 1f - fall / 16f;
@@ -40,8 +43,10 @@ public sealed class NoteRetrigger : ITickCommand
 
             into.Add(new TickEvent(tick, cell with
             {
-                Kind = TrackerEventKind.Trigger, Note = sounding, Gain = gain
+                Kind = TrackerEventKind.Trigger, Note = note, Gain = gain
             }));
         }
+
+        voice.Struck(note);
     }
 }

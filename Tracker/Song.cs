@@ -161,6 +161,13 @@ public sealed class Song
         return Repeats[slot].Held(PatternAt(slot)?.Lines ?? 0);
     }
 
+    /// <summary>
+    /// The last line a slot plays before the song goes on: its pattern's last, or the line its
+    /// break stops at.
+    /// </summary>
+    /// <param name="slot">Which slot of the order.</param>
+    public int LastLineOf(int slot) => RepeatAt(slot).LastLine(PatternAt(slot)?.Lines ?? 0);
+
     /// <summary>Says what a slot does about repeating.</summary>
     /// <param name="slot">Which slot of the order; one that is not there is left alone.</param>
     /// <param name="repeat">What it does.</param>

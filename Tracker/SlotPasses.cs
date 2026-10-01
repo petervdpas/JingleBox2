@@ -61,8 +61,9 @@ public sealed class SlotPasses : ISlotPasses
         }
 
         int lines = song.PatternAt(played.OrderIndex)?.Lines ?? 0;
+        int last = wholePattern ? repeat.LastLine(lines) : lines - 1;
 
-        if (played.Line != lines - 1) return null;
+        if (played.Line < last) return null;
 
         if (wholePattern && _patternPass < repeat.Times)
         {

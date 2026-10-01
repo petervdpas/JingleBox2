@@ -20,14 +20,23 @@ namespace JingleBox2.Tracker.Records;
 /// <see cref="To"/> and <see cref="StretchTimes"/>, is read as the first of <see cref="Loops"/>.
 /// Everything is held to sense by <see cref="Held"/>: counts of at least one, stretches put the
 /// right way round, inside the pattern, sorted, and none sharing a line.
+///
+/// A slot can also stop short of its pattern's end, at <see cref="Last"/>, and go on to the next
+/// slot from there: an ending, or a bar of four in a song of eights, without a pattern of its own.
+/// It is the slot's and not the pattern's for the same reason the stretches are. A stretch reaching
+/// past the slot's last line could never come round, so it is not kept.
 /// </remarks>
 /// <param name="Times">How many times the pattern plays before the song moves on.</param>
 /// <param name="From">The first line of a stretch written the single way, or negative for none.</param>
 /// <param name="To">The last line of a stretch written the single way, or negative for none.</param>
 /// <param name="StretchTimes">How many times a stretch written the single way plays.</param>
 /// <param name="Loops">The stretches, or nothing for none.</param>
+/// <param name="Last">
+/// The last line the slot plays before the song goes on, which is the old trackers' pattern break
+/// set on the slot; negative for the whole pattern.
+/// </param>
 public sealed record SlotRepeat(int Times = 1, int From = -1, int To = -1, int StretchTimes = 1,
-                                IReadOnlyList<LineLoop>? Loops = null)
+                                IReadOnlyList<LineLoop>? Loops = null, int Last = -1)
 {
     /// <summary>Playing once, with no stretch, which is what every slot does until told otherwise.</summary>
     public static readonly SlotRepeat None = new();
@@ -54,28 +63,32 @@ public sealed record SlotRepeat(int Times = 1, int From = -1, int To = -1, int S
     /// <param name="lines">How many lines the slot's pattern has.</param>
     public SlotRepeat Held(int lines)
     {
+        int last = Last >= 0 && Last < lines - 1 ? Last : -1;
+        int end = last >= 0 ? last : lines - 1;
         var kept = new List<LineLoop>();
 
         foreach (var loop in Written())
         {
             int first = Math.Min(loop.From, loop.To);
-            int last = Math.Max(loop.From, loop.To);
+            int to = Math.Max(loop.From, loop.To);
 
-            if (first < 0 || last >= lines || loop.Times < 2) continue;
+            if (first < 0 || to > end || loop.Times < 2) continue;
 
-            var right = new LineLoop(first, last, loop.Times);
+            var right = new LineLoop(first, to, loop.Times);
 
             if (kept.Any(other => other.Overlaps(right))) continue;
 
             kept.Add(right);
         }
 
-        return new SlotRepeat(Math.Max(1, Times), Loops: kept.Count == 0 ? null : kept.OrderBy(loop => loop.From).ToArray());
+        return new SlotRepeat(Math.Max(1, Times), Loops: kept.Count == 0 ? null : kept.OrderBy(loop => loop.From).ToArray(),
+                              Last: last);
     }
 
     /// <summary>
     /// The same with a stretch added: the same lines again change their count, and lines shared
-    /// with a stretch already there are refused, leaving this as it was.
+    /// with a stretch already there are refused, leaving this as it was, as is a stretch reaching
+    /// past the slot's last line.
     /// </summary>
     /// <param name="loop">The stretch to add.</param>
     /// <param name="lines">How many lines the slot's pattern has.</param>
@@ -90,6 +103,9 @@ public sealed record SlotRepeat(int Times = 1, int From = -1, int To = -1, int S
         if (adding.Count == 0) return held;
 
         var wanted = adding[0];
+
+        if (wanted.To > held.LastLine(lines)) return held;
+
         var kept = held.Lines().Where(other => !other.SameLines(wanted)).ToList();
 
         blocking = kept.FirstOrDefault(other => other.Overlaps(wanted));
@@ -98,7 +114,7 @@ public sealed record SlotRepeat(int Times = 1, int From = -1, int To = -1, int S
 
         kept.Add(wanted);
 
-        return new SlotRepeat(held.Times, Loops: kept.OrderBy(other => other.From).ToArray());
+        return held with { Loops = kept.OrderBy(other => other.From).ToArray() };
     }
 
     /// <summary>The same with every stretch that shares a line with the given lines taken off.</summary>
@@ -111,6 +127,15 @@ public sealed record SlotRepeat(int Times = 1, int From = -1, int To = -1, int S
         var span = new LineLoop(Math.Min(first, last), Math.Max(first, last), 1);
         var kept = held.Lines().Where(loop => !loop.Overlaps(span)).ToArray();
 
-        return new SlotRepeat(held.Times, Loops: kept.Length == 0 ? null : kept);
+        return held with { Loops = kept.Length == 0 ? null : kept };
     }
+
+    /// <summary>The same, stopping after the line given, or playing the whole pattern for a negative line.</summary>
+    /// <param name="last">The last line to play, or negative for all of them.</param>
+    /// <param name="lines">How many lines the slot's pattern has.</param>
+    public SlotRepeat EndingAt(int last, int lines) => (this with { Last = last }).Held(lines);
+
+    /// <summary>The last line the slot plays, its pattern's last where it plays the whole pattern.</summary>
+    /// <param name="lines">How many lines the slot's pattern has.</param>
+    public int LastLine(int lines) => Last >= 0 && Last < lines - 1 ? Last : lines - 1;
 }

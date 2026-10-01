@@ -8,10 +8,12 @@ namespace JingleBox2.Tracker.Records;
 /// rather than rejected, so a song from a later version still loads.
 /// </summary>
 /// <remarks>
-/// <c>V</c> and <c>P</c> are levels and are read where a note is given its level. The four that
-/// say what happens inside a line, <c>Q</c>, <c>C</c>, <c>R</c> and <c>A</c>, are played by the
-/// commands module, <see cref="JingleBox2.Tracker.Commands.Interfaces.ILineCommands"/>, which
-/// splits a line into ticks.
+/// <c>V</c>, <c>P</c> and <c>S</c> are about how a note starts and are read where it is started,
+/// and <c>T</c> is about the song and is read by the clock.
+/// The five that say what happens inside a line and after it, <c>Q</c>, <c>C</c>, <c>R</c>,
+/// <c>A</c> and <c>G</c>, are played by the commands module,
+/// <see cref="JingleBox2.Tracker.Commands.Interfaces.ILineCommands"/>, which splits a line into
+/// ticks.
 /// </remarks>
 /// <param name="Command">The letter, upper case, or <see cref="NoCommand"/> for a blank column.</param>
 /// <param name="Parameter">The byte after it, shown as two hex digits.</param>
@@ -49,11 +51,23 @@ public readonly record struct TrackerCommand(char Command, int Parameter)
     /// <summary><c>Cxx</c>: silence the note xx ticks into its line, with no release.</summary>
     public const char Cut = 'C';
 
+    /// <summary>
+    /// <c>Gxx</c>: slide from the note already sounding to this one over xx ticks, without
+    /// starting it again; 00 is one line.
+    /// </summary>
+    public const char Glide = 'G';
+
+    /// <summary><c>Sxx</c>: start a recording xx 256ths of the way in rather than at its start.</summary>
+    public const char Offset = 'S';
+
+    /// <summary><c>Txx</c>: play at xx beats a minute, in hex, from this line on; 20 to FF.</summary>
+    public const char Tempo = 'T';
+
     /// <summary>True when the column is blank.</summary>
     public bool IsNone => Command == NoCommand;
 
     /// <summary>True for one of the letters this names.</summary>
-    public bool IsKnown => Command is SetVolume or SetPan or Retrigger or Arpeggio or Delay or Cut;
+    public bool IsKnown => Command is SetVolume or SetPan or Retrigger or Arpeggio or Delay or Cut or Glide or Offset or Tempo;
 
     /// <summary>Three characters, as every column here is: "..." when blank, else "V40".</summary>
     public override string ToString() =>

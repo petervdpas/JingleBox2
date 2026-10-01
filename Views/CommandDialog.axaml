@@ -126,6 +126,22 @@
       </Grid>
     </StackPanel>
 
+    <!-- A glide: how long the slide takes, nought being one line. -->
+    <Grid ColumnDefinitions="140,*,40" IsVisible="{Binding IsGlide}">
+      <TextBlock Text="Takes so many ticks" VerticalAlignment="Center" />
+      <Slider Grid.Column="1" Minimum="0" Maximum="48" TickFrequency="1"
+              IsSnapToTickEnabled="True" Value="{Binding Slide}" />
+      <TextBlock Grid.Column="2" Text="{Binding Slide}" VerticalAlignment="Center"
+                 HorizontalAlignment="Right" />
+    </Grid>
+
+    <!-- An offset: how far into the recording it starts. -->
+    <Grid ColumnDefinitions="140,*" IsVisible="{Binding IsOffset}">
+      <TextBlock Text="How far in" VerticalAlignment="Center" />
+      <Slider Grid.Column="1" Minimum="0" Maximum="255" TickFrequency="1"
+              IsSnapToTickEnabled="True" Value="{Binding Skip}" />
+    </Grid>
+
     <!-- A volume or a pan: one slider. -->
     <Grid ColumnDefinitions="140,*" IsVisible="{Binding IsVolume}">
       <TextBlock Text="Volume" VerticalAlignment="Center" />
@@ -136,6 +152,14 @@
       <TextBlock Text="Left to right" VerticalAlignment="Center" />
       <Slider Grid.Column="1" Minimum="0" Maximum="128" TickFrequency="1"
               IsSnapToTickEnabled="True" Value="{Binding Place}" />
+    </Grid>
+
+    <Grid ColumnDefinitions="140,*,40" IsVisible="{Binding IsTempo}">
+      <TextBlock Text="Beats a minute" VerticalAlignment="Center" />
+      <Slider Grid.Column="1" Minimum="20" Maximum="255" TickFrequency="1"
+              IsSnapToTickEnabled="True" Value="{Binding Beats}" />
+      <TextBlock Grid.Column="2" Text="{Binding Beats}" VerticalAlignment="Center"
+                 HorizontalAlignment="Right" />
     </Grid>
 
     <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" />

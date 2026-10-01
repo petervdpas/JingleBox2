@@ -217,7 +217,7 @@ public class LineCommandsTests
         var shifts = Line(Note('A', 0x47)).Where(one => one.Event.Kind == TrackerEventKind.Shift).ToArray();
 
         Assert.Equal(Enumerable.Range(1, 11), shifts.Select(one => one.Tick));
-        Assert.Equal(new[] { 4, 7, 0, 4, 7, 0, 4, 7, 0, 4, 7 }, shifts.Select(one => one.Event.Shift));
+        Assert.Equal(new[] { 4f, 7, 0, 4, 7, 0, 4, 7, 0, 4, 7 }, shifts.Select(one => one.Event.Shift));
         Assert.All(shifts, one => Assert.Equal(48, one.Event.Note.Semitone));
     }
 
@@ -228,7 +228,7 @@ public class LineCommandsTests
         var shifts = Line(Note('A', 0x07)).Where(one => one.Event.Kind == TrackerEventKind.Shift).ToArray();
 
         Assert.Equal(new[] { 2, 3, 5, 6, 8, 9, 11 }, shifts.Select(one => one.Tick));
-        Assert.Equal(new[] { 7, 0, 7, 0, 7, 0, 7 }, shifts.Select(one => one.Event.Shift));
+        Assert.Equal(new[] { 7f, 0, 7, 0, 7, 0, 7 }, shifts.Select(one => one.Event.Shift));
     }
 
     /// <summary>A00 is nothing.</summary>
@@ -247,7 +247,7 @@ public class LineCommandsTests
         var back = Assert.Single(Line());
 
         Assert.Equal(0, back.Tick);
-        Assert.Equal((TrackerEventKind.Shift, 0, 48), (back.Event.Kind, back.Event.Shift, back.Event.Note.Semitone));
+        Assert.Equal((TrackerEventKind.Shift, 0f, 48), (back.Event.Kind, back.Event.Shift, back.Event.Note.Semitone));
     }
 
     /// <summary>A new note after an arpeggio is not preceded by the old one being put back.</summary>
@@ -269,8 +269,8 @@ public class LineCommandsTests
 
         var shifts = Line(Bare('A', 0x37)).Where(one => one.Event.Kind == TrackerEventKind.Shift).ToArray();
 
-        Assert.Equal((0, 0), (shifts[0].Tick, shifts[0].Event.Shift));
-        Assert.Equal((1, 3), (shifts[1].Tick, shifts[1].Event.Shift));
+        Assert.Equal((0, 0f), (shifts[0].Tick, shifts[0].Event.Shift));
+        Assert.Equal((1, 3f), (shifts[1].Tick, shifts[1].Event.Shift));
         Assert.All(shifts, one => Assert.Equal(40, one.Event.Note.Semitone));
     }
 
@@ -308,6 +308,138 @@ public class LineCommandsTests
         Assert.Equal((1, 60), (again.Event.Column, again.Event.Note.Semitone));
     }
 
+    /// <summary>A glide slides from the note sounding to the new one over its ticks, without starting it again.</summary>
+    [Fact]
+    public void A_glide_slides_without_starting_again()
+    {
+        Line(Plain(semitone: 48));
+
+        var ticks = Line(Note('G', 0x04, semitone: 52));
+
+        Assert.DoesNotContain(ticks, one => one.Event.Kind == TrackerEventKind.Trigger);
+        Assert.Equal(TrackerEventKind.Adjust, ticks[0].Event.Kind);
+
+        var shifts = ticks.Where(one => one.Event.Kind == TrackerEventKind.Shift).ToArray();
+
+        Assert.Equal(new[] { 0, 1, 2, 3 }, shifts.Select(one => one.Tick));
+        Assert.Equal(new[] { 1f, 2, 3, 4 }, shifts.Select(one => one.Event.Shift));
+        Assert.All(shifts, one => Assert.Equal(48, one.Event.Note.Semitone));
+    }
+
+    /// <summary>A glide down goes down, in fractions where the ticks do not divide the interval.</summary>
+    [Fact]
+    public void A_glide_down_moves_in_fractions()
+    {
+        Line(Plain(semitone: 60));
+
+        var shifts = Line(Note('G', 0x03, semitone: 58)).Where(one => one.Event.Kind == TrackerEventKind.Shift)
+            .Select(one => one.Event.Shift).ToArray();
+
+        Assert.Equal(-2f / 3, shifts[0], 4);
+        Assert.Equal(-4f / 3, shifts[1], 4);
+        Assert.Equal(-2f, shifts[2], 4);
+    }
+
+    /// <summary>G00 takes one whole line.</summary>
+    [Fact]
+    public void G00_takes_one_line()
+    {
+        Line(Plain(semitone: 48));
+
+        var shifts = Line(Note('G', 0x00, semitone: 60)).Where(one => one.Event.Kind == TrackerEventKind.Shift).ToArray();
+
+        Assert.Equal(12, shifts.Length);
+        Assert.Equal(12f, shifts[^1].Event.Shift);
+        Assert.Empty(Line());
+    }
+
+    /// <summary>A glide longer than a line goes on over the lines after it, and stops where it arrives.</summary>
+    [Fact]
+    public void A_long_glide_carries_over_lines()
+    {
+        Line(Plain(semitone: 48));
+        Line(Note('G', 0x18, semitone: 72));
+
+        var second = Line().Where(one => one.Event.Kind == TrackerEventKind.Shift).ToArray();
+
+        Assert.Equal(12, second.Length);
+        Assert.Equal(24f, second[^1].Event.Shift);
+        Assert.Empty(Line());
+    }
+
+    /// <summary>A cell written into the column takes over from a glide still on its way.</summary>
+    [Fact]
+    public void A_new_cell_stops_a_glide_where_it_got_to()
+    {
+        Line(Plain(semitone: 48));
+        Line(Note('G', 0x18, semitone: 72));
+
+        var next = Line(Bare('R', 0x06));
+
+        Assert.DoesNotContain(next, one => one.Event.Kind == TrackerEventKind.Shift);
+
+        var again = next.Single(one => one.Event.Kind == TrackerEventKind.Trigger);
+
+        Assert.Equal(60, again.Event.Note.Semitone);
+    }
+
+    /// <summary>With nothing sounding, a glide simply starts its note.</summary>
+    [Fact]
+    public void A_glide_with_nothing_sounding_starts_its_note()
+    {
+        var note = Note('G', 0x04);
+
+        Assert.Equal(new TickEvent(0, note), Assert.Single(Line(note)));
+    }
+
+    /// <summary>After an OFF there is nothing to slide from.</summary>
+    [Fact]
+    public void A_glide_after_an_off_starts_its_note()
+    {
+        Line(Plain());
+        Line(TrackerEvent.Stop(0));
+
+        Assert.Equal(TrackerEventKind.Trigger, Assert.Single(Line(Note('G', 0x04, semitone: 55))).Event.Kind);
+    }
+
+    /// <summary>An arpeggio after a glide is built on where the glide arrived.</summary>
+    [Fact]
+    public void An_arpeggio_after_a_glide_steps_around_where_it_arrived()
+    {
+        Line(Plain(semitone: 48));
+        Line(Note('G', 0x04, semitone: 52));
+
+        var shifts = Line(Bare('A', 0x37)).Where(one => one.Event.Kind == TrackerEventKind.Shift).ToArray();
+
+        Assert.Equal(new[] { 7f, 11, 4 }, shifts.Take(3).Select(one => one.Event.Shift));
+        Assert.All(shifts, one => Assert.Equal(48, one.Event.Note.Semitone));
+    }
+
+    /// <summary>The line after an arpeggio on a glided note goes back to where the glide arrived, not to the note it started on.</summary>
+    [Fact]
+    public void After_an_arpeggio_on_a_glided_note_it_rests_where_the_glide_arrived()
+    {
+        Line(Plain(semitone: 48));
+        Line(Note('G', 0x04, semitone: 52));
+        Line(Bare('A', 0x37));
+
+        var back = Assert.Single(Line());
+
+        Assert.Equal(4f, back.Event.Shift);
+    }
+
+    /// <summary>A retrigger after a glide plays the note it is heard at.</summary>
+    [Fact]
+    public void A_retrigger_after_a_glide_plays_the_glided_note()
+    {
+        Line(Plain(semitone: 48));
+        Line(Note('G', 0x04, semitone: 55));
+
+        var again = Line(Bare('R', 0x06)).Single(one => one.Event.Kind == TrackerEventKind.Trigger);
+
+        Assert.Equal(55, again.Event.Note.Semitone);
+    }
+
     /// <summary>A command added from outside is answered by its letter, which is what makes the module a module.</summary>
     [Fact]
     public void A_command_added_from_outside_is_answered()
@@ -325,7 +457,7 @@ public class LineCommandsTests
         public char Letter => 'l';
 
         /// <inheritdoc/>
-        public void Spread(TrackerEvent cell, Note sounding, int ticks, System.Collections.Generic.ICollection<TickEvent> into) =>
+        public void Spread(TrackerEvent cell, VoiceState voice, int ticks, System.Collections.Generic.ICollection<TickEvent> into) =>
             into.Add(new TickEvent(9, cell));
     }
 }

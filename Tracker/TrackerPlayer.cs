@@ -122,6 +122,12 @@ public sealed class TrackerPlayer : ITrackerPlayer
     private float?[] _notePan = Array.Empty<float?>();
 
     /// <summary>
+    /// The note each column last sent to a plugin or a MIDI out, so a glide made of many small
+    /// shifts sends a note only when the pitch it rounds to has really moved.
+    /// </summary>
+    private int[] _noteSent = Array.Empty<int>();
+
+    /// <summary>
     /// What a track's plugin instrument was last asked for, before the strip had its say, kept so
     /// the mixer can be re-applied to a plugin that is already sounding.
     /// </summary>
@@ -419,6 +425,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             _sequencer = new TrackerSequencer(song.TrackCount);
             _noteGain = new float[song.TrackCount * Columns];
             _notePan = new float?[song.TrackCount * Columns];
+            _noteSent = new int[song.TrackCount * Columns];
             Mode = mode;
             Position = from;
         }
@@ -484,6 +491,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
         _jump = null;
         _passes.Reset();
         _commands.Reset();
+        _tempo = double.NaN;
 
         _cancel = new CancellationTokenSource();
         var token = _cancel.Token;
@@ -1573,16 +1581,19 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             Automation?.Play(song, position);
 
-            var ticks = _commands.Ticks(sequencer.EventsFor(song, position));
+            var events = sequencer.EventsFor(song, position);
+            TempoFrom(events);
+
+            var ticks = _commands.Ticks(events);
             double lineBegan = ClockFollow?.IsFollowing == true ? clock.Elapsed.TotalSeconds : nextLine;
-            double secondsPerTick = song.Timing.SecondsPerLine / _commands.TicksPerLine;
+            double secondsPerTick = Playing(song).SecondsPerLine / _commands.TicksPerLine;
             int played = ApplyTick(ticks, 0, 0, song);
 
             Position = position;
-            double beatsPerLine = 1.0 / Math.Max(1, song.Timing.ClampedLinesPerBeat);
+            double beatsPerLine = 1.0 / Math.Max(1, Playing(song).ClampedLinesPerBeat);
 
             _mark = new LineMark(position, Stopwatch.GetTimestamp(),
-                (long)(song.Timing.SecondsPerLine * Stopwatch.Frequency), beat, beatsPerLine);
+                (long)(Playing(song).SecondsPerLine * Stopwatch.Frequency), beat, beatsPerLine);
 
             beat += beatsPerLine;
             PositionChanged?.Invoke(this, position);
@@ -1600,12 +1611,12 @@ public sealed class TrackerPlayer : ITrackerPlayer
             var next = _passes.After(song, position, Mode == TrackerPlayMode.Song)
                        ?? (Mode == TrackerPlayMode.Pattern
                            ? TrackerSequencer.AdvanceWithinPattern(song, position, Loop)
-                           : TrackerSequencer.Advance(song, position, Loop));
+                           : TrackerSequencer.Advance(song, Finished(song, position), Loop));
 
             if (next == null) break;
             position = next.Value;
 
-            nextLine += song.Timing.SecondsPerLine;
+            nextLine += Playing(song).SecondsPerLine;
             lines++;
 
             if (ClockFollow?.IsFollowing == true)
@@ -1679,7 +1690,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             if (token.IsCancellationRequested) return false;
 
             double now = clock.Elapsed.TotalSeconds;
-            double tickSeconds = driving ? _grid.TickSeconds(song.Timing.ClampedBpm) : 0;
+            double tickSeconds = driving ? _grid.TickSeconds(Playing(song).ClampedBpm) : 0;
 
             if (driving)
             {
@@ -1716,6 +1727,53 @@ public sealed class TrackerPlayer : ITrackerPlayer
                 Thread.SpinWait(50);
             }
         }
+    }
+
+    /// <summary>
+    /// The tempo a tempo command set while this pass plays, or not a number for the song's own.
+    /// </summary>
+    /// <remarks>
+    /// The pass's and not the song's: a <c>T</c> in a pattern changes how fast it plays from that
+    /// line, and the tempo saved with the song, which is what the box above the pattern shows, is
+    /// left alone. Forgotten when the transport starts again. Written and read on the clock thread.
+    /// </remarks>
+    private double _tempo = double.NaN;
+
+    /// <summary>How fast the song is playing: its own timing, at the tempo a command set where one has.</summary>
+    private TrackerTiming Playing(Song song) =>
+        double.IsNaN(_tempo) ? song.Timing : new TrackerTiming(_tempo, song.LinesPerBeat);
+
+    /// <summary>
+    /// Takes up a tempo command on the line about to be played, which plays at it from this line on,
+    /// and tells the plugins.
+    /// </summary>
+    /// <remarks>
+    /// <c>Txx</c> is the tempo itself in hex, 20 to FF beats a minute. Below 20 is not a tempo
+    /// anybody could mean, and the old trackers spent those values on something else, so they are
+    /// passed over. Where a line has several, the last column read wins.
+    /// </remarks>
+    private void TempoFrom(System.Collections.Generic.IReadOnlyList<TrackerEvent> events)
+    {
+        foreach (var e in events)
+        {
+            if (e.Effect.Command != TrackerCommand.Tempo || e.Effect.Parameter < TrackerTiming.MinBpm) continue;
+
+            _tempo = e.Effect.Parameter;
+            SongClock.Tempo(_tempo);
+        }
+    }
+
+    /// <summary>
+    /// The place to go on from once a line is played: the pattern's last line where the line was
+    /// the last its slot plays, so a slot that stops short goes on to the next slot from there.
+    /// </summary>
+    private static TrackerPosition Finished(Song song, TrackerPosition played)
+    {
+        int lines = song.PatternAt(played.OrderIndex)?.Lines ?? 0;
+
+        return lines > 0 && played.Line >= song.LastLineOf(played.OrderIndex)
+            ? played with { Line = lines - 1 }
+            : played;
     }
 
     /// <summary>
@@ -1783,38 +1841,40 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
     /// <summary>
     /// Moves what a column is sounding off the note it was played at, which is how an arpeggio
-    /// steps.
+    /// steps and a glide slides.
     /// </summary>
     /// <remarks>
-    /// Our own voices are moved where they stand, so an envelope runs on under the steps. A plugin
-    /// and a MIDI out cannot be moved that way, since a pitch bend there would bend the whole
-    /// channel and its range is the receiver's to say, so each step is the shifted note played in
-    /// place of the one before: the column's note is always ended first, whatever the instrument
-    /// says a new note does to the last, or the steps would pile up into a chord.
+    /// Our own voices are moved where they stand, by fractions of a semitone where a glide asks,
+    /// so an envelope runs on under the move. A plugin and a MIDI out cannot be moved that way,
+    /// since a pitch bend there would bend the whole channel and its range is the receiver's to
+    /// say, so they are sent the shifted note rounded to the keyboard, and only when that note has
+    /// changed: a glide is a run of semitones there rather than a slide. The column's note is
+    /// always ended first, whatever the instrument says a new note does to the last, or the steps
+    /// would pile up into a chord.
     /// </remarks>
     private void Shift(TrackerEvent e, Song song)
     {
         if (!e.Note.IsPlayable) return;
 
-        var note = new Note(Math.Clamp(e.Note.Semitone + e.Shift, Note.MinSemitone, Note.MaxSemitone));
+        var note = new Note(Math.Clamp(e.Note.Semitone + (int)MathF.Round(e.Shift), Note.MinSemitone, Note.MaxSemitone));
         float gain = _noteGain[At(e.Track, e.Column)];
+
+        var instrument = song.InstrumentAt(e.Instrument) ?? song.InstrumentAt(song.GetTrackInstrument(e.Track));
+
+        if (instrument?.IsPlugin != true) _synth.Mixer.SetShift(e.Track, e.Column, e.Shift);
+
+        if (_noteSent[At(e.Track, e.Column)] == note.Semitone) return;
+
+        _noteSent[At(e.Track, e.Column)] = note.Semitone;
 
         MidiOut?.NoteOn(song.Mix, e.Track, e.Column, note,
             _wire.VelocityFor((int)Math.Round(gain * TrackerCell.MaxVolume)));
 
-        var instrument = song.InstrumentAt(e.Instrument) ?? song.InstrumentAt(song.GetTrackInstrument(e.Track));
+        if (instrument?.IsPlugin != true || PlayerFor(e.Track, instrument) == null) return;
 
-        if (instrument?.IsPlugin == true)
-        {
-            if (PlayerFor(e.Track, instrument) == null) return;
+        var (mixed, placed) = WithMix(song, e.Track, gain, _notePan[At(e.Track, e.Column)]);
 
-            var (mixed, placed) = WithMix(song, e.Track, gain, _notePan[At(e.Track, e.Column)]);
-
-            _synth.Mixer.PluginNoteOn(e.Track, e.Column, note, mixed, placed ?? 0f, VoiceEnding.Cut);
-            return;
-        }
-
-        _synth.Mixer.SetShift(e.Track, e.Column, e.Shift);
+        _synth.Mixer.PluginNoteOn(e.Track, e.Column, note, mixed, placed ?? 0f, VoiceEnding.Cut);
     }
 
     /// <summary>
@@ -1844,6 +1904,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
     {
         MidiOut?.NoteOn(song.Mix, e.Track, e.Column, e.Note, _wire.VelocityFor(
             e.Gain is { } level ? (int)Math.Round(level * TrackerCell.MaxVolume) : TrackerCell.NoVolume));
+
+        _noteSent[At(e.Track, e.Column)] = e.Note.Semitone;
 
         var instrument = song.InstrumentAt(e.Instrument);
 
@@ -1913,7 +1975,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             _synth.Mixer.NoteOn(
                 e.Track, e.Column, zone, instrument.Sampler ?? new Synth.SamplerPatch(), zoneSample,
                 e.Note, (float)(mixed * zone.Volume), Placed(placed, zone.Pan),
-                instrument.NewNoteAction);
+                instrument.NewNoteAction, OffsetFor(e));
 
             return;
         }
@@ -1940,7 +2002,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             _synth.Mixer.NoteOn(
                 e.Track, e.Column, pad, instrument.Patch, padSample, e.Note,
-                (float)(mixed * pad.Volume), Placed(placed, pad.Pan));
+                (float)(mixed * pad.Volume), Placed(placed, pad.Pan), OffsetFor(e));
 
             return;
         }
@@ -1986,7 +2048,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
         }
 
         Where(e.Track, e.Instrument, instrument, song, "played as a recording");
-        _synth.Mixer.NoteOn(e.Track, e.Column, instrument, sample, e.Note, mixed, placed ?? 0f);
+        _synth.Mixer.NoteOn(e.Track, e.Column, instrument, sample, e.Note, mixed, placed ?? 0f, OffsetFor(e));
     }
 
     /// <summary>
@@ -2235,6 +2297,18 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         return (Math.Clamp(gain, 0f, MaxGain), pan);
     }
+
+    /// <summary>
+    /// How far into its recording a note starts: the sample offset command's amount in 256ths, or
+    /// nought for every other cell.
+    /// </summary>
+    /// <remarks>
+    /// Read where a note is started, beside its level, since it is about how the note begins
+    /// rather than about anything later in the line. Only a recording has somewhere to start
+    /// from, so a synth and a plugin are handed nothing.
+    /// </remarks>
+    private static double OffsetFor(TrackerEvent e) =>
+        e.Effect.Command == TrackerCommand.Offset ? Math.Clamp(e.Effect.Parameter, 0, 0xFF) / 256.0 : 0;
 
     /// <summary>Cuts everything sounding, without deciding anything about the transport.</summary>
     private void StopAllVoices() => _synth.Silence();

@@ -15,9 +15,18 @@ public enum CommandKind
     /// <summary><c>Axy</c>: step the note through a chord.</summary>
     Arpeggio,
 
+    /// <summary><c>Gxx</c>: slide from the note sounding to this one.</summary>
+    Glide,
+
+    /// <summary><c>Sxx</c>: start a recording partway in.</summary>
+    Offset,
+
     /// <summary><c>Vxx</c>: the note's own volume.</summary>
     Volume,
 
     /// <summary><c>Pxx</c>: the note's own place left to right.</summary>
-    Pan
+    Pan,
+
+    /// <summary><c>Txx</c>: the song's tempo from this line on.</summary>
+    Tempo
 }

@@ -53,10 +53,18 @@ lines selected it writes all of them, which is how an arpeggio lasts several lin
 - `Axy` steps the note through itself, `x` semitones up and `y` up, one step a tick.
   `A47` is a major chord out of one voice, and `A37` a minor one. The next line puts
   the note back unless it carries on.
+- `Gxx` slides from the note already sounding to this cell's note over `xx` ticks,
+  without starting it again, for acid bass lines. `G00` takes one line, `G06` half a
+  line, `G18` two lines. With nothing sounding the note just starts.
+- `Sxx` starts a recording `xx` 256ths of the way in: `S40` a quarter, `S80` halfway.
+  One long break can be played as many hits. Synths and plugins ignore it.
+- `Txx` plays the song at `xx` beats a minute from this line on, written in hex:
+  `T5A` is 90, `T78` is 120, `TB4` is 180. It lasts until the next `T` or until the
+  song is stopped, and the tempo saved with the song stays as it is. 20 to 255.
 
-On our own machines an arpeggio moves the pitch of the note that is already sounding.
-A plugin and a track's MIDI out are sent each step as a note of its own instead, and
-a cut there is a note off.
+On our own machines an arpeggio and a glide move the pitch of the note that is already
+sounding. A plugin and a track's MIDI out are sent each step as a note of its own
+instead, so a glide there is a run of semitones, and a cut there is a note off.
 
 The mixer's fader and pan are for a whole track; the volume field, `V` and `P` are
 for one note.

@@ -33,8 +33,11 @@ public sealed partial class CommandEditorViewModel : ObservableObject
         new CommandChoice(CommandKind.Cut, "Cut", TrackerCommand.Cut, "Silences the note partway through its line, with no release."),
         new CommandChoice(CommandKind.Retrigger, "Retrigger", TrackerCommand.Retrigger, "Plays the note again within its line, for rolls and stutters."),
         new CommandChoice(CommandKind.Arpeggio, "Arpeggio", TrackerCommand.Arpeggio, "Steps the note through a chord, one step a tick."),
+        new CommandChoice(CommandKind.Glide, "Glide", TrackerCommand.Glide, "Slides from the note already sounding to this one, without starting it again."),
+        new CommandChoice(CommandKind.Offset, "Offset", TrackerCommand.Offset, "Starts a recording partway in, so one break can be played as many hits."),
         new CommandChoice(CommandKind.Volume, "Volume", TrackerCommand.SetVolume, "Sets this note's own volume."),
-        new CommandChoice(CommandKind.Pan, "Pan", TrackerCommand.SetPan, "Places this note left or right.")
+        new CommandChoice(CommandKind.Pan, "Pan", TrackerCommand.SetPan, "Places this note left or right."),
+        new CommandChoice(CommandKind.Tempo, "Tempo", TrackerCommand.Tempo, "Changes how fast the song plays, from this line on.")
     };
 
     /// <summary>The chords an arpeggio offers by name.</summary>
@@ -65,7 +68,7 @@ public sealed partial class CommandEditorViewModel : ObservableObject
     /// <summary>The command chosen.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Kind), nameof(IsTimed), nameof(IsRetrigger), nameof(IsArpeggio),
-        nameof(IsVolume), nameof(IsPan), nameof(ShowsRuler))]
+        nameof(IsGlide), nameof(IsOffset), nameof(IsVolume), nameof(IsPan), nameof(IsTempo), nameof(ShowsRuler))]
     private CommandChoice chosen;
 
     /// <summary>For a delay or a cut, which tick it happens on.</summary>
@@ -82,6 +85,15 @@ public sealed partial class CommandEditorViewModel : ObservableObject
 
     /// <summary>For an arpeggio, the second interval above the note.</summary>
     [ObservableProperty] private double up2 = 7;
+
+    /// <summary>For a glide, how many ticks the slide takes; nought is one line.</summary>
+    [ObservableProperty] private double slide;
+
+    /// <summary>For an offset, how far into the recording it starts, in 256ths.</summary>
+    [ObservableProperty] private double skip = 0x80;
+
+    /// <summary>For a tempo, the beats a minute, 20 to 255.</summary>
+    [ObservableProperty] private double beats = 120;
 
     /// <summary>For a volume, the level, 00 to 80.</summary>
     [ObservableProperty] private double level = 0x40;
@@ -113,6 +125,15 @@ public sealed partial class CommandEditorViewModel : ObservableObject
     /// <summary>Whether an arpeggio is chosen.</summary>
     public bool IsArpeggio => Kind == CommandKind.Arpeggio;
 
+    /// <summary>Whether a glide is chosen.</summary>
+    public bool IsGlide => Kind == CommandKind.Glide;
+
+    /// <summary>Whether a sample offset is chosen.</summary>
+    public bool IsOffset => Kind == CommandKind.Offset;
+
+    /// <summary>Whether a tempo is chosen.</summary>
+    public bool IsTempo => Kind == CommandKind.Tempo;
+
     /// <summary>Whether a volume is chosen.</summary>
     public bool IsVolume => Kind == CommandKind.Volume;
 
@@ -120,7 +141,7 @@ public sealed partial class CommandEditorViewModel : ObservableObject
     public bool IsPan => Kind == CommandKind.Pan;
 
     /// <summary>Whether the chosen command has anything to show on the ruler.</summary>
-    public bool ShowsRuler => !IsVolume && !IsPan;
+    public bool ShowsRuler => !IsVolume && !IsPan && !IsOffset && !IsTempo;
 
     /// <summary>The command as it will be written into the cell.</summary>
     public TrackerCommand Command => Kind switch
@@ -129,7 +150,10 @@ public sealed partial class CommandEditorViewModel : ObservableObject
         CommandKind.Cut => new TrackerCommand(TrackerCommand.Cut, Tick),
         CommandKind.Retrigger => new TrackerCommand(TrackerCommand.Retrigger, Nibbles(Fall, Every)),
         CommandKind.Arpeggio => new TrackerCommand(TrackerCommand.Arpeggio, Nibbles(Up, Up2)),
+        CommandKind.Glide => new TrackerCommand(TrackerCommand.Glide, Byte(Slide, 0xFF)),
+        CommandKind.Offset => new TrackerCommand(TrackerCommand.Offset, Byte(Skip, 0xFF)),
         CommandKind.Volume => new TrackerCommand(TrackerCommand.SetVolume, Byte(Level, TrackerCell.MaxVolume)),
+        CommandKind.Tempo => new TrackerCommand(TrackerCommand.Tempo, Math.Clamp((int)Math.Round(Beats), MinTempo, 0xFF)),
         _ => new TrackerCommand(TrackerCommand.SetPan, Byte(Place, TrackerCell.MaxVolume))
     };
 
@@ -157,14 +181,18 @@ public sealed partial class CommandEditorViewModel : ObservableObject
                         marks[one.Tick] = new TickMark(one.Tick, true, "");
                     break;
 
+                case CommandKind.Glide:
+                    for (int at = 0; at < Math.Min(TicksPerLine, GlideTicks); at++) marks[at] = new TickMark(at, true, "");
+                    break;
+
                 case CommandKind.Arpeggio:
-                    int shift = 0;
+                    float shift = 0;
                     var steps = Spread(_arpeggio).Where(one => one.Event.Kind == Tracker.Enums.TrackerEventKind.Shift)
                         .ToDictionary(one => one.Tick, one => one.Event.Shift);
 
                     for (int at = 0; at < TicksPerLine; at++)
                     {
-                        if (steps.TryGetValue(at, out int moved)) shift = moved;
+                        if (steps.TryGetValue(at, out float moved)) shift = moved;
 
                         marks[at] = new TickMark(at, shift != 0, shift == 0 ? "0" : "+" + shift);
                     }
@@ -184,6 +212,9 @@ public sealed partial class CommandEditorViewModel : ObservableObject
         CommandKind.Cut => $"The note is cut dead {Ticks(Tick)} into its line, after {Share(Tick)} of it.",
         CommandKind.Retrigger => RetriggerWords(),
         CommandKind.Arpeggio => ArpeggioWords(),
+        CommandKind.Glide => GlideWords(),
+        CommandKind.Offset => $"A recording starts {Math.Round(Byte(Skip, 0xFF) / 2.56)}% of the way in. Synths and plugins are not affected.",
+        CommandKind.Tempo => $"From this line the song plays at {Math.Clamp((int)Math.Round(Beats), MinTempo, 0xFF)} beats a minute, until the next tempo or until it is stopped. The tempo saved with the song stays as it is.",
         CommandKind.Volume => $"This note plays at {Math.Round(Level / TrackerCell.MaxVolume * 100)}% volume, whatever the volume field says.",
         _ => PanWords()
     };
@@ -240,8 +271,20 @@ public sealed partial class CommandEditorViewModel : ObservableObject
                 Up2 = low;
                 break;
 
+            case CommandKind.Glide:
+                Slide = Math.Clamp(current.Parameter, 0, 0xFF);
+                break;
+
+            case CommandKind.Offset:
+                Skip = Math.Clamp(current.Parameter, 0, 0xFF);
+                break;
+
             case CommandKind.Volume:
                 Level = Math.Clamp(current.Parameter, 0, TrackerCell.MaxVolume);
+                break;
+
+            case CommandKind.Tempo:
+                Beats = Math.Clamp(current.Parameter, MinTempo, 0xFF);
                 break;
 
             case CommandKind.Pan:
@@ -272,7 +315,16 @@ public sealed partial class CommandEditorViewModel : ObservableObject
 
     partial void OnUp2Changed(double value) => Moved();
 
+    partial void OnSlideChanged(double value) => Moved();
+
+    partial void OnSkipChanged(double value) => Moved();
+
     partial void OnLevelChanged(double value) => Moved();
+
+    partial void OnBeatsChanged(double value) => Moved();
+
+    /// <summary>The slowest tempo a command can set, which is the slowest the song allows.</summary>
+    public const int MinTempo = (int)Tracker.Records.TrackerTiming.MinBpm;
 
     partial void OnPlaceChanged(double value) => Moved();
 
@@ -283,7 +335,10 @@ public sealed partial class CommandEditorViewModel : ObservableObject
         var note = new Note(48);
         var cell = new TrackerEvent(0, 0, Tracker.Enums.TrackerEventKind.Trigger, note, 0, 1f, Command);
 
-        command.Spread(cell, note, TicksPerLine, into);
+        var voice = new Tracker.Commands.VoiceState();
+        voice.Struck(note);
+
+        command.Spread(cell, voice, TicksPerLine, into);
 
         return into;
     }
@@ -335,6 +390,20 @@ public sealed partial class CommandEditorViewModel : ObservableObject
         string named = ChordName.Length > 0 ? " (" + ChordName.ToLowerInvariant() + ")" : "";
 
         return $"The note steps through itself, {up} semitones up and {up2} up{named}, one step a tick. It lasts one line: select the lines first to write it on all of them.";
+    }
+
+    /// <summary>How many ticks the glide takes, a whole line where it says nought.</summary>
+    private int GlideTicks => Byte(Slide, 0xFF) == 0 ? TicksPerLine : Byte(Slide, 0xFF);
+
+    /// <summary>What a glide will do, in words.</summary>
+    private string GlideWords()
+    {
+        int ticks = GlideTicks;
+        string length = ticks % TicksPerLine == 0
+            ? (ticks / TicksPerLine == 1 ? "one line" : ticks / TicksPerLine + " lines")
+            : Ticks(ticks) + (ticks < TicksPerLine ? ", " + Share(ticks) : ", " + (ticks / (double)TicksPerLine).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " lines");
+
+        return $"The note already sounding slides to this cell's note over {length}, without starting again. With nothing sounding the note just starts.";
     }
 
     /// <summary>Where a pan puts the note, in words.</summary>

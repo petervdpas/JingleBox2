@@ -13,9 +13,17 @@ namespace JingleBox2.ViewModels.Records;
 /// <param name="Loops">Whether this slot is inside the loop range.</param>
 /// <param name="Times">How many times the slot plays its pattern, as the row shows it; empty for once.</param>
 /// <param name="Stretches">The loops of lines on the slot, each a line of its own under the row.</param>
+/// <param name="Break">
+/// Where the slot stops short of its pattern's end, as the row shows it, such as <c>to 23</c>;
+/// empty for the whole pattern.
+/// </param>
 public sealed record OrderSlot(int Slot, string Pattern, bool Loops, string Times = "",
-                               System.Collections.Generic.IReadOnlyList<StretchRow>? Stretches = null)
+                               System.Collections.Generic.IReadOnlyList<StretchRow>? Stretches = null,
+                               string Break = "")
 {
+    /// <summary>Whether the slot stops short of its pattern's end.</summary>
+    public bool HasBreak => Break.Length > 0;
+
     /// <summary>Where in the order, as two digits.</summary>
     /// <remarks>
     /// Its own property rather than formatted in the view, so the two numbers on a row are
@@ -33,7 +41,7 @@ public sealed record OrderSlot(int Slot, string Pattern, bool Loops, string Time
 
     /// <summary>Everything the slot does about repeating, on one line: the count, then each loop.</summary>
     public string Repeat =>
-        string.Join(" ", new[] { Times }.Concat((Stretches ?? System.Array.Empty<StretchRow>()).Select(row => row.Label))
+        string.Join(" ", new[] { Times, Break }.Concat((Stretches ?? System.Array.Empty<StretchRow>()).Select(row => row.Label))
                                      .Where(part => part.Length > 0));
 
     /// <summary>The text, which is what a list with no template shows.</summary>

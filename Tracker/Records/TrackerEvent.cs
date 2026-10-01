@@ -17,7 +17,7 @@ namespace JingleBox2.Tracker.Records;
 /// <param name="Effect">The effect command on this cell, or <see cref="TrackerCommand.None"/>.</param>
 /// <param name="Shift">
 /// For <see cref="TrackerEventKind.Shift"/>, how many semitones above <paramref name="Note"/> the
-/// column sounds; nought for every other kind.
+/// column sounds, which is a fraction while a glide is on its way; nought for every other kind.
 /// </param>
 /// <remarks>
 /// The column is beside the track because the two together are what names a voice. A stop that
@@ -32,7 +32,7 @@ public readonly record struct TrackerEvent(
     int Instrument,
     float? Gain,
     TrackerCommand Effect,
-    int Shift = 0)
+    float Shift = 0)
 {
     /// <summary>The event that silences one column, with every other column saying nothing.</summary>
     public static TrackerEvent Stop(int track, int column = 0) =>

@@ -1500,7 +1500,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         int lines = Song.PatternAt(at)?.Lines ?? 0;
         var wanted = new LineLoop(picked.FirstLine, picked.LastLine, Math.Clamp(times, 2, Song.MaxRepeats));
 
-        Song.RepeatAt(at).WithLoop(wanted, lines, out var blocking);
+        var held = Song.RepeatAt(at);
+        held.WithLoop(wanted, lines, out var blocking);
+
+        if (picked.LastLine > held.LastLine(lines))
+        {
+            Status = $"Slot {at:00} stops after line {held.LastLine(lines):00}, so lines past it never play";
+            return;
+        }
 
         if (blocking != null)
         {
@@ -1574,10 +1581,45 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         if (repeat.Times > 1) parts.Add("\u00d7" + repeat.Times);
 
+        if (BreakText(repeat) is { Length: > 0 } stops) parts.Add(stops);
+
         foreach (var loop in repeat.Lines()) parts.Add(new StretchRow(0, loop).Label);
 
         return string.Join(" ", parts);
     }
+
+    /// <summary>Where a slot stops short of its pattern's end, as the order row says it; empty for the whole pattern.</summary>
+    private static string BreakText(SlotRepeat repeat) =>
+        repeat.Last >= 0 ? "to " + repeat.Last.ToString("00", CultureInfo.InvariantCulture) : "";
+
+    /// <summary>
+    /// Makes the slot playing this pattern stop after the line the cursor is on and go on to the
+    /// next slot, which is the old trackers' pattern break set on the slot.
+    /// </summary>
+    /// <remarks>
+    /// The slot under the cursor and not the pattern, so the same pattern can play whole in one
+    /// slot and stop short in another. On the last line it is the whole pattern again. Loops of
+    /// lines reaching past the new end go, since they could never come round.
+    /// </remarks>
+    public IRelayCommand EndSlotHereCommand => new RelayCommand(() =>
+    {
+        if (Song.Order.Count == 0) return;
+
+        int at = Math.Clamp(OrderIndex, 0, Song.Order.Count - 1);
+        int lines = Song.PatternAt(at)?.Lines ?? 0;
+
+        Repeat("ending a slot early", repeat => repeat.EndingAt(Cursor.Line, lines));
+    });
+
+    /// <summary>Lets a slot play its whole pattern again, which is the red cross on its break.</summary>
+    public IRelayCommand<int> PlayWholePatternCommand => new RelayCommand<int>(slot =>
+    {
+        if (slot < 0 || slot >= Song.Order.Count) return;
+
+        int lines = Song.PatternAt(slot)?.Lines ?? 0;
+
+        Repeat("playing a whole pattern", repeat => repeat.EndingAt(-1, lines), slot);
+    });
 
     /// <summary>Points the picked slot at another pattern, named by its place in the song.</summary>
     public IRelayCommand<int> PlayPatternCommand => new RelayCommand<int>(PlayPattern);
@@ -4655,7 +4697,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
             OrderEntries.Add(new OrderSlot(i, pattern?.Name ?? "--", Song.InLoop(i),
                 repeat.Times > 1 ? "\u00d7" + repeat.Times : "",
-                repeat.Lines().Select(loop => new StretchRow(slot, loop)).ToArray()));
+                repeat.Lines().Select(loop => new StretchRow(slot, loop)).ToArray(),
+                BreakText(repeat)));
         }
 
         OrderIndex = OrderEntries.Count == 0 ? -1 : Math.Clamp(wanted, 0, OrderEntries.Count - 1);

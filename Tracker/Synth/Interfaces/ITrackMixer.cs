@@ -280,8 +280,16 @@ public interface ITrackMixer
     /// patch, its window and its base note off it, and a second way of saying the same thing
     /// is a second thing that can disagree.
     /// </remarks>
+    /// <param name="track">The track it plays on.</param>
+    /// <param name="column">The track's note column.</param>
+    /// <param name="instrument">The instrument, whose patch, window and base note it plays.</param>
+    /// <param name="sample">The recording.</param>
+    /// <param name="note">The note played.</param>
+    /// <param name="gain">How loud, before the strip.</param>
+    /// <param name="pan">Where it sits, minus one to one.</param>
+    /// <param name="offset">How far into its window the recording starts, nought to one: a sample offset.</param>
     void NoteOn(int track, int column, TrackerInstrument instrument, SampleData sample, Note note,
-                float gain, float pan);
+                float gain, float pan, double offset = 0);
 
     /// <summary>
     /// Fires one pad of a kit: its own recording, at its own pitch, over whatever else is
@@ -297,8 +305,17 @@ public interface ITrackMixer
     /// nothing is resampled. That is the machine: a key chooses which recording sounds, not how
     /// fast to read one.
     /// </remarks>
+    /// <param name="track">The track it plays on.</param>
+    /// <param name="column">The track's note column.</param>
+    /// <param name="pad">The pad.</param>
+    /// <param name="patch">The kit's patch.</param>
+    /// <param name="sample">The pad's recording.</param>
+    /// <param name="note">The note played.</param>
+    /// <param name="gain">How loud, before the strip.</param>
+    /// <param name="pan">Where it sits, minus one to one.</param>
+    /// <param name="offset">How far into its window the recording starts, nought to one: a sample offset.</param>
     void NoteOn(int track, int column, DrumPad pad, SynthPatch patch, SampleData sample, Note note,
-                float gain, float pan);
+                float gain, float pan, double offset = 0);
 
     /// <summary>
     /// Plays one zone of a map: its recording, read at whatever speed the key asks for.
@@ -312,8 +329,18 @@ public interface ITrackMixer
     /// than a rack of them, and what a note does to the one before it is the instrument's to
     /// say.
     /// </remarks>
+    /// <param name="track">The track it plays on.</param>
+    /// <param name="column">The track's note column.</param>
+    /// <param name="zone">The zone.</param>
+    /// <param name="patch">The map's patch.</param>
+    /// <param name="sample">The zone's recording.</param>
+    /// <param name="note">The note played.</param>
+    /// <param name="gain">How loud, before the strip.</param>
+    /// <param name="pan">Where it sits, minus one to one.</param>
+    /// <param name="ending">What the note does to the one before it on the column.</param>
+    /// <param name="offset">How far into its window the recording starts, nought to one: a sample offset.</param>
     void NoteOn(int track, int column, SampleZone zone, SamplerPatch patch, SampleData sample,
-                Note note, float gain, float pan, VoiceEnding ending = VoiceEnding.Cut);
+                Note note, float gain, float pan, VoiceEnding ending = VoiceEnding.Cut, double offset = 0);
 
     /// <summary>Sounds a note that releases on its own, for auditioning while editing.</summary>
     /// <param name="patch">The sound being built.</param>

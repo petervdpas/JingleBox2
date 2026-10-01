@@ -17,8 +17,10 @@ public sealed class NoteCut : ITickCommand
     public char Letter => TrackerCommand.Cut;
 
     /// <inheritdoc/>
-    public void Spread(TrackerEvent cell, Note sounding, int ticks, ICollection<TickEvent> into)
+    public void Spread(TrackerEvent cell, VoiceState voice, int ticks, ICollection<TickEvent> into)
     {
+        voice.Take(cell);
+
         into.Add(new TickEvent(0, cell));
 
         int at = cell.Effect.Parameter;
@@ -26,5 +28,7 @@ public sealed class NoteCut : ITickCommand
         if (at < 0 || at >= ticks) return;
 
         into.Add(new TickEvent(at, cell with { Kind = TrackerEventKind.Cut, Note = Note.Off }));
+
+        voice.Silenced();
     }
 }

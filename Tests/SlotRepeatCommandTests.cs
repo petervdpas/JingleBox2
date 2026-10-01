@@ -186,4 +186,55 @@ public class SlotRepeatCommandTests
         Assert.Equal(tracker.Song.RepeatAt(from).Times, tracker.Song.RepeatAt(from + 1).Times);
         Assert.Equal(tracker.Song.RepeatAt(from).Lines(), tracker.Song.RepeatAt(from + 1).Lines());
     }
+
+    /// <summary>Ending the slot after the cursor's line shows on its row, and the red cross plays it whole again.</summary>
+    [Fact]
+    public void Ending_a_slot_shows_on_the_row_and_the_cross_takes_it_off()
+    {
+        var tracker = Tracker();
+
+        tracker.Cursor = new PatternCursor(23, 0, JingleBox2.Tracker.Enums.CellColumn.Note);
+        tracker.EndSlotHereCommand.Execute(null);
+
+        var row = tracker.OrderEntries[tracker.OrderIndex];
+
+        Assert.Equal(23, tracker.Song.LastLineOf(tracker.OrderIndex));
+        Assert.True(row.HasBreak);
+        Assert.Equal("to 23", row.Break);
+
+        tracker.PlayWholePatternCommand.Execute(row.Slot);
+
+        Assert.False(tracker.OrderEntries[tracker.OrderIndex].HasBreak);
+        Assert.Equal(tracker.Song.PatternAt(tracker.OrderIndex)!.Lines - 1, tracker.Song.LastLineOf(tracker.OrderIndex));
+    }
+
+    /// <summary>Ending a slot is one step of undo.</summary>
+    [Fact]
+    public void Ending_a_slot_undoes()
+    {
+        var tracker = Tracker();
+        IShortcutContext keys = tracker;
+
+        tracker.Cursor = new PatternCursor(7, 0, JingleBox2.Tracker.Enums.CellColumn.Note);
+        tracker.EndSlotHereCommand.Execute(null);
+        keys.Do(ShortcutAction.Undo);
+
+        Assert.False(tracker.OrderEntries[tracker.OrderIndex].HasBreak);
+    }
+
+    /// <summary>Lines past the slot's end cannot be looped, and it says why.</summary>
+    [Fact]
+    public void Lines_past_the_end_cannot_be_looped()
+    {
+        var tracker = Tracker();
+
+        tracker.Cursor = new PatternCursor(15, 0, JingleBox2.Tracker.Enums.CellColumn.Note);
+        tracker.EndSlotHereCommand.Execute(null);
+
+        tracker.Selection = new PatternSelection(12, 0, 20, 0);
+        tracker.LoopLinesCommand.Execute(2);
+
+        Assert.Empty(tracker.Song.RepeatAt(tracker.OrderIndex).Lines());
+        Assert.Contains("stops after line 15", tracker.Status);
+    }
 }

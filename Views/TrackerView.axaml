@@ -260,6 +260,13 @@
                        red cross that takes that loop off. -->
                   <StackPanel Grid.Column="3" Spacing="2" VerticalAlignment="Center">
                     <TextBlock Classes="place" Text="{Binding Times}" IsVisible="{Binding HasTimes}" />
+                    <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasBreak}">
+                      <TextBlock Classes="place" Text="{Binding Break}" VerticalAlignment="Center" />
+                      <Button Classes="remove" Content="✕"
+                              Command="{Binding $parent[ListBox].((vm:TrackerViewModel)DataContext).PlayWholePatternCommand}"
+                              CommandParameter="{Binding Slot}"
+                              ToolTip.Tip="Plays the whole pattern again instead of stopping early." />
+                    </StackPanel>
                     <ItemsControl ItemsSource="{Binding Stretches}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vmr:StretchRow">
@@ -319,7 +326,7 @@
                 </MenuItem>
 
                 <MenuItem Header="Clear the repeats" Command="{Binding ClearSlotRepeatCommand}"
-                          ToolTip.Tip="This slot plays its pattern once, straight through, with no lines looped." />
+                          ToolTip.Tip="This slot plays its whole pattern once, straight through, with no lines looped and no early end." />
 
                 <Separator />
 
@@ -461,6 +468,12 @@
                       </MenuItem.ItemContainerTheme>
                     </MenuItem>
 
+                    <!-- The old trackers' pattern break, set on the slot like the loops: this slot
+                         stops after the cursor's line and the song goes on to the next one. The
+                         order list shows it on the slot. -->
+                    <MenuItem Header="End the slot after this line"
+                              Command="{Binding EndSlotHereCommand}"
+                              ToolTip.Tip="The slot playing this pattern stops after this line and the song goes on to the next slot. Other slots playing the same pattern still play all of it. Undo it with the red cross on the slot." />
                     <MenuItem Header="Unloop the selected lines" IsEnabled="{Binding HasSelection}"
                               Command="{Binding UnloopLinesCommand}"
                               ToolTip.Tip="Takes off every loop on this slot that shares a line with the selection." />

@@ -1040,12 +1040,12 @@ public sealed class TrackMixer : ITrackMixer
 
     /// <inheritdoc/>
     public void NoteOn(int track, int column, TrackerInstrument instrument, SampleData sample,
-                       Note note, float gain, float pan)
+                       Note note, float gain, float pan, double offset = 0)
     {
         if (instrument is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
 
         var voice = new SampleVoice(
-            sample, instrument.Patch, instrument.Shape, note, instrument.BaseNote,
+            sample, instrument.Patch, Skipped(instrument.Shape, offset), note, instrument.BaseNote,
             track, gain, pan, SampleRate)
         {
             Column = column,
@@ -1064,12 +1064,12 @@ public sealed class TrackMixer : ITrackMixer
     /// A choke group of nought is no group at all, so nothing is walked and nothing is cut.
     /// </remarks>
     public void NoteOn(int track, int column, DrumPad pad, SynthPatch patch, SampleData sample,
-                       Note note, float gain, float pan)
+                       Note note, float gain, float pan, double offset = 0)
     {
         if (pad is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
 
         var voice = new SampleVoice(
-            sample, patch, pad.Shape, note, note,
+            sample, patch, Skipped(pad.Shape, offset), note, note,
             track, gain, pan, SampleRate)
         {
             Choke = pad.Choke,
@@ -1098,12 +1098,12 @@ public sealed class TrackMixer : ITrackMixer
     /// filters do the work instead.
     /// </remarks>
     public void NoteOn(int track, int column, SampleZone zone, SamplerPatch patch, SampleData sample,
-                       Note note, float gain, float pan, VoiceEnding ending = VoiceEnding.Cut)
+                       Note note, float gain, float pan, VoiceEnding ending = VoiceEnding.Cut, double offset = 0)
     {
         if (zone is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
 
         var voice = new SampleVoice(
-            sample, new SynthPatch(), zone.Shape, note, new Note(zone.Root),
+            sample, new SynthPatch(), Skipped(zone.Shape, offset), note, new Note(zone.Root),
             track, gain, pan, SampleRate, patch)
         {
             Column = column
@@ -2378,6 +2378,13 @@ public sealed class TrackMixer : ITrackMixer
 
     /// <summary>How far an arpeggio is holding a column off its pitch, nought for none.</summary>
     private float ShiftOf(int track, int column) => Shifting(track, column) is int slot ? _shift[slot] : 0f;
+
+    /// <summary>
+    /// The window a recording is played through once a sample offset has moved its start: the one
+    /// given where there is no offset, and the whole recording moved where there was no window.
+    /// </summary>
+    private static SampleShape? Skipped(SampleShape? shape, double offset) =>
+        offset > 0 ? (shape ?? new SampleShape()).Skipping(offset) : shape;
 
     /// <summary>A different seed per voice, so two noise hits are not the same noise.</summary>
     private int NextSeed() => System.Threading.Interlocked.Increment(ref _noiseSeed);

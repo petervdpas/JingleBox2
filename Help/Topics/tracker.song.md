@@ -82,3 +82,17 @@ Playing one pattern round, the lines still loop and the pattern simply goes roun
 always does. Coming round to the same slot again, by the song looping, repeats it again.
 **Play it again** is different: it adds slots of their own after this one, so a run
 reads down the list.
+
+## Ending a slot early
+
+A slot can stop before the end of its pattern and go on to the next slot from there,
+which is the old trackers' pattern break: an ending, or a short bar in the middle of a
+song, without making a pattern for it. Put the cursor on the last line the slot should
+play and choose **End the slot after this line** on the pattern's right click menu. The
+slot's row in the order list shows it as `to 23`, with a red cross that lets the slot
+play the whole pattern again.
+
+It belongs to the slot, like the loops, so the same pattern can play whole in one slot
+and stop short in another. A repeat count goes round the shortened slot, and loops of
+lines past the end are taken off since they could never come round. Playing one pattern
+round, the whole pattern plays.

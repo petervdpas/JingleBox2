@@ -18,6 +18,10 @@ public sealed class NoteDelay : ITickCommand
     public char Letter => TrackerCommand.Delay;
 
     /// <inheritdoc/>
-    public void Spread(TrackerEvent cell, Note sounding, int ticks, ICollection<TickEvent> into) =>
+    public void Spread(TrackerEvent cell, VoiceState voice, int ticks, ICollection<TickEvent> into)
+    {
+        voice.Take(cell);
+
         into.Add(new TickEvent(Math.Clamp(cell.Effect.Parameter, 0, ticks - 1), cell));
+    }
 }

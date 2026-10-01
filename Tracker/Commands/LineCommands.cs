@@ -14,8 +14,8 @@ namespace JingleBox2.Tracker.Commands;
 /// so a delay can land on a half, a third or a quarter of a line and an arpeggio's three steps
 /// come round evenly.
 ///
-/// The commands are found by their letter, and the four this ships with are the ones handed in
-/// when nothing is: delay, cut, retrigger and arpeggio.
+/// The commands are found by their letter, and the five this ships with are the ones handed in
+/// when nothing is: delay, cut, retrigger, arpeggio and glide.
 /// </remarks>
 public sealed class LineCommands : ILineCommands
 {
@@ -25,14 +25,14 @@ public sealed class LineCommands : ILineCommands
     /// <summary>The commands, by letter.</summary>
     private readonly Dictionary<char, ITickCommand> _commands;
 
-    /// <summary>The note each column is sounding, by track and column.</summary>
-    private readonly Dictionary<(int Track, int Column), Note> _sounding = new();
+    /// <summary>What each note column is sounding, by track and column.</summary>
+    private readonly Dictionary<(int Track, int Column), VoiceState> _voices = new();
 
-    /// <summary>The columns an arpeggio left off their own pitch at the end of the last line.</summary>
-    private readonly HashSet<(int Track, int Column)> _shifted = new();
+    /// <summary>The columns the last line left somewhere other than where their voice rests.</summary>
+    private readonly HashSet<(int Track, int Column)> _off = new();
 
-    /// <summary>A module answering to the commands given, or to the four it ships with.</summary>
-    /// <param name="commands">The commands, or nothing for delay, cut, retrigger and arpeggio.</param>
+    /// <summary>A module answering to the commands given, or to the five it ships with.</summary>
+    /// <param name="commands">The commands, or nothing for delay, cut, retrigger, arpeggio and glide.</param>
     /// <param name="ticks">How many ticks a line has.</param>
     public LineCommands(IEnumerable<ITickCommand>? commands = null, int ticks = DefaultTicks)
     {
@@ -40,7 +40,7 @@ public sealed class LineCommands : ILineCommands
 
         _commands = (commands ?? new ITickCommand[]
         {
-            new NoteDelay(), new NoteCut(), new NoteRetrigger(), new NoteArpeggio()
+            new NoteDelay(), new NoteCut(), new NoteRetrigger(), new NoteArpeggio(), new NoteGlide()
         }).ToDictionary(command => char.ToUpperInvariant(command.Letter));
     }
 
@@ -50,15 +50,16 @@ public sealed class LineCommands : ILineCommands
     /// <inheritdoc/>
     public void Reset()
     {
-        _sounding.Clear();
-        _shifted.Clear();
+        _voices.Clear();
+        _off.Clear();
     }
 
     /// <inheritdoc/>
     /// <remarks>
-    /// A column an arpeggio left off its pitch is put back at the start of the next line, before
-    /// anything else on it, unless that line starts a new note there: a new note starts at its own
-    /// pitch anyway, and putting the old one back first would sound it again on a plugin.
+    /// Three things in order. Whatever an earlier line left going goes on, unless this line writes
+    /// into that column, in which case it stops where it had got to. A column an arpeggio left off
+    /// its resting pitch is put back, unless this line starts a new note there, which begins at its
+    /// own pitch anyway. Then the line's own cells.
     ///
     /// Sorted by tick and nothing else, so events on one tick stay in the order they were written,
     /// which is what lets a cut at tick nought come after the note it cuts.
@@ -66,49 +67,72 @@ public sealed class LineCommands : ILineCommands
     public IReadOnlyList<TickEvent> Ticks(IReadOnlyList<TrackerEvent> line)
     {
         var spread = new List<TickEvent>(line.Count);
+        var written = new HashSet<(int, int)>(line.Select(e => (e.Track, e.Column)));
+        var struck = new HashSet<(int, int)>(line.Where(e => e.Kind == TrackerEventKind.Trigger).Select(e => (e.Track, e.Column)));
+        var carried = new HashSet<(int, int)>();
 
-        foreach (var column in _shifted)
+        foreach (var (at, voice) in _voices)
         {
-            if (line.Any(e => e.Track == column.Track && e.Column == column.Column && e.Kind == TrackerEventKind.Trigger))
+            if (voice.Carry is not { } carry) continue;
+
+            if (written.Contains(at))
+            {
+                voice.Carry = null;
                 continue;
+            }
 
-            var note = _sounding.TryGetValue(column, out var was) ? was : Note.Empty;
+            if (!carry.Go(voice, TicksPerLine, spread)) voice.Carry = null;
 
-            spread.Add(new TickEvent(0, new TrackerEvent(column.Track, column.Column, TrackerEventKind.Shift,
-                note, TrackerCell.NoInstrument, null, TrackerCommand.None)));
+            carried.Add(at);
         }
 
-        _shifted.Clear();
+        foreach (var at in _off)
+        {
+            if (struck.Contains(at) || carried.Contains(at) || !_voices.TryGetValue(at, out var voice) || !voice.Sounds)
+                continue;
+
+            spread.Add(new TickEvent(0, new TrackerEvent(at.Track, at.Column, TrackerEventKind.Shift,
+                voice.Base, TrackerCell.NoInstrument, null, TrackerCommand.None, voice.Rest)));
+        }
+
+        _off.Clear();
 
         foreach (var e in line)
         {
-            var at = (e.Track, e.Column);
-
-            if (e.Kind == TrackerEventKind.Trigger) _sounding[at] = e.Note;
-            else if (e.Kind is TrackerEventKind.Stop or TrackerEventKind.Cut) _sounding.Remove(at);
+            var voice = Voice((e.Track, e.Column));
 
             if (!e.Effect.IsNone && _commands.TryGetValue(e.Effect.Command, out var command))
             {
-                var sounding = _sounding.TryGetValue(at, out var note) ? note : Note.Empty;
-
-                command.Spread(e, sounding, TicksPerLine, spread);
+                command.Spread(e, voice, TicksPerLine, spread);
             }
             else
             {
+                voice.Take(e);
                 spread.Add(new TickEvent(0, e));
             }
         }
 
         var ordered = spread.OrderBy(one => one.Tick).ToArray();
+        var last = new Dictionary<(int, int), float>();
 
         foreach (var one in ordered)
         {
-            if (one.Event.Kind != TrackerEventKind.Shift) continue;
+            if (one.Event.Kind == TrackerEventKind.Shift) last[(one.Event.Track, one.Event.Column)] = one.Event.Shift;
+        }
 
-            if (one.Event.Shift != 0) _shifted.Add((one.Event.Track, one.Event.Column));
-            else _shifted.Remove((one.Event.Track, one.Event.Column));
+        foreach (var (at, shift) in last)
+        {
+            if (_voices.TryGetValue(at, out var voice) && voice.Sounds && shift != voice.Rest) _off.Add(at);
         }
 
         return ordered;
+    }
+
+    /// <summary>The memory of one note column, made the first time it is asked for.</summary>
+    private VoiceState Voice((int Track, int Column) at)
+    {
+        if (!_voices.TryGetValue(at, out var voice)) _voices[at] = voice = new VoiceState();
+
+        return voice;
     }
 }

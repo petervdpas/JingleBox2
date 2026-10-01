@@ -37,6 +37,32 @@ public sealed class SampleShape
     public bool IsLooping => LoopMode != SampleLoopMode.None;
 
     /// <summary>
+    /// This window with its playing start moved that share of the way through it, which is what a
+    /// sample offset asks for; itself where the share is nought or not a number.
+    /// </summary>
+    /// <remarks>
+    /// The share is of the window rather than of the whole recording, so an offset means the same
+    /// part of the sound however the window was trimmed. Played backwards the window starts at its
+    /// end, so the end is what moves. A loop that began before the new start begins at it instead,
+    /// since a voice cannot loop back to before where it started.
+    /// </remarks>
+    /// <param name="share">How far in, nought to just under one.</param>
+    public SampleShape Skipping(double share)
+    {
+        if (double.IsNaN(share) || share <= 0) return this;
+
+        var moved = Clone();
+        double into = (End - Start) * Math.Min(share, 0.999);
+
+        if (Reverse) moved.End = End - into;
+        else moved.Start = Start + into;
+
+        moved.Clamp();
+
+        return moved;
+    }
+
+    /// <summary>
     /// A copy that can be edited without the original hearing about it, for a preset landing on
     /// a piece somebody is already holding.
     /// </summary>

@@ -11,6 +11,10 @@ namespace JingleBox2.Tracker.Interfaces;
 /// does, so a song with no repeats set plays exactly as before. The counts belong to one run of the
 /// transport and start again whenever a slot is finished, so coming round to the same slot again,
 /// by the song looping, repeats it again. See <see cref="SlotRepeat"/> for what a slot can say.
+///
+/// Playing the song, a slot's pattern repeat comes round at the slot's last line, which is where
+/// its break stops when it has one. Where the song goes once the slot is finished is the clock's
+/// business, which reads the break the same way.
 /// </remarks>
 public interface ISlotPasses
 {

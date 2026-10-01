@@ -35,6 +35,12 @@ public class CommandEditorTests
     [InlineData('V', 0x80)]
     [InlineData('V', 0x00)]
     [InlineData('P', 0x10)]
+    [InlineData('G', 0x00)]
+    [InlineData('G', 0x18)]
+    [InlineData('S', 0x80)]
+    [InlineData('S', 0xFF)]
+    [InlineData('T', 0x5A)]
+    [InlineData('T', 0x14)]
     public void Opening_and_closing_changes_nothing(char letter, int parameter)
     {
         Assert.Equal(new TrackerCommand(letter, parameter), On(letter, parameter).Command);
@@ -186,5 +192,69 @@ public class CommandEditorTests
     public void Only_timed_commands_show_the_ruler(CommandKind kind, bool shows)
     {
         Assert.Equal(shows, Choosing(kind).ShowsRuler);
+    }
+
+    /// <summary>A glide of nought takes one line, and the ruler lights the whole of it.</summary>
+    [Fact]
+    public void A_glide_of_nought_is_one_line()
+    {
+        var editor = Choosing(CommandKind.Glide);
+
+        Assert.Equal("G00", editor.Written);
+        Assert.All(editor.Ruler, mark => Assert.True(mark.On));
+        Assert.Contains("one line", editor.Explanation);
+    }
+
+    /// <summary>A short glide lights its ticks and says how much of a line that is.</summary>
+    [Fact]
+    public void A_short_glide_lights_its_ticks()
+    {
+        var editor = Choosing(CommandKind.Glide);
+        editor.Slide = 6;
+
+        Assert.Equal("G06", editor.Written);
+        Assert.Equal(Enumerable.Range(0, 6), editor.Ruler.Where(mark => mark.On).Select(mark => mark.Index));
+        Assert.Contains("half a line", editor.Explanation);
+    }
+
+    /// <summary>A glide longer than a line says how many lines.</summary>
+    [Fact]
+    public void A_long_glide_says_its_lines()
+    {
+        var editor = Choosing(CommandKind.Glide);
+        editor.Slide = 24;
+
+        Assert.Contains("2 lines", editor.Explanation);
+    }
+
+    /// <summary>An offset says how far in, and has no ruler.</summary>
+    [Fact]
+    public void An_offset_says_how_far_in()
+    {
+        var editor = Choosing(CommandKind.Offset);
+        editor.Skip = 0x40;
+
+        Assert.Equal("S40", editor.Written);
+        Assert.Contains("25%", editor.Explanation);
+        Assert.False(editor.ShowsRuler);
+    }
+
+    /// <summary>A tempo below twenty read back is held to twenty, the slowest the song allows.</summary>
+    [Fact]
+    public void A_tempo_below_twenty_is_held()
+    {
+        Assert.Equal(new TrackerCommand('T', 0x14), On('T', 0x05).Command);
+    }
+
+    /// <summary>A tempo says its beats a minute in words and has no ruler.</summary>
+    [Fact]
+    public void A_tempo_says_its_beats()
+    {
+        var editor = Choosing(CommandKind.Tempo);
+        editor.Beats = 90;
+
+        Assert.Equal("T5A", editor.Written);
+        Assert.Contains("90 beats a minute", editor.Explanation);
+        Assert.False(editor.ShowsRuler);
     }
 }
