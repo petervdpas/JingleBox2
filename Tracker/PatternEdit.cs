@@ -140,6 +140,32 @@ public sealed class PatternEdit : IPatternEdit
     }
 
     /// <inheritdoc/>
+    public int SetCommand(Pattern pattern, PatternSelection where, int noteColumn, TrackerCommand command)
+    {
+        Taking(pattern, command.IsNone ? "clearing commands" : "a command");
+
+        if (where.IsEmpty) return 0;
+
+        int changed = 0;
+
+        for (int line = Math.Max(0, where.FirstLine); line <= Math.Min(where.LastLine, pattern.Lines - 1); line++)
+        {
+            for (int track = Math.Max(0, where.FirstTrack); track <= Math.Min(where.LastTrack, pattern.TrackCount - 1); track++)
+            {
+                int column = noteColumn >= 0 && noteColumn < pattern.ColumnsOn(track) ? noteColumn : 0;
+                var cell = pattern[line, track, column];
+
+                if (cell.Effect == command) continue;
+
+                pattern[line, track, column] = cell with { Effect = command };
+                changed++;
+            }
+        }
+
+        return changed;
+    }
+
+    /// <inheritdoc/>
     public void ClearAtCursor(Pattern pattern, PatternCursor cursor)
     {
         Taking(pattern, "clearing a cell");

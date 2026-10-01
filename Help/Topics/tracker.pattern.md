@@ -36,6 +36,12 @@ and it steps down. Delete on either stop clears the command.
 
 Every line is twelve ticks, so a delay of `06` is half a line and `03` a quarter.
 
+The same commands can be picked instead of typed: right click a cell and choose
+Command. Pick the command by name, then click a tick on the drawn line for a delay or
+a cut, set how often and how much quieter for a retrigger, or pick a chord for an
+arpeggio. The window says in words what it will do and which letters it writes. With
+lines selected it writes all of them, which is how an arpeggio lasts several lines.
+
 - `Vxx` sets the note's volume, `00` to `80`, and wins over the volume field.
 - `Pxx` pans the note: `00` hard left, `40` centre, `80` hard right.
 - `Qxx` starts the note `xx` ticks into its line, for swing, flams and pushed beats.

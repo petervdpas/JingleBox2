@@ -151,4 +151,52 @@ public class CommandTypingTests
 
         tracker.Finished();
     }
+
+    /// <summary>A command from the popup goes into every line of a selection, in the cursor's note column, as one undo step.</summary>
+    [Fact]
+    public void A_command_fills_a_selection_and_undoes_in_one()
+    {
+        var tracker = new TrackerViewModel(new QuietAudio(), new SoundMachineRack(),
+            new ObservableCollection<Recording>(), new SoundMachineProjects());
+        var pattern = tracker.Song.Patterns[0];
+
+        tracker.Cursor = new PatternCursor(2, 1, CellColumn.Note);
+        tracker.Selection = new PatternSelection(2, 1, 9, 1);
+
+        tracker.SetCommand(new TrackerCommand('A', 0x37));
+
+        for (int line = 2; line <= 9; line++) Assert.Equal(new TrackerCommand('A', 0x37), pattern[line, 1].Effect);
+        Assert.True(pattern[1, 1].Effect.IsNone);
+        Assert.True(pattern[10, 1].Effect.IsNone);
+        Assert.True(pattern[2, 0].Effect.IsNone);
+
+        ((JingleBox2.Shortcuts.Interfaces.IShortcutContext)tracker).Do(JingleBox2.Shortcuts.Enums.ShortcutAction.Undo);
+
+        for (int line = 2; line <= 9; line++) Assert.True(pattern[line, 1].Effect.IsNone);
+
+        tracker.Finished();
+    }
+
+    /// <summary>With no selection it is the cell under the cursor, and nothing clears it.</summary>
+    [Fact]
+    public void A_command_without_a_selection_is_the_cursor_cell()
+    {
+        var tracker = new TrackerViewModel(new QuietAudio(), new SoundMachineRack(),
+            new ObservableCollection<Recording>(), new SoundMachineProjects());
+        var pattern = tracker.Song.Patterns[0];
+        pattern[4, 0] = new TrackerCell(new Note(48), 0, 0x40, TrackerCommand.None);
+
+        tracker.Cursor = new PatternCursor(4, 0, CellColumn.Note);
+        tracker.SetCommand(new TrackerCommand('Q', 0x06));
+
+        Assert.Equal(new TrackerCommand('Q', 0x06), tracker.CommandAtCursor);
+        Assert.Equal(48, pattern[4, 0].Note.Semitone);
+
+        tracker.SetCommand(TrackerCommand.None);
+
+        Assert.True(pattern[4, 0].Effect.IsNone);
+        Assert.Equal(48, pattern[4, 0].Note.Semitone);
+
+        tracker.Finished();
+    }
 }

@@ -123,6 +123,23 @@ public interface IPatternEdit
     /// <returns>True when the letter went in.</returns>
     bool EnterEffectCommand(Pattern pattern, PatternCursor cursor, char command);
 
+    /// <summary>
+    /// Writes one whole command, letter and amount, into one note column of every line and track
+    /// a selection covers, as one edit.
+    /// </summary>
+    /// <remarks>
+    /// One note column of each track rather than all of them, since a command is about a voice
+    /// and the other columns of a chord are other voices: an arpeggio on every voice of a chord
+    /// is three arpeggios. A track with fewer columns than the one named takes it on its first.
+    /// <see cref="TrackerCommand.None"/> clears the command and leaves the rest of each cell.
+    /// </remarks>
+    /// <param name="pattern">The pattern being edited.</param>
+    /// <param name="where">The lines and tracks to write into.</param>
+    /// <param name="noteColumn">Which note column of each track.</param>
+    /// <param name="command">The command, or none to clear it.</param>
+    /// <returns>How many cells changed.</returns>
+    int SetCommand(Pattern pattern, PatternSelection where, int noteColumn, TrackerCommand command);
+
     /// <summary>Clears the column under the cursor. On the note column, clears the whole cell.</summary>
     /// <param name="pattern">The pattern being edited.</param>
     /// <param name="cursor">Which cell and which column to clear.</param>

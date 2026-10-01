@@ -426,6 +426,15 @@
 
                     <Separator />
 
+                    <!-- The second way in to a cell's command: chosen by name and set with a
+                         ruler, a chord or a slider rather than typed as a letter and two digits.
+                         With lines selected it writes every one of them. -->
+                    <MenuItem Header="Command..."
+                              Command="{Binding EditCommandCommand}"
+                              ToolTip.Tip="Delay, cut, retrigger, arpeggio, volume or pan on this note, set by picking rather than typing. With lines selected it writes all of them, which is how an arpeggio lasts." />
+
+                    <Separator />
+
                     <MenuItem Header="Delete selection"
                               InputGesture="Delete"
                               IsEnabled="{Binding HasSelection}"

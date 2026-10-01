@@ -2514,6 +2514,52 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             : $"Cleared {cleared} cell(s) in " + Selection.Describe();
     }
 
+    /// <summary>The command in the cell under the cursor, which the command popup opens on.</summary>
+    public TrackerCommand CommandAtCursor =>
+        CurrentPattern is { } pattern && pattern.Contains(Cursor.Line, Cursor.Track, Cursor.NoteColumn)
+            ? pattern[Cursor.Line, Cursor.Track, Cursor.NoteColumn].Effect
+            : TrackerCommand.None;
+
+    /// <summary>
+    /// Writes a command into the cell under the cursor, or into every line of the selection, as
+    /// one step of undo; nothing clears it.
+    /// </summary>
+    /// <remarks>
+    /// Every line of a selection rather than its first, because the commands that last are written
+    /// on every line they last for: an arpeggio over eight lines is eight cells saying the same
+    /// thing. Not held back by record, like Delete: a dialog somebody opened and pressed OK on is
+    /// not a key hit by accident while jamming.
+    /// </remarks>
+    /// <param name="command">The command, or <see cref="TrackerCommand.None"/> to clear it.</param>
+    public void SetCommand(TrackerCommand command)
+    {
+        if (CurrentPattern == null) return;
+
+        var where = HasSelection ? Selection : PatternSelection.At(Cursor);
+        int changed = Edits.SetCommand(CurrentPattern, where, Cursor.NoteColumn, command);
+
+        string what = command.IsNone ? "Cleared the command" : "Wrote " + command;
+
+        Status = changed == 0
+            ? "Nothing changed in " + where.Describe()
+            : what + (where.LineCount > 1 ? $" on {changed} line(s) in " + where.Describe() : "");
+    }
+
+    /// <summary>
+    /// Opens the command popup on the cell under the cursor, and writes what it gives back into
+    /// that cell or into every line of the selection.
+    /// </summary>
+    public IAsyncRelayCommand EditCommandCommand => new AsyncRelayCommand(async () =>
+    {
+        if (CurrentPattern == null) return;
+
+        string where = HasSelection
+            ? Selection.Describe()
+            : "line " + Cursor.Line.ToString("00", CultureInfo.InvariantCulture) + ", " + CursorTrackLabel;
+
+        if (await Views.CommandDialog.AskAsync(CommandAtCursor, where) is { } command) SetCommand(command);
+    });
+
     /// <summary>The track the cursor is on, named as the grid and the mixer name it.</summary>
     public string CursorTrackLabel => "Track " + (Cursor.Track + 1).ToString("00", CultureInfo.InvariantCulture);
 
