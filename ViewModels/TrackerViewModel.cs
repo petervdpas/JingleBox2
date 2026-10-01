@@ -4264,7 +4264,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// A copy and not a second slot pointing at the same pattern. The order already allows the
     /// same pattern twice, and it is what you want for a part that really does repeat; this is
     /// for the other case, where the second one is about to become different. The cells and the
-    /// automation lanes are both taken, so nothing moves together afterwards.
+    /// automation lanes are both taken, so nothing moves together afterwards, and the new slot
+    /// repeats and loops its lines the way the one it was copied from does.
     ///
     /// The cursor follows it, since a copy nobody is looking at is a copy nobody asked for.
     /// </remarks>
@@ -4282,7 +4283,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         int copy = Song.ClonePattern(pattern);
         if (copy < 0) return;
 
-        Song.InsertSlot(at + 1, copy);
+        Song.InsertSlot(at + 1, copy, Song.RepeatAt(at));
 
         RefreshOrder();
         MarkDirty("copying a pattern");

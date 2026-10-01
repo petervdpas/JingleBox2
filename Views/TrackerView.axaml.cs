@@ -314,7 +314,7 @@ public partial class TrackerView : UserControl
         }
 
         if (!pressed.IsLeftButtonPressed) return;
-        if (slot < 0) return;
+        if (slot < 0 || OnButton(e.Source as Visual)) return;
 
         try
         {
@@ -396,6 +396,24 @@ public partial class TrackerView : UserControl
         while (hit != null && hit != OrderList)
         {
             if (hit is Control control && control.Classes.Contains("loopbar")) return true;
+
+            hit = Avalonia.VisualTree.VisualExtensions.GetVisualParent(hit);
+        }
+
+        return false;
+    }
+
+    /// <summary>Whether a press landed on a button inside a row, such as the red cross on a loop of lines.</summary>
+    /// <remarks>
+    /// Such a press belongs to the button. Started as a drag of the slot, the drag takes the pointer
+    /// and the button never hears the release, so its command never runs.
+    /// </remarks>
+    /// <param name="hit">What the press landed on.</param>
+    private bool OnButton(Visual? hit)
+    {
+        while (hit != null && hit != OrderList)
+        {
+            if (hit is Button) return true;
 
             hit = Avalonia.VisualTree.VisualExtensions.GetVisualParent(hit);
         }

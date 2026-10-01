@@ -166,4 +166,24 @@ public class SlotRepeatCommandTests
         Assert.True(row.HasTimes);
         Assert.Equal("\u21ba00\u201307\u00d72", Assert.Single(row.Stretches!).Label);
     }
+
+    /// <summary>Copying a pattern gives the copy's slot the same repeats and loops as the slot it came from.</summary>
+    [Fact]
+    public void Copying_a_pattern_copies_its_repeats()
+    {
+        var tracker = Tracker();
+
+        tracker.RepeatSlotCommand.Execute(2);
+        tracker.Selection = new PatternSelection(32, 0, 40, 0);
+        tracker.LoopLinesCommand.Execute(2);
+        tracker.Selection = new PatternSelection(48, 0, 63, 0);
+        tracker.LoopLinesCommand.Execute(2);
+
+        int from = tracker.OrderIndex;
+        tracker.CopyPatternCommand.Execute(null);
+
+        Assert.Equal(from + 1, tracker.OrderIndex);
+        Assert.Equal(tracker.Song.RepeatAt(from).Times, tracker.Song.RepeatAt(from + 1).Times);
+        Assert.Equal(tracker.Song.RepeatAt(from).Lines(), tracker.Song.RepeatAt(from + 1).Lines());
+    }
 }
