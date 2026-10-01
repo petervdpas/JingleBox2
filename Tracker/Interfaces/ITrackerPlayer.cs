@@ -102,6 +102,17 @@ public interface ITrackerPlayer : IDisposable
     /// <param name="timestamp">The moment, as <c>Stopwatch.GetTimestamp</c> gives it.</param>
     TrackerPosition NearestLine(long timestamp);
 
+    /// <summary>
+    /// Carries the playing song on from another line at its next step, without stopping it.
+    /// </summary>
+    /// <remarks>
+    /// What scrolling the pattern while it plays does: the music goes where the hand takes it. A
+    /// line outside the song is held to the nearest one it has. Nothing happens while the song is
+    /// not playing.
+    /// </remarks>
+    /// <param name="to">Where to carry on from.</param>
+    void JumpTo(TrackerPosition to);
+
     /// <summary>Whether it is walking the order list or staying on one pattern.</summary>
     /// <remarks>
     /// Settable while a pass is running, and answered on the next line rather than on the next

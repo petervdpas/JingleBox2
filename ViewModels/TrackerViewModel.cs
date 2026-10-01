@@ -1882,6 +1882,30 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>
+    /// Moves the playing song by so many lines, which is what scrolling the pattern while it plays
+    /// does; nothing while it is not playing.
+    /// </summary>
+    /// <remarks>
+    /// Counted from the line the last scroll asked for until the song has reached it, so a quick
+    /// spin of the wheel moves as many lines as it has notches rather than one per frame drawn.
+    /// Held inside the pattern on screen.
+    /// </remarks>
+    /// <param name="lines">How many lines on, negative for back.</param>
+    public void ScrollPlaying(int lines)
+    {
+        if (!IsPlaying || lines == 0 || CurrentPattern is not { } pattern) return;
+
+        int from = _scrolledTo ?? Math.Max(0, PlayingLine);
+        int to = Math.Clamp(from + lines, 0, pattern.Lines - 1);
+
+        _scrolledTo = to;
+        _player.JumpTo(new TrackerPosition(OrderIndex, to));
+    }
+
+    /// <summary>The line the last scroll asked for, until the song has reached a line of its own.</summary>
+    private int? _scrolledTo;
+
+    /// <summary>
     /// Starts the transport at a line, which is what a master telling us to go means.
     /// </summary>
     /// <remarks>
@@ -1979,6 +2003,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             Say(_flow.Stepped(_flowing.Elapsed));
 
             PlayingLine = position.Line;
+            _scrolledTo = null;
 
             Running();
 

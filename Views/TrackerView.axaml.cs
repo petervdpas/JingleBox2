@@ -253,6 +253,7 @@ public partial class TrackerView : UserControl
             RoutingStrategies.Bubble, handledEventsToo: true);
 
         OrderList.AddHandler(PointerWheelChangedEvent, OnOrderWheel, RoutingStrategies.Tunnel);
+        GridScroll.AddHandler(PointerWheelChangedEvent, OnPatternWheel, RoutingStrategies.Tunnel);
 
         OrderList.AddHandler(PointerMovedEvent, OnOrderPointerMoved,
             RoutingStrategies.Bubble, handledEventsToo: true);
@@ -323,6 +324,23 @@ public partial class TrackerView : UserControl
         {
             LetGo();
         }
+    }
+
+    /// <summary>
+    /// Scrolling the pattern while the song plays takes the music with it, a line a notch, which
+    /// is what a tracker has always done; stopped, the wheel scrolls the page as before.
+    /// </summary>
+    /// <param name="sender">The pattern's scroll viewer.</param>
+    /// <param name="e">How far the wheel turned.</param>
+    private void OnPatternWheel(object? sender, PointerWheelEventArgs e)
+    {
+        if (ViewModel is not { IsPlaying: true } model || e.Delta.Y == 0) return;
+
+        e.Handled = true;
+
+        int notches = Math.Max(1, (int)Math.Round(Math.Abs(e.Delta.Y)));
+
+        model.ScrollPlaying(e.Delta.Y > 0 ? -notches : notches);
     }
 
     /// <summary>

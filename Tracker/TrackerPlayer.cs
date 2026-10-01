@@ -303,6 +303,33 @@ public sealed class TrackerPlayer : ITrackerPlayer
     private volatile LineMark? _mark;
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Left for the clock thread as one boxed position and taken there in place of the line it is
+    /// about to play, at the moment it plays it, so the timing is untouched and nothing is torn
+    /// down or loaded again.
+    /// A second move before the first is taken replaces it, since only where the hand ended up
+    /// matters.
+    /// </remarks>
+    public void JumpTo(TrackerPosition to)
+    {
+        if (State != TrackerTransportState.Playing) return;
+
+        Volatile.Write(ref _jump, to);
+    }
+
+    /// <summary>A line asked for by <see cref="JumpTo"/> that the clock has not taken yet, or nothing.</summary>
+    private object? _jump;
+
+    /// <summary>A position held inside the song: a slot of the order that exists, and a line its pattern has.</summary>
+    private static TrackerPosition Held(Song song, TrackerPosition at)
+    {
+        int order = song.Order.Count > 0 ? Math.Clamp(at.OrderIndex, 0, song.Order.Count - 1) : 0;
+        int lines = song.PatternAt(order)?.Lines ?? 1;
+
+        return new TrackerPosition(order, Math.Clamp(at.Line, 0, Math.Max(0, lines - 1)));
+    }
+
+    /// <inheritdoc/>
     public TrackerPosition NearestLine(long timestamp)
     {
         var mark = _mark;
@@ -442,6 +469,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
            against it from that moment: a mark left from the last run would put the new run's beat
            wherever the last one had got to. */
         _mark = null;
+        _jump = null;
 
         _cancel = new CancellationTokenSource();
         var token = _cancel.Token;
@@ -1526,6 +1554,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
         while (!token.IsCancellationRequested)
         {
             if (generation != Volatile.Read(ref _generation)) return;
+
+            if (Interlocked.Exchange(ref _jump, null) is TrackerPosition jump) position = Held(song, jump);
 
             Automation?.Play(song, position);
 
