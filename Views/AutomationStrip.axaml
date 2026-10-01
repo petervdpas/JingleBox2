@@ -38,6 +38,18 @@
       <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
+    <!-- A parameter that already has a lane, in the picker: in the accent colour, so what the
+         track already moves stands out of a long list. On the row the pointer or the pick is
+         on, which is itself filled with the accent, it keeps the row's own lettering colour so
+         it can still be read. -->
+    <Style Selector="TextBlock.automated">
+      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="ComboBoxItem:pointerover TextBlock.automated, ComboBoxItem:selected TextBlock.automated">
+      <Setter Property="Foreground" Value="{Binding $parent[ComboBoxItem].Foreground}" />
+    </Style>
+
     <Style Selector="TextBlock.deviceValue">
       <Setter Property="FontSize" Value="10" />
       <Setter Property="FontFamily" Value="monospace" />
@@ -106,11 +118,13 @@
                 <DataTemplate x:DataType="vm:AutomationRow">
                   <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <TextBlock Grid.Column="0" Text="{Binding Said}"
+                               Classes.automated="{Binding HasLane}"
                                TextTrimming="CharacterEllipsis" />
 
                     <!-- Only for the ones that have a lane, so the picker says at a glance
                          what this track already moves. -->
-                    <TextBlock Grid.Column="1" Classes="deviceKey" Text="{Binding Says}" />
+                    <TextBlock Grid.Column="1" Classes="deviceKey" Classes.automated="{Binding HasLane}"
+                               Text="{Binding Says}" />
                   </Grid>
                 </DataTemplate>
               </ComboBox.ItemTemplate>

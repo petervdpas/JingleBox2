@@ -142,4 +142,66 @@ public sealed class PadOnBusTests : IDisposable
 
         Assert.False(engine.IsPadPlaying(0));
     }
+
+    /// <summary>
+    /// A pad that plays to its end on the bus says it has stopped, so its play button comes back.
+    /// </summary>
+    /// <remarks>
+    /// The end is reported by the mixer add-on's own sync, on the mixing thread, and nothing else
+    /// would ever say it: a pad whose end went unheard stays playing for ever, with its play button
+    /// greyed out.
+    /// </remarks>
+    [Fact]
+    public void A_pad_that_plays_to_its_end_says_it_stopped()
+    {
+        if (!Available()) return;
+
+        using var engine = new BassAudioEngine(padCount: 4);
+        using var stopped = new ManualResetEventSlim();
+
+        engine.PadPlaybackChanged += (_, change) =>
+        {
+            if (change.PadIndex == 0 && change.State == JingleBox2.Audio.Enums.PadPlaybackState.Stopped) stopped.Set();
+        };
+
+        engine.EnsureInitialized();
+
+        if (!engine.PadBus.IsOpen) return;
+
+        engine.PlaySample(0, Tone(), 1f);
+
+        Assert.True(stopped.Wait(TimeSpan.FromSeconds(5)), "a one second pad never said it had stopped");
+        Assert.False(engine.IsPadPlaying(0), "a pad that reached its end still called itself playing");
+    }
+
+    /// <summary>A pad played again after it ended plays, and ends again, on the same stream.</summary>
+    [Fact]
+    public void A_pad_played_again_after_its_end_plays_and_ends_again()
+    {
+        if (!Available()) return;
+
+        using var engine = new BassAudioEngine(padCount: 4);
+        int stops = 0;
+
+        engine.PadPlaybackChanged += (_, change) =>
+        {
+            if (change.PadIndex == 0 && change.State == JingleBox2.Audio.Enums.PadPlaybackState.Stopped)
+                Interlocked.Increment(ref stops);
+        };
+
+        engine.EnsureInitialized();
+
+        if (!engine.PadBus.IsOpen) return;
+
+        string tone = Tone();
+
+        engine.PlaySample(0, tone, 1f);
+        Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref stops) == 1, TimeSpan.FromSeconds(5)), "the first play never ended");
+
+        engine.PlaySample(0, tone, 1f);
+        Assert.True(engine.IsPadPlaying(0), "the second play did not sound");
+
+        Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref stops) == 2, TimeSpan.FromSeconds(5)), "the second play never ended");
+        Assert.False(engine.IsPadPlaying(0));
+    }
 }

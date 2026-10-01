@@ -11,8 +11,7 @@ using Xunit;
 namespace JingleBox2.Tests;
 
 /// <summary>
-/// A slot stopping short of its pattern's end and going on to the next slot, and the tempo command
-/// changing how fast the song plays from its line.
+/// A slot stopping short of its pattern's end and going on to the next slot.
 /// </summary>
 public class SlotBreakTests
 {
@@ -158,56 +157,6 @@ public class SlotBreakTests
         var reached = Play(song, TrackerPlayMode.Pattern, seen => seen.Count >= 9);
 
         Assert.Equal(new[] { 0, 1, 2, 3, 4, 5, 6, 7, 0 }, reached.Take(9).Select(at => at.Line));
-    }
-
-    /// <summary>A tempo command slows the song from its line on, and the saved tempo stays.</summary>
-    [Fact]
-    public void A_tempo_command_changes_how_fast_it_plays()
-    {
-        var song = Of(1, 64, bpm: 240);
-        song.Patterns[0][2, 0] = new TrackerCell(Note.Empty, TrackerCell.NoInstrument, TrackerCell.NoVolume,
-            new TrackerCommand(TrackerCommand.Tempo, 0x3C));
-
-        var times = new ConcurrentQueue<(int Line, double Ms)>();
-        var clock = Stopwatch.StartNew();
-
-        using var player = new TrackerPlayer(new SilentAudio());
-        player.PositionChanged += (_, at) => times.Enqueue((at.Line, clock.Elapsed.TotalMilliseconds));
-        player.Play(song, TrackerPosition.Start, TrackerPlayMode.Pattern);
-
-        Assert.True(Until(() => times.Count >= 5));
-        player.Stop();
-
-        var seen = times.ToArray();
-        double fast = seen[1].Ms - seen[0].Ms;
-        double slow = seen[4].Ms - seen[3].Ms;
-
-        Assert.InRange(fast, 40, 110);
-        Assert.InRange(slow, 200, 330);
-        Assert.Equal(240, song.Bpm);
-    }
-
-    /// <summary>A tempo below twenty is not a tempo and changes nothing.</summary>
-    [Fact]
-    public void A_tempo_below_twenty_changes_nothing()
-    {
-        var song = Of(1, 64, bpm: 240);
-        song.Patterns[0][1, 0] = new TrackerCell(Note.Empty, TrackerCell.NoInstrument, TrackerCell.NoVolume,
-            new TrackerCommand(TrackerCommand.Tempo, 0x05));
-
-        var times = new ConcurrentQueue<double>();
-        var clock = Stopwatch.StartNew();
-
-        using var player = new TrackerPlayer(new SilentAudio());
-        player.PositionChanged += (_, _) => times.Enqueue(clock.Elapsed.TotalMilliseconds);
-        player.Play(song, TrackerPosition.Start, TrackerPlayMode.Pattern);
-
-        Assert.True(Until(() => times.Count >= 4));
-        player.Stop();
-
-        var seen = times.ToArray();
-
-        Assert.InRange(seen[3] - seen[2], 40, 110);
     }
 
     /// <summary>Plays a song until enough positions are seen, and gives them back.</summary>

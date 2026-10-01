@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Threading;
 using JingleBox2.Audio.Records;
 using ManagedBass;
+using JingleBox2.Diagnostics;
+using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Enums;
 using JingleBox2.Config.Enums;
 using JingleBox2.Audio.Interfaces;
@@ -155,6 +157,12 @@ public sealed class BassAudioEngine : IAudioEngine, Interfaces.IRecordingSource
     /// <summary>The hook each effect is hung on, or 0 where nothing is hung.</summary>
     private int[] _padDsp;
 
+    /// <summary>
+    /// The stream each pad's end is being watched on, nought for none: a sync lives on a stream
+    /// while it is plugged into the bus, so this is what says whether one has to be set again.
+    /// </summary>
+    private int[] _padWatched;
+
     /// <summary>Kept alive for as long as any pad has an effect: BASS holds the pointer.</summary>
     private readonly DSPProcedure _dspProcedure;
 
@@ -212,6 +220,7 @@ public sealed class BassAudioEngine : IAudioEngine, Interfaces.IRecordingSource
 
         _padInserts = new Plugins.Interfaces.IAudioInsert?[padCount];
         _padDsp = new int[padCount];
+        _padWatched = new int[padCount];
         _padScratch = new float[padCount][];
         _padChannels = new int[padCount];
 
@@ -777,17 +786,16 @@ public sealed class BassAudioEngine : IAudioEngine, Interfaces.IRecordingSource
                 _padStreams[padIndex] = handle;
 
                 if (_padInserts[padIndex] != null) AttachDspLocked(padIndex, handle);
-
-                if (!_padLoops[padIndex])
-                    WatchEndLocked(handle, padIndex);
             }
+
+            bool watch = !_padLoops[padIndex];
 
             var fadeIn = _padFadeIn[padIndex];
             if (fadeIn > 0)
             {
                 Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, 0f);
                 Bass.ChannelSetPosition(handle, 0);
-                if (!SoundLocked(handle))
+                if (!SoundLocked(handle, padIndex, watch))
                     throw new InvalidOperationException($"the pad would not start: {Bass.LastError}");
                 Bass.ChannelSlideAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex], (int)(fadeIn * 1000));
             }
@@ -795,7 +803,7 @@ public sealed class BassAudioEngine : IAudioEngine, Interfaces.IRecordingSource
             {
                 Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex]);
                 Bass.ChannelSetPosition(handle, 0);
-                if (!SoundLocked(handle))
+                if (!SoundLocked(handle, padIndex, watch))
                     throw new InvalidOperationException($"the pad would not start: {Bass.LastError}");
             }
 
@@ -858,22 +866,20 @@ public sealed class BassAudioEngine : IAudioEngine, Interfaces.IRecordingSource
                 _padStreams[padIndex] = handle;
 
                 if (_padInserts[padIndex] != null) AttachDspLocked(padIndex, handle);
-
-                WatchEndLocked(handle, padIndex);
             }
 
             var fadeIn = _padFadeIn[padIndex];
             if (fadeIn > 0)
             {
                 Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, 0f);
-                if (!SoundLocked(handle))
+                if (!SoundLocked(handle, padIndex, true))
                     throw new InvalidOperationException($"the pad would not start: {Bass.LastError}");
                 Bass.ChannelSlideAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex], (int)(fadeIn * 1000));
             }
             else
             {
                 Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex]);
-                if (!SoundLocked(handle))
+                if (!SoundLocked(handle, padIndex, true))
                     throw new InvalidOperationException($"the pad would not start: {Bass.LastError}");
             }
 
@@ -950,11 +956,14 @@ public sealed class BassAudioEngine : IAudioEngine, Interfaces.IRecordingSource
 
     /// <summary>A pad has reached its end, on BASS's own thread.</summary>
     /// <remarks>
-    /// The reference is dropped rather than the stream being freed, and only where the pad is
-    /// still holding this very handle: the sync arrives on the mixing thread and is handed to the
-    /// pool, so by the time this runs the pad may have been pressed again and be on a new stream.
-    /// Freeing here would then free the stream that is playing. The handle itself is let go where
-    /// the pad next needs one, or by <see cref="FreeStreamLocked"/>.
+    /// The stream is unplugged from the bus and kept, so the pad stops calling itself playing and
+    /// the next press plays the same stream again from the start. It is compared by the channel
+    /// that ended, never by the sync's own handle, which is a different number.
+    ///
+    /// Only where the pad is still holding this stream and it really is at its end: the sync
+    /// arrives on the mixing thread and is handed to the pool, so by the time this runs the pad
+    /// may have been pressed again and be playing this stream from the start, or another stream
+    /// altogether. Unplugging then would silence the press, so nothing happens and nothing is said.
     /// </remarks>
     /// <param name="handle">The sync this came from.</param>
     /// <param name="channel">The channel that ended.</param>
@@ -966,8 +975,10 @@ public sealed class BassAudioEngine : IAudioEngine, Interfaces.IRecordingSource
 
         lock (_lock)
         {
-            if (InRange(padIndex) && _padStreams[padIndex] == handle)
-                _padStreams[padIndex] = 0;
+            if (!InRange(padIndex) || _padStreams[padIndex] != channel) return;
+            if (Bass.ChannelIsActive(channel) != PlaybackState.Stopped) return;
+
+            SilenceLocked(channel);
         }
 
         Raise(padIndex, PadPlaybackState.Stopped);
@@ -1081,11 +1092,40 @@ public sealed class BassAudioEngine : IAudioEngine, Interfaces.IRecordingSource
     /// </remarks>
     /// <param name="handle">The pad's stream.</param>
     /// <returns>False where it would not start.</returns>
-    private bool SoundLocked(int handle) => _padBus.Add(handle);
+    /// <param name="padIndex">Which pad it is.</param>
+    /// <param name="watchEnd">
+    /// Whether the pad's end is to be heard, which is every stream but a recording set to loop.
+    /// </param>
+    /// <remarks>
+    /// The end is watched once the stream is plugged in and not before: the add-on keeps a sync
+    /// only on one of its own sources, so one set beforehand is refused, and with nothing anywhere
+    /// saying so the pad plays to its end and goes on calling itself playing for ever. Unplugging
+    /// takes the sync with it, so it is set again whenever the stream is plugged back in.
+    /// </remarks>
+    private bool SoundLocked(int handle, int padIndex, bool watchEnd)
+    {
+        if (!_padBus.Add(handle)) return false;
+
+        if (watchEnd && _padWatched[padIndex] != handle) WatchEndLocked(handle, padIndex);
+
+        return true;
+    }
 
     /// <inheritdoc cref="SoundLocked"/>
     /// <param name="handle">The pad's stream.</param>
-    private void SilenceLocked(int handle) => _padBus.Remove(handle);
+    private void SilenceLocked(int handle)
+    {
+        _padBus.Remove(handle);
+
+        Unwatched(handle);
+    }
+
+    /// <summary>Forgets that a stream's end is being watched, since unplugging it took the watch with it.</summary>
+    private void Unwatched(int handle)
+    {
+        for (int pad = 0; pad < _padWatched.Length; pad++)
+            if (_padWatched[pad] == handle) _padWatched[pad] = 0;
+    }
 
     /// <inheritdoc cref="SoundLocked"/>
     /// <remarks>
@@ -1245,8 +1285,18 @@ public sealed class BassAudioEngine : IAudioEngine, Interfaces.IRecordingSource
     /// </remarks>
     /// <param name="handle">The pad's stream.</param>
     /// <param name="padIndex">Which pad it is.</param>
-    private void WatchEndLocked(int handle, int padIndex) =>
-        ManagedBass.Mix.BassMix.ChannelSetSync(handle, SyncFlags.End, 0, _mixEndSync, new IntPtr(padIndex));
+    private void WatchEndLocked(int handle, int padIndex)
+    {
+        if (ManagedBass.Mix.BassMix.ChannelSetSync(handle, SyncFlags.End, 0, _mixEndSync, new IntPtr(padIndex)) != 0)
+        {
+            _padWatched[padIndex] = handle;
+            return;
+        }
+
+        Log.Write(LogArea.Audio, () =>
+            "pad " + (padIndex + 1) + ": its end could not be watched (" + Bass.LastError
+            + "), so it will go on calling itself playing after it finishes");
+    }
 
     /// <summary>
     /// A pad reached its end while on the bus, on the thread that renders the audio.
@@ -1282,6 +1332,7 @@ public sealed class BassAudioEngine : IAudioEngine, Interfaces.IRecordingSource
         _padDsp[padIndex] = 0;
 
         _padBus.Remove(handle);
+        Unwatched(handle);
 
         var state = Bass.ChannelIsActive(handle);
         if (state != PlaybackState.Stopped)
@@ -1456,6 +1507,7 @@ public sealed class BassAudioEngine : IAudioEngine, Interfaces.IRecordingSource
             _padFadeOut = new double[newPadCount];
             _padInserts = new Plugins.Interfaces.IAudioInsert?[newPadCount];
             _padDsp = new int[newPadCount];
+            _padWatched = new int[newPadCount];
             _padScratch = new float[newPadCount][];
             _padChannels = new int[newPadCount];
 

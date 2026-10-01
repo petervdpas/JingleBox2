@@ -22,6 +22,18 @@ public interface IControlTargets
     IControlTarget? Find(ControlMapping mapping);
 
     /// <summary>
+    /// The same targets with nothing held back for which page is in front, which is what the song
+    /// playing its own automation uses.
+    /// </summary>
+    /// <remarks>
+    /// A hand on a knob is held to the page in front, so one turn does not move a machine on the
+    /// rack and a mixer strip together. A lane is not a hand: it is the song saying what a
+    /// parameter does over these lines, and it has to say it whichever page is showing, or a
+    /// fader drawn into a lane plays only while somebody happens to be looking at the mixer.
+    /// </remarks>
+    IControlTargets Everywhere => this;
+
+    /// <summary>
     /// What the modulation wheel drives on the machine a track plays, or nothing where it drives
     /// nothing.
     /// </summary>

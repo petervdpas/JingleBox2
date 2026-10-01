@@ -63,7 +63,15 @@ public sealed partial class PluginChainViewModel : ObservableObject
 
         _poll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(PollMilliseconds) };
         _poll.Tick += (_, _) => Poll();
+
+        Devices.CollectionChanged += (_, _) => OnPropertyChanged(nameof(Count));
     }
+
+    /// <summary>
+    /// How many devices are on the chain, the instrument at its head included, which is what the
+    /// strip's tab shows.
+    /// </summary>
+    public int Count => Devices.Count + (Instrument != null ? 1 : 0);
 
     /// <summary>Fast enough for a meter to move, slow enough to cost nothing.</summary>
     private const int PollMilliseconds = 120;
@@ -396,7 +404,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// reached.
     /// </remarks>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasInstrument))]
+    [NotifyPropertyChangedFor(nameof(HasInstrument), nameof(Count))]
     private PluginInstrumentViewModel? instrument;
 
     /// <summary>True when there is something at the head of the strip to draw.</summary>

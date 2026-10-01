@@ -37,7 +37,7 @@ public sealed partial class CommandEditorViewModel : ObservableObject
         new CommandChoice(CommandKind.Offset, "Offset", TrackerCommand.Offset, "Starts a recording partway in, so one break can be played as many hits."),
         new CommandChoice(CommandKind.Volume, "Volume", TrackerCommand.SetVolume, "Sets this note's own volume."),
         new CommandChoice(CommandKind.Pan, "Pan", TrackerCommand.SetPan, "Places this note left or right."),
-        new CommandChoice(CommandKind.Tempo, "Tempo", TrackerCommand.Tempo, "Changes how fast the song plays, from this line on.")
+        new CommandChoice(CommandKind.Tempo, "Tempo", TrackerCommand.Tempo, "Changes how fast the song plays from this line, as a step in the song's tempo lane.")
     };
 
     /// <summary>The chords an arpeggio offers by name.</summary>
@@ -93,7 +93,7 @@ public sealed partial class CommandEditorViewModel : ObservableObject
     [ObservableProperty] private double skip = 0x80;
 
     /// <summary>For a tempo, the beats a minute, 20 to 255.</summary>
-    [ObservableProperty] private double beats = 120;
+    [ObservableProperty] private double beats = TrackerTiming.DefaultBpm;
 
     /// <summary>For a volume, the level, 00 to 80.</summary>
     [ObservableProperty] private double level = 0x40;
@@ -214,7 +214,7 @@ public sealed partial class CommandEditorViewModel : ObservableObject
         CommandKind.Arpeggio => ArpeggioWords(),
         CommandKind.Glide => GlideWords(),
         CommandKind.Offset => $"A recording starts {Math.Round(Byte(Skip, 0xFF) / 2.56)}% of the way in. Synths and plugins are not affected.",
-        CommandKind.Tempo => $"From this line the song plays at {Math.Clamp((int)Math.Round(Beats), MinTempo, 0xFF)} beats a minute, until the next tempo or until it is stopped. The tempo saved with the song stays as it is.",
+        CommandKind.Tempo => $"From this line the song plays at {Math.Clamp((int)Math.Round(Beats), MinTempo, 0xFF)} beats a minute. It goes into the song's tempo lane on the mixer, not into the cell, and the tempo saved with the song stays as it is.",
         CommandKind.Volume => $"This note plays at {Math.Round(Level / TrackerCell.MaxVolume * 100)}% volume, whatever the volume field says.",
         _ => PanWords()
     };
@@ -323,8 +323,8 @@ public sealed partial class CommandEditorViewModel : ObservableObject
 
     partial void OnBeatsChanged(double value) => Moved();
 
-    /// <summary>The slowest tempo a command can set, which is the slowest the song allows.</summary>
-    public const int MinTempo = (int)Tracker.Records.TrackerTiming.MinBpm;
+    /// <summary>The slowest tempo a command can set, which is the slowest a song allows.</summary>
+    public const int MinTempo = (int)TrackerTiming.MinBpm;
 
     partial void OnPlaceChanged(double value) => Moved();
 

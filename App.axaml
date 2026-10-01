@@ -120,6 +120,13 @@
                 <SolidColorBrush Color="{DynamicResource Color.Danger}" />
             </Setter>
         </Style>
+        <!-- A NumberField showing a value that is not the one saved, such as the tempo box while
+             a tempo lane has the song playing faster or slower than its own. -->
+        <Style Selector="ui|NumberField.moving /template/ TextBox#PART_TextBox">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
         <!-- The stepper buttons inside a NumberField: as small as a glyph allows. -->
         <Style Selector="RepeatButton.stepper">
             <Setter Property="FontSize" Value="6" />
@@ -412,6 +419,12 @@
                                                Width="14" VerticalAlignment="Center" />
                                     <TextBlock Classes="foldName" VerticalAlignment="Center"
                                                Text="{TemplateBinding Title}" />
+                                    <!-- How many things are under the lid, so a folded strip
+                                         still says whether it is worth opening. -->
+                                    <Border Classes="foldCount" VerticalAlignment="Center"
+                                            IsVisible="{TemplateBinding Count, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                        <TextBlock Text="{TemplateBinding Count}" />
+                                    </Border>
                                 </StackPanel>
                             </Border>
                         </ToggleButton>
@@ -520,6 +533,30 @@
 
         <Style Selector="ToggleButton.fold:pointerover Border.foldBar > StackPanel > TextBlock.foldName">
             <Setter Property="Opacity" Value="1" />
+        </Style>
+
+        <!-- The count on a strip's tab: quiet at nought, lit in the accent when there is
+             something under the lid. -->
+        <Style Selector="Border.foldCount">
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="6,0" />
+            <Setter Property="MinWidth" Value="18" />
+            <Setter Property="Opacity" Value="0.55" />
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource Color.TextMuted}" Opacity="0.25" />
+            </Setter>
+        </Style>
+        <Style Selector="Border.foldCount > TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="views|FoldStrip:some Border.foldCount">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+        </Style>
+        <Style Selector="views|FoldStrip:some Border.foldCount > TextBlock">
+            <Setter Property="Foreground" Value="White" />
         </Style>
 
         <!-- The grip itself, drawn the way the handle between two rows is drawn, because it is

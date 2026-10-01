@@ -239,22 +239,23 @@ public class CommandEditorTests
         Assert.False(editor.ShowsRuler);
     }
 
-    /// <summary>A tempo below twenty read back is held to twenty, the slowest the song allows.</summary>
+    /// <summary>A tempo below twenty read back is held to twenty, the slowest a song allows.</summary>
     [Fact]
     public void A_tempo_below_twenty_is_held()
     {
         Assert.Equal(new TrackerCommand('T', 0x14), On('T', 0x05).Command);
     }
 
-    /// <summary>A tempo says its beats a minute in words and has no ruler.</summary>
+    /// <summary>A tempo says its beats a minute and where it goes, and has no ruler.</summary>
     [Fact]
-    public void A_tempo_says_its_beats()
+    public void A_tempo_says_its_beats_and_where_it_goes()
     {
         var editor = Choosing(CommandKind.Tempo);
         editor.Beats = 90;
 
         Assert.Equal("T5A", editor.Written);
         Assert.Contains("90 beats a minute", editor.Explanation);
+        Assert.Contains("tempo lane", editor.Explanation);
         Assert.False(editor.ShowsRuler);
     }
 }

@@ -363,21 +363,31 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     public void UseAutomation(Midi.Interfaces.IControlTargets targets)
     {
-        _player.Automation = new AutomationPlayer(targets);
+        var lanes = targets.Everywhere;
+
+        _player.Automation = new AutomationPlayer(lanes);
         _player.Controls = targets;
 
         Lanes = new AutomationViewModel(
-            targets, () => Song, () => CurrentPattern, () => LinesPerBeat, () => PlayingLine)
+            lanes, () => Song, () => CurrentPattern, () => LinesPerBeat, () => PlayingLine)
         {
             Taking = History.Taking,
-            Dirtied = () => MarkDirty("automation")
+            Dirtied = () =>
+            {
+                MarkDirty("automation");
+                LanesCounted();
+            }
         };
 
         MasterLanes = new AutomationViewModel(
-            targets, () => Song, () => CurrentPattern, () => LinesPerBeat, () => PlayingLine)
+            lanes, () => Song, () => CurrentPattern, () => LinesPerBeat, () => PlayingLine)
         {
             Taking = History.Taking,
-            Dirtied = () => MarkDirty("automation")
+            Dirtied = () =>
+            {
+                MarkDirty("automation");
+                LanesCounted();
+            }
         };
 
         MasterLanes.Show(TrackerPlayer.MasterStrip);
@@ -593,6 +603,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         foreach (var strip in Strips) strip.IsSelected = strip.Track == track;
 
         LightInstrument();
+        LanesCounted();
 
         if (ShowsLanes) Lanes?.Show(track);
     }
@@ -1216,7 +1227,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             work => Dispatcher.UIThread.Post(work))
         {
             Taking = History.Taking,
-            Dirtied = () => MarkDirty("automation")
+            Dirtied = () =>
+            {
+                MarkDirty("automation");
+                LanesCounted();
+            }
         };
 
         TrackEffect.Changing += () =>
@@ -1264,6 +1279,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         _player.PositionChanged += OnPositionChanged;
         _player.StateChanged += OnPlayerStateChanged;
+        _player.TempoMoved += (_, _) => Dispatcher.UIThread.Post(TempoShown);
         _player.Stopped += OnPlayerStopped;
 
         RefreshOrder();
@@ -1298,8 +1314,39 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             SongClock.Tempo(Song.Timing.ClampedBpm);
 
             OnPropertyChanged();
+            TempoShown();
             MarkDirty("the tempo");
         }
+    }
+
+    /// <summary>
+    /// The tempo the box above the pattern shows: the one the song is playing at while it plays,
+    /// so a tempo lane is seen moving it, and the song's own otherwise. Typing into it sets the
+    /// song's own.
+    /// </summary>
+    /// <remarks>
+    /// While a lane is driving the tempo, what is typed is saved with the song and the box goes on
+    /// showing the lane, since the lane is what is playing; stopped, it shows what was typed.
+    /// </remarks>
+    public double ShownBpm
+    {
+        get => _player.IsPlaying ? _player.PlayingBpm : Bpm;
+        set => Bpm = value;
+    }
+
+    /// <summary>Whether the song is playing at a tempo other than its own, which the box says in its colour.</summary>
+    public bool TempoMoving => _player.IsPlaying && Math.Abs(_player.PlayingBpm - Song.Timing.ClampedBpm) >= 0.001;
+
+    /// <summary>
+    /// Says the box's tempo and its colour may have moved, and so may the reading on the song
+    /// master's lane panel when it is showing the tempo.
+    /// </summary>
+    private void TempoShown()
+    {
+        OnPropertyChanged(nameof(ShownBpm));
+        OnPropertyChanged(nameof(TempoMoving));
+
+        MasterLanes?.Chosen?.Reread();
     }
 
     /// <summary>
@@ -2182,6 +2229,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Dispatcher.UIThread.Post(() =>
         {
             Transport = state;
+            TempoShown();
+
             if (state == TrackerTransportState.Stopped)
             {
                 PlayingLine = -1;
@@ -2402,10 +2451,38 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (newValue != null) newValue.Changed += OnPatternEdited;
 
         NeighboursMoved();
+        LanesCounted();
     }
 
-    /// <summary>Any edit to the pattern on screen is work that is not on disc.</summary>
-    private void OnPatternEdited(object? sender, EventArgs e) => MarkDirty("the pattern");
+    /// <summary>Any edit to the pattern on screen is work that is not on disc, and may have moved a lane.</summary>
+    private void OnPatternEdited(object? sender, EventArgs e)
+    {
+        MarkDirty("the pattern");
+        LanesCounted();
+    }
+
+    /// <summary>
+    /// How many lanes on the cursor's track in the pattern on screen have anything in them, which
+    /// is what the automation strip's tab shows.
+    /// </summary>
+    /// <remarks>
+    /// Worked out here rather than by the strip's panel, which only reads itself while it is open:
+    /// the count is most worth having on a strip that is folded away.
+    /// </remarks>
+    public int LaneCount => LanesIn(Cursor.Track);
+
+    /// <summary>The same for the song's master, for the strip on the mixer.</summary>
+    public int MasterLaneCount => LanesIn(TrackerPlayer.MasterStrip);
+
+    /// <summary>How many lanes on a strip in the pattern on screen have at least one point.</summary>
+    private int LanesIn(int strip) => CurrentPattern?.LanesOn(strip).Count(lane => lane.Points.Count > 0) ?? 0;
+
+    /// <summary>Says both lane counts may have moved.</summary>
+    private void LanesCounted()
+    {
+        OnPropertyChanged(nameof(LaneCount));
+        OnPropertyChanged(nameof(MasterLaneCount));
+    }
 
     /// <summary>
     /// A different song is a different description, different neighbours, and a different mix
@@ -2569,7 +2646,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <remarks>
     /// Every line of a selection rather than its first, because the commands that last are written
     /// on every line they last for: an arpeggio over eight lines is eight cells saying the same
-    /// thing. Not held back by record, like Delete: a dialog somebody opened and pressed OK on is
+    /// thing. A tempo is the exception: it goes into the song's tempo lane from the selection's
+    /// first line, since tempo is kept there and nowhere else. Not held back by record, like Delete: a dialog somebody opened and pressed OK on is
     /// not a key hit by accident while jamming.
     /// </remarks>
     /// <param name="command">The command, or <see cref="TrackerCommand.None"/> to clear it.</param>
@@ -2578,6 +2656,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (CurrentPattern == null) return;
 
         var where = HasSelection ? Selection : PatternSelection.At(Cursor);
+
+        if (command.Command == TrackerCommand.Tempo)
+        {
+            TempoAt(where.FirstLine, command.Parameter);
+            return;
+        }
         int changed = Edits.SetCommand(CurrentPattern, where, Cursor.NoteColumn, command);
 
         string what = command.IsNone ? "Cleared the command" : "Wrote " + command;
@@ -3999,7 +4083,53 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (_digits < 2) return;
 
         _digitsAt = null;
+
+        if (Cursor.Column == CellColumn.Amount && CommandAtCursor.Command == TrackerCommand.Tempo)
+        {
+            int typed = CommandAtCursor.Parameter;
+            var pattern = CurrentPattern;
+            var at = Cursor;
+
+            pattern[at.Line, at.Track, at.NoteColumn] = pattern[at.Line, at.Track, at.NoteColumn] with { Effect = TrackerCommand.None };
+            TempoAt(at.Line, typed);
+        }
+
         StepDown();
+    }
+
+    /// <summary>Writes a typed tempo into the pattern's tempo lane rather than keeping it in a cell.</summary>
+    private readonly ITempoSteps _tempoSteps = new TempoSteps();
+
+    /// <summary>
+    /// Writes a tempo from a line on into the song's tempo lane, as one step of undo, and says so;
+    /// a tempo no song can have is refused and said.
+    /// </summary>
+    /// <remarks>
+    /// What typing <c>T</c> and two digits does, and what the command popup's tempo does: tempo is
+    /// kept in the lane and nowhere else, so neither leaves anything in the cell.
+    /// </remarks>
+    /// <param name="line">The line the tempo starts on.</param>
+    /// <param name="bpm">Beats a minute.</param>
+    private void TempoAt(int line, int bpm)
+    {
+        if (CurrentPattern is not { } pattern) return;
+
+        if (bpm < TrackerTiming.MinBpm)
+        {
+            Status = $"T{bpm:X2} is {bpm} beats a minute, under the {TrackerTiming.MinBpm:0} a song allows, so no tempo was written";
+            return;
+        }
+
+        History.Taking(pattern, "a tempo");
+
+        _tempoSteps.Step(pattern, line, bpm, Song.Timing.ClampedBpm);
+
+        pattern.LaneChanged();
+        Lanes?.Restock();
+        MasterLanes?.Restock();
+        MarkDirty("a tempo");
+
+        Status = $"{bpm} beats a minute from line {line:00}, on the song's tempo lane";
     }
 
     /// <summary>The field the last digit went into, or nothing once its value was finished.</summary>

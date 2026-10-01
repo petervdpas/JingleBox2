@@ -58,7 +58,7 @@ public sealed class LinkTargets : ILinkTargets
     private const string Master = "master";
 
     /// <summary>
-    /// The mixer's six, spelled out both ways.
+    /// The mixer's six and the song's tempo, spelled out both ways.
     /// </summary>
     /// <remarks>
     /// Written out as a map of literal words rather than worked out from the enum's own names,
@@ -72,7 +72,8 @@ public sealed class LinkTargets : ILinkTargets
         (MixControl.Mute, "mute"),
         (MixControl.Solo, "solo"),
         (MixControl.Duck, "duck"),
-        (MixControl.Release, "duck-release")
+        (MixControl.Release, "duck-release"),
+        (MixControl.Tempo, "tempo")
     };
 
     /// <summary>The transport's five, spelled out both ways, for the same reason.</summary>

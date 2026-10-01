@@ -78,6 +78,7 @@ public static class MixLinks
             MixControl.Solo => "solo",
             MixControl.Duck => "duck",
             MixControl.Release => "duck release",
+            MixControl.Tempo => "tempo",
             _ => "level"
         };
 

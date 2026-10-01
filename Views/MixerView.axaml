@@ -258,6 +258,7 @@
                  pattern, because the master is not a track and the panel down there is about the
                  track the cursor is in. -->
             <views:FoldStrip DockPanel.Dock="Bottom" Title="song master automation"
+                             Count="{Binding MasterLaneCount}"
                              IsOpen="{Binding ShowsMasterLanes, Mode=TwoWay}"
                              StripHeight="{Binding MasterLanesHeight, Mode=TwoWay}">
               <views:AutomationStrip DataContext="{Binding MasterLanes}" />
@@ -270,6 +271,7 @@
              docked from the bottom the automation goes lowest and this stands over it, against
              the row of faders. -->
         <views:FoldStrip DockPanel.Dock="Bottom" Title="song master effects" Margin="0,10,0,0"
+                             Count="{Binding MasterEffect.Count}"
                              IsOpen="{Binding ShowsMasterChain, Mode=TwoWay}"
                              StripHeight="{Binding MasterChainHeight, Mode=TwoWay}">
               <views:PluginStrip DataContext="{Binding MasterEffect}" />

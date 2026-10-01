@@ -42,6 +42,33 @@ public sealed class FoldStrip : ContentControl
     public static readonly StyledProperty<string> TitleProperty =
         AvaloniaProperty.Register<FoldStrip, string>(nameof(Title), "");
 
+    /// <summary>How many things the strip holds, shown on its tab; nothing for no count at all.</summary>
+    public static readonly StyledProperty<int?> CountProperty =
+        AvaloniaProperty.Register<FoldStrip, int?>(nameof(Count));
+
+    /// <summary>
+    /// How many things the strip holds, such as the devices on a chain or the lanes that move
+    /// something, shown on its tab so a folded strip still says whether there is anything under it.
+    /// </summary>
+    /// <remarks>
+    /// Nothing leaves the tab as it was, for a strip whose contents have no count worth giving.
+    /// Above nought the tab carries <c>:some</c>, which is what the count's chip is lit by: a
+    /// strip with something in it is the one worth opening.
+    /// </remarks>
+    public int? Count
+    {
+        get => GetValue(CountProperty);
+        set => SetValue(CountProperty, value);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property == CountProperty) PseudoClasses.Set(":some", Count > 0);
+    }
+
     /// <summary>
     /// Whether what is under the line is showing.
     /// </summary>

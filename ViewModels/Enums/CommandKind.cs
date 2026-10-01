@@ -27,6 +27,6 @@ public enum CommandKind
     /// <summary><c>Pxx</c>: the note's own place left to right.</summary>
     Pan,
 
-    /// <summary><c>Txx</c>: the song's tempo from this line on.</summary>
+    /// <summary><c>Txx</c>: the song's tempo from this line on, written into its tempo lane.</summary>
     Tempo
 }

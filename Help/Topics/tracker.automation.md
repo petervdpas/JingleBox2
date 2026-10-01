@@ -22,6 +22,17 @@ A lane names a strip rather than a track, so the master is automated exactly as 
 track is. Its lanes are on the mixer, under the master, because the panel under the
 pattern follows the cursor and the master is not somewhere a cursor can be.
 
+The song's tempo is a lane on the master too, called Tempo. Draw a step and the song
+changes speed on that line; draw a slope and it speeds up or slows down gradually. It
+changes how fast the song plays, and the MIDI clock sent to other gear and the tempo
+the plugins are told follow it; the tempo saved with the song stays as it is. While
+the song plays, the BPM box above the pattern shows the tempo it is playing at, in
+colour when a lane has moved it, and goes back to the song's own when it stops.
+
+Lanes play whichever page is in front. A knob in your hand only reaches the mixer while
+the mixer is showing, so one turn cannot move two things at once, but a lane is the song
+itself and plays the same wherever you are looking.
+
 Recording one is playing it: move the control while the transport runs and the pass
 leaves one undo step for the lane rather than one per point, which is the same rule
 the instrument knobs use.

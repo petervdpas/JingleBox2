@@ -8,8 +8,7 @@ namespace JingleBox2.Tracker.Records;
 /// rather than rejected, so a song from a later version still loads.
 /// </summary>
 /// <remarks>
-/// <c>V</c>, <c>P</c> and <c>S</c> are about how a note starts and are read where it is started,
-/// and <c>T</c> is about the song and is read by the clock.
+/// <c>V</c>, <c>P</c> and <c>S</c> are about how a note starts and are read where it is started.
 /// The five that say what happens inside a line and after it, <c>Q</c>, <c>C</c>, <c>R</c>,
 /// <c>A</c> and <c>G</c>, are played by the commands module,
 /// <see cref="JingleBox2.Tracker.Commands.Interfaces.ILineCommands"/>, which splits a line into
@@ -60,14 +59,17 @@ public readonly record struct TrackerCommand(char Command, int Parameter)
     /// <summary><c>Sxx</c>: start a recording xx 256ths of the way in rather than at its start.</summary>
     public const char Offset = 'S';
 
-    /// <summary><c>Txx</c>: play at xx beats a minute, in hex, from this line on; 20 to FF.</summary>
+    /// <summary>
+    /// <c>Txx</c>: the tempo from this line on, xx beats a minute in hex, 20 to FF. Never kept in a
+    /// cell: typing it writes a step into the song's tempo lane, which is the one place tempo lives.
+    /// </summary>
     public const char Tempo = 'T';
 
     /// <summary>True when the column is blank.</summary>
     public bool IsNone => Command == NoCommand;
 
     /// <summary>True for one of the letters this names.</summary>
-    public bool IsKnown => Command is SetVolume or SetPan or Retrigger or Arpeggio or Delay or Cut or Glide or Offset or Tempo;
+    public bool IsKnown => Command is SetVolume or SetPan or Retrigger or Arpeggio or Delay or Cut or Glide or Offset;
 
     /// <summary>Three characters, as every column here is: "..." when blank, else "V40".</summary>
     public override string ToString() =>

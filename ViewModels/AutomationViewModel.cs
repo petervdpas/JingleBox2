@@ -428,6 +428,7 @@ public sealed class AutomationRow : ObservableObject
     /// <summary>Reads its own lane again, for when the picture changed it underneath.</summary>
     public void Reread()
     {
+        OnPropertyChanged(nameof(HasLane));
         OnPropertyChanged(nameof(Says));
         OnPropertyChanged(nameof(How));
         OnPropertyChanged(nameof(Reads));

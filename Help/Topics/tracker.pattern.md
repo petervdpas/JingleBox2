@@ -58,9 +58,10 @@ lines selected it writes all of them, which is how an arpeggio lasts several lin
   line, `G18` two lines. With nothing sounding the note just starts.
 - `Sxx` starts a recording `xx` 256ths of the way in: `S40` a quarter, `S80` halfway.
   One long break can be played as many hits. Synths and plugins ignore it.
-- `Txx` plays the song at `xx` beats a minute from this line on, written in hex:
-  `T5A` is 90, `T78` is 120, `TB4` is 180. It lasts until the next `T` or until the
-  song is stopped, and the tempo saved with the song stays as it is. 20 to 255.
+- `Txx` sets the song's tempo from this line, `xx` beats a minute in hex: `T5A` is 90,
+  `T78` is 120, `TB4` is 180, 20 to 255. It is not kept in the cell: typing it writes a
+  step into the song's tempo lane on the mixer, which is the one place tempo lives, and
+  the cell is left empty.
 
 On our own machines an arpeggio and a glide move the pitch of the note that is already
 sounding. A plugin and a track's MIDI out are sent each step as a note of its own

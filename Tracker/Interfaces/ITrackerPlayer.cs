@@ -113,6 +113,29 @@ public interface ITrackerPlayer : IDisposable
     /// <param name="to">Where to carry on from.</param>
     void JumpTo(TrackerPosition to);
 
+    /// <summary>
+    /// The tempo the song is playing at: what a tempo lane last set while it plays, otherwise the
+    /// song's own.
+    /// </summary>
+    /// <remarks>
+    /// The pass's and not the song's. A tempo lane changes how fast the song plays, and the tempo
+    /// saved with the song is left alone; stopping and starting again plays at the song's own
+    /// until a lane says otherwise. The lines, the MIDI clock sent out and the tempo the plugins
+    /// are told all follow it.
+    /// </remarks>
+    double PlayingBpm { get; }
+
+    /// <summary>Plays at that tempo from the next line, held to what a song allows; nothing while stopped.</summary>
+    /// <remarks>Called from the clock thread by a lane and from the drawing thread by a hand on a knob.</remarks>
+    /// <param name="bpm">Beats a minute.</param>
+    void PlayAt(double bpm);
+
+    /// <summary>
+    /// Says the playing tempo moved: a lane or a knob set it, or the transport started or stopped.
+    /// Raised on whichever thread moved it.
+    /// </summary>
+    event EventHandler? TempoMoved;
+
     /// <summary>Whether it is walking the order list or staying on one pattern.</summary>
     /// <remarks>
     /// Settable while a pass is running, and answered on the next line rather than on the next

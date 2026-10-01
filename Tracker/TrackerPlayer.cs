@@ -262,6 +262,26 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// </remarks>
     private long _ticksSent;
 
+    /// <summary>
+    /// When the tick spacing last changed, in seconds into the pass, and how many ticks had gone out
+    /// by then; the ticks since are counted from there.
+    /// </summary>
+    /// <remarks>
+    /// Counting every tick from the start of the pass at whatever the tempo is now would rewrite
+    /// the whole count the moment the tempo moves: faster would owe a burst of every tick the new
+    /// tempo says should have gone out since the start, and slower would owe nothing until the
+    /// clock caught up. A synth following it would rush or stall. Counted from the last tick of
+    /// the old spacing, the ticks go on evenly at the new one. The clock thread's alone, like the
+    /// count.
+    /// </remarks>
+    private double _tickAnchorAt;
+
+    /// <summary>How many ticks had gone out at <see cref="_tickAnchorAt"/>.</summary>
+    private long _tickAnchorCount;
+
+    /// <summary>The tick spacing the anchor was taken at, nought before the first tick of a pass.</summary>
+    private double _tickSpacing;
+
     /// <summary>Which machines this installation has, asked before anything is allowed to sound.</summary>
     private readonly ISoundMachineProjects _machines;
 
@@ -491,7 +511,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
         _jump = null;
         _passes.Reset();
         _commands.Reset();
-        _tempo = double.NaN;
+        Volatile.Write(ref _tempo, double.NaN);
 
         _cancel = new CancellationTokenSource();
         var token = _cancel.Token;
@@ -1562,6 +1582,9 @@ public sealed class TrackerPlayer : ITrackerPlayer
         var clock = Stopwatch.StartNew();
 
         _ticksSent = 0;
+        _tickAnchorAt = 0;
+        _tickAnchorCount = 0;
+        _tickSpacing = 0;
 
         var position = Position;
         double nextLine = 0;
@@ -1581,10 +1604,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             Automation?.Play(song, position);
 
-            var events = sequencer.EventsFor(song, position);
-            TempoFrom(events);
-
-            var ticks = _commands.Ticks(events);
+            var ticks = _commands.Ticks(sequencer.EventsFor(song, position));
             double lineBegan = ClockFollow?.IsFollowing == true ? clock.Elapsed.TotalSeconds : nextLine;
             double secondsPerTick = Playing(song).SecondsPerLine / _commands.TicksPerLine;
             int played = ApplyTick(ticks, 0, 0, song);
@@ -1694,7 +1714,18 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             if (driving)
             {
-                long due = _grid.DueBy(now, tickSeconds);
+                if (tickSeconds != _tickSpacing)
+                {
+                    if (_tickSpacing > 0)
+                    {
+                        _tickAnchorAt += (_ticksSent - _tickAnchorCount) * _tickSpacing;
+                        _tickAnchorCount = _ticksSent;
+                    }
+
+                    _tickSpacing = tickSeconds;
+                }
+
+                long due = _tickAnchorCount + _grid.DueBy(now - _tickAnchorAt, tickSeconds);
 
                 if (due > _ticksSent)
                 {
@@ -1712,7 +1743,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             if (driving)
             {
-                double untilTick = ((_ticksSent + 1) * tickSeconds) - now;
+                double untilTick = _tickAnchorAt + (_ticksSent + 1 - _tickAnchorCount) * tickSeconds - now;
 
                 if (untilTick > 0 && untilTick < wait) wait = untilTick;
             }
@@ -1730,38 +1761,53 @@ public sealed class TrackerPlayer : ITrackerPlayer
     }
 
     /// <summary>
-    /// The tempo a tempo command set while this pass plays, or not a number for the song's own.
+    /// The tempo a lane or a knob set while this pass plays, or not a number for the song's own.
     /// </summary>
     /// <remarks>
-    /// The pass's and not the song's: a <c>T</c> in a pattern changes how fast it plays from that
-    /// line, and the tempo saved with the song, which is what the box above the pattern shows, is
-    /// left alone. Forgotten when the transport starts again. Written and read on the clock thread.
+    /// Written from the clock thread by a lane and from the drawing thread by a knob, and read on
+    /// the clock thread every line, so it is only ever read and written whole.
     /// </remarks>
     private double _tempo = double.NaN;
 
-    /// <summary>How fast the song is playing: its own timing, at the tempo a command set where one has.</summary>
-    private TrackerTiming Playing(Song song) =>
-        double.IsNaN(_tempo) ? song.Timing : new TrackerTiming(_tempo, song.LinesPerBeat);
-
-    /// <summary>
-    /// Takes up a tempo command on the line about to be played, which plays at it from this line on,
-    /// and tells the plugins.
-    /// </summary>
-    /// <remarks>
-    /// <c>Txx</c> is the tempo itself in hex, 20 to FF beats a minute. Below 20 is not a tempo
-    /// anybody could mean, and the old trackers spent those values on something else, so they are
-    /// passed over. Where a line has several, the last column read wins.
-    /// </remarks>
-    private void TempoFrom(System.Collections.Generic.IReadOnlyList<TrackerEvent> events)
+    /// <summary>How fast the song is playing: its own timing, at the tempo a lane set where one has.</summary>
+    private TrackerTiming Playing(Song song)
     {
-        foreach (var e in events)
-        {
-            if (e.Effect.Command != TrackerCommand.Tempo || e.Effect.Parameter < TrackerTiming.MinBpm) continue;
+        double tempo = Volatile.Read(ref _tempo);
 
-            _tempo = e.Effect.Parameter;
-            SongClock.Tempo(_tempo);
+        return double.IsNaN(tempo) ? song.Timing : new TrackerTiming(tempo, song.LinesPerBeat);
+    }
+
+    /// <inheritdoc/>
+    public double PlayingBpm
+    {
+        get
+        {
+            double tempo = Volatile.Read(ref _tempo);
+
+            if (!double.IsNaN(tempo) && IsPlaying) return tempo;
+
+            Song? song;
+            lock (_lock) song = _song;
+
+            return song?.Timing.ClampedBpm ?? TrackerTiming.DefaultBpm;
         }
     }
+
+    /// <inheritdoc/>
+    public void PlayAt(double bpm)
+    {
+        if (!IsPlaying || double.IsNaN(bpm)) return;
+
+        double held = Math.Clamp(bpm, TrackerTiming.MinBpm, TrackerTiming.MaxBpm);
+
+        if (Interlocked.Exchange(ref _tempo, held) == held) return;
+
+        SongClock.Tempo(held);
+        TempoMoved?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <inheritdoc/>
+    public event EventHandler? TempoMoved;
 
     /// <summary>
     /// The place to go on from once a line is played: the pattern's last line where the line was

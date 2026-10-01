@@ -109,6 +109,17 @@ public sealed class ControlTargets : IControlTargets
     /// <summary>The transport, where there is one.</summary>
     private readonly ITransportPresses? _presses;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The same pieces handed to a second set of targets that is told nothing about pages, made
+    /// the first time it is asked for.
+    /// </remarks>
+    public IControlTargets Everywhere =>
+        _pages is null ? this : _everywhere ??= new ControlTargets(_tracker, _machines, _rack, _presses, _effects, _front, _pads, _toggles);
+
+    /// <summary>The targets <see cref="Everywhere"/> hands out, once made.</summary>
+    private IControlTargets? _everywhere;
+
     /// <summary>
     /// Which of the pages a controller can be pointed at is on the screen, or nothing.
     /// </summary>
@@ -158,6 +169,7 @@ public sealed class ControlTargets : IControlTargets
         if (track == Tracker.TrackerPlayer.MasterStrip)
             return mapping.Kind switch
             {
+                ControlKind.Mix when mapping.Mix == MixControl.Tempo => OnTempo(mapping),
                 ControlKind.Mix => OnStrip(mapping, track),
                 ControlKind.Plugin => OnPlugin(mapping, track),
                 _ => null
@@ -292,9 +304,23 @@ public sealed class ControlTargets : IControlTargets
 
     }
 
-    /// <summary>The handful of things every strip has, the master included.</summary>
+    /// <summary>The handful of things every strip has, the master included, and the song's tempo on the master.</summary>
     private IEnumerable<ControlChoice> OnMixer(int track)
     {
+        if (track == Tracker.TrackerPlayer.MasterStrip)
+            yield return new ControlChoice(
+                new ControlMapping
+                {
+                    Kind = ControlKind.Mix,
+                    Scope = ControlScope.Fixed,
+                    Track = track,
+                    Mix = MixControl.Tempo,
+                    Ordinal = -1
+                },
+                "Song",
+                "Tempo",
+                "BPM");
+
         foreach (var (control, said) in new[]
                  {
                      (MixControl.Volume, "Level"), (MixControl.Pan, "Pan"),
@@ -822,6 +848,22 @@ public sealed class ControlTargets : IControlTargets
             played: value => strip.Played(() => write(value)));
     }
 
+    /// <summary>How fast the song plays, on the master.</summary>
+    /// <remarks>
+    /// Not held back for the page in front, unlike the strips: it is not on the mixer's face, so
+    /// nothing a hand does on another page could be mistaken for it. It writes the player's
+    /// playing tempo and never the song's, so a lane speeds the song up as it plays and the tempo
+    /// saved with it, which is what the box above the pattern holds, is left alone.
+    /// </remarks>
+    private IControlTarget OnTempo(ControlMapping mapping)
+    {
+        var player = _tracker.Player;
+
+        return new Target(
+            "Tempo", Tracker.Records.TrackerTiming.MinBpm, Tracker.Records.TrackerTiming.MaxBpm,
+            () => player.PlayingBpm, player.PlayAt, this, mapping, unit: "BPM", direct: true);
+    }
+
     /// <summary>
     /// A button on a machine's panel, which is a press rather than a position.
     /// </summary>
@@ -951,10 +993,16 @@ public sealed class ControlTargets : IControlTargets
         /// Where a value goes when the song is playing its own automation back. Left out, a lane
         /// writes exactly where a hand does, which is what everything but a mixer strip wants.
         /// </param>
+        /// <param name="direct">
+        /// True where the write is safe from any thread and has to land at once rather than on the
+        /// drawing thread: the song's tempo, which the clock reads on the very line a lane writes
+        /// it, and which may not wait on a busy screen.
+        /// </param>
         public Target(string name, double min, double max, Func<double> read, Action<double> write,
                       ControlTargets desk, ControlMapping mapping, string unit = "", bool flips = false,
-                      bool pressed = false, Action<double>? played = null)
+                      bool pressed = false, Action<double>? played = null, bool direct = false)
         {
+            _direct = direct;
             _pressed = pressed;
             _played = played;
             Name = name;
@@ -1031,7 +1079,14 @@ public sealed class ControlTargets : IControlTargets
         /// Queued rather than written, so it lands on the drawing thread. A value coalesces there
         /// and a press does not: see <see cref="IControlWrites"/>.
         /// </remarks>
-        public void Set(double value) => _desk.Queue(_mapping, _write, value, _pressed);
+        public void Set(double value)
+        {
+            if (_direct) _write(value);
+            else _desk.Queue(_mapping, _write, value, _pressed);
+        }
+
+        /// <summary>Whether a write lands at once rather than on the drawing thread.</summary>
+        private readonly bool _direct;
 
         /// <summary>Where a lane's write goes, when this target wanted a separate one.</summary>
         private readonly Action<double>? _played;
@@ -1041,8 +1096,11 @@ public sealed class ControlTargets : IControlTargets
         /// Queued exactly as <see cref="Set"/> is, and under the same mapping, so a lane and a
         /// hand on the same control still coalesce against each other rather than both landing.
         /// </remarks>
-        public void Played(double value) =>
-            _desk.Queue(_mapping, _played ?? _write, value, _pressed);
+        public void Played(double value)
+        {
+            if (_direct) (_played ?? _write)(value);
+            else _desk.Queue(_mapping, _played ?? _write, value, _pressed);
+        }
     }
 
     /// <summary>

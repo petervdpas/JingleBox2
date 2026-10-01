@@ -32,5 +32,11 @@ public enum MixControl
     /// this one had no name for a link to use, so the knob beside Duck was the one thing on the
     /// mixer a controller could not reach.
     /// </remarks>
-    Release
+    Release,
+
+    /// <summary>
+    /// How fast the song plays, which is the master's alone: a lane on it speeds the song up or
+    /// slows it down, and the tempo saved with the song is left as it is.
+    /// </summary>
+    Tempo
 }

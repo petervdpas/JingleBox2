@@ -88,9 +88,13 @@
         <!-- Every label the same distance from the field before it and from its own, so the
              row reads as five settings rather than as one run of digits. -->
         <TextBlock Classes="field" Text="BPM" Margin="16,0,6,0" />
-        <ui:NumberField Value="{Binding Bpm}"
+        <!-- While the song plays it shows the tempo it is playing at, so a tempo lane on the
+             master is seen moving it, in the accent colour while that differs from the song's
+             own. Typing sets the song's own. -->
+        <ui:NumberField Value="{Binding ShownBpm}"
+                           Classes.moving="{Binding TempoMoving}"
                            Minimum="20" Maximum="400" SmallStep="1" LargeStep="10" Width="76"
-                           ToolTip.Tip="Scroll or use the arrow keys. Hold Shift for larger steps." />
+                           ToolTip.Tip="The song's tempo, saved with it. While it plays, the tempo it is playing at, which a tempo lane on the master can move; then it is in colour. Scroll or use the arrow keys, Shift for larger steps." />
 
         <!-- This pattern's own length. A song's patterns need not be the same length and never
              had to be: the number is per pattern in the model and in the file, and the
@@ -587,12 +591,14 @@
             <!-- The upper of the two, so this is the one that carries the room above the pair:
                  the automation sits under it and wants nothing between them. -->
             <views:FoldStrip Grid.Row="1" Title="chain" Margin="0,10,0,0"
+                             Count="{Binding TrackEffect.Count}"
                              IsOpen="{Binding ShowsChain, Mode=TwoWay}"
                              StripHeight="{Binding ChainHeight, Mode=TwoWay}">
               <views:PluginStrip x:Name="TrackChain" DataContext="{Binding TrackEffect}" />
             </views:FoldStrip>
 
             <views:FoldStrip Grid.Row="2" Title="automation"
+                             Count="{Binding LaneCount}"
                              IsOpen="{Binding ShowsLanes, Mode=TwoWay}"
                              StripHeight="{Binding LanesHeight, Mode=TwoWay}">
               <Grid>
