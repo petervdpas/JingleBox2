@@ -135,4 +135,32 @@ public class SlotPassesTests
 
         Assert.Equal(new[] { "0.0", "0.1" }, Walk(song, 10));
     }
+
+    /// <summary>Two stretches in one pattern each go round their own number of times.</summary>
+    [Fact]
+    public void Two_stretches_each_go_round_their_own_count()
+    {
+        var song = Of(1, 6);
+        song.SetRepeat(0, SlotRepeat.None
+            .WithLoop(new LineLoop(1, 1, 2), 6, out _)
+            .WithLoop(new LineLoop(3, 4, 3), 6, out _));
+
+        Assert.Equal(
+            new[] { "0.0", "0.1", "0.1", "0.2", "0.3", "0.4", "0.3", "0.4", "0.3", "0.4", "0.5" },
+            Walk(song, 30));
+    }
+
+    /// <summary>Two stretches next to each other, sharing no line, each go round in turn.</summary>
+    [Fact]
+    public void Stretches_side_by_side_go_round_in_turn()
+    {
+        var song = Of(1, 4);
+        song.SetRepeat(0, SlotRepeat.None
+            .WithLoop(new LineLoop(0, 1, 2), 4, out _)
+            .WithLoop(new LineLoop(2, 3, 2), 4, out _));
+
+        Assert.Equal(
+            new[] { "0.0", "0.1", "0.0", "0.1", "0.2", "0.3", "0.2", "0.3" },
+            Walk(song, 30));
+    }
 }

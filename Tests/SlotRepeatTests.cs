@@ -152,7 +152,7 @@ public class SlotRepeatTests
         var repeat = new SlotRepeat(0, 70, 10, -3).Held(64);
 
         Assert.Equal(1, repeat.Times);
-        Assert.False(repeat.HasStretch);
+        Assert.Empty(repeat.Lines());
     }
 
     /// <summary>A stretch drawn backwards is the same stretch.</summary>
@@ -161,8 +161,86 @@ public class SlotRepeatTests
     {
         var repeat = new SlotRepeat(1, 63, 32, 4).Held(64);
 
-        Assert.True(repeat.HasStretch);
-        Assert.Equal(32, repeat.From);
-        Assert.Equal(63, repeat.To);
+        Assert.Equal(new LineLoop(32, 63, 4), Assert.Single(repeat.Lines()));
+    }
+
+    /// <summary>Stretches that do not share a line can all be on one slot, kept in order.</summary>
+    [Fact]
+    public void Stretches_that_do_not_touch_are_all_kept_in_order()
+    {
+        var repeat = SlotRepeat.None
+            .WithLoop(new LineLoop(48, 63, 4), 64, out var first)
+            .WithLoop(new LineLoop(16, 23, 2), 64, out var second);
+
+        Assert.Null(first);
+        Assert.Null(second);
+        Assert.Equal(new[] { new LineLoop(16, 23, 2), new LineLoop(48, 63, 4) }, repeat.Lines());
+    }
+
+    /// <summary>A stretch sharing a line with another is refused, and says which one is in the way.</summary>
+    [Theory]
+    [InlineData(20, 30)]
+    [InlineData(10, 16)]
+    [InlineData(23, 40)]
+    [InlineData(18, 20)]
+    [InlineData(0, 63)]
+    public void A_stretch_that_shares_a_line_is_refused(int from, int to)
+    {
+        var held = SlotRepeat.None.WithLoop(new LineLoop(16, 23, 2), 64, out _);
+
+        var after = held.WithLoop(new LineLoop(from, to, 3), 64, out var blocking);
+
+        Assert.Equal(new LineLoop(16, 23, 2), blocking);
+        Assert.Equal(held.Lines(), after.Lines());
+    }
+
+    /// <summary>The same lines again changes how many times they go round.</summary>
+    [Fact]
+    public void The_same_lines_again_change_the_count()
+    {
+        var repeat = SlotRepeat.None
+            .WithLoop(new LineLoop(16, 23, 2), 64, out _)
+            .WithLoop(new LineLoop(16, 23, 6), 64, out var blocking);
+
+        Assert.Null(blocking);
+        Assert.Equal(new LineLoop(16, 23, 6), Assert.Single(repeat.Lines()));
+    }
+
+    /// <summary>Unlooping takes off every stretch that shares a line with the selection, and leaves the rest.</summary>
+    [Fact]
+    public void Unlooping_takes_off_what_the_selection_touches()
+    {
+        var repeat = SlotRepeat.None
+            .WithLoop(new LineLoop(8, 11, 2), 64, out _)
+            .WithLoop(new LineLoop(16, 23, 2), 64, out _)
+            .WithLoop(new LineLoop(48, 63, 4), 64, out _)
+            .WithoutLoopsIn(10, 20, 64);
+
+        Assert.Equal(new LineLoop(48, 63, 4), Assert.Single(repeat.Lines()));
+    }
+
+    /// <summary>Stretches that came back overlapping, from a file edited by hand, keep the first and drop the rest.</summary>
+    [Fact]
+    public void Overlapping_stretches_from_a_file_keep_the_first()
+    {
+        var repeat = new SlotRepeat(1, Loops: new[] { new LineLoop(10, 20, 2), new LineLoop(15, 30, 3), new LineLoop(40, 41, 2) })
+            .Held(64);
+
+        Assert.Equal(new[] { new LineLoop(10, 20, 2), new LineLoop(40, 41, 2) }, repeat.Lines());
+    }
+
+    /// <summary>Several stretches come back from the song file as they went in.</summary>
+    [Fact]
+    public void Several_stretches_come_back_from_the_file()
+    {
+        var song = Of(1);
+        song.SetRepeat(0, SlotRepeat.None
+            .WithLoop(new LineLoop(16, 23, 2), 64, out _)
+            .WithLoop(new LineLoop(48, 63, 4), 64, out _));
+
+        var back = SongStore.Uncopy(SongStore.Copy(song))!;
+        back.Normalize();
+
+        Assert.Equal(new[] { new LineLoop(16, 23, 2), new LineLoop(48, 63, 4) }, back.RepeatAt(0).Lines());
     }
 }

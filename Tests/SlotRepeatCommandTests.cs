@@ -43,7 +43,7 @@ public class SlotRepeatCommandTests
 
         var repeat = tracker.Song.RepeatAt(tracker.OrderIndex);
 
-        Assert.Equal((8, 40, 3), (repeat.From, repeat.To, repeat.StretchTimes));
+        Assert.Equal(new LineLoop(8, 40, 3), Assert.Single(repeat.Lines()));
         Assert.Equal("↺08–40×3", tracker.OrderEntries[tracker.OrderIndex].Repeat);
     }
 
@@ -84,5 +84,86 @@ public class SlotRepeatCommandTests
 
         Assert.Equal(1, tracker.Song.RepeatAt(tracker.OrderIndex).Times);
         Assert.Equal("", tracker.OrderEntries[tracker.OrderIndex].Repeat);
+    }
+
+    /// <summary>A second stretch elsewhere is added beside the first, and both show on the row.</summary>
+    [Fact]
+    public void A_second_stretch_is_added_beside_the_first()
+    {
+        var tracker = Tracker();
+
+        tracker.Selection = new PatternSelection(48, 0, 63, 0);
+        tracker.LoopLinesCommand.Execute(4);
+        tracker.Selection = new PatternSelection(16, 1, 23, 1);
+        tracker.LoopLinesCommand.Execute(2);
+
+        Assert.Equal(2, tracker.Song.RepeatAt(tracker.OrderIndex).Lines().Count);
+        Assert.Equal("\u21ba16\u201323\u00d72 \u21ba48\u201363\u00d74", tracker.OrderEntries[tracker.OrderIndex].Repeat);
+    }
+
+    /// <summary>A stretch sharing lines with one already there is refused, on any track, and changes nothing.</summary>
+    [Fact]
+    public void A_stretch_over_another_is_refused()
+    {
+        var tracker = Tracker();
+
+        tracker.Selection = new PatternSelection(16, 0, 23, 0);
+        tracker.LoopLinesCommand.Execute(2);
+        tracker.Selection = new PatternSelection(20, 2, 30, 2);
+        tracker.LoopLinesCommand.Execute(4);
+
+        Assert.Equal(new LineLoop(16, 23, 2), Assert.Single(tracker.Song.RepeatAt(tracker.OrderIndex).Lines()));
+        Assert.Contains("16", tracker.Status);
+    }
+
+    /// <summary>Unlooping the selected lines takes off the stretch they touch.</summary>
+    [Fact]
+    public void Unlooping_takes_the_stretch_off()
+    {
+        var tracker = Tracker();
+
+        tracker.Selection = new PatternSelection(16, 0, 23, 0);
+        tracker.LoopLinesCommand.Execute(2);
+        tracker.Selection = new PatternSelection(20, 3, 20, 3);
+        tracker.UnloopLinesCommand.Execute(null);
+
+        Assert.Empty(tracker.Song.RepeatAt(tracker.OrderIndex).Lines());
+    }
+
+    /// <summary>The red cross on a loop's line takes that loop off and leaves the others.</summary>
+    [Fact]
+    public void The_cross_on_a_loop_takes_only_that_loop_off()
+    {
+        var tracker = Tracker();
+
+        tracker.Selection = new PatternSelection(16, 0, 23, 0);
+        tracker.LoopLinesCommand.Execute(2);
+        tracker.Selection = new PatternSelection(48, 1, 63, 1);
+        tracker.LoopLinesCommand.Execute(4);
+
+        var row = tracker.OrderEntries[tracker.OrderIndex];
+        Assert.Equal(2, row.Stretches!.Count);
+
+        tracker.RemoveStretchCommand.Execute(row.Stretches[0]);
+
+        Assert.Equal(new LineLoop(48, 63, 4), Assert.Single(tracker.Song.RepeatAt(tracker.OrderIndex).Lines()));
+        Assert.Single(tracker.OrderEntries[tracker.OrderIndex].Stretches!);
+    }
+
+    /// <summary>The count and the loops are on the row apart, so each loop can be drawn on a line of its own.</summary>
+    [Fact]
+    public void The_count_and_the_loops_are_apart()
+    {
+        var tracker = Tracker();
+
+        tracker.RepeatSlotCommand.Execute(3);
+        tracker.Selection = new PatternSelection(0, 0, 7, 0);
+        tracker.LoopLinesCommand.Execute(2);
+
+        var row = tracker.OrderEntries[tracker.OrderIndex];
+
+        Assert.Equal("\u00d73", row.Times);
+        Assert.True(row.HasTimes);
+        Assert.Equal("\u21ba00\u201307\u00d72", Assert.Single(row.Stretches!).Label);
     }
 }

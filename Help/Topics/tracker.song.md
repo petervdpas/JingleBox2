@@ -62,7 +62,7 @@ Adding the machine is SETTINGS, Devices.
 
 ## Repeating a slot
 
-A slot of the order can play its pattern more than once, and can go round a stretch
+A slot of the order can play its pattern more than once, and can go round stretches
 of its lines a number of times on each pass, which is the old trackers' pattern loop
 set where you can see it. Both belong to the slot rather than the pattern, so a
 pattern in the order twice can repeat in one place and not the other.
@@ -70,8 +70,13 @@ pattern in the order twice can repeat in one place and not the other.
 **Repeat the pattern**, on the slot's right click menu in the order list, sets how many
 times the slot plays before the song moves on. **Loop the selected lines**, on the
 pattern's right click menu, makes the lines you have selected go round that many times
-on each pass and then carry on. The row in the order list shows both, for example
-`×2 ↺32–63×4`, and **Clear the repeats** puts the slot back to playing once.
+on each pass and then carry on. A slot can have several of these, as long as no two
+share a line: a loop is the whole row of lines whichever track you selected it on, so
+lines that are already in a loop are refused, and the status line says which loop is in
+the way. Selecting the same lines again changes how many times they go round, and
+**Unloop the selected lines** takes off the loops the selection touches. The row in the
+order list shows everything, for example `×2 ↺16–23×2 ↺48–63×4`, and
+**Clear the repeats** puts the slot back to playing once.
 
 Playing one pattern round, the lines still loop and the pattern simply goes round as it
 always does. Coming round to the same slot again, by the song looping, repeats it again.

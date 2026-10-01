@@ -1486,18 +1486,51 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Makes the lines selected in the pattern go round so many times on each pass of the slot
     /// playing it, which is the old trackers' pattern loop set on the slot.
     /// </summary>
+    /// <remarks>
+    /// The lines are the whole row whichever track they were selected on, so a stretch that shares
+    /// a line with one already on the slot is refused, and says which one is in the way; the same
+    /// lines again change how many times they go round.
+    /// </remarks>
     public IRelayCommand<int> LoopLinesCommand => new RelayCommand<int>(times =>
     {
-        if (!HasSelection) return;
+        if (!HasSelection || Song.Order.Count == 0) return;
 
         var picked = Selection;
+        int at = Math.Clamp(OrderIndex, 0, Song.Order.Count - 1);
+        int lines = Song.PatternAt(at)?.Lines ?? 0;
+        var wanted = new LineLoop(picked.FirstLine, picked.LastLine, Math.Clamp(times, 2, Song.MaxRepeats));
 
-        Repeat("looping lines", repeat => repeat with
+        Song.RepeatAt(at).WithLoop(wanted, lines, out var blocking);
+
+        if (blocking != null)
         {
-            From = picked.FirstLine,
-            To = picked.LastLine,
-            StretchTimes = Math.Clamp(times, 1, Song.MaxRepeats)
-        });
+            Status = $"Lines {picked.FirstLine:00} to {picked.LastLine:00} share lines with the loop "
+                     + $"{blocking.From:00} to {blocking.To:00} already on slot {at:00}";
+            return;
+        }
+
+        Repeat("looping lines", repeat => repeat.WithLoop(wanted, lines, out _));
+    });
+
+    /// <summary>Takes off every stretch on the slot that shares a line with the lines selected.</summary>
+    public IRelayCommand UnloopLinesCommand => new RelayCommand(() =>
+    {
+        if (!HasSelection || Song.Order.Count == 0) return;
+
+        var picked = Selection;
+        int lines = Song.PatternAt(Math.Clamp(OrderIndex, 0, Song.Order.Count - 1))?.Lines ?? 0;
+
+        Repeat("unlooping lines", repeat => repeat.WithoutLoopsIn(picked.FirstLine, picked.LastLine, lines));
+    });
+
+    /// <summary>Takes one loop of lines off the slot it is on, which is the red cross on its line.</summary>
+    public IRelayCommand<StretchRow?> RemoveStretchCommand => new RelayCommand<StretchRow?>(row =>
+    {
+        if (row == null) return;
+
+        int lines = Song.PatternAt(row.Slot)?.Lines ?? 0;
+
+        Repeat("unlooping lines", repeat => repeat.WithoutLoopsIn(row.Loop.From, row.Loop.To, lines), row.Slot);
     });
 
     /// <summary>Puts the slot under the cursor back to playing its pattern once, straight through.</summary>
@@ -1509,11 +1542,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </summary>
     /// <param name="what">What is being done, for undo and for the mark saying there is something unsaved.</param>
     /// <param name="change">The change, from what the slot did before.</param>
-    private void Repeat(string what, Func<SlotRepeat, SlotRepeat> change)
+    /// <param name="slot">Which slot, the one under the cursor where nothing is said.</param>
+    private void Repeat(string what, Func<SlotRepeat, SlotRepeat> change, int slot = -1)
     {
         if (Song.Order.Count == 0) return;
 
-        int at = Math.Clamp(OrderIndex, 0, Song.Order.Count - 1);
+        int at = Math.Clamp(slot >= 0 ? slot : OrderIndex, 0, Song.Order.Count - 1);
 
         Changing(what);
 
@@ -1536,14 +1570,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <param name="repeat">What the slot does.</param>
     private static string RepeatText(SlotRepeat repeat)
     {
-        string times = repeat.Times > 1 ? "\u00d7" + repeat.Times : "";
-        string stretch = repeat.HasStretch
-            ? "\u21ba" + repeat.From.ToString("00", System.Globalization.CultureInfo.InvariantCulture)
-              + "\u2013" + repeat.To.ToString("00", System.Globalization.CultureInfo.InvariantCulture)
-              + "\u00d7" + repeat.StretchTimes
-            : "";
+        var parts = new List<string>();
 
-        return (times + " " + stretch).Trim();
+        if (repeat.Times > 1) parts.Add("\u00d7" + repeat.Times);
+
+        foreach (var loop in repeat.Lines()) parts.Add(new StretchRow(0, loop).Label);
+
+        return string.Join(" ", parts);
     }
 
     /// <summary>Points the picked slot at another pattern, named by its place in the song.</summary>
@@ -4552,7 +4585,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         for (int i = 0; i < Song.Order.Count; i++)
         {
             var pattern = Song.PatternAt(i);
-            OrderEntries.Add(new OrderSlot(i, pattern?.Name ?? "--", Song.InLoop(i), RepeatText(Song.RepeatAt(i))));
+            var repeat = Song.RepeatAt(i);
+            int slot = i;
+
+            OrderEntries.Add(new OrderSlot(i, pattern?.Name ?? "--", Song.InLoop(i),
+                repeat.Times > 1 ? "\u00d7" + repeat.Times : "",
+                repeat.Lines().Select(loop => new StretchRow(slot, loop)).ToArray()));
         }
 
         OrderIndex = OrderEntries.Count == 0 ? -1 : Math.Clamp(wanted, 0, OrderEntries.Count - 1);

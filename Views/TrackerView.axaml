@@ -255,10 +255,25 @@
                     <TextBlock Text="{Binding Pattern}" />
                   </Border>
 
-                  <!-- What the slot does about repeating, empty when it plays once: how many
-                       times the pattern plays, and a stretch of lines gone round on each pass. -->
-                  <TextBlock Grid.Column="3" Classes="place" Text="{Binding Repeat}"
-                             VerticalAlignment="Center" />
+                  <!-- What the slot does about repeating, nothing when it plays once: how many
+                       times the pattern plays, then each loop of lines on a line of its own with a
+                       red cross that takes that loop off. -->
+                  <StackPanel Grid.Column="3" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="place" Text="{Binding Times}" IsVisible="{Binding HasTimes}" />
+                    <ItemsControl ItemsSource="{Binding Stretches}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vmr:StretchRow">
+                          <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Classes="place" Text="{Binding Label}" VerticalAlignment="Center" />
+                            <Button Classes="remove" Content="✕"
+                                    Command="{Binding $parent[ListBox].((vm:TrackerViewModel)DataContext).RemoveStretchCommand}"
+                                    CommandParameter="{Binding}"
+                                    ToolTip.Tip="Takes this loop off. The lines play straight through." />
+                          </StackPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
                 </Grid>
               </DataTemplate>
             </ListBox.ItemTemplate>
@@ -436,6 +451,10 @@
                         </ControlTheme>
                       </MenuItem.ItemContainerTheme>
                     </MenuItem>
+
+                    <MenuItem Header="Unloop the selected lines" IsEnabled="{Binding HasSelection}"
+                              Command="{Binding UnloopLinesCommand}"
+                              ToolTip.Tip="Takes off every loop on this slot that shares a line with the selection." />
 
                     <Separator />
 
