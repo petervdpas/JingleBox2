@@ -777,6 +777,9 @@ public sealed class SongStore : ISongStore
 
         public List<int> Order { get; set; } = new();
 
+        /// <summary>What each slot says about repeating; absent in a song written before slots could repeat.</summary>
+        public List<SlotRepeat>? Repeats { get; set; }
+
         /// <summary>
         /// The loop range over the order, either end, or -1 apiece for none.
         /// </summary>
@@ -837,6 +840,7 @@ public sealed class SongStore : ISongStore
             TrackCount = song.TrackCount,
             NoteColumns = new List<int>(song.NoteColumns),
             Order = new List<int>(song.Order),
+            Repeats = new List<SlotRepeat>(song.Repeats),
             LoopFrom = song.LoopFrom,
             LoopTo = song.LoopTo,
             TrackInstruments = new List<int>(song.TrackInstruments),
@@ -967,6 +971,7 @@ public sealed class SongStore : ISongStore
                 TrackCount = TrackCount,
                 NoteColumns = new List<int>(NoteColumns),
                 Order = new List<int>(Order),
+                Repeats = new List<SlotRepeat>(Repeats ?? new List<SlotRepeat>()),
                 LoopFrom = LoopFrom,
                 LoopTo = LoopTo,
                 TrackInstruments = new List<int>(TrackInstruments),

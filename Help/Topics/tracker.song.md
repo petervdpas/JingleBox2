@@ -59,3 +59,21 @@ A song carries its instruments but not the machines they are on. One that is not
 registered here makes no sound and has no panel, the status line names it as the song
 opens, and opening that instrument says so rather than showing an empty frame.
 Adding the machine is SETTINGS, Devices.
+
+## Repeating a slot
+
+A slot of the order can play its pattern more than once, and can go round a stretch
+of its lines a number of times on each pass, which is the old trackers' pattern loop
+set where you can see it. Both belong to the slot rather than the pattern, so a
+pattern in the order twice can repeat in one place and not the other.
+
+**Repeat the pattern**, on the slot's right click menu in the order list, sets how many
+times the slot plays before the song moves on. **Loop the selected lines**, on the
+pattern's right click menu, makes the lines you have selected go round that many times
+on each pass and then carry on. The row in the order list shows both, for example
+`×2 ↺32–63×4`, and **Clear the repeats** puts the slot back to playing once.
+
+Playing one pattern round, the lines still loop and the pattern simply goes round as it
+always does. Coming round to the same slot again, by the song looping, repeats it again.
+**Play it again** is different: it adds slots of their own after this one, so a run
+reads down the list.

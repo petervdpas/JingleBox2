@@ -9,7 +9,8 @@ namespace JingleBox2.ViewModels.Records;
 /// <param name="Slot">Where in the order, which is what the left column shows.</param>
 /// <param name="Pattern">What the slot plays, by the pattern's own name.</param>
 /// <param name="Loops">Whether this slot is inside the loop range.</param>
-public sealed record OrderSlot(int Slot, string Pattern, bool Loops)
+/// <param name="Repeat">What the slot does about repeating, short enough for the row; empty for playing once.</param>
+public sealed record OrderSlot(int Slot, string Pattern, bool Loops, string Repeat = "")
 {
     /// <summary>Where in the order, as two digits.</summary>
     /// <remarks>

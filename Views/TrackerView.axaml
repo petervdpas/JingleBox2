@@ -207,7 +207,7 @@
     <!-- Three columns you can move the edges of. The pattern in the middle takes whatever the
          other two leave, so widening the order list or the instruments narrows the pattern
          rather than pushing anything off the end. -->
-    <Grid ColumnDefinitions="180,12,*,12,220"
+    <Grid ColumnDefinitions="240,12,*,12,220"
           IsVisible="{Binding ShowsPattern}">
 
       <!-- Order list -->
@@ -240,7 +240,7 @@
                      a mark on the row, because a range is drawn by dragging down it and a drag
                      needs somewhere to start that is not the row itself, which is already how a
                      slot is moved. Renoise puts it in the same place for the same reason. -->
-                <Grid ColumnDefinitions="10,Auto,Auto" ColumnSpacing="6">
+                <Grid ColumnDefinitions="10,Auto,Auto,Auto" ColumnSpacing="6">
                   <Border Grid.Column="0" Classes="loopbar"
                           Classes.looped="{Binding Loops}"
                           CornerRadius="2" />
@@ -254,6 +254,11 @@
                   <Border Grid.Column="2" Classes="slotpattern">
                     <TextBlock Text="{Binding Pattern}" />
                   </Border>
+
+                  <!-- What the slot does about repeating, empty when it plays once: how many
+                       times the pattern plays, and a stretch of lines gone round on each pass. -->
+                  <TextBlock Grid.Column="3" Classes="place" Text="{Binding Repeat}"
+                             VerticalAlignment="Center" />
                 </Grid>
               </DataTemplate>
             </ListBox.ItemTemplate>
@@ -281,6 +286,25 @@
                     </ControlTheme>
                   </MenuItem.ItemContainerTheme>
                 </MenuItem>
+
+                <!-- One slot played over again, where Play it again adds slots: the count stays on
+                     the slot, so a long run of one part does not fill the list. -->
+                <MenuItem Header="Repeat the pattern" ItemsSource="{Binding SlotTimes}"
+                          ToolTip.Tip="How many times this slot plays its pattern before the song moves on.">
+                  <MenuItem.ItemContainerTheme>
+                    <ControlTheme TargetType="MenuItem"
+                                  BasedOn="{StaticResource {x:Type MenuItem}}"
+                                  x:DataType="vmr:RepeatChoice">
+                      <Setter Property="Header" Value="{Binding Label}" />
+                      <Setter Property="Command"
+                              Value="{Binding $parent[ContextMenu].((vm:TrackerViewModel)DataContext).RepeatSlotCommand}" />
+                      <Setter Property="CommandParameter" Value="{Binding Times}" />
+                    </ControlTheme>
+                  </MenuItem.ItemContainerTheme>
+                </MenuItem>
+
+                <MenuItem Header="Clear the repeats" Command="{Binding ClearSlotRepeatCommand}"
+                          ToolTip.Tip="This slot plays its pattern once, straight through, with no lines looped." />
 
                 <Separator />
 
@@ -394,6 +418,24 @@
                     <MenuItem Header="Select whole pattern"
                               InputGesture="Ctrl+A"
                               Command="{Binding SelectAllCommand}" />
+
+                    <!-- The old trackers' pattern loop, set on the slot playing this pattern: the
+                         selected lines go round so many times on each pass, then the song goes
+                         on. The order list shows it on the slot. -->
+                    <MenuItem Header="Loop the selected lines" IsEnabled="{Binding HasSelection}"
+                              ItemsSource="{Binding StretchTimes}"
+                              ToolTip.Tip="The selected lines play this many times on each pass of this slot, then the song carries on. Clear it from the slot's menu in the order list.">
+                      <MenuItem.ItemContainerTheme>
+                        <ControlTheme TargetType="MenuItem"
+                                      BasedOn="{StaticResource {x:Type MenuItem}}"
+                                      x:DataType="vmr:RepeatChoice">
+                          <Setter Property="Header" Value="{Binding Label}" />
+                          <Setter Property="Command"
+                                  Value="{Binding $parent[ContextMenu].((vm:TrackerViewModel)DataContext).LoopLinesCommand}" />
+                          <Setter Property="CommandParameter" Value="{Binding Times}" />
+                        </ControlTheme>
+                      </MenuItem.ItemContainerTheme>
+                    </MenuItem>
 
                     <Separator />
 

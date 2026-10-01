@@ -136,6 +136,78 @@ public sealed class Song
     /// <summary>Indexes into <see cref="Patterns"/>, in playing order.</summary>
     public List<int> Order { get; set; } = new();
 
+    /// <summary>
+    /// What each slot of the order says about repeating, one to a slot and in the same order.
+    /// </summary>
+    /// <remarks>
+    /// Kept beside the order rather than in it, so everything that reads the order as a list of
+    /// pattern numbers goes on doing so. The two are kept the same length by
+    /// <see cref="Normalize"/>, and every edit that puts a slot in, takes one out or moves one goes
+    /// through <see cref="InsertSlot"/>, <see cref="RemoveSlot"/> or <see cref="MoveOrder"/>, which
+    /// move the repeat with its slot. A song written before slots could repeat reads back with
+    /// none, and every slot plays once.
+    /// </remarks>
+    public List<SlotRepeat> Repeats { get; set; } = new();
+
+    /// <summary>
+    /// What a slot says about repeating, held inside its pattern; playing once for a slot that is
+    /// not there or a song whose repeats have not been lined up with its order yet.
+    /// </summary>
+    /// <param name="slot">Which slot of the order.</param>
+    public SlotRepeat RepeatAt(int slot)
+    {
+        if (Repeats is null || slot < 0 || slot >= Repeats.Count) return SlotRepeat.None;
+
+        return Repeats[slot].Held(PatternAt(slot)?.Lines ?? 0);
+    }
+
+    /// <summary>Says what a slot does about repeating.</summary>
+    /// <param name="slot">Which slot of the order; one that is not there is left alone.</param>
+    /// <param name="repeat">What it does.</param>
+    public void SetRepeat(int slot, SlotRepeat repeat)
+    {
+        AlignRepeats();
+
+        if (slot < 0 || slot >= Repeats.Count) return;
+
+        Repeats[slot] = repeat;
+    }
+
+    /// <summary>Puts a slot into the order, with what it says about repeating.</summary>
+    /// <param name="at">Where it goes, held inside the order.</param>
+    /// <param name="pattern">Which pattern it plays.</param>
+    /// <param name="repeat">What it says about repeating, playing once where nothing is said.</param>
+    public void InsertSlot(int at, int pattern, SlotRepeat? repeat = null)
+    {
+        AlignRepeats();
+
+        at = Math.Clamp(at, 0, Order.Count);
+
+        Order.Insert(at, pattern);
+        Repeats.Insert(at, repeat ?? SlotRepeat.None);
+    }
+
+    /// <summary>Takes a slot out of the order, and what it said about repeating with it.</summary>
+    /// <param name="at">Which slot.</param>
+    public void RemoveSlot(int at)
+    {
+        AlignRepeats();
+
+        if (at < 0 || at >= Order.Count) return;
+
+        Order.RemoveAt(at);
+        Repeats.RemoveAt(at);
+    }
+
+    /// <summary>Makes the repeats as long as the order, plain ones added and extra ones dropped.</summary>
+    private void AlignRepeats()
+    {
+        Repeats ??= new List<SlotRepeat>();
+
+        while (Repeats.Count < Order.Count) Repeats.Add(SlotRepeat.None);
+        if (Repeats.Count > Order.Count) Repeats.RemoveRange(Order.Count, Repeats.Count - Order.Count);
+    }
+
     /// <summary>The first slot of the loop range, or <see cref="NoLoop"/> for none.</summary>
     /// <remarks>
     /// A range over the order rather than over the patterns: it is slots that are looped, so a
@@ -639,10 +711,16 @@ public sealed class Song
         to = Math.Clamp(to, 0, Order.Count - 1);
         if (to == from) return false;
 
+        AlignRepeats();
+
         int slot = Order[from];
+        var repeat = Repeats[from];
 
         Order.RemoveAt(from);
         Order.Insert(to, slot);
+
+        Repeats.RemoveAt(from);
+        Repeats.Insert(to, repeat);
 
         return true;
     }
@@ -872,9 +950,21 @@ public sealed class Song
             pattern.SetColumns(NoteColumns);
         }
 
-        Order.RemoveAll(index => index < 0 || index >= Patterns.Count);
+        AlignRepeats();
+
+        for (int at = Order.Count - 1; at >= 0; at--)
+        {
+            if (Order[at] >= 0 && Order[at] < Patterns.Count) continue;
+
+            Order.RemoveAt(at);
+            Repeats.RemoveAt(at);
+        }
+
         if (Order.Count == 0)
+        {
             Order.Add(0);
+            Repeats.Add(SlotRepeat.None);
+        }
 
         foreach (var instrument in Instruments)
         {

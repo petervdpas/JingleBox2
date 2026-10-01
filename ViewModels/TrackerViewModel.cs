@@ -1470,6 +1470,82 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     public int[] RepeatCounts { get; } = { 1, 2, 4, 8, 16 };
 
+    /// <summary>How many times a slot can play its pattern, for the slot's menu.</summary>
+    public RepeatChoice[] SlotTimes { get; } =
+        new[] { 1, 2, 3, 4, 6, 8, 12, 16 }.Select(t => new RepeatChoice(t, t == 1 ? "Once" : "\u00d7" + t)).ToArray();
+
+    /// <summary>How many times a stretch of lines can play on each pass, for the pattern's menu.</summary>
+    public RepeatChoice[] StretchTimes { get; } =
+        new[] { 2, 3, 4, 6, 8, 12, 16 }.Select(t => new RepeatChoice(t, "\u00d7" + t)).ToArray();
+
+    /// <summary>Sets how many times the slot under the cursor plays its pattern.</summary>
+    public IRelayCommand<int> RepeatSlotCommand => new RelayCommand<int>(times =>
+        Repeat("repeating a slot", repeat => repeat with { Times = Math.Clamp(times, 1, Song.MaxRepeats) }));
+
+    /// <summary>
+    /// Makes the lines selected in the pattern go round so many times on each pass of the slot
+    /// playing it, which is the old trackers' pattern loop set on the slot.
+    /// </summary>
+    public IRelayCommand<int> LoopLinesCommand => new RelayCommand<int>(times =>
+    {
+        if (!HasSelection) return;
+
+        var picked = Selection;
+
+        Repeat("looping lines", repeat => repeat with
+        {
+            From = picked.FirstLine,
+            To = picked.LastLine,
+            StretchTimes = Math.Clamp(times, 1, Song.MaxRepeats)
+        });
+    });
+
+    /// <summary>Puts the slot under the cursor back to playing its pattern once, straight through.</summary>
+    public IRelayCommand ClearSlotRepeatCommand => new RelayCommand(() => Repeat("clearing a slot's repeats", _ => SlotRepeat.None));
+
+    /// <summary>
+    /// Changes what the slot under the cursor does about repeating, as one step of undo, and says
+    /// what it does now.
+    /// </summary>
+    /// <param name="what">What is being done, for undo and for the mark saying there is something unsaved.</param>
+    /// <param name="change">The change, from what the slot did before.</param>
+    private void Repeat(string what, Func<SlotRepeat, SlotRepeat> change)
+    {
+        if (Song.Order.Count == 0) return;
+
+        int at = Math.Clamp(OrderIndex, 0, Song.Order.Count - 1);
+
+        Changing(what);
+
+        Song.SetRepeat(at, change(Song.RepeatAt(at)));
+
+        RefreshOrder();
+        MarkDirty(what);
+
+        OrderIndex = at;
+
+        string said = RepeatText(Song.RepeatAt(at));
+
+        Status = said.Length == 0 ? $"Slot {at:00} plays once" : $"Slot {at:00}: {said}";
+    }
+
+    /// <summary>
+    /// What a slot does about repeating, as short as the order list's row needs: times two, and a
+    /// loop of lines thirty two to sixty three four times. Empty for playing once.
+    /// </summary>
+    /// <param name="repeat">What the slot does.</param>
+    private static string RepeatText(SlotRepeat repeat)
+    {
+        string times = repeat.Times > 1 ? "\u00d7" + repeat.Times : "";
+        string stretch = repeat.HasStretch
+            ? "\u21ba" + repeat.From.ToString("00", System.Globalization.CultureInfo.InvariantCulture)
+              + "\u2013" + repeat.To.ToString("00", System.Globalization.CultureInfo.InvariantCulture)
+              + "\u00d7" + repeat.StretchTimes
+            : "";
+
+        return (times + " " + stretch).Trim();
+    }
+
     /// <summary>Points the picked slot at another pattern, named by its place in the song.</summary>
     public IRelayCommand<int> PlayPatternCommand => new RelayCommand<int>(PlayPattern);
 
@@ -4137,7 +4213,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Changing("adding a pattern");
 
         int index = Song.AddPattern();
-        Song.Order.Add(index);
+        Song.InsertSlot(Song.Order.Count, index);
         RefreshOrder();
         MarkDirty("adding a pattern");
         OrderIndex = Song.Order.Count - 1;
@@ -4173,7 +4249,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         int copy = Song.ClonePattern(pattern);
         if (copy < 0) return;
 
-        Song.Order.Insert(at + 1, copy);
+        Song.InsertSlot(at + 1, copy);
 
         RefreshOrder();
         MarkDirty("copying a pattern");
@@ -4214,7 +4290,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         int at = Math.Clamp(OrderIndex, 0, Song.Order.Count - 1);
         int pattern = Song.Order[at];
 
-        for (int i = 0; i < more; i++) Song.Order.Insert(at + 1 + i, pattern);
+        for (int i = 0; i < more; i++) Song.InsertSlot(at + 1 + i, pattern);
 
         RefreshOrder();
         MarkDirty("repeating a pattern");
@@ -4307,7 +4383,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         if (Song.Order.Count <= 1) return;
 
-        Song.Order.RemoveAt(Math.Clamp(OrderIndex, 0, Song.Order.Count - 1));
+        Song.RemoveSlot(Math.Clamp(OrderIndex, 0, Song.Order.Count - 1));
         RefreshOrder();
         MarkDirty("removing an order slot");
         OrderIndex = Math.Clamp(OrderIndex, 0, Song.Order.Count - 1);
@@ -4476,7 +4552,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         for (int i = 0; i < Song.Order.Count; i++)
         {
             var pattern = Song.PatternAt(i);
-            OrderEntries.Add(new OrderSlot(i, pattern?.Name ?? "--", Song.InLoop(i)));
+            OrderEntries.Add(new OrderSlot(i, pattern?.Name ?? "--", Song.InLoop(i), RepeatText(Song.RepeatAt(i))));
         }
 
         OrderIndex = OrderEntries.Count == 0 ? -1 : Math.Clamp(wanted, 0, OrderEntries.Count - 1);

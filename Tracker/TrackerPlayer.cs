@@ -317,6 +317,12 @@ public sealed class TrackerPlayer : ITrackerPlayer
         Volatile.Write(ref _jump, to);
     }
 
+    /// <summary>
+    /// How many times each slot's pattern and stretch have played in this run, which is what sends
+    /// the clock back where a slot says it repeats. Asked only from the clock thread.
+    /// </summary>
+    private readonly ISlotPasses _passes = new SlotPasses();
+
     /// <summary>A line asked for by <see cref="JumpTo"/> that the clock has not taken yet, or nothing.</summary>
     private object? _jump;
 
@@ -470,6 +476,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
            wherever the last one had got to. */
         _mark = null;
         _jump = null;
+        _passes.Reset();
 
         _cancel = new CancellationTokenSource();
         var token = _cancel.Token;
@@ -1569,9 +1576,10 @@ public sealed class TrackerPlayer : ITrackerPlayer
             beat += beatsPerLine;
             PositionChanged?.Invoke(this, position);
 
-            var next = Mode == TrackerPlayMode.Pattern
-                ? TrackerSequencer.AdvanceWithinPattern(song, position, Loop)
-                : TrackerSequencer.Advance(song, position, Loop);
+            var next = _passes.After(song, position, Mode == TrackerPlayMode.Song)
+                       ?? (Mode == TrackerPlayMode.Pattern
+                           ? TrackerSequencer.AdvanceWithinPattern(song, position, Loop)
+                           : TrackerSequencer.Advance(song, position, Loop));
 
             if (next == null) break;
             position = next.Value;
