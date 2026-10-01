@@ -282,8 +282,8 @@
             <views:FoldStrip DockPanel.Dock="Bottom" Title="master effect chain" Topic="tracker.effects"
                              IsVisible="{Binding MixerShowsDesk}"
                              Count="{Binding $parent[views:MixerView].DeskEffect.Count}" Leaves="580"
-                             IsOpen="{Binding ShowsMasterChain, Mode=TwoWay}"
-                             StripHeight="{Binding MasterChainHeight, Mode=TwoWay}">
+                             IsOpen="{Binding ShowsDeskChain, Mode=TwoWay}"
+                             StripHeight="{Binding DeskChainHeight, Mode=TwoWay}">
               <views:PluginStrip DataContext="{Binding $parent[views:MixerView].DeskEffect}" />
             </views:FoldStrip>
 

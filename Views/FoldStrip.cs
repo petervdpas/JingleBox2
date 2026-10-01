@@ -269,7 +269,7 @@ public sealed class FoldStrip : ContentControl
         foreach (var child in parent.GetVisualChildren())
         {
             if (ReferenceEquals(child, this)) continue;
-            if (child is not FoldStrip strip) continue;
+            if (child is not FoldStrip strip || !strip.IsVisible) continue;
 
             taken += strip.Bounds.Height;
         }

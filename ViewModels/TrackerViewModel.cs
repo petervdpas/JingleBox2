@@ -582,6 +582,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>How tall it stands while it is open. See the strips under the pattern.</summary>
     [ObservableProperty] private double masterChainHeight = 104;
 
+    /// <summary>True while the desk MASTER's effect chain is unfolded on the mixer, apart from the song's.</summary>
+    [ObservableProperty] private bool showsDeskChain;
+
+    /// <summary>How tall the desk MASTER's effect chain stands while it is open.</summary>
+    [ObservableProperty] private double deskChainHeight = 104;
+
     /// <summary>Which track the effect slot is pointed at, so the cursor does not retarget it
     /// on every keystroke that stays in the same column.</summary>
     private int _effectTrack = -1;
