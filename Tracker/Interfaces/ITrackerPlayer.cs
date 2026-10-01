@@ -511,6 +511,13 @@ public interface ITrackerPlayer : IDisposable
     IPluginInstrument? PlayerOn(int track);
 
     /// <summary>
+    /// Says a track's plugin instrument has finished starting, naming the track, so anything
+    /// listing what that plugin can be asked to do can read it again. Raised on the thread that
+    /// started it, which is never the drawing thread.
+    /// </summary>
+    event Action<int>? InstrumentStarted;
+
+    /// <summary>
     /// The plugin behind an audition, loaded if it is not already the one being auditioned. Also
     /// what the editor calls to get a live plugin to work on.
     /// </summary>

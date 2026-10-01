@@ -70,7 +70,40 @@ public sealed class OutputBus : IOutputBus
     /// Ahead of the meter and of anything else reading the bus. BASS calls a higher priority first,
     /// and everything else here goes on at nought.
     /// </summary>
-    private const int GainPriority = 1;
+    private const int GainPriority = 2;
+
+    /// <summary>
+    /// Where the chain sits among the bus's own readers: after the trim, which is the top of the
+    /// channel, and before the meter, so the meter reads what the chain made.
+    /// </summary>
+    private const int InsertPriority = 1;
+
+    /// <summary>Hands each block to <see cref="Insert"/>; made once so the delegate outlives the call that hung it.</summary>
+    private readonly DSPProcedure _insertProcedure;
+
+    /// <summary>The hook <see cref="_insertProcedure"/> is hung by, or nought.</summary>
+    private int _insertDsp;
+
+    /// <summary>Behind <see cref="Insert"/>, read on the audio thread.</summary>
+    private volatile Plugins.Interfaces.IAudioInsert? _insert;
+
+    /// <summary>Behind <see cref="Rate"/>.</summary>
+    private int _rate;
+
+    /// <inheritdoc/>
+    public int Rate => _rate;
+
+    /// <summary>How wide the open bus is, which a block is worked through at.</summary>
+    private int _channels = 2;
+
+    /// <summary>
+    /// The stereo buffer the chain works in, allocated once here so the audio thread never does.
+    /// A longer block is worked through in pieces this size.
+    /// </summary>
+    private readonly float[] _insertScratch = new float[8192 * 2];
+
+    /// <summary>A block through whatever effect is on it, the same act a pad's chain is.</summary>
+    private static readonly IInsertPass Passing = new InsertPass();
 
     /// <summary>The peak reader's own handle, or nought while the bus is not open.</summary>
     private int _peak;
@@ -94,6 +127,7 @@ public sealed class OutputBus : IOutputBus
         _peaks = peaks ?? new StereoPeak();
         _peakProcedure = ReadPeak;
         _gainProcedure = Trim;
+        _insertProcedure = Through;
     }
 
     /// <inheritdoc/>
@@ -228,6 +262,8 @@ public sealed class OutputBus : IOutputBus
                 return false;
             }
 
+            _rate = rate;
+
             SayLevelLocked();
 
             WatchLocked();
@@ -353,6 +389,13 @@ public sealed class OutputBus : IOutputBus
 
         _gainDsp = Bass.ChannelSetDSP(_handle, _gainProcedure, IntPtr.Zero, GainPriority);
 
+        _channels = Math.Max(1, Bass.ChannelGetInfo(_handle).Channels);
+
+        _insertDsp = Bass.ChannelSetDSP(_handle, _insertProcedure, IntPtr.Zero, InsertPriority);
+
+        if (_insertDsp == 0)
+            Log.Write(LogArea.Audio, () => "bus: the chain would not go on the bus: " + Bass.LastError);
+
         if (_gainDsp == 0)
             Log.Write(LogArea.Audio, () => "bus: the trim would not go on the bus: " + Bass.LastError);
 
@@ -372,6 +415,9 @@ public sealed class OutputBus : IOutputBus
     {
         if (_handle != 0 && _peak != 0) Bass.ChannelRemoveDSP(_handle, _peak);
         if (_handle != 0 && _gainDsp != 0) Bass.ChannelRemoveDSP(_handle, _gainDsp);
+        if (_handle != 0 && _insertDsp != 0) Bass.ChannelRemoveDSP(_handle, _insertDsp);
+
+        _insertDsp = 0;
 
         _gainDsp = 0;
 
@@ -396,6 +442,28 @@ public sealed class OutputBus : IOutputBus
 
             _gain = value;
         }
+    }
+
+    /// <inheritdoc/>
+    public Plugins.Interfaces.IAudioInsert? Insert
+    {
+        get => _insert;
+        set => _insert = value;
+    }
+
+    /// <summary>The block through the chain, where there is one.</summary>
+    /// <remarks>Takes no lock: it runs on the audio thread while another may hold one inside a BASS call.</remarks>
+    /// <param name="handle">The hook's own handle, which is not used.</param>
+    /// <param name="channel">The bus, which is not used.</param>
+    /// <param name="buffer">The block, changed where it stands.</param>
+    /// <param name="length">How many bytes of it there are.</param>
+    /// <param name="user">Nothing was handed over.</param>
+    private void Through(int handle, int channel, IntPtr buffer, int length, IntPtr user)
+    {
+        var insert = _insert;
+        if (insert == null) return;
+
+        Passing.Run(insert, _insertScratch, buffer, length, _channels);
     }
 
     /// <summary>Multiplies the block by the trim, where the trim is anything but one.</summary>

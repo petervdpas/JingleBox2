@@ -63,7 +63,7 @@ public class TempoLaneTests
     /// <summary>A tempo lane on the first pattern holding one tempo up to a line and another from it.</summary>
     private static void TempoStep(Song song, int line, double before, double after)
     {
-        var lane = song.Patterns[0].Lane(AutomationLane.For(Master(MixControl.Tempo), TrackerPlayer.MasterStrip)!);
+        var lane = song.Lane(AutomationLane.For(Master(MixControl.Tempo), TrackerPlayer.MasterStrip)!);
         double Share(double bpm) => (bpm - TrackerTiming.MinBpm) / (TrackerTiming.MaxBpm - TrackerTiming.MinBpm);
 
         lane.Put(0, Share(before));
@@ -177,6 +177,73 @@ public class TempoLaneTests
         Assert.Equal(TrackerTiming.MinBpm, player.PlayingBpm, 3);
 
         player.Stop();
+    }
+
+    /// <summary>A tracker on a song of two slots of 16 lines each, quick enough to play through.</summary>
+    private static TrackerViewModel TwoSlots(double bpm)
+    {
+        var (tracker, _) = Made(bpm);
+        var song = tracker.Song;
+
+        song.Patterns[0].Resize(16);
+        song.Patterns.Add(new Pattern(16, song.TrackCount) { Name = "B" });
+        song.Order.Add(1);
+        song.Normalize();
+
+        return tracker;
+    }
+
+    /// <summary>The song's tempo lane runs along the order: a step in the second slot is heard when the song gets there.</summary>
+    [Fact]
+    public void The_tempo_lane_runs_along_the_song()
+    {
+        var tracker = TwoSlots(400);
+        double Share(double bpm) => (bpm - TrackerTiming.MinBpm) / (TrackerTiming.MaxBpm - TrackerTiming.MinBpm);
+
+        var lane = tracker.Song.Lane(AutomationLane.For(Master(MixControl.Tempo), TrackerPlayer.MasterStrip)!);
+        lane.Put(0, Share(400));
+        lane.Put(15, Share(400));
+        lane.Put(16, Share(300));
+
+        var reached = new ConcurrentQueue<(TrackerPosition At, double Bpm)>();
+        tracker.Player.PositionChanged += (_, at) => reached.Enqueue((at, tracker.Player.PlayingBpm));
+        tracker.Player.Loop = false;
+        tracker.Player.Play(tracker.Song, TrackerPosition.Start, TrackerPlayMode.Song);
+
+        Assert.True(Until(() => reached.Any(one => one.At.OrderIndex == 1 && one.At.Line >= 2)));
+        tracker.Player.Stop();
+
+        Assert.All(reached.Where(one => one.At.OrderIndex == 0 && one.At.Line > 0), one => Assert.Equal(400, one.Bpm, 3));
+        Assert.All(reached.Where(one => one.At.OrderIndex == 1 && one.At.Line > 0), one => Assert.Equal(300, one.Bpm, 3));
+
+        tracker.Finished();
+    }
+
+    /// <summary>The tempo on the master's panel is drawn across the whole song, slot by slot, and stays when another pattern is in front.</summary>
+    [Fact]
+    public void The_panel_draws_the_tempo_across_the_song()
+    {
+        var tracker = TwoSlots(120);
+        tracker.ShowsMixerLanes = true;
+
+        var panel = tracker.MixerLanes!;
+        panel.Show(TrackerPlayer.MasterStrip);
+        panel.Chosen = panel.Parameters.First(row => Song.IsTempo(row.Choice.Mapping));
+        panel.Chosen.AddCommand.Execute(null);
+
+        panel.Chosen = panel.Parameters.First(row => Song.IsTempo(row.Choice.Mapping));
+
+        Assert.NotNull(tracker.Song.Tempo);
+        Assert.Equal(32, panel.Lines);
+        Assert.Equal(new[] { 0, 16 }, panel.Slots);
+
+        tracker.OrderIndex = 1;
+
+        Assert.True(panel.Parameters.First(row => Song.IsTempo(row.Choice.Mapping)).HasLane);
+        Assert.Empty(tracker.Song.Patterns[0].Lanes);
+        Assert.Empty(tracker.Song.Patterns[1].Lanes);
+
+        tracker.Finished();
     }
 
     /// <summary>A strip a hand cannot reach while the mixer is hidden is still reached by the targets a lane plays through.</summary>

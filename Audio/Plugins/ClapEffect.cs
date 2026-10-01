@@ -39,6 +39,9 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// <summary>The parameter the standard reserves for switching the plugin out of circuit.</summary>
     private const uint BypassFlag = 1 << 4;
 
+    /// <summary>The plugin offering this one to be driven over time.</summary>
+    private const uint AutomatableFlag = 1 << 5;
+
     /// <summary>The library this plugin came out of. Held so the reference can be given back.</summary>
     private readonly ClapBundle _bundle;
 
@@ -1122,7 +1125,8 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
                 (info.Flags & HiddenFlag) != 0,
                 (info.Flags & ReadOnlyFlag) != 0,
                 (info.Flags & BypassFlag) != 0,
-                Normalized: false));
+                Normalized: false,
+                CanAutomate: (info.Flags & AutomatableFlag) != 0));
         }
 
         return parameters;

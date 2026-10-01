@@ -122,8 +122,17 @@ public sealed class ControlMapping
     /// </summary>
     public string Plugin { get; set; } = "";
 
-    /// <summary>Which insert, counted from zero. Only read when the scope is fixed.</summary>
+    /// <summary>
+    /// Which insert, counted from zero, or <see cref="InstrumentSlot"/> for the plugin the track
+    /// plays as its instrument. Only read when the scope is fixed.
+    /// </summary>
     public int Slot { get; set; }
+
+    /// <summary>
+    /// The <see cref="Slot"/> that means the track's own instrument rather than an insert, since
+    /// the same plugin can be both and a lane has to say which of the two it moves.
+    /// </summary>
+    public const int InstrumentSlot = -1;
 
     /// <summary>Which parameter, as the plugin numbers them.</summary>
     public uint Parameter { get; set; }

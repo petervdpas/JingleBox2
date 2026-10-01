@@ -70,6 +70,46 @@ public sealed partial class AutomationViewModel : ObservableObject
     /// <summary>The playing line moved, so the picture can show where the song has got to.</summary>
     public void Running() => OnPropertyChanged(nameof(PlayingLine));
 
+    /// <summary>
+    /// Takes one undo step of the whole song before one of the song's own lanes is edited, which
+    /// is every mixer lane: a pattern's step would not hold it.
+    /// </summary>
+    public Action<string>? Changing;
+
+    /// <summary>Where the playing line is along the order, for a song-wide lane's playhead; below nought while stopped.</summary>
+    public Func<int>? SongPlaying;
+
+    /// <summary>
+    /// Which of a track's controls this panel lists. The one under the pattern lists what belongs
+    /// to the pattern and the one on the mixer what belongs to the song, so each is about one
+    /// timeline. Left out, everything is listed.
+    /// </summary>
+    public Func<ControlChoice, bool>? Offers;
+
+    /// <summary>
+    /// Whether a row is about the song as a whole rather than the pattern in front: everything on
+    /// the mixer is, the master and the tempo included.
+    /// </summary>
+    private static bool SongWide(AutomationRow? row) => row is not null && Song.IsSongWide(row.Choice.Mapping);
+
+    /// <summary>The lane a parameter has: the song's for the mixer, the pattern's for a machine, an effect or a plugin.</summary>
+    internal AutomationLane? LaneOf(ControlChoice choice, Pattern pattern, int track) =>
+        Song.IsSongWide(choice.Mapping) ? _song()?.LaneFor(choice.Mapping, track) : pattern.LaneFor(choice.Mapping, track);
+
+    /// <summary>Takes the undo step an edit to a row's lane needs: the song's for the mixer, the pattern's otherwise.</summary>
+    private void Take(AutomationRow row, Pattern pattern, string what)
+    {
+        if (SongWide(row)) Changing?.Invoke(what);
+        else Taking?.Invoke(pattern, what);
+    }
+
+    /// <summary>
+    /// Where each slot starts along the song, in lines, while one of the song's lanes is chosen, so the
+    /// picture can mark where one slot ends and the next begins; empty otherwise.
+    /// </summary>
+    public System.Collections.Generic.IReadOnlyList<int> Slots =>
+        SongWide(Chosen) && _song() is { } song ? song.SlotStarts : Array.Empty<int>();
+
     /// <summary>Told before a lane is added or taken away, so undo has somewhere to go.</summary>
     public Action<Pattern, string>? Taking;
 
@@ -113,13 +153,15 @@ public sealed partial class AutomationViewModel : ObservableObject
     /// nothing but which panel it is showing. Told when they move, since a pattern changed
     /// underneath is a different grid.
     /// </remarks>
-    public int Lines => _pattern()?.Lines ?? 0;
+    /// <remarks>The whole song's lines while a mixer control is chosen, since its lane runs along the order.</remarks>
+    public int Lines => SongWide(Chosen) ? _song()?.TotalLines ?? 0 : _pattern()?.Lines ?? 0;
 
     /// <inheritdoc cref="Lines"/>
     public int LinesPerBeat => _beat();
 
     /// <inheritdoc cref="Lines"/>
-    public int PlayingLine => _playing();
+    /// <remarks>Along the order while a mixer control is chosen, and in the pattern otherwise.</remarks>
+    public int PlayingLine => SongWide(Chosen) ? SongPlaying?.Invoke() ?? -1 : _playing();
 
     /// <summary>Which track and which pattern, since a lane belongs to both.</summary>
     /// <remarks>
@@ -196,6 +238,8 @@ public sealed partial class AutomationViewModel : ObservableObject
 
             foreach (var choice in _targets.On(Track))
             {
+                if (Offers is { } offers && !offers(choice)) continue;
+
                 if (wanted.Length > 0
                     && choice.Name.IndexOf(wanted, StringComparison.OrdinalIgnoreCase) < 0
                     && choice.Device.IndexOf(wanted, StringComparison.OrdinalIgnoreCase) < 0)
@@ -213,10 +257,20 @@ public sealed partial class AutomationViewModel : ObservableObject
         OnPropertyChanged(nameof(Nothing));
         OnPropertyChanged(nameof(Lines));
         OnPropertyChanged(nameof(LinesPerBeat));
+        OnPropertyChanged(nameof(Slots));
     }
 
-    /// <summary>Says whether there is anything in the room to the right now.</summary>
-    partial void OnChosenChanged(AutomationRow? value) => OnPropertyChanged(nameof(HasChosen));
+    /// <summary>
+    /// Says whether there is anything in the room to the right now, and how long the picture is:
+    /// the mixer runs along the whole song and everything else along the pattern.
+    /// </summary>
+    partial void OnChosenChanged(AutomationRow? value)
+    {
+        OnPropertyChanged(nameof(HasChosen));
+        OnPropertyChanged(nameof(Lines));
+        OnPropertyChanged(nameof(PlayingLine));
+        OnPropertyChanged(nameof(Slots));
+    }
 
     /// <summary>Puts a lane on the chosen parameter, with one point where it stands.</summary>
     /// <remarks>
@@ -233,9 +287,12 @@ public sealed partial class AutomationViewModel : ObservableObject
         var made = AutomationLane.For(row.Choice.Mapping, row.Track);
         if (made is null) return;
 
-        Taking?.Invoke(pattern, "automating " + row.Name);
+        Take(row, pattern, "automating " + row.Name);
 
-        var lane = pattern.Lane(made);
+        AutomationLane lane;
+
+        if (SongWide(row) && _song() is { } song) lane = song.Lane(made);
+        else lane = pattern.Lane(made);
 
         if (_targets.Find(row.Choice.Mapping) is { } target && target.Max > target.Min)
             lane.Put(0, Math.Clamp((target.Value - target.Min) / (target.Max - target.Min), 0, 1));
@@ -250,9 +307,10 @@ public sealed partial class AutomationViewModel : ObservableObject
         var pattern = _pattern();
         if (pattern is null || row.Lane is null) return;
 
-        Taking?.Invoke(pattern, "clearing " + row.Name);
+        Take(row, pattern, "clearing " + row.Name);
 
-        pattern.RemoveLane(row.Lane);
+        if (SongWide(row) && _song() is { } song) song.RemoveLane(row.Lane);
+        else pattern.RemoveLane(row.Lane);
 
         Dirtied?.Invoke();
         Restock();
@@ -264,7 +322,7 @@ public sealed partial class AutomationViewModel : ObservableObject
         var pattern = _pattern();
         if (pattern is null || row.Lane is null) return;
 
-        Taking?.Invoke(pattern, row.Name + "'s shape");
+        Take(row, pattern, row.Name + "'s shape");
 
         row.Lane.Play = row.Lane.Play == AutomationPlay.Lines
             ? AutomationPlay.Points
@@ -286,13 +344,16 @@ public sealed partial class AutomationViewModel : ObservableObject
     /// </remarks>
     public void Editing(string what)
     {
-        if (_pattern() is { } pattern) Taking?.Invoke(pattern, what);
+        if (_pattern() is not { } pattern) return;
+
+        if (Chosen is { } row) Take(row, pattern, what);
+        else Taking?.Invoke(pattern, what);
     }
 
     /// <summary>And it has happened: the pattern has changed and the row has to read itself again.</summary>
     public void Edited()
     {
-        _pattern()?.LaneChanged();
+        if (!SongWide(Chosen)) _pattern()?.LaneChanged();
 
         Touched();
     }
@@ -347,12 +408,31 @@ public sealed partial class AutomationViewModel : ObservableObject
     {
         if (_targets.Find(choice.Mapping) is not { } target) return "";
 
-        string said = target.Reads(target.Value);
+        return Word(choice, target, target.Value);
+    }
+
+    /// <summary>Any value of a parameter in its own words, for the numbers on the picture.</summary>
+    /// <param name="choice">Which parameter.</param>
+    /// <param name="value">The value, in its own units.</param>
+    internal string Word(ControlChoice choice, double value) =>
+        _targets.Find(choice.Mapping) is { } target ? Word(choice, target, value) : "";
+
+    /// <summary>A value in the target's own words, with the unit added where the target did not say it.</summary>
+    private static string Word(ControlChoice choice, Midi.Interfaces.IControlTarget target, double value)
+    {
+        string said = target.Reads(value);
 
         return choice.Unit.Length > 0 && !said.EndsWith(choice.Unit, StringComparison.Ordinal)
             ? said + " " + choice.Unit
             : said;
     }
+
+    /// <summary>The bottom and top of a parameter's own range, nought and one where nothing answers.</summary>
+    /// <param name="choice">Which parameter.</param>
+    internal (double Min, double Max) RangeOf(ControlChoice choice) =>
+        _targets.Find(choice.Mapping) is { } target && target.Max > target.Min
+            ? (target.Min, target.Max)
+            : (0, 1);
 }
 
 /// <summary>One parameter of one track, and the lane it has or has not got.</summary>
@@ -371,7 +451,7 @@ public sealed class AutomationRow : ObservableObject
         _owner = owner;
         Choice = choice;
         Track = track;
-        Lane = pattern.LaneFor(choice.Mapping, track);
+        Lane = owner.LaneOf(choice, pattern, track);
     }
 
     /// <summary>What this row is about: the mapping, and the words for it.</summary>
@@ -397,6 +477,15 @@ public sealed class AutomationRow : ObservableObject
 
     /// <summary>Where its nought sits on the picture: the floor for a level, the middle for a pan.</summary>
     public double Zero => _owner.ZeroOf(Choice);
+
+    /// <summary>The bottom of the parameter's own range, which the foot of the picture stands for.</summary>
+    public double Minimum => _owner.RangeOf(Choice).Min;
+
+    /// <summary>The top of the parameter's own range, which the top of the picture stands for.</summary>
+    public double Maximum => _owner.RangeOf(Choice).Max;
+
+    /// <summary>A value of this parameter in its own words, which is what the picture's numbers say.</summary>
+    public Func<double, string> Words => value => _owner.Word(Choice, value);
 
     /// <summary>True when this parameter is automated, which is what the buttons swap on.</summary>
     public bool HasLane => Lane is not null;

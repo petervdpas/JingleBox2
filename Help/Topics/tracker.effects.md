@@ -1,9 +1,12 @@
-# Track effects
+# Instrument/effect chain
 
-The effects on the track the cursor is on, ours and the plugins alike.
+What a sound goes through, in order: a track's instrument and its effects, or the effects on the song, a pad or the recording input.
 
-The effects on the track the cursor is on, in the order the audio goes through them.
-Moving the cursor to another track changes what this row is about.
+A chain is a row of blocks in the order the audio goes through them. A track's
+chain is its **instrument/effect chain**: the instrument first and its effects after,
+and it follows the track the cursor is on. The song's master, every pad and the
+recording input each have an **effect chain**, which is the same row with no
+instrument at its head, since nothing is played there.
 
 When the track plays a plugin instrument, that plugin is the first block in the row,
 because that is where it is in the audio: it makes the sound and everything after
@@ -80,11 +83,9 @@ it made, so first is the only place it has. Right click still has Move earlier a
 Move later, a step at a time, and Remove.
 
 An effect of ours carries a page about itself the way a machine does: the hamburger in the
-corner of its face has **Help** on it where its author wrote one, and all six that ship
-have one.
+corner of its face has **Help** on it where its author wrote one, and every one that ships has one.
 
-The mixer's master has a chain of its own, and so does a pad. The same effect on two
-tracks is two sets of knob positions.
+The same effect on two chains is two sets of knob positions.
 
 Chains are saved with the song. An effect that is missing when a song is opened is
 named rather than passed over, and the rest of the chain still loads: for a plugin

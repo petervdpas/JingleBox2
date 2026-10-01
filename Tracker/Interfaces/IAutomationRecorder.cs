@@ -45,6 +45,12 @@ public interface IAutomationRecorder
     /// </remarks>
     Action<Pattern, string>? Taking { get; set; }
 
+    /// <summary>
+    /// Takes one undo step of the whole song, with what to call it, before the first point of a
+    /// pass goes into one of the song's own lanes: a mixer control, the master or the tempo.
+    /// </summary>
+    Action<string>? Changing { get; set; }
+
     /// <summary>Told after a point is written, since the song now has something unsaved in it.</summary>
     /// <remarks>
     /// Separate from the pattern's own <c>Changed</c> on purpose. Recording happens on whatever

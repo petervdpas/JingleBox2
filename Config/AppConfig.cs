@@ -303,6 +303,13 @@ public sealed class AppConfig
     public Audio.Plugins.PluginChainConfig? RecordEffects { get; set; }
 
     /// <summary>
+    /// What is on the desk's MASTER chain, which everything this application plays goes through
+    /// on its way out. Kept here rather than in a song for the reason <see cref="RecordEffects"/>
+    /// is: it is how the room is wired. Null where nothing was put on it.
+    /// </summary>
+    public Audio.Plugins.PluginChainConfig? DeskEffects { get; set; }
+
+    /// <summary>
     /// Where the patchbay's blocks have been dragged to, one entry per block that was moved.
     /// </summary>
     /// <remarks>

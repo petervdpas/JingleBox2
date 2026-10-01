@@ -194,7 +194,8 @@ public class BridgeBodyTests
         {
             new PluginParameter(0, "Cutoff", 0, 1, 0.5, 0, false, false, false, true, "Hz"),
             new PluginParameter(4294967295, "Gain reduction", -60, 0, 0, 0, false, true, false, false, "dB"),
-            new PluginParameter(7, "", 0, 0, 0, 1, true, false, true, false)
+            new PluginParameter(7, "", 0, 0, 0, 1, true, false, true, false),
+            new PluginParameter(8, "MIDI CC 0|1", 0, 1, 0, 0, false, false, false, true, CanAutomate: false)
         };
 
         var back = _body.ReadParameters(_body.Parameters(said));
@@ -213,6 +214,7 @@ public class BridgeBodyTests
             Assert.Equal(said[i].IsReadOnly, back[i].IsReadOnly);
             Assert.Equal(said[i].IsBypass, back[i].IsBypass);
             Assert.Equal(said[i].Normalized, back[i].Normalized);
+            Assert.Equal(said[i].CanAutomate, back[i].CanAutomate);
             Assert.Equal(said[i].Units, back[i].Units);
         }
     }

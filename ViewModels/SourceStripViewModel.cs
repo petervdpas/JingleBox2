@@ -23,6 +23,16 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class SourceStripViewModel : ObservableObject, Interfaces.IStripSwitches
 {
+    /// <summary>Behind <see cref="IsSelected"/>.</summary>
+    private bool _isSelected;
+
+    /// <summary>Whether this is the strip picked on the mixer, which only the desk's MASTER can be.</summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => SetProperty(ref _isSelected, value);
+    }
+
     /// <summary>Reads where the level stands.</summary>
     private readonly Func<double> _read;
 

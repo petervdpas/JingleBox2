@@ -42,6 +42,28 @@ public sealed class FoldStrip : ContentControl
     public static readonly StyledProperty<string> TitleProperty =
         AvaloniaProperty.Register<FoldStrip, string>(nameof(Title), "");
 
+    /// <summary>
+    /// The help topic for what is folded away, drawn as a badge beside the tab the way every other
+    /// heading carries one. Empty means no badge.
+    /// </summary>
+    public static readonly StyledProperty<string> TopicProperty =
+        AvaloniaProperty.Register<FoldStrip, string>(nameof(Topic), "");
+
+    /// <summary>How much room, in pixels, the strip leaves for whatever it is folded under.</summary>
+    public static readonly StyledProperty<double> LeavesProperty =
+        AvaloniaProperty.Register<FoldStrip, double>(nameof(Leaves), StripRoom.DefaultLeast);
+
+    /// <summary>
+    /// How much room the strip leaves for whatever it is folded under when it is pulled taller:
+    /// enough for a few lines of the pattern by default, and as much as the mixer's strips need
+    /// under the mixer, so pulling the automation up never squashes a fader over its own labels.
+    /// </summary>
+    public double Leaves
+    {
+        get => GetValue(LeavesProperty);
+        set => SetValue(LeavesProperty, value);
+    }
+
     /// <summary>How many things the strip holds, shown on its tab; nothing for no count at all.</summary>
     public static readonly StyledProperty<int?> CountProperty =
         AvaloniaProperty.Register<FoldStrip, int?>(nameof(Count));
@@ -90,6 +112,13 @@ public sealed class FoldStrip : ContentControl
     {
         get => GetValue(TitleProperty);
         set => SetValue(TitleProperty, value);
+    }
+
+    /// <inheritdoc cref="TopicProperty"/>
+    public string Topic
+    {
+        get => GetValue(TopicProperty);
+        set => SetValue(TopicProperty, value);
     }
 
     /// <inheritdoc cref="IsOpenProperty"/>
@@ -146,6 +175,9 @@ public sealed class FoldStrip : ContentControl
     /// Measured with no ceiling, which is the only way to be told what something wants rather
     /// than what it was given: the presenter is handed the strip's own height, so asking it
     /// answers that height back.
+    ///
+    /// The strip is held to the room it may take here as well as while it is dragged, so a height
+    /// kept from a bigger window, or a window made smaller, cannot squash what it is folded under.
     /// </remarks>
     protected override Size MeasureOverride(Size available)
     {
@@ -156,6 +188,13 @@ public sealed class FoldStrip : ContentControl
             ContentLeast = Math.Min(Most, inside.DesiredSize.Height);
 
             if (StripHeight < ContentLeast) StripHeight = ContentLeast;
+
+            if (this.GetVisualParent() is Visual parent && parent.Bounds.Height > 0)
+            {
+                double tallest = Room.Tallest(parent.Bounds.Height, Siblings(), Leaves, ContentLeast);
+
+                if (StripHeight > tallest) StripHeight = tallest;
+            }
         }
 
         return base.MeasureOverride(available);
@@ -204,7 +243,7 @@ public sealed class FoldStrip : ContentControl
             double tallest = Room.Tallest(
                 (this.GetVisualParent() as Visual)?.Bounds.Height ?? 0,
                 Siblings(),
-                StripRoom.DefaultLeast,
+                Leaves,
                 ContentLeast);
 
             if (StripHeight >= tallest) return;

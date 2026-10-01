@@ -217,7 +217,7 @@
       <!-- Order list -->
       <Border Grid.Column="0" Classes="card">
         <DockPanel>
-          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8">
+          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
             <TextBlock Classes="cardTitle" Text="Order" />
             <views:HelpBadge Topic="tracker.song" />
           </StackPanel>
@@ -590,24 +590,18 @@
                  taking its room off its neighbour rather than off the music. -->
             <!-- The upper of the two, so this is the one that carries the room above the pair:
                  the automation sits under it and wants nothing between them. -->
-            <views:FoldStrip Grid.Row="1" Title="chain" Margin="0,10,0,0"
+            <views:FoldStrip Grid.Row="1" Title="instrument/effect chain" Topic="tracker.effects" Margin="0,10,0,0"
                              Count="{Binding TrackEffect.Count}"
                              IsOpen="{Binding ShowsChain, Mode=TwoWay}"
                              StripHeight="{Binding ChainHeight, Mode=TwoWay}">
               <views:PluginStrip x:Name="TrackChain" DataContext="{Binding TrackEffect}" />
             </views:FoldStrip>
 
-            <views:FoldStrip Grid.Row="2" Title="automation"
+            <views:FoldStrip Grid.Row="2" Title="automation" Topic="tracker.automation"
                              Count="{Binding LaneCount}"
                              IsOpen="{Binding ShowsLanes, Mode=TwoWay}"
                              StripHeight="{Binding LanesHeight, Mode=TwoWay}">
-              <Grid>
-                <views:AutomationStrip DataContext="{Binding Lanes}" />
-
-                <views:HelpBadge Topic="tracker.automation"
-                                 HorizontalAlignment="Right" VerticalAlignment="Top"
-                                 Margin="0,2,6,0" />
-              </Grid>
+              <views:AutomationStrip DataContext="{Binding Lanes}" />
             </views:FoldStrip>
           </Grid>
 
@@ -620,7 +614,7 @@
 
       <Border Grid.Column="4" Classes="card">
         <DockPanel>
-          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8">
+          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
             <TextBlock Classes="cardTitle" Text="Song instruments" />
 
             <views:HelpBadge Topic="tracker.song-instruments" />

@@ -175,9 +175,13 @@
                                    IsVisible="{Binding Chosen.HasLane}"
                                    Lane="{Binding Chosen.Lane}"
                                    Zero="{Binding Chosen.Zero}"
+                                   Minimum="{Binding Chosen.Minimum}"
+                                   Maximum="{Binding Chosen.Maximum}"
+                                   Words="{Binding Chosen.Words}"
+                                   Slots="{Binding Slots}"
                                    Lines="{Binding Lines}"
                                    LinesPerBeat="{Binding LinesPerBeat}"
-                                   ToolTip.Tip="Click to add a point or take hold of one, drag to move it, right click to take one away." />
+                                   ToolTip.Tip="Click to add a point or take hold of one, drag to move it, right click to take one away. A point snaps to the marked lines and to round numbers; hold Shift to place it freely." />
 
             <views:AutomationPlayhead IsVisible="{Binding Chosen.HasLane}"
                                       PlayingLine="{Binding PlayingLine}"

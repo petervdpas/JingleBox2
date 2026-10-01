@@ -88,13 +88,19 @@ public sealed class ControlTargets : IControlTargets
     /// held, since it is a setting somebody can change while the show is running. Left out, it is
     /// toggle, which is what a pad box wants and what the setting defaults to.
     /// </param>
+    /// <param name="instruments">
+    /// The plugin a track plays as its instrument, by track. Left out, the tracker is asked, which
+    /// is the real answer; a test hands in its own so it needs no plugin process.
+    /// </param>
     public ControlTargets(TrackerViewModel tracker, ISoundMachineProjects machines,
                           RackViewModel? rack = null, ITransportPresses? presses = null,
                           SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null,
                           ViewModels.Interfaces.ISoundEffectInFront? front = null,
                           IPadTrigger? pads = null, Func<bool>? toggles = null,
-                          ViewModels.Interfaces.IPageInFront? pages = null)
+                          ViewModels.Interfaces.IPageInFront? pages = null,
+                          Func<int, IPluginParameters?>? instruments = null)
     {
+        _instruments = instruments ?? tracker.InstrumentPluginOn;
         _pages = pages;
         _pads = pads;
         _toggles = toggles;
@@ -109,13 +115,16 @@ public sealed class ControlTargets : IControlTargets
     /// <summary>The transport, where there is one.</summary>
     private readonly ITransportPresses? _presses;
 
+    /// <summary>The plugin a track plays as its instrument, by track.</summary>
+    private readonly Func<int, IPluginParameters?> _instruments;
+
     /// <inheritdoc/>
     /// <remarks>
     /// The same pieces handed to a second set of targets that is told nothing about pages, made
     /// the first time it is asked for.
     /// </remarks>
     public IControlTargets Everywhere =>
-        _pages is null ? this : _everywhere ??= new ControlTargets(_tracker, _machines, _rack, _presses, _effects, _front, _pads, _toggles);
+        _pages is null ? this : _everywhere ??= new ControlTargets(_tracker, _machines, _rack, _presses, _effects, _front, _pads, _toggles, instruments: _instruments);
 
     /// <summary>The targets <see cref="Everywhere"/> hands out, once made.</summary>
     private IControlTargets? _everywhere;
@@ -201,7 +210,8 @@ public sealed class ControlTargets : IControlTargets
     /// What a track has on it that a lane could be about, in the order the eye reads it.
     /// </summary>
     /// <remarks>
-    /// The machine first, then the inserts in the order they are in the chain, then the strip.
+    /// The instrument first, a machine of ours or a plugin, then the inserts in the order they are
+    /// in the chain, then the strip.
     /// That is the order a track is read in on the screen, and a list in any other order would
     /// be a list somebody has to search rather than scan.
     ///
@@ -212,9 +222,11 @@ public sealed class ControlTargets : IControlTargets
     /// turns like the others, and a lane driving it would be a song insisting on somebody's
     /// zoom level.
     ///
-    /// A plugin's read-only parameters are left out for a harder reason: a compressor's gain
-    /// reduction meter is a parameter that reports rather than accepts, and a lane pointed at
-    /// one would write into a value the plugin overwrites on the next block.
+    /// A plugin's parameters are listed only where <see cref="Automatable"/> says so. A
+    /// compressor's gain reduction meter reports rather than accepts, and a lane pointed at one
+    /// would write into a value the plugin overwrites on the next block; a parameter the plugin
+    /// does not offer for driving, such as JUCE's thousands of MIDI controller stand-ins, would
+    /// bury the dozen knobs somebody came for.
     ///
     /// The master has a strip and nothing else, since no machine plays through it and no
     /// instrument's plugin sits on it: everything has been played by the time it is reached. Its
@@ -258,16 +270,53 @@ public sealed class ControlTargets : IControlTargets
             }
         }
 
+        foreach (var choice in OnInstrumentPlugin(track)) yield return choice;
+
         foreach (var choice in OnInserts(track)) yield return choice;
 
         foreach (var choice in OnMixer(track)) yield return choice;
     }
 
+    /// <summary>
+    /// Whether a plugin's parameter belongs in a lane list: one the plugin offers for driving,
+    /// is willing to be written, and has not asked to keep out of sight.
+    /// </summary>
+    private static bool Automatable(Audio.Plugins.Records.PluginParameter parameter) =>
+        parameter.CanAutomate && !parameter.IsReadOnly && !parameter.IsHidden;
+
+    /// <summary>Every parameter of the plugin a track plays as its instrument.</summary>
+    /// <remarks>
+    /// Nothing until the plugin has loaded, since its parameters are only known by asking it.
+    /// Only what <see cref="Automatable"/> lets through, for the reasons <see cref="On"/> gives.
+    /// </remarks>
+    private IEnumerable<ControlChoice> OnInstrumentPlugin(int track)
+    {
+        if (_instruments(track) is not { } plugin) yield break;
+
+        foreach (var parameter in plugin.Parameters())
+        {
+            if (!Automatable(parameter)) continue;
+
+            yield return new ControlChoice(
+                new ControlMapping
+                {
+                    Kind = ControlKind.Plugin,
+                    Scope = ControlScope.Fixed,
+                    Track = track,
+                    Plugin = plugin.Info.Id,
+                    Slot = ControlMapping.InstrumentSlot,
+                    Parameter = parameter.Id,
+                    Ordinal = -1
+                },
+                plugin.Info.Name,
+                parameter.Name,
+                parameter.Units);
+        }
+    }
+
     /// <summary>Every parameter of every plugin on a strip's chain, in the order they run.</summary>
     /// <remarks>
-    /// A plugin's read-only parameters are left out: a compressor's gain reduction meter reports
-    /// rather than accepts, and a lane pointed at one would write into a value the plugin
-    /// overwrites on the next block.
+    /// Only what <see cref="Automatable"/> lets through, for the reasons <see cref="On"/> gives.
     /// </remarks>
     private IEnumerable<ControlChoice> OnInserts(int track)
     {
@@ -281,7 +330,7 @@ public sealed class ControlTargets : IControlTargets
 
             foreach (var parameter in plugin.Parameters())
             {
-                if (parameter.IsReadOnly) continue;
+                if (!Automatable(parameter)) continue;
 
                 yield return new ControlChoice(
                     new ControlMapping
@@ -598,23 +647,36 @@ public sealed class ControlTargets : IControlTargets
     }
 
     /// <summary>
-    /// A knob on a plugin in a track's chain, when that is the plugin it is about.
+    /// A knob on a plugin in a track's chain, or on the plugin the track plays as its instrument,
+    /// when that is the plugin it is about.
     /// </summary>
     /// <remarks>
     /// Only an automation lane reaches this now. A hardware control cannot be pointed at a
     /// plugin at all: a plugin brings its own MIDI learn, so a mapping made here would be a
     /// second one beside the plugin's own with no way for the two to agree.
     ///
-    /// The track's own instrument is deliberately not searched, although it may well be a
-    /// plugin. A lane names something on the track's chain, and a plugin playing the track is
-    /// not on its chain.
+    /// <see cref="ControlMapping.InstrumentSlot"/> says the instrument rather than an insert, and
+    /// the plugin's id still has to agree, so a lane outlives its track being pointed at another
+    /// instrument by answering nothing rather than moving a parameter that happens to share a
+    /// number on the new one.
     /// </remarks>
     private IControlTarget? OnPlugin(ControlMapping mapping, int track)
     {
-        var chain = _tracker.InsertsOn(track);
-        if (chain is null) return null;
+        IPluginParameters? wanted;
 
-        var wanted = Insert(chain, mapping);
+        if (mapping.Slot == ControlMapping.InstrumentSlot)
+        {
+            wanted = track == Tracker.TrackerPlayer.MasterStrip ? null : _instruments(track);
+            if (wanted is not null && mapping.Plugin.Length > 0
+                && !string.Equals(wanted.Info.Id, mapping.Plugin, StringComparison.Ordinal))
+                wanted = null;
+        }
+        else
+        {
+            var chain = _tracker.InsertsOn(track);
+            wanted = chain is null ? null : Insert(chain, mapping);
+        }
+
         if (wanted is null) return null;
 
         var parameter = wanted.Parameters().FirstOrDefault(one => one.Id == mapping.Parameter);

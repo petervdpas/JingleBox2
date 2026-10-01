@@ -580,6 +580,7 @@ public partial class MainWindow : Window
 
         Mixer.Levels = main.Levels;
         Mixer.DeskMaster = main.DeskMaster;
+        Mixer.DeskEffect = main.DeskEffect;
         Mixer.RecorderInput = main.RecorderInput;
         Mixer.Patchbay = main.Patchbay;
         Mixer.Input = main.Record;

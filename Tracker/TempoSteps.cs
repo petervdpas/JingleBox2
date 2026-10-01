@@ -16,9 +16,11 @@ namespace JingleBox2.Tracker;
 public sealed class TempoSteps : ITempoSteps
 {
     /// <inheritdoc/>
-    public void Step(Pattern pattern, int line, double bpm, double songBpm)
+    public void Step(Song song, int line, double bpm)
     {
-        if (pattern is null || line < 0 || line >= pattern.Lines || double.IsNaN(bpm)) return;
+        if (song is null || line < 0 || line >= song.TotalLines || double.IsNaN(bpm)) return;
+
+        double songBpm = song.Timing.ClampedBpm;
 
         var mapping = new ControlMapping
         {
@@ -28,7 +30,7 @@ public sealed class TempoSteps : ITempoSteps
             Track = TrackerPlayer.MasterStrip
         };
 
-        var lane = pattern.Lane(AutomationLane.For(mapping, TrackerPlayer.MasterStrip)!);
+        var lane = song.Tempo ?? song.Lane(AutomationLane.For(mapping, TrackerPlayer.MasterStrip)!);
 
         if (line > 0)
         {

@@ -1342,10 +1342,15 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             _players[track] = (instrument.Id, player);
             _synth.Mixer.SetInstrument(track, player);
-
-            return player;
         }
+
+        InstrumentStarted?.Invoke(track);
+
+        return player;
     }
+
+    /// <inheritdoc/>
+    public event Action<int>? InstrumentStarted;
 
     /// <inheritdoc/>
     /// <remarks>

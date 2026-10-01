@@ -53,7 +53,10 @@ public sealed class AutomationLane
     /// <summary>The plugin, by the id the scanner gave it, for a parameter on an insert.</summary>
     public string Plugin { get; set; } = "";
 
-    /// <summary>Which insert, counted from zero, for a chain where the plugin is not named.</summary>
+    /// <summary>
+    /// Which insert, counted from zero, for a chain where the plugin is not named, or
+    /// <see cref="ControlMapping.InstrumentSlot"/> for the plugin the track plays as its instrument.
+    /// </summary>
     public int Slot { get; set; }
 
     /// <summary>Which parameter of it, as the plugin numbers them.</summary>
@@ -140,7 +143,9 @@ public sealed class AutomationLane
             ControlKind.Plugin =>
                 string.Equals(mapping.Plugin, Plugin, StringComparison.Ordinal)
                 && mapping.Parameter == Parameter
-                && (Plugin.Length > 0 || mapping.Slot == Slot),
+                && (Plugin.Length > 0
+                    ? (mapping.Slot == ControlMapping.InstrumentSlot) == (Slot == ControlMapping.InstrumentSlot)
+                    : mapping.Slot == Slot),
 
             ControlKind.Mix => mapping.Mix == Mix,
 

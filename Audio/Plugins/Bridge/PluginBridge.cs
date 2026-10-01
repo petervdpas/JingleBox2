@@ -480,6 +480,7 @@ public sealed class BridgeBody : IBridgeBody
             writer.Write(parameter.IsBypass);
             writer.Write(parameter.Normalized);
             writer.Write(parameter.Units ?? "");
+            writer.Write(parameter.CanAutomate);
         }
 
         return stream.ToArray();
@@ -517,7 +518,8 @@ public sealed class BridgeBody : IBridgeBody
                     reader.ReadBoolean(),
                     reader.ReadBoolean(),
                     reader.ReadBoolean(),
-                    reader.ReadString()));
+                    reader.ReadString(),
+                    reader.ReadBoolean()));
             }
         }
         catch (Exception)

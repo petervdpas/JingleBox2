@@ -7,6 +7,9 @@ using System;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Rack.Controls.Records;
 using JingleBox2.Tracker.Records;
+using JingleBox2.UI;
+using JingleBox2.UI.Interfaces;
+using System.Globalization;
 
 namespace JingleBox2.Views;
 
@@ -61,11 +64,28 @@ public sealed class AutomationCurve : ThemedControl
     public static readonly StyledProperty<double> ZeroProperty =
         AvaloniaProperty.Register<AutomationCurve, double>(nameof(Zero), 0);
 
+    /// <summary>The bottom of the parameter's own range, which the foot of the picture stands for.</summary>
+    public static readonly StyledProperty<double> MinimumProperty =
+        AvaloniaProperty.Register<AutomationCurve, double>(nameof(Minimum), 0);
+
+    /// <summary>The top of the parameter's own range, which the top of the picture stands for.</summary>
+    public static readonly StyledProperty<double> MaximumProperty =
+        AvaloniaProperty.Register<AutomationCurve, double>(nameof(Maximum), 1);
+
+    /// <summary>Where each slot of the order starts, in lines, for a lane that runs along the whole song.</summary>
+    public static readonly StyledProperty<System.Collections.Generic.IReadOnlyList<int>?> SlotsProperty =
+        AvaloniaProperty.Register<AutomationCurve, System.Collections.Generic.IReadOnlyList<int>?>(nameof(Slots));
+
+    /// <summary>How a value is said, in the parameter's own words; nothing for no numbers at all.</summary>
+    public static readonly StyledProperty<Func<double, string>?> WordsProperty =
+        AvaloniaProperty.Register<AutomationCurve, Func<double, string>?>(nameof(Words));
+
     /// <summary>Nothing here changes the room asked for: the lane fills what it is given.</summary>
     static AutomationCurve()
     {
         AffectsRender<AutomationCurve>(
-            LaneProperty, LinesProperty, LinesPerBeatProperty, ZeroProperty);
+            LaneProperty, LinesProperty, LinesPerBeatProperty, ZeroProperty,
+            MinimumProperty, MaximumProperty, WordsProperty, SlotsProperty);
     }
 
     /// <inheritdoc cref="LaneProperty"/>
@@ -95,6 +115,54 @@ public sealed class AutomationCurve : ThemedControl
         get => GetValue(ZeroProperty);
         set => SetValue(ZeroProperty, value);
     }
+
+    /// <summary>
+    /// Where each slot of the order starts, in lines, for a lane that runs along the whole song,
+    /// such as the tempo: each start is drawn as a stronger line with the slot's number at the
+    /// top, so it can be read where in the song a point is. Nothing or empty for a pattern's lane.
+    /// </summary>
+    public System.Collections.Generic.IReadOnlyList<int>? Slots
+    {
+        get => GetValue(SlotsProperty);
+        set => SetValue(SlotsProperty, value);
+    }
+
+    /// <summary>The bottom of the parameter's own range.</summary>
+    public double Minimum
+    {
+        get => GetValue(MinimumProperty);
+        set => SetValue(MinimumProperty, value);
+    }
+
+    /// <summary>The top of the parameter's own range.</summary>
+    public double Maximum
+    {
+        get => GetValue(MaximumProperty);
+        set => SetValue(MaximumProperty, value);
+    }
+
+    /// <summary>
+    /// How a value is said, such as <c>120 BPM</c> or <c>-6 dB</c>: the marked lines are labelled
+    /// with it, and so is every point while there are few enough to read, and always the one in
+    /// the hand.
+    /// </summary>
+    public Func<double, string>? Words
+    {
+        get => GetValue(WordsProperty);
+        set => SetValue(WordsProperty, value);
+    }
+
+    /// <summary>Which round values are marked, and where a point lands.</summary>
+    private static readonly ILaneGrid Grid = new LaneGrid();
+
+    /// <summary>How close to a marked line, in pixels, a point is pulled onto it.</summary>
+    private const double Pull = 6;
+
+    /// <summary>Points beyond this many are not each labelled, since a recorded lane holds hundreds.</summary>
+    private const int MostLabelled = 12;
+
+    /// <summary>Whether the hand held Shift as it pressed or moved, which places a point freely.</summary>
+    private bool _free;
 
     /// <summary>
     /// Raised once when a gesture starts, with what to call it, before anything has changed.
@@ -159,6 +227,8 @@ public sealed class AutomationCurve : ThemedControl
 
         if (!kind.IsLeftButtonPressed) return;
 
+        _free = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
         Editing?.Invoke("a point");
 
         if (Nearest(lane, at) is double held)
@@ -192,6 +262,8 @@ public sealed class AutomationCurve : ThemedControl
         if (double.IsNaN(_holding) || Lane is not { } lane) return;
 
         var at = e.GetPosition(this);
+
+        _free = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
         double time = LineAt(at.X);
         double value = ValueAt(at.Y);
@@ -229,8 +301,18 @@ public sealed class AutomationCurve : ThemedControl
     }
 
     /// <summary>How far up the picture is, which is the value, nought at the floor.</summary>
-    private double ValueAt(double y) =>
-        Math.Clamp(1 - y / Math.Max(1, Bounds.Height), 0, 1);
+    private double ValueAt(double y)
+    {
+        double share = Math.Clamp(1 - y / Math.Max(1, Bounds.Height), 0, 1);
+        double span = Maximum - Minimum;
+
+        if (_free || !(span > 0)) return share;
+
+        double reach = Pull / Math.Max(1, Bounds.Height) * span;
+        double landed = Grid.Snap(Minimum + share * span, Minimum, Maximum, reach);
+
+        return Math.Clamp((landed - Minimum) / span, 0, 1);
+    }
 
     /// <summary>Whether the lane already has a point on that line.</summary>
     private static bool Held(AutomationLane lane, double time)
@@ -326,7 +408,55 @@ public sealed class AutomationCurve : ThemedControl
             context.DrawLine(beat,
                 new Point(0, Math.Round(Y(Zero)) + 0.5),
                 new Point(size.Width, Math.Round(Y(Zero)) + 0.5));
+
+        double span = Maximum - Minimum;
+
+        if (!(span > 0)) return;
+
+        if (Slots is { Count: > 1 } slots)
+        {
+            var edge = new Pen(new SolidColorBrush(ThemePalette.Alpha(palette.Accent, 0x90)), 1);
+
+            for (int slot = 0; slot < slots.Count; slot++)
+            {
+                double x = Math.Round(X(slots[slot])) + 0.5;
+
+                if (slot > 0) context.DrawLine(edge, new Point(x, 0), new Point(x, size.Height));
+
+                context.DrawText(
+                    Label(slot.ToString("00", CultureInfo.InvariantCulture), palette, 0.8),
+                    new Point(x + 3, 1));
+            }
+        }
+
+        double labelled = double.PositiveInfinity;
+
+        foreach (double value in Grid.Lines(Minimum, Maximum))
+        {
+            double y = Math.Round(Y((value - Minimum) / span)) + 0.5;
+
+            context.DrawLine(faint, new Point(0, y), new Point(size.Width, y));
+
+            if (Words is null) continue;
+
+            var label = Label(Words(value), palette, 0.55);
+            double top = Math.Clamp(y - label.Height - 1, 0, size.Height - label.Height);
+
+            if (top + label.Height > labelled) continue;
+
+            context.DrawText(label, new Point(Slots is { Count: > 1 } ? 22 : 3, top));
+            labelled = top;
+        }
     }
+
+    /// <summary>A number to draw on the picture, small and in the lettering colour at the strength given.</summary>
+    /// <remarks>
+    /// The marked lines are labelled from the bottom up and a label that would overlap the one
+    /// below it is left out, so a short lane says every other value rather than a pile of them.
+    /// </remarks>
+    private static FormattedText Label(string text, ThemePalette palette, double strength) =>
+        new(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, Typeface.Default, 10,
+            new SolidColorBrush(palette.Text, strength));
 
     /// <summary>The shape itself: what is under it, the line, and the points on it.</summary>
     /// <remarks>
@@ -378,6 +508,7 @@ public sealed class AutomationCurve : ThemedControl
             shape);
 
         var handle = new SolidColorBrush(palette.Accent);
+        bool labelEach = lane.Points.Count <= MostLabelled;
 
         foreach (var point in lane.Points)
         {
@@ -385,6 +516,15 @@ public sealed class AutomationCurve : ThemedControl
 
             context.FillRectangle(handle, new Rect(
                 middle.X - PointSize, middle.Y - PointSize, PointSize * 2, PointSize * 2));
+
+            if (Words is null || !(labelEach || point.Time == _holding)) continue;
+
+            var label = Label(Words(Minimum + point.Value * (Maximum - Minimum)), palette, 0.95);
+            double y = middle.Y - label.Height - PointSize - 1;
+
+            if (y < 0) y = middle.Y + PointSize + 1;
+
+            context.DrawText(label, new Point(Math.Clamp(middle.X - label.Width / 2, 0, size.Width - label.Width), y));
         }
     }
 }

@@ -150,6 +150,136 @@ public sealed class Song
     public List<SlotRepeat> Repeats { get; set; } = new();
 
     /// <summary>
+    /// The song's own lanes: everything that moves the mixer, the master and the tempo included,
+    /// as the song plays from beginning to end.
+    /// </summary>
+    /// <remarks>
+    /// The mixer is about the song as a whole, so its lanes are the song's and not a pattern's: a
+    /// track that starts soft, comes up in the middle and goes down again at the end is one shape
+    /// across the order, and a pattern in the order twice must not make the same fade happen twice.
+    /// What a machine, an effect or a plugin does stays in the pattern, where it belongs to the
+    /// part it is written against and comes along wherever that part is played.
+    ///
+    /// Their time runs along the order, slot after slot, counted in lines: slot nought's lines
+    /// first, then slot one's, which is what <see cref="LineOf"/> works out. Repeats of a slot and
+    /// loops of lines play the same stretch again. One lane per thing moved, exactly as in a
+    /// pattern; <see cref="Lane"/> is the only way one is made.
+    /// </remarks>
+    public List<AutomationLane> Lanes { get; set; } = new();
+
+    /// <summary>The song's tempo lane, or nothing for a song that plays at its own tempo throughout.</summary>
+    [JsonIgnore]
+    public AutomationLane? Tempo => Lanes.FirstOrDefault(lane => IsTempo(lane.Mapping()));
+
+    /// <summary>The song's lane for that mapping on that strip, if it has one.</summary>
+    public AutomationLane? LaneFor(Midi.ControlMapping mapping, int track) =>
+        Lanes.FirstOrDefault(one => one.About(mapping, track));
+
+    /// <summary>Puts a lane in, or hands back the one already there for the same thing.</summary>
+    public AutomationLane Lane(AutomationLane wanted)
+    {
+        var already = Lanes.FirstOrDefault(one => one.About(wanted.Mapping(), wanted.Track));
+        if (already is not null) return already;
+
+        Lanes.Add(wanted);
+
+        return wanted;
+    }
+
+    /// <summary>Takes a lane out. What it moved stays where it was left.</summary>
+    public bool RemoveLane(AutomationLane? lane) => lane is not null && Lanes.Remove(lane);
+
+    /// <summary>Whether a lane naming that is the song's rather than a pattern's, which is everything on the mixer.</summary>
+    /// <param name="mapping">What the lane names.</param>
+    public static bool IsSongWide(Midi.ControlMapping? mapping) =>
+        mapping is { Kind: Midi.Enums.ControlKind.Mix };
+
+    /// <summary>How many lines the order has, slot after slot, which is how long the song's lanes are.</summary>
+    [JsonIgnore]
+    public int TotalLines
+    {
+        get
+        {
+            int total = 0;
+
+            for (int slot = 0; slot < Order.Count; slot++) total += PatternAt(slot)?.Lines ?? 0;
+
+            return total;
+        }
+    }
+
+    /// <summary>Where a line of a slot is along the order, counted in lines from the top of the song.</summary>
+    /// <param name="slot">The slot of the order.</param>
+    /// <param name="line">The line of that slot's pattern.</param>
+    public int LineOf(int slot, int line)
+    {
+        int before = 0;
+
+        for (int at = 0; at < Math.Min(slot, Order.Count); at++) before += PatternAt(at)?.Lines ?? 0;
+
+        return before + Math.Max(0, line);
+    }
+
+    /// <summary>Where each slot starts along the order, in lines, for drawing where one ends and the next begins.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<int> SlotStarts
+    {
+        get
+        {
+            var starts = new List<int>();
+            int at = 0;
+
+            for (int slot = 0; slot < Order.Count; slot++)
+            {
+                starts.Add(at);
+                at += PatternAt(slot)?.Lines ?? 0;
+            }
+
+            return starts;
+        }
+    }
+
+    /// <summary>Whether a lane or a link names the song's tempo.</summary>
+    /// <param name="mapping">What it names.</param>
+    public static bool IsTempo(Midi.ControlMapping? mapping) =>
+        mapping is { Kind: Midi.Enums.ControlKind.Mix, Mix: Midi.Enums.MixControl.Tempo };
+
+    /// <summary>
+    /// Moves mixer lanes kept inside patterns into the song's own, laid where each pattern first
+    /// plays in the order, and takes them out of the patterns.
+    /// </summary>
+    /// <remarks>
+    /// Every lane was a pattern's once, and a song saved then has its fades and its tempo there. A
+    /// pattern that is in no slot has nowhere along the order for them to go, so they are dropped,
+    /// and a pattern in the order twice gives its shape to the first place it plays.
+    /// </remarks>
+    private void MixerIntoSong()
+    {
+        var placed = new HashSet<Pattern>();
+
+        for (int slot = 0; slot < Order.Count; slot++)
+        {
+            if (PatternAt(slot) is not { } pattern || !placed.Add(pattern)) continue;
+
+            int start = LineOf(slot, 0);
+
+            foreach (var old in pattern.Lanes.Where(one => IsSongWide(one.Mapping())))
+            {
+                if (AutomationLane.For(old.Mapping(), old.Track) is not { } made) continue;
+
+                var lane = Lane(made);
+                lane.Play = old.Play;
+
+                foreach (var point in old.Points) lane.Put(start + point.Time, point.Value);
+            }
+        }
+
+        foreach (var pattern in Patterns)
+            foreach (var lane in pattern.Lanes.Where(one => IsSongWide(one.Mapping())).ToList())
+                pattern.RemoveLane(lane);
+    }
+
+    /// <summary>
     /// What a slot says about repeating, held inside its pattern; playing once for a slot that is
     /// not there or a song whose repeats have not been lined up with its order yet.
     /// </summary>
@@ -864,6 +994,9 @@ public sealed class Song
 
         foreach (var pattern in Patterns) pattern.MoveTrack(from, to);
 
+        foreach (var lane in Lanes)
+            if (!lane.IsMaster) lane.Track = WhereTrackWent(lane.Track, from, to);
+
         Shift(TrackInstruments, from, to);
         Shift(Mix, from, to);
         Shift(NoteColumns, from, to);
@@ -918,6 +1051,8 @@ public sealed class Song
             pattern.SetTrackCount(TrackCount);
             pattern.SetColumns(NoteColumns);
         }
+
+        Lanes.RemoveAll(lane => !lane.IsMaster && lane.Track >= TrackCount);
     }
 
     /// <summary>How long the whole song lasts, every slot of the order counted in turn.</summary>
@@ -972,6 +1107,10 @@ public sealed class Song
             Order.Add(0);
             Repeats.Add(SlotRepeat.None);
         }
+
+        MixerIntoSong();
+
+        Lanes.RemoveAll(lane => !lane.IsMaster && lane.Track >= TrackCount);
 
         foreach (var instrument in Instruments)
         {

@@ -39,6 +39,11 @@ namespace JingleBox2.Audio.Plugins.Records;
 /// since the number says nothing on its own.
 /// </param>
 /// <param name="Units">The plugin's own name for the units, empty when it does not say.</param>
+/// <param name="CanAutomate">
+/// Whether the plugin offers it to be driven over time. A JUCE plugin carries some two thousand
+/// stand-ins for MIDI controllers, "MIDI CC 0|1" and so on, that say no here, and a lane list
+/// holding them is a list nobody can find a knob in.
+/// </param>
 public sealed record PluginParameter(
     uint Id,
     string Name,
@@ -50,7 +55,8 @@ public sealed record PluginParameter(
     bool IsReadOnly,
     bool IsBypass,
     bool Normalized,
-    string Units = "")
+    string Units = "",
+    bool CanAutomate = true)
 {
     /// <summary>Whole positions rather than a sweep: a mode, a count, a switch.</summary>
     public bool IsStepped => Steps > 0;

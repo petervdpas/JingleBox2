@@ -18,7 +18,8 @@
          a track pushing another track down and belongs to the song. One template for all four,
          since what differs between them is only what the fader writes to. -->
     <DataTemplate x:Key="SourceStrip" x:DataType="vm:SourceStripViewModel">
-      <Border Classes="inset" Width="134">
+      <Border Classes="inset" Width="134"
+              Classes.selected="{Binding IsSelected}">
         <!-- The same six rows every strip here uses, so a row of them lines up: badge, pan,
              mute and solo, the fader and its meter, the reading, and the side chain. This shape
              has no side chain, so its last row stays empty rather than the rows being different
@@ -146,7 +147,7 @@
             <CheckBox Content="Hear it"
                       Classes="strip"
                       IsChecked="{Binding Source.Hearing, Mode=TwoWay}"
-                      ToolTip.Tip="Hear what is coming in, through the Recording Effects chain, out of the master. It arrives a buffer or two late, and the output this application is playing through cannot be heard this way, since that is a loop." />
+                      ToolTip.Tip="Hear what is coming in, through the recording effect chain, out of the master. It arrives a buffer or two late, and the output this application is playing through cannot be heard this way, since that is a loop." />
 
 
           </StackPanel>
@@ -254,28 +255,42 @@
                              ToolTip.Tip="What your controllers do to the mixer. Point one at a template you have already made, or start learning." />
             </Grid>
 
-            <!-- What the master makes move over the pattern. Under the mixer rather than under the
-                 pattern, because the master is not a track and the panel down there is about the
-                 track the cursor is in. -->
-            <views:FoldStrip DockPanel.Dock="Bottom" Title="song master automation"
-                             Count="{Binding MasterLaneCount}"
-                             IsOpen="{Binding ShowsMasterLanes, Mode=TwoWay}"
-                             StripHeight="{Binding MasterLanesHeight, Mode=TwoWay}">
-              <views:AutomationStrip DataContext="{Binding MasterLanes}" />
+            <!-- What the mixer moves over the whole song, for the strip last touched: its level, pan,
+                 switches and ducking, and on the master the tempo and the master's own chain. The
+                 panel under the pattern lists only what belongs to the pattern. -->
+            <views:FoldStrip DockPanel.Dock="Bottom" Title="{Binding MixerLanesTitle}" Topic="tracker.automation"
+                             IsVisible="{Binding MixerShowsLanes}"
+                             Count="{Binding MixerLaneCount}" Leaves="580"
+                             IsOpen="{Binding ShowsMixerLanes, Mode=TwoWay}"
+                             StripHeight="{Binding MixerLanesHeight, Mode=TwoWay}">
+              <views:AutomationStrip DataContext="{Binding MixerLanes}" />
             </views:FoldStrip>
 
             <!-- What the whole mix goes through, under the strips it is the sum of. The same strip
                  the pattern page puts under a track, because a chain is a chain: what differs is
                  only which of them it is about. -->
-            <!-- The topmost of the two, so this is the one that carries the room above the pair:
-             docked from the bottom the automation goes lowest and this stands over it, against
-             the row of faders. -->
-        <views:FoldStrip DockPanel.Dock="Bottom" Title="song master effects" Margin="0,10,0,0"
-                             Count="{Binding MasterEffect.Count}"
+        <views:FoldStrip DockPanel.Dock="Bottom" Title="song effect chain" Topic="tracker.effects"
+                             IsVisible="{Binding MixerShowsSongChain}"
+                             Count="{Binding MasterEffect.Count}" Leaves="580"
                              IsOpen="{Binding ShowsMasterChain, Mode=TwoWay}"
                              StripHeight="{Binding MasterChainHeight, Mode=TwoWay}">
               <views:PluginStrip DataContext="{Binding MasterEffect}" />
             </views:FoldStrip>
+
+            <!-- What everything this application plays goes through on its way out, while the desk's
+                 MASTER is the strip touched. -->
+            <views:FoldStrip DockPanel.Dock="Bottom" Title="master effect chain" Topic="tracker.effects"
+                             IsVisible="{Binding MixerShowsDesk}"
+                             Count="{Binding $parent[views:MixerView].DeskEffect.Count}" Leaves="580"
+                             IsOpen="{Binding ShowsMasterChain, Mode=TwoWay}"
+                             StripHeight="{Binding MasterChainHeight, Mode=TwoWay}">
+              <views:PluginStrip DataContext="{Binding $parent[views:MixerView].DeskEffect}" />
+            </views:FoldStrip>
+
+            <!-- The room between the faders and whichever folds are showing, owned here rather than
+                 by the top fold, since which fold is on top depends on the strip picked. Docked
+                 last from the bottom, so it stands over both. -->
+            <Border DockPanel.Dock="Bottom" Height="10" />
 
             <!-- **Two masters, in series, which is what a desk has always had.** MASTER is the
                  desk's: everything on this page is summed onto it and what leaves it is what the
@@ -307,7 +322,8 @@
                             Content="{Binding MasterStrip}">
               <ContentControl.ContentTemplate>
                 <DataTemplate x:DataType="vm:TrackStripViewModel">
-                  <Border Classes="inset" Width="134">
+                  <Border Classes="inset" Width="134"
+                          Classes.selected="{Binding IsSelected}">
                     <!-- The same six rows the other two strip shapes use, so the master lines up
                          with the tracks beside it. It has no side chain, so its last row is empty. -->
                     <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto">

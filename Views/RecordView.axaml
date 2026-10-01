@@ -70,7 +70,7 @@
                See ITakeEffects. -->
           <!-- Folded away under the same line the chains under the pattern and under the mixer
                use, because a chain is a chain: what differs is only which of them it is about. -->
-          <views:FoldStrip Title="Recording Effects" Count="{Binding Effect.Count}">
+          <views:FoldStrip Title="recording effect chain" Topic="tracker.effects" Count="{Binding Effect.Count}">
             <views:PluginStrip DataContext="{Binding Effect}" />
           </views:FoldStrip>
 

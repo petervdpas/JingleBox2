@@ -899,7 +899,8 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
                 (info.Flags & Vst3Abi.ReadOnlyFlag) != 0,
                 (info.Flags & Vst3Abi.BypassFlag) != 0,
                 Normalized: true,
-                Units: ReadWide(info.Units)));
+                Units: ReadWide(info.Units),
+                CanAutomate: (info.Flags & Vst3Abi.CanAutomate) != 0));
         }
 
         return parameters;

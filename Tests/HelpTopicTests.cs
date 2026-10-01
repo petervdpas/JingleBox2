@@ -23,14 +23,15 @@ namespace JingleBox2.Tests;
 public class HelpTopicTests
 {
     /// <summary>
-    /// How a badge is found in a layout: the part before the topic it names.
+    /// How a badge is found in a layout: the part before the topic it names, on a badge of its
+    /// own or on a folding strip, which draws one beside its tab.
     /// </summary>
     /// <remarks>
     /// Written once and used by both directions, since two spellings of one pattern would
     /// eventually disagree about what counts as a badge, and the way that fails is a test that
     /// quietly stops seeing half of them.
     /// </remarks>
-    private const string Badge = @"HelpBadge[^>]*?Topic=""([^""]+)""";
+    private const string Badge = @"(?:HelpBadge|FoldStrip)[^>]*?Topic=""([^""]+)""";
 
     /// <summary>Everything the app explains about itself, as it ships.</summary>
     private readonly IHelpText _help = new HelpText();

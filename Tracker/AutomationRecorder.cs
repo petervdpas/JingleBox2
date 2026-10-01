@@ -71,6 +71,9 @@ public sealed class AutomationRecorder : IAutomationRecorder
     public Action<Pattern, string>? Taking { get; set; }
 
     /// <inheritdoc/>
+    public Action<string>? Changing { get; set; }
+
+    /// <inheritdoc/>
     public Action? Dirtied { get; set; }
 
     /// <inheritdoc/>
@@ -114,12 +117,55 @@ public sealed class AutomationRecorder : IAutomationRecorder
         int line = position.Line;
         string said = target.Name;
 
-        if (pattern.LaneFor(mapping, track) is null && AutomationLane.For(mapping, track) is null)
-            return false;
+        if (AutomationLane.For(mapping, track) is null) return false;
+
+        if (Song.IsSongWide(mapping))
+        {
+            int along = song.LineOf(position.OrderIndex, line);
+
+            _onto(() => WriteSong(song, mapping, track, along, normalised, said));
+
+            return true;
+        }
 
         _onto(() => Write(pattern, mapping, track, line, normalised, said, position.OrderIndex));
 
         return true;
+    }
+
+    /// <summary>
+    /// Puts one point into one of the song's own lanes, a mixer control's, at its place along the
+    /// order, taking a step of the whole song first if this is the lane's first point of the pass.
+    /// </summary>
+    private void WriteSong(Song song, ControlMapping mapping, int track, int along, double value, string said)
+    {
+        var lane = song.LaneFor(mapping, track);
+
+        if (lane is null)
+        {
+            if (AutomationLane.For(mapping, track) is not { } made) return;
+
+            Begin(said);
+
+            lane = song.Lane(made);
+            _touched.Add(lane);
+
+            Log.Write(LogArea.Tracker, () => "automation: recording " + said + " into the song");
+        }
+        else if (_touched.Add(lane))
+        {
+            Begin(said);
+        }
+
+        lane.Put(along, value);
+        Dirtied?.Invoke();
+    }
+
+    /// <summary>Takes one step of the whole song and marks the pass as having written something.</summary>
+    private void Begin(string what)
+    {
+        _passing = true;
+        Changing?.Invoke("recording " + what);
     }
 
     /// <summary>

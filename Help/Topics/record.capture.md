@@ -30,7 +30,7 @@ left and right, and **CLIP** lights when the input reaches full scale and stays 
 so a single hit is not missed. A take that clips has the clip in it, so turn the gain down and
 record again rather than fixing it afterwards.
 
-## Recording Effects
+## Recording effect chain
 
 The folded strip under the clock is a chain like a track's: our own effects or plugins, in order.
 Every take goes through it once it has been stopped, and the capture as it arrived is kept beside

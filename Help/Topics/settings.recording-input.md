@@ -26,7 +26,7 @@ be coming out of the desk speakers a moment later. So a source pointed at the in
 to the desk from that moment, and the desk is the only way back to a speaker.
 
 That means a browser goes quiet the moment you pick it. **Hear it**, under the picker, is
-what brings it back: thrown, what is coming in goes through the Recording Effects chain and
+what brings it back: thrown, what is coming in goes through the recording effect chain and
 out of the master. Off, the input is captured and nobody hears it.
 
 Picking another source puts the last one back, and so does closing the application.

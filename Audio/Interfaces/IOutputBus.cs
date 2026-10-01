@@ -134,6 +134,24 @@ public interface IOutputBus : IDisposable
     }
 
     /// <summary>
+    /// The effect chain everything on the bus goes through, after the trim and before the meter
+    /// and the fader, or nothing.
+    /// </summary>
+    /// <remarks>
+    /// Kept across the bus being opened again, like <see cref="Gain"/>. Run on the audio thread
+    /// on every block that passes, so setting one is the only thing that may touch it from
+    /// outside. Answered by default as a bus with none.
+    /// </remarks>
+    Plugins.Interfaces.IAudioInsert? Insert
+    {
+        get => null;
+        set { }
+    }
+
+    /// <summary>The rate the bus was last opened at, nought before it ever was.</summary>
+    int Rate => 0;
+
+    /// <summary>
     /// Opens the bus at a rate and a width.
     /// </summary>
     /// <remarks>

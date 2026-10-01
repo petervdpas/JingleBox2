@@ -1575,6 +1575,60 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
             ApplySolo,
             strip: _desk.Master);
 
+    /// <summary>
+    /// The desk MASTER's effect chain, which everything this application plays goes through on
+    /// its way out. Shown on the mixer while MASTER is the strip touched there.
+    /// </summary>
+    public PluginChainViewModel? DeskEffect { get; private set; }
+
+    /// <summary>The chain under <see cref="DeskEffect"/>, hung on the output bus.</summary>
+    private DeskPluginTarget? _deskChain;
+
+    /// <summary>Reads and writes <see cref="DeskEffect"/> to and from the settings.</summary>
+    private IPluginChainState? _deskChains;
+
+    /// <summary>
+    /// Gives the desk its chain and puts back what was on it, the way the recording input's is.
+    /// </summary>
+    /// <remarks>
+    /// Written down a moment after the hand stops, on the drawing thread, since reading a patch
+    /// is a round trip to every plugin on it.
+    /// </remarks>
+    private void UseDeskChain()
+    {
+        _deskChains = new PluginChainState(new SoundDevices.SoundEffects.SoundEffectEngines(_effects));
+        _deskChain = new DeskPluginTarget(_audio.Output);
+
+        DeskEffect = new PluginChainViewModel(Plugins, _effects, front: _effectInFront)
+        {
+            Target = _deskChain,
+            Nothing = "Nothing on the master yet, so everything leaves as it is mixed."
+        };
+
+        var save = _hints.Gathered(
+            "the master's chain",
+            TimeSpan.FromMilliseconds(600),
+            TimeSpan.FromMilliseconds(6000),
+            () => Dispatcher.UIThread.Post(() =>
+            {
+                _cfg.DeskEffects = _deskChains.Capture(_deskChain.Chain, patches: true);
+                _settings.Moved();
+            }));
+
+        DeskEffect.Changed += save.Moved;
+
+        if (_cfg.DeskEffects is { IsEmpty: false } saved)
+        {
+            var missing = _deskChains.Restore(_deskChain.Chain, saved, _deskChain.SampleRate, PluginChainViewModel.MaxFrames);
+
+            DeskEffect.Reload();
+
+            if (missing.Count > 0) DeskEffect.Status = "Missing: " + string.Join(", ", missing);
+        }
+
+        OnPropertyChanged(nameof(DeskEffect));
+    }
+
     /// <summary>Backing field for <see cref="RecorderPlay"/>.</summary>
     private SourceStripViewModel? recorderPlay;
 
@@ -2442,6 +2496,8 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         _desk.Restore();
 
         Record.UsePlugins(Plugins, _effects, _effectInFront);
+
+        UseDeskChain();
 
         // The recording input has two faders on two pages and one gain underneath them, so each
         // has to hear the other move. The mixer's writes reach RECORD already, since it writes

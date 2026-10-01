@@ -356,10 +356,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// nobody calls it on plays songs exactly as it did before automation existed, which is
     /// what every test that makes one relies on.
     ///
-    /// Two panels come out of it, not one. <see cref="MasterLanes"/> is the same panel again
-    /// pointed at the strip that is not a track, and it is its own rather than the one under
-    /// the pattern for the same reason its chain is: that one follows the cursor, and the
-    /// master is not somewhere the cursor can be.
+    /// Two panels come out of it, one per timeline. <see cref="Lanes"/> under the pattern lists
+    /// what belongs to the pattern, the instrument and the effects on the track's chain;
+    /// <see cref="MixerLanes"/> on the mixer lists what belongs to the song, the mixer controls
+    /// of whichever strip was last touched there. The master's chain is on that panel too,
+    /// since the master is not somewhere the cursor can be.
     /// </remarks>
     public void UseAutomation(Midi.Interfaces.IControlTargets targets)
     {
@@ -372,6 +373,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             lanes, () => Song, () => CurrentPattern, () => LinesPerBeat, () => PlayingLine)
         {
             Taking = History.Taking,
+            Changing = Changing,
+            SongPlaying = SongPlayingLine,
+            Offers = choice => !Song.IsSongWide(choice.Mapping),
             Dirtied = () =>
             {
                 MarkDirty("automation");
@@ -379,10 +383,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             }
         };
 
-        MasterLanes = new AutomationViewModel(
+        MixerLanes = new AutomationViewModel(
             lanes, () => Song, () => CurrentPattern, () => LinesPerBeat, () => PlayingLine)
         {
             Taking = History.Taking,
+            Changing = Changing,
+            SongPlaying = SongPlayingLine,
+            Offers = choice => choice.Mapping.Track == TrackerPlayer.MasterStrip || Song.IsSongWide(choice.Mapping),
             Dirtied = () =>
             {
                 MarkDirty("automation");
@@ -390,7 +397,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             }
         };
 
-        MasterLanes.Show(TrackerPlayer.MasterStrip);
+        MixerLanes.Show(MixerStrip);
     }
 
     /// <summary>
@@ -488,6 +495,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         CurrentPattern = Song.PatternAt(OrderIndex) ?? Song.PatternAt(0);
 
         PointEffectSlot();
+        LanesMoved();
 
         OnPropertyChanged(nameof(Song));
         OnPropertyChanged(nameof(TrackCount));
@@ -600,7 +608,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         TrackEffect.Instrument = InstrumentBoxFor(track);
         TrackEffect.Midi = MidiBlockFor(track);
 
-        foreach (var strip in Strips) strip.IsSelected = strip.Track == track;
+        if (track != _mixerFollowed)
+        {
+            _mixerFollowed = track;
+            ShowMixerStrip(track);
+        }
 
         LightInstrument();
         LanesCounted();
@@ -1227,6 +1239,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             work => Dispatcher.UIThread.Post(work))
         {
             Taking = History.Taking,
+            Changing = Changing,
             Dirtied = () =>
             {
                 MarkDirty("automation");
@@ -1280,6 +1293,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _player.PositionChanged += OnPositionChanged;
         _player.StateChanged += OnPlayerStateChanged;
         _player.TempoMoved += (_, _) => Dispatcher.UIThread.Post(TempoShown);
+        _player.InstrumentStarted += _ => Dispatcher.UIThread.Post(LanesMoved);
         _player.Stopped += OnPlayerStopped;
 
         RefreshOrder();
@@ -1346,7 +1360,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         OnPropertyChanged(nameof(ShownBpm));
         OnPropertyChanged(nameof(TempoMoving));
 
-        MasterLanes?.Chosen?.Reread();
+        MixerLanes?.Chosen?.Reread();
     }
 
     /// <summary>
@@ -1837,6 +1851,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     public void PickTrack(int track)
     {
+        if (track == TrackerPlayer.MasterStrip || track == DeskStrip)
+        {
+            ShowMixerStrip(track);
+            return;
+        }
+
+        if (track >= 0 && track < Song.TrackCount) ShowMixerStrip(track);
+
         if (track < 0 || track >= Song.TrackCount || track == Cursor.Track) return;
 
         Cursor = Cursor with { Track = track };
@@ -1863,6 +1885,16 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <param name="track">The track, counted from nought.</param>
     public TrackerInstrument? InstrumentOn(int track) =>
         Song.InstrumentAt(Song.GetTrackInstrument(track));
+
+    /// <summary>
+    /// The plugin a track plays as its instrument, once it has been started, or nothing when the
+    /// track plays one of ours, plays nothing, or its plugin has not loaded yet.
+    /// </summary>
+    /// <param name="track">The track, counted from nought.</param>
+    public Audio.Plugins.Interfaces.IPluginParameters? InstrumentPluginOn(int track) =>
+        track >= 0 && track < Song.TrackCount && InstrumentOn(track)?.IsPlugin == true
+            ? _player.PlayerOn(track)
+            : null;
 
     /// <summary>Which machine a track plays, by its slot id, or nothing when it plays a plugin.</summary>
     public string MachineOn(int track)
@@ -2184,7 +2216,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private void Running()
     {
         Lanes?.Running();
-        MasterLanes?.Running();
+        MixerLanes?.Running();
     }
 
     /// <summary>
@@ -2451,7 +2483,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (newValue != null) newValue.Changed += OnPatternEdited;
 
         NeighboursMoved();
-        LanesCounted();
+        LanesMoved();
     }
 
     /// <summary>Any edit to the pattern on screen is work that is not on disc, and may have moved a lane.</summary>
@@ -2469,19 +2501,43 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Worked out here rather than by the strip's panel, which only reads itself while it is open:
     /// the count is most worth having on a strip that is folded away.
     /// </remarks>
-    public int LaneCount => LanesIn(Cursor.Track);
+    public int LaneCount => CurrentPattern?.LanesOn(Cursor.Track).Count(lane => lane.Points.Count > 0) ?? 0;
 
-    /// <summary>The same for the song's master, for the strip on the mixer.</summary>
-    public int MasterLaneCount => LanesIn(TrackerPlayer.MasterStrip);
+    /// <summary>
+    /// How many of the song's lanes on the mixer's strip have anything in them, the tempo
+    /// included on the master, and the master's own chain lanes in the pattern on screen.
+    /// </summary>
+    public int MixerLaneCount =>
+        Song.Lanes.Count(lane => lane.Track == MixerStrip && lane.Points.Count > 0)
+        + (MixerStrip == TrackerPlayer.MasterStrip
+            ? CurrentPattern?.LanesOn(MixerStrip).Count(lane => lane.Points.Count > 0) ?? 0
+            : 0);
 
-    /// <summary>How many lanes on a strip in the pattern on screen have at least one point.</summary>
-    private int LanesIn(int strip) => CurrentPattern?.LanesOn(strip).Count(lane => lane.Points.Count > 0) ?? 0;
+    /// <summary>Where the playing line is along the order, below nought while nothing plays.</summary>
+    private int SongPlayingLine() => PlayingLine < 0 ? -1 : Song.LineOf(OrderIndex, PlayingLine);
+
+    /// <summary>
+    /// The lanes underneath may be other lanes now: another song, another pattern, or a step of
+    /// undo poured into the same pattern. The open lane panels read themselves again and the
+    /// counts are said again.
+    /// </summary>
+    /// <remarks>
+    /// Left out, a panel went on showing the lanes of the song before, so points drawn into it
+    /// went into a song that was not playing and nothing on the screen said so.
+    /// </remarks>
+    private void LanesMoved()
+    {
+        if (ShowsLanes) Lanes?.Restock();
+        if (ShowsMixerLanes) MixerLanes?.Restock();
+
+        LanesCounted();
+    }
 
     /// <summary>Says both lane counts may have moved.</summary>
     private void LanesCounted()
     {
         OnPropertyChanged(nameof(LaneCount));
-        OnPropertyChanged(nameof(MasterLaneCount));
+        OnPropertyChanged(nameof(MixerLaneCount));
     }
 
     /// <summary>
@@ -3021,32 +3077,93 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private AutomationViewModel? _lanes;
 
     /// <summary>What the master makes move over this pattern, and what else on it could.</summary>
-    public AutomationViewModel? MasterLanes
+    public AutomationViewModel? MixerLanes
     {
-        get => _masterLanes;
+        get => _mixerLanes;
         private set
         {
-            _masterLanes = value;
+            _mixerLanes = value;
             OnPropertyChanged();
         }
     }
 
-    /// <summary>Behind <see cref="MasterLanes"/>. Pointed at strip -1 and never moved.</summary>
-    private AutomationViewModel? _masterLanes;
+    /// <summary>Behind <see cref="MixerLanes"/>.</summary>
+    private AutomationViewModel? _mixerLanes;
+
+    /// <summary>
+    /// The strip the mixer's automation is about: the last one touched on the mixer, or the
+    /// track the cursor moved to, with the master until either happens.
+    /// </summary>
+    public int MixerStrip { get; private set; } = TrackerPlayer.MasterStrip;
+
+    /// <summary>
+    /// What <see cref="MixerStrip"/> is while the desk's MASTER is the strip touched: not a strip
+    /// of the song, so it has no automation, only the master effect chain.
+    /// </summary>
+    public const int DeskStrip = -2;
+
+    /// <summary>Whether the desk's MASTER is the strip picked on the mixer.</summary>
+    public bool MixerShowsDesk => MixerStrip == DeskStrip;
+
+    /// <summary>Whether the mixer shows automation, which is for any strip of the song and not for the desk.</summary>
+    public bool MixerShowsLanes => !MixerShowsDesk;
+
+    /// <summary>
+    /// The cursor track the mixer's automation last followed, so reading the cursor's track again
+    /// without it having moved leaves a strip picked on the mixer where it is.
+    /// </summary>
+    private int? _mixerFollowed;
+
+    /// <summary>
+    /// Whether the mixer shows the song's effect chain, which is while SONG is the strip picked
+    /// there and only then: a track's chain is under its pattern, and a track has no song chain.
+    /// </summary>
+    public bool MixerShowsSongChain => MixerStrip == TrackerPlayer.MasterStrip;
+
+    /// <summary>
+    /// The heading over the mixer's automation, naming the strip it is about in the words that
+    /// strip's own badge uses, so it is never mistaken for the whole mixer.
+    /// </summary>
+    public string MixerLanesTitle =>
+        "automation \u00b7 " + ((MixerStrip == TrackerPlayer.MasterStrip
+            ? MasterStrip
+            : Strips.FirstOrDefault(one => one.Track == MixerStrip))?.Label ?? "");
+
+    /// <summary>
+    /// Points the mixer's automation at a strip, lights that strip and no other, and reads the
+    /// panel again while it is open.
+    /// </summary>
+    /// <param name="strip">A track, or <see cref="TrackerPlayer.MasterStrip"/>.</param>
+    private void ShowMixerStrip(int strip)
+    {
+        MixerStrip = strip;
+
+        foreach (var one in Strips) one.IsSelected = one.Track == strip;
+        if (MasterStrip is { } master) master.IsSelected = strip == TrackerPlayer.MasterStrip;
+
+        if (ShowsMixerLanes && strip != DeskStrip) MixerLanes?.Show(strip);
+
+        OnPropertyChanged(nameof(MixerStrip));
+        OnPropertyChanged(nameof(MixerShowsDesk));
+        OnPropertyChanged(nameof(MixerShowsLanes));
+        OnPropertyChanged(nameof(MixerLanesTitle));
+        OnPropertyChanged(nameof(MixerShowsSongChain));
+        LanesCounted();
+    }
 
     /// <summary>True while the master's automation is unfolded under the mixer.</summary>
-    [ObservableProperty] private bool showsMasterLanes;
+    [ObservableProperty] private bool showsMixerLanes;
 
     /// <summary>How tall it stands while it is open. See the strips under the pattern.</summary>
-    [ObservableProperty] private double masterLanesHeight = 120;
+    [ObservableProperty] private double mixerLanesHeight = 120;
 
     /// <summary>
     /// Read when it is opened, the same rule the pattern's automation follows, since reading a
     /// strip's parameters costs a walk over everything on it.
     /// </summary>
-    partial void OnShowsMasterLanesChanged(bool value)
+    partial void OnShowsMixerLanesChanged(bool value)
     {
-        if (value) MasterLanes?.Show(TrackerPlayer.MasterStrip);
+        if (value && MixerStrip != DeskStrip) MixerLanes?.Show(MixerStrip);
     }
 
     /// <summary>
@@ -4120,13 +4237,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             return;
         }
 
-        History.Taking(pattern, "a tempo");
+        Changing("a tempo");
 
-        _tempoSteps.Step(pattern, line, bpm, Song.Timing.ClampedBpm);
+        _tempoSteps.Step(Song, Song.LineOf(OrderIndex, line), bpm);
 
-        pattern.LaneChanged();
         Lanes?.Restock();
-        MasterLanes?.Restock();
+        MixerLanes?.Restock();
         MarkDirty("a tempo");
 
         Status = $"{bpm} beats a minute from line {line:00}, on the song's tempo lane";
@@ -4704,11 +4820,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
                 track, Song.Mix[track], instrument?.Name ?? "", Song.TrackCount,
                 OnMixChanged, OnMixPlayed)
             {
-                IsSelected = track == Cursor.Track
+                IsSelected = track == MixerStrip
             });
         }
 
         ShowMaster();
+        OnPropertyChanged(nameof(MixerLanesTitle));
     }
 
     /// <summary>
@@ -4789,7 +4906,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private void ShowMaster()
     {
         MasterStrip = new TrackStripViewModel(
-            TrackerPlayer.MasterStrip, Song.Master, "", Song.TrackCount, OnMixChanged, OnMixPlayed);
+            TrackerPlayer.MasterStrip, Song.Master, "", Song.TrackCount, OnMixChanged, OnMixPlayed)
+        {
+            IsSelected = MixerStrip == TrackerPlayer.MasterStrip
+        };
 
         MixShown?.Invoke();
     }
@@ -5411,6 +5531,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         CurrentPattern = Song.PatternAt(OrderIndex) ?? Song.PatternAt(0);
         Cursor = Cursor.Clamp(CurrentPattern?.Lines ?? 0, Song.TrackCount);
+        LanesMoved();
 
         PointEffectSlot();
 

@@ -350,7 +350,7 @@
                      chains on the other pages fold under, so its tab says how many devices are
                      on it. Open to begin with, since the pad's settings are what this card is
                      for. -->
-                <views:FoldStrip Title="pad effects" IsOpen="True" Margin="0,10,0,0"
+                <views:FoldStrip Title="pad effect chain" Topic="tracker.effects" IsOpen="True" Margin="0,10,0,0"
                                  Count="{Binding Effect.Count}">
                   <views:PluginStrip DataContext="{Binding Effect}" />
                 </views:FoldStrip>

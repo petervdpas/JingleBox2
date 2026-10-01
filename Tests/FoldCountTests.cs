@@ -32,6 +32,10 @@ public class FoldCountTests
     private static AutomationLane LevelLane(int strip) =>
         AutomationLane.For(new ControlMapping { Kind = ControlKind.Mix, Mix = MixControl.Volume, Scope = ControlScope.Fixed, Track = strip }, strip)!;
 
+    /// <summary>A lane on a machine's parameter, which belongs to the pattern.</summary>
+    private static AutomationLane DeviceLane(int track) =>
+        AutomationLane.For(new ControlMapping { Kind = ControlKind.SoundDevice, Machine = "zampler", Key = "cutoff", Scope = ControlScope.Fixed, Track = track }, track)!;
+
     /// <summary>The tab shows no count until it is given one, and is lit only above nought.</summary>
     [Fact]
     public void The_tab_is_lit_only_with_something_under_it()
@@ -62,7 +66,7 @@ public class FoldCountTests
 
         Assert.Equal(0, tracker.LaneCount);
 
-        var empty = pattern.Lane(LevelLane(0));
+        var empty = pattern.Lane(DeviceLane(0));
         Assert.Equal(0, tracker.LaneCount);
 
         empty.Put(0, 0.5);
@@ -77,17 +81,25 @@ public class FoldCountTests
         tracker.Finished();
     }
 
-    /// <summary>The master's lanes are counted apart from any track's.</summary>
+    /// <summary>
+    /// The mixer's tab counts the song's lanes on the strip last touched there, and the pattern's
+    /// tab never counts them.
+    /// </summary>
     [Fact]
-    public void The_masters_lanes_are_counted_apart()
+    public void The_mixers_lanes_are_counted_apart()
     {
         var tracker = Tracker();
-        var pattern = tracker.Song.Patterns[0];
 
-        pattern.Lane(LevelLane(TrackerPlayer.MasterStrip)).Put(0, 0.5);
-        pattern.LaneChanged();
+        tracker.Song.Lane(LevelLane(TrackerPlayer.MasterStrip)).Put(0, 0.5);
+        tracker.Song.Lane(LevelLane(0)).Put(0, 0.5);
+        tracker.Song.Lane(LevelLane(1)).Put(0, 0.5);
 
-        Assert.Equal(1, tracker.MasterLaneCount);
+        tracker.PickTrack(TrackerPlayer.MasterStrip);
+        Assert.Equal(1, tracker.MixerLaneCount);
+
+        tracker.PickTrack(1);
+        Assert.Equal(1, tracker.MixerLaneCount);
+        Assert.Equal(1, tracker.MixerStrip);
         Assert.Equal(0, tracker.LaneCount);
 
         tracker.Finished();
@@ -105,10 +117,11 @@ public class FoldCountTests
         int seen = -1;
         ((INotifyPropertyChanged)tracker).PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(TrackerViewModel.MasterLaneCount)) seen = tracker.MasterLaneCount;
+            if (e.PropertyName == nameof(TrackerViewModel.MixerLaneCount)) seen = tracker.MixerLaneCount;
         };
 
-        var panel = tracker.MasterLanes!;
+        tracker.PickTrack(TrackerPlayer.MasterStrip);
+        var panel = tracker.MixerLanes!;
         panel.Show(TrackerPlayer.MasterStrip);
         panel.Parameters[0].AddCommand.Execute(null);
 

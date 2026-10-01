@@ -38,6 +38,18 @@ public partial class MixerView : UserControl
 
         AddHandler(PointerPressedEvent, Touched, RoutingStrategies.Tunnel);
 
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is not TrackerViewModel tracker) return;
+
+            tracker.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(TrackerViewModel.MixerShowsDesk)) LightDesk(tracker);
+            };
+
+            LightDesk(tracker);
+        };
+
         LinkKey.Watch(this);
 
         _meters = new Avalonia.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(50) };
@@ -257,6 +269,20 @@ public partial class MixerView : UserControl
         set => SetValue(DeskMasterProperty, value);
     }
 
+    /// <summary>The desk MASTER's effect chain. See <see cref="DeskMasterProperty"/>.</summary>
+    public static readonly StyledProperty<ViewModels.PluginChainViewModel?> DeskEffectProperty =
+        AvaloniaProperty.Register<MixerView, ViewModels.PluginChainViewModel?>(nameof(DeskEffect));
+
+    /// <summary>
+    /// The chain everything goes through on its way out, shown while MASTER is the strip touched.
+    /// Handed in like <see cref="DeskMaster"/>, for the same reason.
+    /// </summary>
+    public ViewModels.PluginChainViewModel? DeskEffect
+    {
+        get => GetValue(DeskEffectProperty);
+        set => SetValue(DeskEffectProperty, value);
+    }
+
     /// <summary>The one table of what each point on the routing is carrying.</summary>
     public static readonly StyledProperty<UI.Interfaces.ISignalTable?> LevelsProperty =
         AvaloniaProperty.Register<MixerView, UI.Interfaces.ISignalTable?>(nameof(Levels));
@@ -412,6 +438,13 @@ public partial class MixerView : UserControl
         };
     }
 
+    /// <summary>Lights the desk's MASTER while it is the strip picked, and no other time.</summary>
+    /// <param name="tracker">What says which strip is picked.</param>
+    private void LightDesk(TrackerViewModel tracker)
+    {
+        if (DeskMaster is SourceStripViewModel desk) desk.IsSelected = tracker.MixerShowsDesk;
+    }
+
     /// <summary>
     /// Touching a strip anywhere picks its track.
     /// </summary>
@@ -426,6 +459,13 @@ public partial class MixerView : UserControl
 
         for (var at = e.Source as Visual; at is not null; at = at.GetVisualParent())
         {
+            if (at is Control { DataContext: SourceStripViewModel source } && ReferenceEquals(source, DeskMaster))
+            {
+                tracker.PickTrack(TrackerViewModel.DeskStrip);
+
+                return;
+            }
+
             if (at is not Control { DataContext: TrackStripViewModel strip }) continue;
 
             tracker.PickTrack(strip.Track);

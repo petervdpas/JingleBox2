@@ -14,7 +14,7 @@ together.
 
 IN is the desk's input channel and its fader is the input's own gain, so it decides
 what a take holds. At the foot of it are the source it is listening to and **Hear it**,
-which puts what is coming in through the Recording Effects chain and out of the master.
+which puts what is coming in through the recording effect chain and out of the master.
 Choosing a source is what takes it off its own output, so a browser picked here goes
 quiet everywhere else and Hear it is what brings it back through the desk. On Windows the
 taking aside does not happen, so a source is heard twice; there is a way to do the same
@@ -41,8 +41,23 @@ It has no solo, since soloing everything is what it is already doing, and no duc
 since everything is summed by the time it is reached. Its meter reads what is
 leaving, which makes it the one meter on the page measuring what you actually hear.
 
-Its effects and its automation fold open underneath it, and they are the master's own
-rather than the ones under the pattern, which follow wherever the cursor is.
+Its effect chain folds open under the strips while SONG is the strip you touched, and
+only then: a track's chain is under its pattern.
+
+Touching MASTER shows the **master effect chain**, which everything this application
+plays goes through on its way out: the song, the pads, a take and the input being heard.
+It belongs to this installation rather than to a song, so it is kept in the settings, and
+MASTER has no automation, since automation is part of a song.
+
+## Automation
+
+The automation under the strips is about one strip, the one you last touched, the song
+included, or the track the cursor last moved to, and its heading names it: automation
+TR-01, automation SONG. It holds what the
+mixer moves over the whole song: a track's level, pan, mute, solo and ducking, and on
+the master its own controls, the tempo and its effects. The lane runs along the order,
+slot after slot, so a track can start soft, come up in the middle and go down at the end.
+What a track's instrument and its effects do is automated under the pattern instead.
 
 ## Meters
 

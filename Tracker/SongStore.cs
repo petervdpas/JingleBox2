@@ -780,6 +780,15 @@ public sealed class SongStore : ISongStore
         /// <summary>What each slot says about repeating; absent in a song written before slots could repeat.</summary>
         public List<SlotRepeat>? Repeats { get; set; }
 
+        /// <summary>The song's own lanes, the mixer's and the tempo, along the order; absent in a song with none.</summary>
+        public List<LaneDocument>? Lanes { get; set; }
+
+        /// <summary>
+        /// A tempo lane on its own, which is how a song kept it before every mixer lane was the
+        /// song's. Read and never written.
+        /// </summary>
+        public LaneDocument? Tempo { get; set; }
+
         /// <summary>
         /// The loop range over the order, either end, or -1 apiece for none.
         /// </summary>
@@ -841,6 +850,7 @@ public sealed class SongStore : ISongStore
             NoteColumns = new List<int>(song.NoteColumns),
             Order = new List<int>(song.Order),
             Repeats = new List<SlotRepeat>(song.Repeats),
+            Lanes = song.Lanes.Count == 0 ? null : song.Lanes.Select(LaneDocument.From).ToList(),
             LoopFrom = song.LoopFrom,
             LoopTo = song.LoopTo,
             TrackInstruments = new List<int>(song.TrackInstruments),
@@ -972,6 +982,9 @@ public sealed class SongStore : ISongStore
                 NoteColumns = new List<int>(NoteColumns),
                 Order = new List<int>(Order),
                 Repeats = new List<SlotRepeat>(Repeats ?? new List<SlotRepeat>()),
+                Lanes = (Lanes ?? new List<LaneDocument>())
+                    .Concat(Tempo is null ? Array.Empty<LaneDocument>() : new[] { Tempo })
+                    .Select(one => one.ToLane()).OfType<AutomationLane>().ToList(),
                 LoopFrom = LoopFrom,
                 LoopTo = LoopTo,
                 TrackInstruments = new List<int>(TrackInstruments),

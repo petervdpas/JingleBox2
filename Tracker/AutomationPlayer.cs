@@ -60,40 +60,57 @@ public sealed class AutomationPlayer : IAutomationPlayer
     public void Play(Song? song, TrackerPosition position)
     {
         var pattern = song?.PatternAt(position.OrderIndex);
-        if (pattern is null || pattern.Lanes.Count == 0) return;
+        if (song is null || pattern is null) return;
         if (position.Line < 0 || position.Line >= pattern.Lines) return;
 
-        foreach (var lane in pattern.Lanes)
+        if (song.Lanes.Count > 0)
         {
-            if (lane.ValueAt(position.Line) is not double wanted) continue;
+            int along = song.LineOf(position.OrderIndex, position.Line);
 
-            if (!_known.TryGetValue(lane, out var known))
-            {
-                known = new Known { Mapping = lane.Mapping() };
-                _known[lane] = known;
-            }
-
-            var target = _targets.Find(known.Mapping);
-            if (target is null)
-            {
-                if (!known.Complained && Log.On(LogArea.Tracker))
-                {
-                    known.Complained = true;
-                    Log.Write(LogArea.Tracker, () =>
-                        "automation: track " + (lane.Track + 1) + " has a lane for "
-                        + lane.Kind + " '" + (lane.Key.Length > 0 ? lane.Key : lane.Mix.ToString())
-                        + "' and nothing here answers to it");
-                }
-
-                continue;
-            }
-
-            double value = target.Min + wanted * (target.Max - target.Min);
-
-            if (value == known.Written) continue;
-
-            known.Written = value;
-            target.Played(value);
+            foreach (var lane in song.Lanes) Write(lane, along);
         }
+
+        foreach (var lane in pattern.Lanes) Write(lane, position.Line);
+    }
+
+    /// <summary>Writes one lane's value at a time into what it names, where it says anything and it has moved.</summary>
+    /// <remarks>
+    /// The song's lanes are asked by where the line is along the order and a pattern's lanes by
+    /// the line of the pattern, which is the whole difference between the two: everything else is
+    /// the same door, the same cache and the same complaint said once.
+    /// </remarks>
+    /// <param name="lane">The lane.</param>
+    /// <param name="time">Where along it, in its own lines.</param>
+    private void Write(AutomationLane lane, double time)
+    {
+        if (lane.ValueAt(time) is not double wanted) return;
+
+        if (!_known.TryGetValue(lane, out var known))
+        {
+            known = new Known { Mapping = lane.Mapping() };
+            _known[lane] = known;
+        }
+
+        var target = _targets.Find(known.Mapping);
+        if (target is null)
+        {
+            if (!known.Complained && Log.On(LogArea.Tracker))
+            {
+                known.Complained = true;
+                Log.Write(LogArea.Tracker, () =>
+                    "automation: track " + (lane.Track + 1) + " has a lane for "
+                    + lane.Kind + " '" + (lane.Key.Length > 0 ? lane.Key : lane.Mix.ToString())
+                    + "' and nothing here answers to it");
+            }
+
+            return;
+        }
+
+        double value = target.Min + wanted * (target.Max - target.Min);
+
+        if (value == known.Written) return;
+
+        known.Written = value;
+        target.Played(value);
     }
 }
