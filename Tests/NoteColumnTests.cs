@@ -463,7 +463,7 @@ public class NoteColumnTests
     public void The_cursor_walks_the_columns_it_really_has()
     {
         var columns = new NoteColumns(new[] { 2, 1, 1, 1 });
-        var cursor = new PatternCursor(0, 0, CellColumn.Effect);
+        var cursor = new PatternCursor(0, 0, CellColumn.Amount);
 
         var moved = cursor.MoveColumn(1, 4, columns);
 
@@ -477,7 +477,7 @@ public class NoteColumnTests
     public void The_cursor_leaves_a_track_after_its_last_column()
     {
         var columns = new NoteColumns(new[] { 2, 1, 1, 1 });
-        var cursor = new PatternCursor(0, 0, CellColumn.Effect, 1);
+        var cursor = new PatternCursor(0, 0, CellColumn.Amount, 1);
 
         var moved = cursor.MoveColumn(1, 4, columns);
 

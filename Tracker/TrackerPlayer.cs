@@ -323,6 +323,12 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// </summary>
     private readonly ISlotPasses _passes = new SlotPasses();
 
+    /// <summary>
+    /// The pattern commands that work inside a line: which tick of it each event lands on, and
+    /// what delay, cut, retrigger and arpeggio add between.
+    /// </summary>
+    private readonly Commands.Interfaces.ILineCommands _commands = new Commands.LineCommands();
+
     /// <summary>A line asked for by <see cref="JumpTo"/> that the clock has not taken yet, or nothing.</summary>
     private object? _jump;
 
@@ -477,6 +483,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
         _mark = null;
         _jump = null;
         _passes.Reset();
+        _commands.Reset();
 
         _cancel = new CancellationTokenSource();
         var token = _cancel.Token;
@@ -1566,7 +1573,11 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             Automation?.Play(song, position);
 
-            ApplyEvents(sequencer.EventsFor(song, position), song);
+            var ticks = _commands.Ticks(sequencer.EventsFor(song, position));
+            double lineBegan = ClockFollow?.IsFollowing == true ? clock.Elapsed.TotalSeconds : nextLine;
+            double secondsPerTick = song.Timing.SecondsPerLine / _commands.TicksPerLine;
+            int played = ApplyTick(ticks, 0, 0, song);
+
             Position = position;
             double beatsPerLine = 1.0 / Math.Max(1, song.Timing.ClampedLinesPerBeat);
 
@@ -1575,6 +1586,16 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             beat += beatsPerLine;
             PositionChanged?.Invoke(this, position);
+
+            while (played < ticks.Count)
+            {
+                int tick = ticks[played].Tick;
+
+                if (!WaitUntil(clock, lineBegan + tick * secondsPerTick, token, song)) return;
+                if (generation != Volatile.Read(ref _generation)) return;
+
+                played = ApplyTick(ticks, played, tick, song);
+            }
 
             var next = _passes.After(song, position, Mode == TrackerPlayMode.Song)
                        ?? (Mode == TrackerPlayMode.Pattern
@@ -1698,34 +1719,102 @@ public sealed class TrackerPlayer : ITrackerPlayer
     }
 
     /// <summary>
-    /// Plays one step's events. Anything for a track this pass does not have is dropped rather
-    /// than reaching past the end of the per-track arrays.
+    /// Plays the events of one tick, starting at the one given, and says where the next tick's
+    /// begin.
     /// </summary>
-    private void ApplyEvents(System.Collections.Generic.IReadOnlyList<TrackerEvent> events, Song song)
+    /// <param name="ticks">The line's events in the order they happen.</param>
+    /// <param name="from">The first event of this tick.</param>
+    /// <param name="tick">The tick being played.</param>
+    /// <param name="song">The song being played.</param>
+    /// <returns>The first event of a later tick, or the count where there is none.</returns>
+    private int ApplyTick(System.Collections.Generic.IReadOnlyList<Commands.Records.TickEvent> ticks,
+                          int from, int tick, Song song)
     {
-        foreach (var e in events)
+        int at = from;
+
+        while (at < ticks.Count && ticks[at].Tick <= tick)
         {
-            if (e.Track < 0 || e.Track >= Tracks || e.Column < 0 || e.Column >= Columns) continue;
-
-            switch (e.Kind)
-            {
-                case TrackerEventKind.Stop:
-                    _synth.Mixer.NoteOff(e.Track, e.Column);
-                    _synth.Mixer.PluginNoteOff(e.Track, e.Column);
-                    MidiOut?.NoteOff(e.Track, e.Column);
-
-                    NotePlayed?.Invoke(this, (e.Track, Note.Off, 0d));
-                    break;
-
-                case TrackerEventKind.Trigger:
-                    Trigger(e, song);
-                    break;
-
-                case TrackerEventKind.Adjust:
-                    Adjust(e, song);
-                    break;
-            }
+            Apply(ticks[at].Event, song);
+            at++;
         }
+
+        return at;
+    }
+
+    /// <summary>
+    /// Plays one event. Anything for a track this pass does not have is dropped rather than
+    /// reaching past the end of the per-track arrays.
+    /// </summary>
+    private void Apply(TrackerEvent e, Song song)
+    {
+        if (e.Track < 0 || e.Track >= Tracks || e.Column < 0 || e.Column >= Columns) return;
+
+        switch (e.Kind)
+        {
+            case TrackerEventKind.Stop:
+                _synth.Mixer.NoteOff(e.Track, e.Column);
+                _synth.Mixer.PluginNoteOff(e.Track, e.Column);
+                MidiOut?.NoteOff(e.Track, e.Column);
+
+                NotePlayed?.Invoke(this, (e.Track, Note.Off, 0d));
+                break;
+
+            case TrackerEventKind.Trigger:
+                Trigger(e, song);
+                break;
+
+            case TrackerEventKind.Adjust:
+                Adjust(e, song);
+                break;
+
+            case TrackerEventKind.Cut:
+                _synth.Mixer.Cut(e.Track, e.Column);
+                _synth.Mixer.PluginNoteOff(e.Track, e.Column);
+                MidiOut?.NoteOff(e.Track, e.Column);
+
+                NotePlayed?.Invoke(this, (e.Track, Note.Off, 0d));
+                break;
+
+            case TrackerEventKind.Shift:
+                Shift(e, song);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Moves what a column is sounding off the note it was played at, which is how an arpeggio
+    /// steps.
+    /// </summary>
+    /// <remarks>
+    /// Our own voices are moved where they stand, so an envelope runs on under the steps. A plugin
+    /// and a MIDI out cannot be moved that way, since a pitch bend there would bend the whole
+    /// channel and its range is the receiver's to say, so each step is the shifted note played in
+    /// place of the one before: the column's note is always ended first, whatever the instrument
+    /// says a new note does to the last, or the steps would pile up into a chord.
+    /// </remarks>
+    private void Shift(TrackerEvent e, Song song)
+    {
+        if (!e.Note.IsPlayable) return;
+
+        var note = new Note(Math.Clamp(e.Note.Semitone + e.Shift, Note.MinSemitone, Note.MaxSemitone));
+        float gain = _noteGain[At(e.Track, e.Column)];
+
+        MidiOut?.NoteOn(song.Mix, e.Track, e.Column, note,
+            _wire.VelocityFor((int)Math.Round(gain * TrackerCell.MaxVolume)));
+
+        var instrument = song.InstrumentAt(e.Instrument) ?? song.InstrumentAt(song.GetTrackInstrument(e.Track));
+
+        if (instrument?.IsPlugin == true)
+        {
+            if (PlayerFor(e.Track, instrument) == null) return;
+
+            var (mixed, placed) = WithMix(song, e.Track, gain, _notePan[At(e.Track, e.Column)]);
+
+            _synth.Mixer.PluginNoteOn(e.Track, e.Column, note, mixed, placed ?? 0f, VoiceEnding.Cut);
+            return;
+        }
+
+        _synth.Mixer.SetShift(e.Track, e.Column, e.Shift);
     }
 
     /// <summary>

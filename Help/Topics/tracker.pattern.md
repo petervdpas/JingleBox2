@@ -23,6 +23,38 @@ The volume column runs 00 to 80, which is 128 steps, so a velocity from a keyboa
 written in unchanged and can be read back against what the keyboard said it sent.
 Full is 80 and a key at its hardest is 7F.
 
+## Commands
+
+The last field of a cell is a command: a letter and two hex digits, such as `Q06`. It
+acts on the note in its own cell, on that line, so every note of a chord can carry a
+different one. On a line with no note it acts on the note still ringing in that
+column.
+
+The cursor stops on the letter and on the digits separately. On the letter any key
+names the command, and the cursor moves on to the digits by itself; type two digits
+and it steps down. Delete on either stop clears the command.
+
+Every line is twelve ticks, so a delay of `06` is half a line and `03` a quarter.
+
+- `Vxx` sets the note's volume, `00` to `80`, and wins over the volume field.
+- `Pxx` pans the note: `00` hard left, `40` centre, `80` hard right.
+- `Qxx` starts the note `xx` ticks into its line, for swing, flams and pushed beats.
+  A delayed OFF lets go late.
+- `Cxx` cuts the note dead `xx` ticks into its line, with no release, for stabs and
+  gated hats.
+- `Rxy` plays the note again every `y` ticks. `x` makes each repeat quieter: `0`
+  keeps the level, `8` halves it each time. `R04` is three hits in the line.
+- `Axy` steps the note through itself, `x` semitones up and `y` up, one step a tick.
+  `A47` is a major chord out of one voice, and `A37` a minor one. The next line puts
+  the note back unless it carries on.
+
+On our own machines an arpeggio moves the pitch of the note that is already sounding.
+A plugin and a track's MIDI out are sent each step as a note of its own instead, and
+a cut there is a note off.
+
+The mixer's fader and pan are for a whole track; the volume field, `V` and `P` are
+for one note.
+
 ## Note columns
 
 A track is as many voices as it has note columns, one by default and up to eight. A

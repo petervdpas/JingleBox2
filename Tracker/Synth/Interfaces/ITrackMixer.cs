@@ -501,6 +501,25 @@ public interface ITrackMixer
     /// </remarks>
     void NoteOff(int track, int column = 0);
 
+    /// <summary>Silences one note column at once, with no release, which is what a note cut asks for.</summary>
+    /// <param name="track">The track.</param>
+    /// <param name="column">The note column.</param>
+    void Cut(int track, int column);
+
+    /// <summary>
+    /// Holds what one note column is sounding that many semitones off the note it was played at,
+    /// on top of whatever the pitch wheel is doing, which is how an arpeggio moves a note without
+    /// starting it again.
+    /// </summary>
+    /// <remarks>
+    /// Kept until the column starts a new note, which begins at its own pitch, or until it is
+    /// told nought. Stopping everything puts every column back.
+    /// </remarks>
+    /// <param name="track">The track.</param>
+    /// <param name="column">The note column.</param>
+    /// <param name="semitones">How far off, plus or minus.</param>
+    void SetShift(int track, int column, float semitones);
+
     /// <summary>Follows the volume and pan columns while a note holds.</summary>
     void SetLevels(int track, int column, float gain, float? pan);
 

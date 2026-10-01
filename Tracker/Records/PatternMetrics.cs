@@ -41,22 +41,25 @@ public readonly record struct PatternMetrics(
     /// <summary>Blank characters between a track's divider and its columns, each side.</summary>
     public const double TrackPadChars = 1;
 
-    /// <summary>One blank character after each column.</summary>
-    public const int ColumnGapChars = 1;
+    /// <summary>Characters per stop: note, instrument, volume, the command's letter and its amount.</summary>
+    public static readonly int[] ColumnWidths = { 3, 2, 2, 1, 2 };
 
-    /// <summary>Characters per column: note, instrument, volume, effect.</summary>
-    public static readonly int[] ColumnWidths = { 3, 2, 2, 3 };
+    /// <summary>
+    /// Blank characters after each stop: one, except after a command's letter, since the letter and
+    /// its amount are one command and read as <c>Q06</c>.
+    /// </summary>
+    public static readonly int[] ColumnGaps = { 1, 1, 1, 0, 1 };
 
     /// <summary>The line number gutter, plus the blank character after it.</summary>
     public double GutterWidth => (LineNumberChars + 1) * CharWidth;
 
-    /// <summary>One note column: its four fields and the gap after each of them.</summary>
+    /// <summary>One note column: its five stops and the gap after each of them.</summary>
     public double NoteColumnWidth
     {
         get
         {
             double chars = 0;
-            foreach (int width in ColumnWidths) chars += width + ColumnGapChars;
+            for (int i = 0; i < ColumnWidths.Length; i++) chars += ColumnWidths[i] + ColumnGaps[i];
 
             return chars * CharWidth;
         }
@@ -115,7 +118,7 @@ public readonly record struct PatternMetrics(
         double x = NoteColumnX(track, noteColumn);
 
         for (int i = 0; i < (int)column; i++)
-            x += (ColumnWidths[i] + ColumnGapChars) * CharWidth;
+            x += (ColumnWidths[i] + ColumnGaps[i]) * CharWidth;
 
         return x;
     }
@@ -184,7 +187,7 @@ public readonly record struct PatternMetrics(
 
         for (int i = 0; i < ColumnWidths.Length; i++)
         {
-            edge += (ColumnWidths[i] + ColumnGapChars) * CharWidth;
+            edge += (ColumnWidths[i] + ColumnGaps[i]) * CharWidth;
             if (inside < edge) return (CellColumn)i;
         }
 

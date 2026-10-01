@@ -112,12 +112,11 @@ public sealed class PatternEdit : IPatternEdit
                     cell with { Volume = TrackerCell.ClampVolume(ShiftIn(volume, value)) };
                 return true;
 
-            case CellColumn.Effect:
-                var effect = cell.Effect.IsNone
-                    ? new TrackerCommand(TrackerCommand.SetVolume, 0)
-                    : cell.Effect;
+            case CellColumn.Amount:
+                if (cell.Effect.IsNone) return false;
+
                 pattern[cursor.Line, cursor.Track, cursor.NoteColumn] =
-                    cell with { Effect = effect with { Parameter = ShiftIn(effect.Parameter, value) } };
+                    cell with { Effect = cell.Effect with { Parameter = ShiftIn(cell.Effect.Parameter, value) } };
                 return true;
 
             default:
@@ -132,7 +131,7 @@ public sealed class PatternEdit : IPatternEdit
 
         if (!pattern.Contains(cursor.Line, cursor.Track, cursor.NoteColumn)) return false;
         if (cursor.Column != CellColumn.Effect) return false;
-        if (!char.IsLetter(command)) return false;
+        if (!char.IsLetterOrDigit(command) || command > 'z') return false;
 
         var cell = pattern[cursor.Line, cursor.Track, cursor.NoteColumn];
         pattern[cursor.Line, cursor.Track, cursor.NoteColumn] =
@@ -154,7 +153,7 @@ public sealed class PatternEdit : IPatternEdit
             CellColumn.Note => TrackerCell.Empty,
             CellColumn.Instrument => cell with { Instrument = TrackerCell.NoInstrument },
             CellColumn.Volume => cell with { Volume = TrackerCell.NoVolume },
-            CellColumn.Effect => cell with { Effect = TrackerCommand.None },
+            CellColumn.Effect or CellColumn.Amount => cell with { Effect = TrackerCommand.None },
             _ => cell
         };
     }

@@ -25,7 +25,7 @@ public readonly record struct PatternCursor(
     int Line, int Track, CellColumn Column, int NoteColumn = 0)
 {
     /// <summary>How many fields a cell has, which is how the flat column index is worked out.</summary>
-    public const int ColumnCount = 4;
+    public const int ColumnCount = 5;
 
     /// <summary>The top left of a pattern, on the note column, which is where a song opens.</summary>
     public static readonly PatternCursor Start = new(0, 0, CellColumn.Note);

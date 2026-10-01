@@ -1099,9 +1099,9 @@ var asked = Keys.Find(e.Key, e.KeyModifiers);
         char typed = KeyToChar(e.Key);
         if (typed != '\0')
         {
-            if (vm.Cursor.Column == CellColumn.Effect && char.IsLetter(typed) && !IsHexLetter(typed))
+            if (vm.Cursor.Column == CellColumn.Effect)
                 vm.EnterEffectCommand(typed);
-            else
+            else if (char.IsDigit(typed) || IsHexLetter(typed))
                 vm.EnterHexDigit(typed);
 
             e.Handled = true;

@@ -3903,14 +3903,32 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public void EnterHexDigit(char digit)
     {
         if (CurrentPattern == null || !IsRecording) return;
-        if (Edits.EnterHexDigit(CurrentPattern, Cursor, digit)) StepDown();
+        if (!Edits.EnterHexDigit(CurrentPattern, Cursor, digit)) return;
+
+        _digits = _digitsAt == Cursor ? _digits + 1 : 1;
+        _digitsAt = Cursor;
+
+        if (_digits < 2) return;
+
+        _digitsAt = null;
+        StepDown();
     }
 
-    /// <summary>Types the letter half of an effect, leaving its digits where they are.</summary>
+    /// <summary>The field the last digit went into, or nothing once its value was finished.</summary>
+    private PatternCursor? _digitsAt;
+
+    /// <summary>How many digits have gone into <see cref="_digitsAt"/> in a row.</summary>
+    private int _digits;
+
+    /// <summary>
+    /// Names the command under the cursor by a letter or digit, keeping its amount, and moves on to
+    /// the amount, which is what gets typed next.
+    /// </summary>
     public void EnterEffectCommand(char command)
     {
         if (CurrentPattern == null || !IsRecording) return;
-        Edits.EnterEffectCommand(CurrentPattern, Cursor, command);
+        if (Edits.EnterEffectCommand(CurrentPattern, Cursor, command))
+            Cursor = Cursor with { Column = CellColumn.Amount };
     }
 
     /// <summary>

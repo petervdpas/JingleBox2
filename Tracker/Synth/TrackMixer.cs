@@ -1259,6 +1259,37 @@ public sealed class TrackMixer : ITrackMixer
     }
 
     /// <inheritdoc/>
+    public void Cut(int track, int column)
+    {
+        if (track < 0) return;
+
+        lock (_lock)
+        {
+            foreach (var voice in _voices)
+            {
+                if (voice.Track == track && voice.Column == column) voice.Cut();
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    public void SetShift(int track, int column, float semitones)
+    {
+        if (Shifting(track, column) is not int slot) return;
+
+        lock (_lock)
+        {
+            _shift[slot] = semitones;
+
+            foreach (var voice in _voices)
+            {
+                if (voice.Track == track && voice.Column == column)
+                    voice.Bend = _bend[Bending(track)] + semitones;
+            }
+        }
+    }
+
+    /// <inheritdoc/>
     /// <remarks>
     /// Every voice on the track and not one column of it, unlike a level: a volume column is
     /// about a column, and a hand on a wheel is about everything that hand is playing, which is
@@ -1279,7 +1310,7 @@ public sealed class TrackMixer : ITrackMixer
             {
                 if (voice.Track != track) continue;
 
-                voice.Bend = semitones;
+                voice.Bend = semitones + ShiftOf(voice.Track, voice.Column);
             }
         }
     }
@@ -1313,6 +1344,7 @@ public sealed class TrackMixer : ITrackMixer
             foreach (var voice in _voices) voice.Kill();
 
             _voices.Clear();
+            Array.Clear(_shift);
             _snapshotStale = true;
 
             Rest();
@@ -2306,6 +2338,8 @@ public sealed class TrackMixer : ITrackMixer
         while (_voices.Count >= MaxVoices)
             _voices.RemoveAt(0);
 
+        if (Shifting(voice.Track, voice.Column) is int slot) _shift[slot] = 0f;
+
         voice.Bend = _bend[Bending(voice.Track)];
 
         _voices.Add(voice);
@@ -2328,6 +2362,22 @@ public sealed class TrackMixer : ITrackMixer
 
     /// <summary>Which slot of <see cref="_bend"/> a track number means, the loose bus included.</summary>
     private static int Bending(int track) => Math.Clamp(track + 1, 0, MaxTracks);
+
+    /// <summary>
+    /// How far an arpeggio is holding each note column off its own pitch, in semitones, by track
+    /// and column. A new note on a column puts it back to nought, since a note starts at its own
+    /// pitch. Written and read under the lock.
+    /// </summary>
+    private readonly float[] _shift = new float[MaxTracks * Song.MaxNoteColumns];
+
+    /// <summary>Which slot of <see cref="_shift"/> a column means, or nothing for one that has none.</summary>
+    private static int? Shifting(int track, int column) =>
+        track >= 0 && track < MaxTracks && column >= 0 && column < Song.MaxNoteColumns
+            ? track * Song.MaxNoteColumns + column
+            : null;
+
+    /// <summary>How far an arpeggio is holding a column off its pitch, nought for none.</summary>
+    private float ShiftOf(int track, int column) => Shifting(track, column) is int slot ? _shift[slot] : 0f;
 
     /// <summary>A different seed per voice, so two noise hits are not the same noise.</summary>
     private int NextSeed() => System.Threading.Interlocked.Increment(ref _noiseSeed);
