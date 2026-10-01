@@ -23,23 +23,18 @@ public sealed partial class RealtimeThread : IRealtimeThread
     public const string Variable = "JB_REALTIME";
 
     /// <summary>
-    /// Whether to ask at all, which is no until <c>JB_REALTIME=1</c> says otherwise.
+    /// Whether to ask at all, which is what <c>JB_REALTIME=1</c> says.
     /// </summary>
     /// <remarks>
-    /// **Off until it has been listened to**, which is the rule this application keeps for every
-    /// change to the audio path. Asking the operating system to put a thread ahead of everything
-    /// else on the machine is not a thing to switch on for somebody, and the last time it went in
-    /// beside three other changes at once the sound came apart and nobody could say which of the
-    /// four had done it.
-    ///
-    /// It is read from the environment rather than the settings so that a plugin's own process,
-    /// which reads no settings at all, hears the same answer by inheriting it.
+    /// Set at startup from what the system allows, see <see cref="Allowed"/>, and read from the
+    /// environment so that a plugin's own process, which reads no settings and asks nothing at
+    /// startup, hears the same answer by inheriting it.
     /// </remarks>
     private static bool Wanted =>
         Environment.GetEnvironmentVariable(Variable) == "1";
 
     /// <summary>
-    /// Says what the settings hold, for everything after this and for every process started from
+    /// Says what the system allows, for everything after this and for every process started from
     /// here.
     /// </summary>
     /// <remarks>
@@ -146,6 +141,11 @@ public sealed partial class RealtimeThread : IRealtimeThread
                    StringMarshalling = StringMarshalling.Utf16)]
     private static partial nint JoinClass(string task, ref uint index);
 
+    /// <summary>Takes the calling thread back out of the class it was put in. Nought means refused.</summary>
+    [LibraryImport("avrt.dll", EntryPoint = "AvRevertMmThreadCharacteristics")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool LeaveClass(nint task);
+
     /// <summary>
     /// What the system handed back, kept so the arrangement lasts as long as this does.
     /// </summary>
@@ -211,6 +211,62 @@ public sealed partial class RealtimeThread : IRealtimeThread
         {
             return false;
         }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The thread asks with <see cref="ResetOnFork"/> like any other, so nothing it could start
+    /// inherits anything, and it ends at once. Answered once per process and kept, in a static,
+    /// because the permission belongs to the process rather than to any one instance.
+    /// </remarks>
+    public bool Allowed => AllowedHere.Value;
+
+    /// <summary>The system's answer, asked the first time anybody wants it.</summary>
+    private static readonly Lazy<bool> AllowedHere = new(Probe);
+
+    /// <summary>
+    /// Asks the system for real-time scheduling on a thread of its own, and says whether it was
+    /// given: the real-time scheduler on Linux, the Pro Audio class on Windows.
+    /// </summary>
+    private static bool Probe()
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsWindows()) return false;
+
+        bool given = false;
+
+        var probe = new System.Threading.Thread(() =>
+        {
+            try
+            {
+                if (OperatingSystem.IsWindows())
+                {
+                    uint index = 0;
+                    nint task = JoinClass(ProAudio, ref index);
+
+                    given = task != 0;
+
+                    if (given) LeaveClass(task);
+
+                    return;
+                }
+
+                var param = new SchedParam { SchedPriority = Priority };
+                given = SetSchedule(0, SchedFifo | ResetOnFork, ref param) == 0;
+            }
+            catch (Exception)
+            {
+                given = false;
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "real-time probe"
+        };
+
+        probe.Start();
+        probe.Join();
+
+        return given;
     }
 
     /// <inheritdoc/>

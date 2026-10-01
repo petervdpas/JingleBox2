@@ -1206,7 +1206,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             config?.OutputUpdatePeriodMs ?? 0,
             config?.OutputUpdateThreads ?? 0)));
 
-        _player.UseRenderAhead(config?.RenderAheadMs ?? 0);
+        _player.UseRenderAhead(new Audio.AudioDefaults().Cushion(config?.RenderAheadMs ?? AppConfig.FollowsRecommendation));
 
         Automation = new AutomationRecorder(
             () => Song,

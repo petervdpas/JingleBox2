@@ -56,7 +56,30 @@ class Program
             Note($"FATAL: {ex}");
             throw;
         }
+
+        if (!RestartWanted) return;
+
+        try
+        {
+            System.Diagnostics.Process.Start(
+                new UI.Relaunch().Again(Environment.ProcessPath ?? "", Environment.GetCommandLineArgs()));
+        }
+        catch (Exception ex)
+        {
+            Note($"could not start again: {ex.Message}");
+        }
     }
+
+    /// <summary>
+    /// Whether the application starts itself again once this run has finished closing.
+    /// </summary>
+    /// <remarks>
+    /// Set when somebody agrees to restart for a setting that only takes effect at the next start.
+    /// Acted on after the window and everything behind it have gone, so the new run never meets
+    /// the old one: two copies would share the audio routing, and the plugins of the old one are
+    /// put away first.
+    /// </remarks>
+    public static bool RestartWanted { get; set; }
 
     /// <summary>
     /// Writes one line into <c>startup.log</c> in the application folder, and never throws.

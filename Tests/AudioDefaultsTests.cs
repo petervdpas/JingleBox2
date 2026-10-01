@@ -37,12 +37,15 @@ public class AudioDefaultsTests
         Assert.True(sizes.UpdatePeriodMs > 0);
     }
 
-    /// <summary>Nothing chosen leaves the sound library on its own thread count.</summary>
+    /// <summary>
+    /// Nothing chosen is one filling thread, said out loud, which is what the sound library uses
+    /// when it is told nothing and so sounds exactly as it always has.
+    /// </summary>
     [Fact]
-    public void Nobody_is_given_a_thread_count_by_default()
+    public void One_filling_thread_by_default()
     {
-        Assert.Equal(0, _defaults.For(windows: false).UpdateThreads);
-        Assert.Equal(0, _defaults.For(windows: true).UpdateThreads);
+        Assert.Equal(1, _defaults.For(windows: false).UpdateThreads);
+        Assert.Equal(1, _defaults.For(windows: true).UpdateThreads);
     }
 
     /// <summary>

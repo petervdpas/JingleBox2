@@ -232,14 +232,20 @@
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding OutputSizesHint}" />
 
+              <!-- One press back to what this system is best at: the cushion, the buffer, the
+                   top-up and the filling threads, each to the value marked recommended. -->
+              <Button Content="Reset to recommended values"
+                      HorizontalAlignment="Left"
+                      Command="{Binding ResetAudioCommand}" />
+
               <!-- The one setting here that changes how the machine treats this application
                    rather than how much audio is held, so it stands apart from the three sizes
                    above it. -->
               <CheckBox Margin="0,6,0,0"
                         Content="Real-time audio"
-                        IsChecked="{Binding RealtimeAudio}"
-                        IsEnabled="{Binding RealtimeAvailable}"
-                        ToolTip.Tip="Asks the system to schedule the mixing thread and each plugin's audio thread ahead of everything else." />
+                        IsChecked="{Binding RealtimeAudio, Mode=OneWay}"
+                        IsEnabled="False"
+                        ToolTip.Tip="Ticked when the system allows real-time audio, which is then used. The system decides this, not this box." />
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding RealtimeHint}" />
 
@@ -248,7 +254,7 @@
                    about how much time this machine has, which is why it is here and not a
                    parameter on a machine's own face. -->
               <CheckBox Margin="0,6,0,0"
-                        Content="Fast drive curve"
+                        Content="Fast drive curve (recommended)"
                         IsChecked="{Binding FastDriveCurve}"
                         ToolTip.Tip="Reads the drive's curve off a table instead of asking the system for it. About six times cheaper a sample, and 161 dB from what it replaces." />
 

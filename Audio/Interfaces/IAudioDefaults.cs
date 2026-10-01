@@ -27,7 +27,10 @@ public interface IAudioDefaults
     /// <param name="windows">True for Windows, false for everything else.</param>
     AudioSizes For(bool windows);
 
-    /// <summary>What this machine is, so a caller that only wants the answer can have it.</summary>
+    /// <summary>
+    /// What to use on this machine where nothing has been chosen: what is recommended for what its
+    /// system allows.
+    /// </summary>
     AudioSizes Here { get; }
 
     /// <summary>
@@ -41,4 +44,11 @@ public interface IAudioDefaults
     /// </remarks>
     /// <param name="stored">What the settings hold, or nought for nothing chosen.</param>
     AudioSizes Chosen(AudioSizes stored);
+
+    /// <summary>
+    /// The plugin cushion to use, in milliseconds: what is stored, or what is recommended for what
+    /// the system allows where the setting follows the recommendation.
+    /// </summary>
+    /// <param name="stored">What the settings hold, negative meaning it follows.</param>
+    int Cushion(int stored);
 }

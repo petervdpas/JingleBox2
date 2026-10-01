@@ -228,7 +228,7 @@ public partial class MainWindow : Window
 
         _routing = new AudioRoutingFactory().Create(_recording);
 
-        Audio.RealtimeThread.Wants(cfg.RealtimeAudio);
+        Audio.RealtimeThread.Wants(new Audio.RealtimeThread().Allowed);
 
         var clock = new Audio.ClockResolution();
 
@@ -329,6 +329,14 @@ public partial class MainWindow : Window
 
         vm.MatrixSizeChanged += OnMatrixSizeChanged;
 
+        vm.RestartAsked += () =>
+        {
+            Program.RestartWanted = true;
+
+            (Avalonia.Application.Current?.ApplicationLifetime
+                as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.Shutdown();
+        };
+
         RestoreWindowSize(cfg);
 
         Closed += (_, __) =>
@@ -385,9 +393,9 @@ public partial class MainWindow : Window
             : "threads " + Preferred));
 
         saying.Under("Rendering ahead " +
-            (cfg.RenderAheadMs > 0 ? cfg.RenderAheadMs + " ms" : "not at all"));
+            (new Audio.AudioDefaults().Cushion(cfg.RenderAheadMs) is > 0 and var ahead ? ahead + " ms" : "not at all"));
 
-        saying.Under("Realtime audio thread " + (cfg.RealtimeAudio ? "on" : "off"));
+        saying.Under("Realtime audio thread " + (new Audio.RealtimeThread().Allowed ? "on" : "off"));
 
     }
 

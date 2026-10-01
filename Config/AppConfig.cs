@@ -328,20 +328,12 @@ public sealed class AppConfig
     public System.Collections.Generic.List<string> PatchedIntoInput { get; set; } = new();
 
     /// <summary>
-    /// Whether the threads that must not be late are scheduled as audio threads.
+    /// Read back from a settings file that has it, and used for nothing.
     /// </summary>
     /// <remarks>
-    /// **Off, until it has been listened to on this machine.** It asks the operating system to
-    /// put a thread ahead of everything else running, which is what every serious audio
-    /// application on Linux does and is not a thing to switch on for somebody without their
-    /// hearing the difference.
-    ///
-    /// It reaches two threads: the one mixing ahead here, and the one inside each plugin's own
-    /// process. Both, because the mixer sends a plugin a block and then waits for the answer, so
-    /// promoting only this side leaves the wait exactly where it was.
-    ///
-    /// It needs permission the system gives per user and a machine not set up for audio will
-    /// refuse, which is ordinary and is written in the log rather than thrown.
+    /// Whether the audio runs in real time is the system's to decide and not a setting: see
+    /// <see cref="Audio.Interfaces.IRealtimeThread.Allowed"/>. The field stays so a file that
+    /// carries it is read without complaint.
     /// </remarks>
     public bool RealtimeAudio { get; set; }
 
@@ -349,17 +341,18 @@ public sealed class AppConfig
     /// Whether the drive's curve is read off a table rather than worked out by the system.
     /// </summary>
     /// <remarks>
-    /// Off in a settings file that has never heard of it, which is every file written before it
-    /// existed, so nothing anybody already has starts sounding different for this being added.
+    /// On in a settings file that has never heard of it, since it sounds the same and only leaves
+    /// more room; a file that says off keeps it off until somebody ticks it or resets to what is
+    /// recommended.
     ///
     /// A setting rather than something on a machine, and the difference is worth being exact
-    /// about. <c>EvenDrive</c> and <c>FilterFirst</c> are parameters on the box because they are
+    /// about. <c>EvenDrive</c> and <c>FilterFirst</c> are parameters on the device because they are
     /// facts about the sound, saved with the instrument and carried in the song; this is a fact
     /// about how much time this computer has, which is where the buffer sizes and the real-time
     /// switch live. A song that sounded different on two machines for a reason nobody chose is
     /// exactly what a parameter here would have bought.
     /// </remarks>
-    public bool FastDriveCurve { get; set; }
+    public bool FastDriveCurve { get; set; } = true;
 
     /// <summary>
     /// Whether a block's crossings to plugin processes are begun together rather than in turn.
@@ -419,30 +412,24 @@ public sealed class AppConfig
     public int OutputUpdateThreads { get; set; }
 
     /// <summary>
-    /// How far ahead of the sound card the tracker mixes, in milliseconds.
+    /// How far ahead of the sound card the tracker mixes, in milliseconds, or
+    /// <see cref="FollowsRecommendation"/> to use what is recommended for this system.
     /// </summary>
     /// <remarks>
-    /// Zero mixes in step, and that is the default because it was measured and a cushion did
-    /// not earn its cost. What made a cushion look necessary was timing the mixing against the
-    /// length of a block, eleven and a half milliseconds, as though a block late by one were a
-    /// hole in the output. It is not: the stream is buffered as far ahead as
-    /// <c>AudioSizes.BufferFrames</c> comes to at the rate in force, which at the default of 2048 is
-    /// about forty five milliseconds, and BASS tops that up every ten, so a block that took
-    /// longer than its own length is absorbed. Measured on the real output with a thread
-    /// allocating hard enough to pause the process for a quarter of its wall time, thirty-two
-    /// voices of synths, of recordings and of both: the sound card went without nothing, with
-    /// the cushion and without it.
-    ///
-    /// So a cushion buys nothing here and costs the one thing this application cannot spare,
-    /// which is how long a key waits before it sounds, on top of what is already in the
-    /// stream. What it is still for is a plugin: every block one plays is a round trip to
-    /// another process, and that is the case worth turning it on for, which is what the words
-    /// in SETTINGS say.
+    /// Following is the default, so a machine that is given real-time audio works closer to the
+    /// sound card than one that is not without anybody setting it; see
+    /// <see cref="Audio.Interfaces.IAudioChoices.RecommendedCushion"/>. A size somebody chooses is
+    /// kept, nought included, which mixes in step. What a cushion is for is a plugin: every block
+    /// one plays is a round trip to another process, and a plugin that is late eats into the
+    /// cushion instead of into the output.
     ///
     /// See <c>JingleBox2.Audio.TrackerOutput.UseRenderAhead</c>, and <c>docs/threads.md</c> for
     /// what the thread it starts is allowed to touch.
     /// </remarks>
-    public int RenderAheadMs { get; set; }
+    public int RenderAheadMs { get; set; } = FollowsRecommendation;
+
+    /// <summary>What <see cref="RenderAheadMs"/> holds while it follows the recommendation.</summary>
+    public const int FollowsRecommendation = -1;
 
     /// <summary>
     /// What wrote this file, so a setting whose default has changed can be moved once.
@@ -459,7 +446,7 @@ public sealed class AppConfig
     public int Version { get; set; } = 1;
 
     /// <summary>What this build writes.</summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     /// <summary>
     /// Whether the tracker puts its plugins down when you go and work somewhere else.

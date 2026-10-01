@@ -70,4 +70,18 @@ public interface IRealtimeThread
     /// the half that can be quietly ignored.
     /// </remarks>
     string Said();
+
+    /// <summary>
+    /// Whether the system allows this program real-time scheduling, which is then used.
+    /// </summary>
+    /// <remarks>
+    /// The system decides this and not a setting: a machine set up for audio gives the user
+    /// permission through the audio group or rtkit, and where it does, the mixing and every
+    /// plugin's audio run in real time. Answered by trying it on a short-lived thread of its own,
+    /// since the request is the only question the system really answers, and kept for the run,
+    /// since the permission does not change while the program runs. On Linux the question is the
+    /// real-time scheduler, on Windows the system's Pro Audio class, and elsewhere the answer is
+    /// no.
+    /// </remarks>
+    bool Allowed { get; }
 }

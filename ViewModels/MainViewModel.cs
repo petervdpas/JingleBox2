@@ -938,24 +938,21 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     }
 
     /// <summary>
-    /// What the engine runs at. Zero follows the output device, which is what keeps the audio
-    /// from being resampled on its way out and tells a plugin the rate it is really fed at.
+    /// The rates the engine can run at, the sound server's own marked recommended, since running
+    /// at it is what keeps the audio from being converted on its way out.
     /// </summary>
-    public static (int Rate, string Label)[] EngineRates { get; } =
-    {
-        (Audio.TrackerOutput.FollowDevice, "Follow the output device"),
-        (44100, "44100 Hz"),
-        (48000, "48000 Hz"),
-        (96000, "96000 Hz")
-    };
+    public (int Rate, string Label)[] EngineRates =>
+        _choices.Rates
+            .Select(rate => (rate, rate + " Hz"
+                                   + (rate == _choices.RecommendedRate(_clock.Read()) ? RecommendedMark : "")))
+            .ToArray();
 
     /// <summary>
     /// The chosen rate, as the words the picker shows rather than as a number.
     /// </summary>
     /// <remarks>
-    /// A rate the settings hold that is not on the list reads back as the first entry, which is
-    /// following the device, since that is the only answer that is right whatever the card
-    /// turns out to be. Takes effect when the app is started again.
+    /// The rate in force: what was chosen, or the recommended one where nothing was. Takes effect
+    /// when the app is started again.
     /// </remarks>
     public string SelectedEngineRate
     {
@@ -963,7 +960,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         {
             foreach (var (rate, label) in EngineRates)
             {
-                if (rate == _cfg.EngineSampleRate) return label;
+                if (rate == Rate) return label;
             }
 
             return EngineRates[0].Label;
@@ -979,6 +976,8 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(EngineRateHint));
+
+                OfferRestart();
                 return;
             }
         }
@@ -993,7 +992,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     /// </remarks>
     private readonly Audio.Interfaces.IAudioDefaults _audioDefaults = new Audio.AudioDefaults();
 
-    /// <summary>The three sizes as they stand, with nought resolved to this machine's default.</summary>
+    /// <summary>The three sizes as they stand, with nought resolved to what is recommended here.</summary>
     private Audio.Records.AudioSizes Sizes => _audioDefaults.Chosen(new Audio.Records.AudioSizes(
         _cfg.OutputBufferSize, _cfg.OutputUpdatePeriodMs, _cfg.OutputUpdateThreads));
 
@@ -1011,11 +1010,19 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     /// sizes double at each step: a slider over the numbers themselves would give the whole low
     /// half of the range a hair's width and hand the top two sizes most of the travel.
     /// </remarks>
-    private static readonly int[] BufferChoices =
-        { 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
+    private IReadOnlyList<int> BufferChoices => _choices.BufferFrames(_realtime.Allowed);
+
+    /// <summary>
+    /// What is offered and what is recommended, with and without real time, which is the system's
+    /// to decide. See <see cref="Audio.Interfaces.IAudioChoices"/>.
+    /// </summary>
+    private readonly Audio.Interfaces.IAudioChoices _choices = new Audio.AudioChoices();
+
+    /// <summary>What is put after the value that is recommended, wherever one is listed.</summary>
+    private const string RecommendedMark = " (recommended)";
 
     /// <summary>How far along that list the slider may go.</summary>
-    public double BufferSteps => BufferChoices.Length - 1;
+    public double BufferSteps => BufferChoices.Count - 1;
 
     /// <summary>
     /// Which place on the list is chosen, which is what the slider moves.
@@ -1031,7 +1038,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
             int wanted = Sizes.BufferFrames;
             int nearest = 0;
 
-            for (int at = 1; at < BufferChoices.Length; at++)
+            for (int at = 1; at < BufferChoices.Count; at++)
             {
                 if (Math.Abs(BufferChoices[at] - wanted) < Math.Abs(BufferChoices[nearest] - wanted))
                     nearest = at;
@@ -1041,7 +1048,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         }
         set
         {
-            int at = Math.Clamp((int)Math.Round(value), 0, BufferChoices.Length - 1);
+            int at = Math.Clamp((int)Math.Round(value), 0, BufferChoices.Count - 1);
             int frames = BufferChoices[at];
 
             if (_cfg.OutputBufferSize == frames) return;
@@ -1060,49 +1067,79 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     /// <summary>What this machine can be asked about scheduling, for the settings page.</summary>
     private readonly Audio.Interfaces.IRealtimeThread _realtime = new Audio.RealtimeThread();
 
-    /// <summary>Whether this platform has an answer for real-time scheduling at all.</summary>
-    /// <remarks>
-    /// The real-time scheduler is a Linux idea, so the switch is shown and cannot be moved
-    /// anywhere else: a control that does nothing is worse than a control that says why.
-    ///
-    /// **It is not the question of whether the threads are scheduled for audio at all**, which
-    /// they ask to be on every platform. Windows says it the other way, through the multimedia
-    /// class scheduler, and that is asked for on every run without this switch, so a greyed tick
-    /// there means this particular mechanism is absent rather than that nothing was arranged.
-    /// <see cref="RealtimeHint"/> is where that is said to somebody looking at it.
-    /// </remarks>
-    public bool RealtimeAvailable => _realtime.Possible;
-
     /// <summary>
-    /// Whether the threads that must not be late are scheduled as audio threads.
+    /// Puts the sample rate, the buffer, the top-up, the filling threads, the cushion and the drive
+    /// curve back to what is recommended here.
     /// </summary>
     /// <remarks>
-    /// Written into the environment as well as the settings, because the other half that needs
-    /// the answer is in another process: a plugin host reads no settings of its own and inherits
-    /// this instead.
-    ///
-    /// The output is opened again, which is what makes it take effect on the mixing thread now.
-    /// A plugin already loaded keeps the scheduling it started with, since that is decided when
-    /// its process makes the thread; the next one loaded gets the new answer.
+    /// The rate, the buffer, the top-up, the threads and the cushion go back to following what is
+    /// recommended, so they move with the sound server and the system if those ever change, and
+    /// the fast drive curve is switched on. All of it takes effect at once, the same way choosing
+    /// them does, except the rate, which takes effect when the application is started again, as
+    /// the line under it says.
     /// </remarks>
-    public bool RealtimeAudio
+    public IRelayCommand ResetAudioCommand => new RelayCommand(ResetAudio);
+
+    /// <summary>Does what <see cref="ResetAudioCommand"/> says.</summary>
+    private void ResetAudio()
     {
-        get => _cfg.RealtimeAudio;
-        set
-        {
-            if (_cfg.RealtimeAudio == value) return;
+        _cfg.OutputBufferSize = 0;
+        _cfg.OutputUpdatePeriodMs = 0;
+        _cfg.OutputUpdateThreads = 0;
+        _cfg.RenderAheadMs = AppConfig.FollowsRecommendation;
+        _cfg.EngineSampleRate = 0;
 
-            _cfg.RealtimeAudio = value;
-            _settings.Moved();
+        FastDriveCurve = true;
 
-            Audio.RealtimeThread.Wants(value);
+        _settings.Moved();
 
-            ApplyAudioSizes();
+        ApplyAudioSizes();
 
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(RealtimeHint));
-        }
+        OnPropertyChanged(nameof(BufferStep));
+        OnPropertyChanged(nameof(BufferReading));
+        OnPropertyChanged(nameof(SelectedUpdatePeriod));
+        OnPropertyChanged(nameof(SelectedUpdateThreads));
+        OnPropertyChanged(nameof(OutputSizesHint));
+        OnPropertyChanged(nameof(SelectedRenderAhead));
+        OnPropertyChanged(nameof(RenderAheadHint));
+        OnPropertyChanged(nameof(SelectedEngineRate));
+        OnPropertyChanged(nameof(EngineRateHint));
+
+        OfferRestart();
     }
+
+    /// <summary>Raised when somebody agreed to restart the application now.</summary>
+    public event Action? RestartAsked;
+
+    /// <summary>
+    /// Asks whether to restart now, where the rate chosen is not the rate running.
+    /// </summary>
+    /// <remarks>
+    /// The rate is only taken when the application starts, so a change that is left waiting is a
+    /// setting that looks chosen and is not in force. Saying yes closes the application the
+    /// ordinary way and starts it again; saying no leaves it to the next start, as the line under
+    /// the rate says.
+    /// </remarks>
+    private async void OfferRestart()
+    {
+        int wanted = Rate;
+
+        if (wanted == Tracker.EngineSampleRate) return;
+
+        bool now = await Views.ConfirmDialog.AskAsync(
+            "Restart JingleBox2",
+            "The sample rate becomes " + wanted + " Hz when JingleBox2 starts again. Restart now?",
+            "Restart");
+
+        if (now) RestartAsked?.Invoke();
+    }
+
+    /// <summary>Whether the audio runs in real time, which the system decides.</summary>
+    /// <remarks>
+    /// Shown and never set: where the system allows real-time scheduling it is used, and where it
+    /// does not it cannot be. See <see cref="Audio.Interfaces.IRealtimeThread.Allowed"/>.
+    /// </remarks>
+    public bool RealtimeAudio => _realtime.Allowed;
 
     /// <summary>
     /// Whether the drive's curve is read off a table rather than worked out by the system.
@@ -1684,36 +1721,25 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     /// <summary>What the switch means, said plainly enough to choose by.</summary>
     public string FastDriveCurveHint =>
         _cfg.FastDriveCurve
-            ? "Every drive in the application is reading its curve off a table drawn at startup. "
-              + "It is about six times cheaper a sample than asking the system, and at the mixer's "
-              + "own voice ceiling the drive is over half of what a rich patch costs. The two "
-              + "curves differ by 161 dB at worst, which is below what a sample can carry out of "
-              + "here, so this is a speed setting rather than a sound."
-            : "Every drive is asking the system for its curve, which is what this application has "
-              + "always done and what everything in it has been listened to on. Switch it on if "
-              + "notes break up on a busy song, and listen: nothing else here is on the audio path "
-              + "for every sample of every sounding voice.";
+            ? "On: every drive reads its curve from a table, which costs a fraction of working it "
+              + "out each time and sounds the same, so a busy song has more room for voices and "
+              + "plugins."
+            : "Off: every drive works its curve out on every sample, which is slower and sounds "
+              + "the same. Switch it on for more room on busy songs.";
 
     /// <summary>What the switch means, said plainly enough to choose by.</summary>
     public string RealtimeHint =>
-        !RealtimeAvailable
-            ? "Nothing to switch here, and nothing missing. This tick is the real-time " +
-              "scheduler, which only Linux has. On Windows the mixing thread and each plugin's " +
-              "audio thread already ask to be treated as audio, through the system's own Pro " +
-              "Audio class, which hands back a share of every interval rather than the machine " +
-              "and needs nobody's permission. The log says which of the two you got."
-            : _cfg.RealtimeAudio
-                ? "On: the mixing thread and one audio thread per plugin run on the real-time " +
-                  "scheduler, all at the same priority, and the mix waits for every one of them " +
-                  "each block. With a dozen plugins that was measured breaking up while plugin " +
-                  "windows opened: plugins woke 50 to 185 ms late and blocks were played as " +
-                  "silence. A plugin already loaded keeps what it started with; restart the " +
-                  "application after changing this."
-                : "Off, and off is what was measured clean with a dozen plugins. Nothing about " +
-                  "the machine changes either way: other audio programs keep their own real-time " +
-                  "permission. This only decides whether JingleBox2 moves its own audio threads " +
-                  "onto the real-time scheduler, and switched on it made plugins break up while " +
-                  "their windows opened.";
+        RealtimeAudio
+            ? "This system allows real-time audio, so it is used: the mixing and every plugin's " +
+              "audio go ahead of other programs, a busy browser or a build cannot hold up the " +
+              "sound, and smaller sizes are offered below to try."
+            : OperatingSystem.IsWindows()
+                ? "This system does not give audio priority right now, so the audio takes its " +
+                  "turn with everything else. Windows gives it through its multimedia class " +
+                  "scheduler, which is normally on; start JingleBox2 again once it is."
+                : "This system does not allow real-time audio, so the audio takes its turn with " +
+                  "everything else. To allow it, add your user to the audio group or install " +
+                  "rtkit, then start JingleBox2 again.";
 
     /// <summary>
     /// Puts the sizes on the running output, so a change is heard now rather than next time.
@@ -1727,27 +1753,34 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     /// Not the sample rate, which is the one that still waits: the mixer, every voice in it and
     /// every plugin that has been told what it is fed at are all built from it.
     /// </remarks>
-    private void ApplyAudioSizes() => Tracker.ApplyAudioSizes(Sizes, _cfg.RenderAheadMs);
+    private void ApplyAudioSizes() => Tracker.ApplyAudioSizes(Sizes, Cushion);
+
+    /// <summary>The cushion in force, with following resolved to what is recommended here.</summary>
+    private int Cushion => _audioDefaults.Cushion(_cfg.RenderAheadMs);
 
     /// <summary>
     /// What the slider is on: the size, and the latency it comes to.
     /// </summary>
     /// <remarks>
-    /// Short, because it stands beside the slider and the pair has to fit a narrow window. What
-    /// it means, and whether it is this machine's default, is said once underneath rather than
-    /// twice.
+    /// Short, because it stands beside the slider and the pair has to fit a narrow window, and
+    /// marked when it is the recommended size. What it means is said once underneath.
     /// </remarks>
     public string BufferReading =>
-        Sizes.BufferFrames + " · " + MillisecondsFor(Sizes.BufferFrames) + " ms";
+        Sizes.BufferFrames + " · " + MillisecondsFor(Sizes.BufferFrames) + " ms"
+        + (Sizes.BufferFrames == RecommendedSizes.BufferFrames ? RecommendedMark : "");
 
     /// <summary>What rate the arithmetic between frames and milliseconds is done at.</summary>
     /// <remarks>
     /// The setting rather than what the device came up at, since the slider has to answer before
     /// anything is open. They are the same number in every case anybody has run.
     /// </remarks>
-    private int Rate => _cfg.EngineSampleRate > 0
-        ? _cfg.EngineSampleRate
-        : Audio.TrackerOutput.DefaultSampleRate;
+    private int Rate => new Audio.OutputRate(_clock, _choices).Chosen(_cfg.EngineSampleRate);
+
+    /// <summary>The sound server's cycle, which the recommended buffer and rate follow.</summary>
+    private readonly Audio.Interfaces.ISoundServerClock _clock = new Audio.SoundServerClock();
+
+    /// <summary>What is recommended here, for what the system allows and the server runs at.</summary>
+    private Audio.Records.AudioSizes RecommendedSizes => _choices.Recommended(_realtime.Allowed, _clock.Read(), Rate);
 
     /// <summary>What a number of frames comes to in milliseconds, at the engine's rate.</summary>
     private int MillisecondsFor(int frames) =>
@@ -1760,21 +1793,19 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     /// Chosen beside the buffer because it is half of the same decision: a period that cannot keep
     /// up with the buffer is a dropout with no other explanation.
     /// </remarks>
-    private static readonly (int Milliseconds, string Label)[] UpdatePeriods =
-    {
-        (0, "Default for this machine"),
-        (5, "every 5 ms"),
-        (10, "every 10 ms"),
-        (20, "every 20 ms")
-    };
+    private (int Milliseconds, string Label)[] UpdatePeriods =>
+        _choices.UpdatePeriods(_realtime.Allowed)
+            .Select(ms => (ms, "every " + ms + " ms"
+                               + (ms == RecommendedSizes.UpdatePeriodMs ? RecommendedMark : "")))
+            .ToArray();
 
     /// <summary>The choices, for the picker to show.</summary>
-    public string[] UpdatePeriodLabels { get; } = UpdatePeriods.Select(u => u.Label).ToArray();
+    public string[] UpdatePeriodLabels => UpdatePeriods.Select(u => u.Label).ToArray();
 
     /// <summary>Which one is in force, read back off the settings by its number.</summary>
     public string SelectedUpdatePeriod
     {
-        get => Chosen(UpdatePeriods, _cfg.OutputUpdatePeriodMs);
+        get => Chosen(UpdatePeriods, Sizes.UpdatePeriodMs);
         set => Take(UpdatePeriods, value, _cfg.OutputUpdatePeriodMs, ms =>
         {
             _cfg.OutputUpdatePeriodMs = ms;
@@ -1793,22 +1824,19 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     /// block with a plugin in it delays every pad back. More lets a slow stream stop holding up
     /// the others. Past four they wake to look at buffers that are already full.
     /// </remarks>
-    private static readonly (int Milliseconds, string Label)[] UpdateThreads =
-    {
-        (0, "Default for this machine"),
-        (1, "1 thread"),
-        (2, "2 threads"),
-        (3, "3 threads"),
-        (4, "4 threads")
-    };
+    private (int Milliseconds, string Label)[] UpdateThreads =>
+        new[] { 1, 2, 3, 4 }
+            .Select(count => (count, count + (count == 1 ? " thread" : " threads")
+                                     + (count == RecommendedSizes.UpdateThreads ? RecommendedMark : "")))
+            .ToArray();
 
     /// <summary>The choices, for the picker to show.</summary>
-    public string[] UpdateThreadLabels { get; } = UpdateThreads.Select(u => u.Label).ToArray();
+    public string[] UpdateThreadLabels => UpdateThreads.Select(u => u.Label).ToArray();
 
     /// <summary>Which one is in force, read back off the settings by its number.</summary>
     public string SelectedUpdateThreads
     {
-        get => Chosen(UpdateThreads, _cfg.OutputUpdateThreads);
+        get => Chosen(UpdateThreads, Sizes.UpdateThreads);
         set => Take(UpdateThreads, value, _cfg.OutputUpdateThreads, count =>
         {
             _cfg.OutputUpdateThreads = count;
@@ -1850,18 +1878,17 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
     /// <summary>What the three add up to, in the numbers actually in force.</summary>
     /// <remarks>
-    /// The resolved numbers rather than what is stored, since "Default for this machine" tells
+    /// The numbers actually in force rather than what is stored, since a stored nought tells
     /// nobody what their machine is doing. Said once under the three, because they are one
     /// decision and reading them apart is how somebody sets a buffer of twenty and leaves it
     /// topped up every twenty.
     /// </remarks>
     public string OutputSizesHint =>
         DrivenHint +
-        "Running with " + Sizes.BufferFrames + " frames of buffer" +
-        (_cfg.OutputBufferSize <= 0 ? " (this machine's default)" : "") + ", " +
+        "Running with " + Sizes.BufferFrames + " frames of buffer, " +
         MillisecondsFor(Sizes.BufferFrames) + " ms, topped up every " +
         Sizes.UpdatePeriodMs + " ms by " +
-        (Sizes.UpdateThreads > 0 ? Sizes.UpdateThreads + " threads" : "the sound library's own one thread") +
+        Sizes.UpdateThreads + (Sizes.UpdateThreads == 1 ? " thread" : " threads") +
         ". The buffer is the latency: what you hear was mixed that long ago, and it is what a key " +
         "waits before it sounds. Too small for the machine and the mixing cannot keep up, which is " +
         "a stutter with no other explanation. These are per platform, since Linux is buffering " +
@@ -1912,20 +1939,14 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     /// Nothing here changes what anybody has: a picker with more rows in it still shows
     /// whichever row the settings already name.
     /// </remarks>
-    private static readonly (int Milliseconds, string Label)[] RenderAheads =
-    {
-        (0, "In step (tightest)"),
-        (10, "10 ms cushion"),
-        (20, "20 ms cushion"),
-        (40, "40 ms cushion"),
-        (80, "80 ms cushion"),
-        (120, "120 ms cushion"),
-        (160, "160 ms cushion"),
-        (200, "200 ms cushion (loosest)")
-    };
+    private (int Milliseconds, string Label)[] RenderAheads =>
+        _choices.Cushions(_realtime.Allowed)
+            .Select(ms => (ms, (ms == 0 ? "In step (tightest)" : ms + " ms cushion")
+                               + (ms == _choices.RecommendedCushion(_realtime.Allowed) ? RecommendedMark : "")))
+            .ToArray();
 
     /// <summary>The four choices, for the picker to show.</summary>
-    public string[] RenderAheadLabels { get; } = RenderAheads.Select(a => a.Label).ToArray();
+    public string[] RenderAheadLabels => RenderAheads.Select(a => a.Label).ToArray();
 
     /// <summary>
     /// Which cushion is in force, as the words rather than the milliseconds.
@@ -1941,7 +1962,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         {
             foreach (var (milliseconds, label) in RenderAheads)
             {
-                if (milliseconds == _cfg.RenderAheadMs) return label;
+                if (milliseconds == Cushion) return label;
             }
 
             return RenderAheads[0].Label;
@@ -1966,14 +1987,14 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
     /// <summary>What the choice means, said plainly enough to choose by.</summary>
     public string RenderAheadHint =>
-        _cfg.RenderAheadMs <= 0
+        Cushion <= 0
             ? "Each block is mixed inside the call that asks for it, which is as tight as this gets. " +
               "A plugin that takes a moment longer than usual has nowhere to take it from, and what " +
               "comes out is a gap. Give it a cushion if the sound breaks up while plugins are playing. " +
               "Takes effect at once."
-            : "The mixer works " + _cfg.RenderAheadMs + " ms ahead on a thread of its own, so a plugin " +
+            : "The mixer works " + Cushion + " ms ahead on a thread of its own, so a plugin " +
               "being late eats into that instead of into the output. It also means what you hear was " +
-              "mixed " + _cfg.RenderAheadMs + " ms ago, which is what a key you press waits before it " +
+              "mixed " + Cushion + " ms ago, which is what a key you press waits before it " +
               "sounds. Takes effect at once.";
 
     /// <summary>
@@ -2097,7 +2118,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         $"Running at {Tracker.EngineSampleRate} Hz. A change takes effect when the app is started again.";
 
     /// <summary>The rates, for the picker to show.</summary>
-    public string[] EngineRateLabels { get; } = EngineRates.Select(r => r.Label).ToArray();
+    public string[] EngineRateLabels => EngineRates.Select(r => r.Label).ToArray();
 
     /// <summary>What plugins this machine has. Scanned from SETTINGS, on demand.</summary>
     /// <remarks>

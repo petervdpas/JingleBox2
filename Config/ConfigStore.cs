@@ -247,16 +247,16 @@ public sealed class ConfigStore : IConfigStore
     /// it is allowed to change a value somebody could have chosen, which is exactly why it has
     /// to know whether it has run before: <see cref="AppConfig.Version"/> is that record.
     ///
-    /// Nothing to move yet, and the empty body is the point rather than an oversight: the
-    /// machinery is here because a default that turns out to be wrong cannot otherwise be
-    /// corrected for anybody who has already run the program once, and finding that out is
-    /// exactly what happened to the mixing cushion. It was going to be changed from none to
-    /// twenty milliseconds until the real output was measured and the cushion turned out to buy
-    /// nothing; see <see cref="AppConfig.RenderAheadMs"/>.
+    /// The plugin cushion is what it moves: before version 3 every file was born with a cushion
+    /// of nought, so nought there is a cushion nobody chose, and it is moved onto following what
+    /// is recommended for this system. A size somebody did choose is left as it is, and from
+    /// version 3 on nought is a choice like any other. See <see cref="AppConfig.RenderAheadMs"/>.
     /// </remarks>
     private static void Brought(AppConfig cfg)
     {
         if (cfg.Version >= AppConfig.CurrentVersion) return;
+
+        if (cfg.Version < 3 && cfg.RenderAheadMs == 0) cfg.RenderAheadMs = AppConfig.FollowsRecommendation;
 
         cfg.Version = AppConfig.CurrentVersion;
     }

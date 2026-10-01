@@ -44,34 +44,33 @@ them, so the right value can be found by listening rather than by restarting bet
 guesses.
 
 Two switches sit under them and neither is about how much audio is held.
-**Real-time audio** decides whether JingleBox2 moves its own audio threads onto the
-machine's real-time scheduler: the mixing thread, and one audio thread for every plugin,
-since each plugin runs in a process of its own. It does not say whether the machine
-allows real time, and it changes nothing for other audio programs, which keep their own
-permission whichever way this is set.
+**Real-time audio** is ticked when the system allows it, and then it is used: the mixing
+and the audio of every plugin go ahead of other programs, so a busy browser, a build or
+a backup cannot hold up the sound. The box only shows this; the system decides it. On
+Linux that is the real-time scheduler, which most audio setups allow through the audio
+group or rtkit; on Windows it is the system's Pro Audio class, which is normally on. It
+changes nothing for other audio programs.
 
-Leave it off. With a dozen plugins, switched on, plugins woke 50 to 185 ms late while
-plugin windows opened and whole blocks were played as silence; switched off, the same
-song and the same windows stayed under 10 ms. All those threads sit at one priority and
-the mix waits for every one of them each block, so one of them held up holds up the
-lot. A plugin already loaded keeps what it started with, so restart the application
-after changing it.
+The recommended buffer and sample rate come from the sound server: PipeWire on Linux,
+the device's own period on Windows. The server moves audio in fixed cycles, and a buffer
+shorter than two of them runs dry however fast the computer is, so the buffer recommended
+is the smallest that holds two. The rate recommended is the server's own, so nothing has
+to be converted on the way out. Where the server cannot be asked, 2048 frames at 44100 Hz
+is recommended. With real-time audio, smaller sizes are offered to try, and the
+recommended cushion moves down.
 
-**Fast drive curve** is the third, and it is the only setting here that is about
-arithmetic. Every drive in this application, on a machine and inside an effect, bends
-its signal through the same curve, and asking the system for that curve is a call that
-stays a call however fast the rest of the mixing gets. At the mixer's own ceiling of
-forty eight voices it is over half of what a rich patch costs. With this on the curve
-is read off a table drawn once at startup, which is about six times cheaper for every
-sample of every sounding voice.
+In every list the value that suits this system is marked **(recommended)**, and until you
+choose otherwise those are the values JingleBox2 runs at. **Reset to recommended values**
+puts all of them back in one press: the sample rate, the cushion, the buffer, the top-up,
+the filling threads and the drive curve. Everything takes effect at once except the
+sample rate, which takes effect when JingleBox2 starts again; when it changes, JingleBox2
+asks whether to restart now, and on **Restart** it closes and starts itself again.
 
-The two curves are 161 decibels apart at worst, which is below the steps a sample has
-once it is written out, so a driven note rendered either way is the same note at the
-output. It is a speed setting rather than a sound, and it is off unless you turn it on,
-which is the rule everything on the audio path here keeps: what shipped is what you
-have until you have listened to the other thing. Turn it on if notes break up on a busy
-song. It lands inside the block being mixed, so you can sit with a song playing and
-throw it back and forth.
+**Fast drive curve (recommended)** makes every drive in the application, on a
+soundmachine and inside an effect, read its curve from a table instead of working it out
+on every sample. That costs a fraction of the time and sounds the same, so a busy song
+has more room for voices and plugins. It is on unless you switch it off, and it changes
+inside the block being mixed, so it can be switched while a song plays.
 
 It is here rather than on a machine's own face on purpose. A machine's **Drive keeps**
 and **Order** are facts about the sound, saved with the instrument and carried in the

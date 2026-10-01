@@ -159,4 +159,39 @@ public class RealtimeThreadTests : IDisposable
         Assert.True(thread.PossibleOn(linux: true));
         Assert.False(thread.PossibleOn(linux: false));
     }
+
+    /// <summary>
+    /// What the system allows is answered by the system, and is the same answer a thread asking
+    /// for it gets.
+    /// </summary>
+    /// <remarks>
+    /// JingleBox2 does not decide whether its audio runs in real time; the system does, and
+    /// whatever it allows is used. So the answer has to be the one a real thread gets when it asks,
+    /// on any machine the tests run on: granted here means granted there, refused means refused.
+    /// </remarks>
+    [Fact]
+    public void What_the_system_allows_is_what_a_thread_gets()
+    {
+        IRealtimeThread realtime = new RealtimeThread();
+
+        bool allowed = realtime.Allowed;
+
+        Environment.SetEnvironmentVariable(RealtimeThread.Variable, "1");
+
+        bool taken = false;
+        var asker = new System.Threading.Thread(() => taken = realtime.Take());
+        asker.Start();
+        asker.Join();
+
+        Assert.Equal(allowed, taken);
+    }
+
+    /// <summary>Asking twice gives the same answer, since the system's permission does not move while the program runs.</summary>
+    [Fact]
+    public void Asking_twice_gives_the_same_answer()
+    {
+        IRealtimeThread realtime = new RealtimeThread();
+
+        Assert.Equal(realtime.Allowed, realtime.Allowed);
+    }
 }
