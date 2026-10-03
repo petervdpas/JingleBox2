@@ -63,3 +63,8 @@ the instrument knobs use.
 
 A lane is part of the pattern, so undo puts the notes and the movement back together
 rather than putting the notes back and leaving the movement where it was.
+
+Pattern automation in SETTINGS, Tracker switches this strip off on a machine with little
+to spare. The lanes are kept in the song but are neither played nor recorded until it is
+switched on again; the song's own lanes on the mixer have a switch of their own under
+SETTINGS, Mixer.

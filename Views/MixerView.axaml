@@ -226,7 +226,7 @@
          summing; the patchbay is where that sound comes from and where it goes, which is the
          same question asked one step further out. It is a tab rather than a page along the
          top because nothing on it means anything without the strips beside it. -->
-    <TabControl Classes="inner">
+    <TabControl x:Name="Tabs" Classes="inner">
 
       <TabItem Header="Mixer">
         <Border Classes="card">
@@ -483,7 +483,8 @@
                         <!-- The side chain, along the bottom of the strip: the track it
                              listens to, how far down it goes, and how long it takes to come back.
                              Every strip's is at the same height, so a mixer reads across. -->
-                        <StackPanel Grid.Row="5" Spacing="4" Margin="0,10,0,0">
+                        <StackPanel Grid.Row="5" Spacing="4" Margin="0,10,0,0"
+                                    IsVisible="{Binding $parent[views:MixerView].((vm:TrackerViewModel)DataContext).Features.SideChain}">
                           <TextBlock Classes="cardHint" HorizontalAlignment="Center" Text="Duck from" />
 
                           <ComboBox HorizontalAlignment="Stretch"
@@ -565,7 +566,7 @@
            either feeds this application or is this application, and every cable has us at one
            end, which is what makes it a patchbay somebody can use rather than a picture of the
            whole machine: there is no gesture on it that can unplug the speakers. -->
-      <TabItem Header="Patchbay">
+      <TabItem x:Name="PatchbayTab" Header="Patchbay" IsVisible="{Binding Features.Patchbay}">
         <ContentControl Content="{Binding $parent[views:MixerView].Patchbay}">
           <ContentControl.ContentTemplate>
             <DataTemplate x:DataType="vm:PatchbayViewModel">

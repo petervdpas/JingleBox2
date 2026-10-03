@@ -47,10 +47,16 @@ public sealed class AutomationPlayer : IAutomationPlayer
     /// </remarks>
     private readonly Dictionary<AutomationLane, Known> _known = new();
 
+    /// <summary>Which timelines are switched on, or nothing for both.</summary>
+    private readonly Config.Interfaces.IFeatures? _features;
+
     /// <summary>Reads and writes parameters through the door a link already goes through.</summary>
-    public AutomationPlayer(IControlTargets targets)
+    /// <param name="targets">Where a lane's parameter is reached.</param>
+    /// <param name="features">Which timelines are switched on, or nothing for both.</param>
+    public AutomationPlayer(IControlTargets targets, Config.Interfaces.IFeatures? features = null)
     {
         _targets = targets;
+        _features = features;
     }
 
     /// <inheritdoc/>
@@ -63,12 +69,14 @@ public sealed class AutomationPlayer : IAutomationPlayer
         if (song is null || pattern is null) return;
         if (position.Line < 0 || position.Line >= pattern.Lines) return;
 
-        if (song.Lanes.Count > 0)
+        if (song.Lanes.Count > 0 && _features?.Automates(songWide: true) != false)
         {
             int along = song.LineOf(position.OrderIndex, position.Line);
 
             foreach (var lane in song.Lanes) Write(lane, along);
         }
+
+        if (_features?.Automates(songWide: false) == false) return;
 
         foreach (var lane in pattern.Lanes) Write(lane, position.Line);
     }

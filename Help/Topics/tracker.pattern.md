@@ -12,7 +12,8 @@ The pattern that is really coming next is drawn faintly in that space, so you ca
 what you are writing towards. Only one that is really coming: in song mode it is the
 next slot in the order, there is nothing at the two ends because a song does not
 wrap, and there is nothing at all in pattern mode, where the only thing coming is
-this pattern again.
+this pattern again. Neighbouring patterns in SETTINGS, Tracker switches them off, and
+the space is then left empty.
 
 ## A cell
 
@@ -41,6 +42,7 @@ Command. Pick the command by name, then click a tick on the drawn line for a del
 a cut, set how often and how much quieter for a retrigger, or pick a chord for an
 arpeggio. The window says in words what it will do and which letters it writes. With
 lines selected it writes all of them, which is how an arpeggio lasts several lines.
+Command editor in SETTINGS, Tracker takes it off the menu.
 
 - `Vxx` sets the note's volume, `00` to `80`, and wins over the volume field.
 - `Pxx` pans the note: `00` hard left, `40` centre, `80` hard right.

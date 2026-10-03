@@ -263,6 +263,17 @@ public sealed class AppConfig
     public List<string> PluginsOff { get; set; } = new();
 
     /// <summary>
+    /// The parts of the tracker and the mixer switched off, by their words.
+    /// </summary>
+    /// <remarks>
+    /// The ones switched off rather than the ones on, so a part added later arrives on in every
+    /// settings file written before it. A word this build does not know is left alone, so a part
+    /// switched off by a later version is not quietly switched back on by this one. See
+    /// <see cref="Interfaces.IFeatures"/>.
+    /// </remarks>
+    public List<string> FeaturesOff { get; set; } = new();
+
+    /// <summary>
     /// What the tracker and the synth run at, in Hz.
     /// </summary>
     /// <remarks>

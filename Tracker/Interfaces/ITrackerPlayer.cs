@@ -174,6 +174,12 @@ public interface ITrackerPlayer : IDisposable
     AutomationPlayer? Automation { get; set; }
 
     /// <summary>
+    /// Which parts are switched on, asked where the mix is applied: with the side chain off, no
+    /// track is ducked. Nothing means everything is on.
+    /// </summary>
+    Config.Interfaces.IFeatures? Features { get; set; }
+
+    /// <summary>
     /// What a parameter named by a machine reaches, so the modulation wheel can turn it.
     /// </summary>
     /// <remarks>

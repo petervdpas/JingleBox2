@@ -310,11 +310,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// anything is drawn there.
     /// </remarks>
     public Pattern? PatternBefore =>
-        PlayMode == TrackerPlayMode.Pattern ? null : Song.PatternAt(OrderIndex - 1);
+        ShowsNeighbours ? Song.PatternAt(OrderIndex - 1) : null;
 
     /// <summary>What is coming next, on the same terms as <see cref="PatternBefore"/>.</summary>
     public Pattern? PatternAfter =>
-        PlayMode == TrackerPlayMode.Pattern ? null : Song.PatternAt(OrderIndex + 1);
+        ShowsNeighbours ? Song.PatternAt(OrderIndex + 1) : null;
+
+    /// <summary>Whether anything is drawn either side: in song mode, while the neighbours are switched on.</summary>
+    private bool ShowsNeighbours => PlayMode == TrackerPlayMode.Song && Features.NeighbourPatterns;
 
     /// <summary>
     /// Says both neighbours may have changed, for the things that change them without either
@@ -366,7 +369,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         var lanes = targets.Everywhere;
 
-        _player.Automation = new AutomationPlayer(lanes);
+        _player.Automation = new AutomationPlayer(lanes, Features.Switches);
         _player.Controls = targets;
 
         Lanes = new AutomationViewModel(
@@ -439,6 +442,43 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     private void Changing(string what) => History.Taking(Song, what, Pour);
 
+    /// <summary>Which parts of the tracker and the mixer are switched on, for the screens and the work behind them.</summary>
+    public FeatureSwitchesViewModel Features { get; }
+
+    /// <summary>
+    /// Tells whatever a part's switch reaches that it moved.
+    /// </summary>
+    /// <remarks>
+    /// Everything that does the work asks <see cref="Features"/> as it goes, so what is left here
+    /// is what has already been done and has to be done again or undone: the neighbours handed to
+    /// the grid, the mix already applied, the readings already read, and a tempo a lane had moved,
+    /// which goes back to the song's own when the song's automation is switched off.
+    /// </remarks>
+    /// <param name="feature">The part that was switched.</param>
+    private void FeatureMoved(Config.Enums.Feature feature)
+    {
+        switch (feature)
+        {
+            case Config.Enums.Feature.NeighbourPatterns:
+                NeighboursMoved();
+                break;
+            case Config.Enums.Feature.SideChain:
+                _player.ApplyMix();
+                break;
+            case Config.Enums.Feature.ChainReadings:
+                TrackEffect.Reread();
+                MasterEffect.Reread();
+                break;
+            case Config.Enums.Feature.CommandEditor:
+                _editCommand?.NotifyCanExecuteChanged();
+                break;
+            case Config.Enums.Feature.SongAutomation:
+                OnPropertyChanged(nameof(MixerShowsLanes));
+                if (!Features.SongAutomation) _player.PlayAt(Bpm);
+                break;
+        }
+    }
+
     /// <summary>
     /// Pours a song read back out of the history into the one that is open.
     /// </summary>
@@ -498,10 +538,32 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         LanesMoved();
 
         OnPropertyChanged(nameof(Song));
-        OnPropertyChanged(nameof(TrackCount));
         OnPropertyChanged(nameof(PatternLines));
+        SettingsShown();
 
         return true;
+    }
+
+    /// <summary>
+    /// Tells the transport and the bar what the song now says about how it plays.
+    /// </summary>
+    /// <remarks>
+    /// Every way a song's contents are put back goes through here: opening one, cancelling the
+    /// changes and an undo. The transport holds its own copy of the play mode and the loop, since
+    /// the clock reads them on every line, so a song changed underneath it and not told plays
+    /// one way while the bar says another and the file says a third.
+    /// </remarks>
+    private void SettingsShown()
+    {
+        _player.Mode = Song.PlayMode;
+        _player.Loop = Song.Looping;
+
+        OnPropertyChanged(nameof(Bpm));
+        OnPropertyChanged(nameof(LinesPerBeat));
+        OnPropertyChanged(nameof(LoopPlayback));
+        OnPropertyChanged(nameof(PlayMode));
+        OnPropertyChanged(nameof(QuantizeChoices));
+        OnPropertyChanged(nameof(TrackCount));
     }
 
     /// <summary>
@@ -757,7 +819,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             {
                 Waves = Waves
             },
-            () => ClearTrackInstrument(track));
+            () => ClearTrackInstrument(track),
+            features: Features.Switches);
 
         _instrumentBoxes[track] = box;
 
@@ -1209,13 +1272,18 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _config = settings?.Config;
 
         var config = _config;
+
+        Features = new FeatureSwitchesViewModel(new Config.Features(config, () => settings?.Moved()));
+        Features.Switches.Changed += FeatureMoved;
+
         Plugins = plugins ?? new PluginLibraryViewModel();
-        TrackEffect = new PluginChainViewModel(Plugins, Ours, front: front);
+        TrackEffect = new PluginChainViewModel(Plugins, Ours, front: front) { Features = Features.Switches };
         TrackEffect.Changed += () => MarkDirty("a track's effects");
 
         MasterEffect = new PluginChainViewModel(Plugins, Ours, front: front)
         {
-            Nothing = "No effect across the mix yet."
+            Nothing = "No effect across the mix yet.",
+            Features = Features.Switches
         };
 
         MasterEffect.Changed += () => MarkDirty("the master's effects");
@@ -1224,7 +1292,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         typedVelocity = config?.TypedVelocity ?? false;
         recordNoteOffs = config?.RecordNoteOffs ?? false;
 
-        _player = new TrackerPlayer(audio, machines, effects);
+        _player = new TrackerPlayer(audio, machines, effects) { Features = Features.Switches };
 
         _out = new Midi.PortPlays(() => _player.MidiOut, () => Song.Mix, () => _cursorTrack);
 
@@ -1242,7 +1310,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             () => Transport == TrackerTransportState.Playing,
             () => _player.Position,
             () => FocusedTrack,
-            work => Dispatcher.UIThread.Post(work))
+            work => Dispatcher.UIThread.Post(work),
+            Features.Switches)
         {
             Taking = History.Taking,
             Changing = Changing,
@@ -2737,7 +2806,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Opens the command popup on the cell under the cursor, and writes what it gives back into
     /// that cell or into every line of the selection.
     /// </summary>
-    public IAsyncRelayCommand EditCommandCommand => new AsyncRelayCommand(async () =>
+    public IAsyncRelayCommand EditCommandCommand => _editCommand ??= new AsyncRelayCommand(async () =>
     {
         if (CurrentPattern == null) return;
 
@@ -2746,7 +2815,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             : "line " + Cursor.Line.ToString("00", CultureInfo.InvariantCulture) + ", " + CursorTrackLabel;
 
         if (await Views.CommandDialog.AskAsync(CommandAtCursor, where) is { } command) SetCommand(command);
-    });
+    }, () => Features.CommandEditor);
+
+    /// <summary>Backs <see cref="EditCommandCommand"/>, kept so it can be told when the editor is switched.</summary>
+    private IAsyncRelayCommand? _editCommand;
 
     /// <summary>The track the cursor is on, named as the grid and the mixer name it.</summary>
     public string CursorTrackLabel => "Track " + (Cursor.Track + 1).ToString("00", CultureInfo.InvariantCulture);
@@ -3112,7 +3184,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public bool MixerShowsDesk => MixerStrip == DeskStrip;
 
     /// <summary>Whether the mixer shows automation, which is for any strip of the song and not for the desk.</summary>
-    public bool MixerShowsLanes => !MixerShowsDesk;
+    public bool MixerShowsLanes => !MixerShowsDesk && Features.SongAutomation;
 
     /// <summary>
     /// The cursor track the mixer's automation last followed, so reading the cursor's track again
@@ -5467,15 +5539,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Drop();
 
-        _player.Mode = Song.PlayMode;
-        _player.Loop = Song.Looping;
-
-        OnPropertyChanged(nameof(Bpm));
-        OnPropertyChanged(nameof(LinesPerBeat));
-        OnPropertyChanged(nameof(LoopPlayback));
-        OnPropertyChanged(nameof(PlayMode));
-        OnPropertyChanged(nameof(QuantizeChoices));
-        OnPropertyChanged(nameof(TrackCount));
+        SettingsShown();
     }
 
     /// <summary>
@@ -5545,16 +5609,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Drop();
 
-        _player.Mode = Song.PlayMode;
-        _player.Loop = Song.Looping;
-
         OnPropertyChanged(nameof(Song));
-        OnPropertyChanged(nameof(Bpm));
-        OnPropertyChanged(nameof(LinesPerBeat));
-        OnPropertyChanged(nameof(LoopPlayback));
-        OnPropertyChanged(nameof(PlayMode));
-        OnPropertyChanged(nameof(QuantizeChoices));
-        OnPropertyChanged(nameof(TrackCount));
+        SettingsShown();
         OnPropertyChanged(nameof(PatternLines));
     }
 

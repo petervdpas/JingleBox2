@@ -441,10 +441,11 @@
                          ruler, a chord or a slider rather than typed as a letter and two digits.
                          With lines selected it writes every one of them. -->
                     <MenuItem Header="Command..."
+                              IsVisible="{Binding Features.CommandEditor}"
                               Command="{Binding EditCommandCommand}"
                               ToolTip.Tip="Delay, cut, retrigger, arpeggio, volume or pan on this note, set by picking rather than typing. With lines selected it writes all of them, which is how an arpeggio lasts." />
 
-                    <Separator />
+                    <Separator IsVisible="{Binding Features.CommandEditor}" />
 
                     <MenuItem Header="Delete selection"
                               InputGesture="Delete"
@@ -598,6 +599,7 @@
             </views:FoldStrip>
 
             <views:FoldStrip Grid.Row="2" Title="automation" Topic="tracker.automation"
+                             IsVisible="{Binding Features.PatternAutomation}"
                              Count="{Binding LaneCount}"
                              IsOpen="{Binding ShowsLanes, Mode=TwoWay}"
                              StripHeight="{Binding LanesHeight, Mode=TwoWay}">

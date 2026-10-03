@@ -68,3 +68,6 @@ looking.
 The handle between the picture and the details gives either of them more room, and the
 two caps in the picture's own corner draw it larger or smaller. Zooming moves nothing:
 the same arrangement is simply drawn at another size.
+
+Patchbay in SETTINGS, Mixer takes the tab away on a machine with little to spare. The
+sound still goes where it is patched; only the picture is no longer built or kept moving.

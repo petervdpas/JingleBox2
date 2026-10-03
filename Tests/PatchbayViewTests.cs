@@ -692,4 +692,64 @@ public class PatchbayViewTests
 
         return default;
     }
+
+    /// <summary>Counts the readings the busses were asked to follow.</summary>
+    private sealed class Followed : IPatchedAudio
+    {
+        /// <summary>How many times.</summary>
+        public int Times;
+
+        /// <inheritdoc/>
+        public void Follow(PatchScene scene) => Times++;
+    }
+
+    /// <summary>
+    /// With the patchbay switched off the picture is neither built nor kept moving, and the audio
+    /// still follows what is patched; switched back on, the picture is there again.
+    /// </summary>
+    [Fact]
+    public void Switched_off_it_draws_nothing_and_the_audio_still_follows()
+    {
+        var features = new JingleBox2.Config.Features();
+        features.Set(JingleBox2.Config.Enums.Feature.Patchbay, false);
+        var bench = new Bench();
+        bench.Routes.Add(Route("firefox"));
+        var audio = new Followed();
+
+        var bay = new PatchbayViewModel(bench, audio: audio, features: features);
+
+        Assert.Empty(bay.Nodes);
+        Assert.Empty(bay.Links);
+        Assert.Equal(1, audio.Times);
+
+        features.Set(JingleBox2.Config.Enums.Feature.Patchbay, true);
+
+        Assert.Contains(bay.Nodes, n => n.Id == "firefox");
+        Assert.Equal(2, audio.Times);
+    }
+
+    /// <summary>Switched off again, what was drawn is let go rather than left standing.</summary>
+    [Fact]
+    public void Switched_off_again_the_picture_is_let_go()
+    {
+        var features = new JingleBox2.Config.Features();
+        var bay = new PatchbayViewModel(BenchWith("firefox"), features: features);
+
+        Assert.NotEmpty(bay.Nodes);
+
+        features.Set(JingleBox2.Config.Enums.Feature.Patchbay, false);
+
+        Assert.Empty(bay.Nodes);
+        Assert.Empty(bay.Live);
+    }
+
+    /// <summary>A bench with the given sources on it.</summary>
+    private static Bench BenchWith(params string[] nodes)
+    {
+        var bench = new Bench();
+
+        foreach (string node in nodes) bench.Routes.Add(Route(node));
+
+        return bench;
+    }
 }

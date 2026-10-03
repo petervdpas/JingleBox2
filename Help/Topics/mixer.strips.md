@@ -29,7 +29,8 @@ your `.jibx`.
 The side chain at the bottom of a strip ducks that track while another one sounds:
 pick the track to listen to, how far down this one goes, and how long it takes to
 come back. The attack is always fast, because a slow one leaves the kick fighting
-the track it is meant to be clearing room for.
+the track it is meant to be clearing room for. Side chain in SETTINGS, Mixer takes the
+row away, and then no track is ducked.
 
 ## The master
 
@@ -58,6 +59,8 @@ mixer moves over the whole song: a track's level, pan, mute, solo and ducking, a
 the master its own controls, the tempo and its effects. The lane runs along the order,
 slot after slot, so a track can start soft, come up in the middle and go down at the end.
 What a track's instrument and its effects do is automated under the pattern instead.
+Song automation in SETTINGS, Mixer switches this strip off, and the song's lanes are
+then kept but not played.
 
 ## Meters
 

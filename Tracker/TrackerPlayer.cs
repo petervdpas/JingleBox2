@@ -422,6 +422,9 @@ public sealed class TrackerPlayer : ITrackerPlayer
     public AutomationPlayer? Automation { get; set; }
 
     /// <inheritdoc/>
+    public Config.Interfaces.IFeatures? Features { get; set; }
+
+    /// <inheritdoc/>
     /// <remarks>
     /// The automation is reset before the first line: the parameters have been moved by hand
     /// since the last pass, so what was written last time is no longer what they hold, and a
@@ -2289,6 +2292,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
         lock (_lock) song = _song;
         if (song == null) return;
 
+        bool ducks = Features?.IsOn(Config.Enums.Feature.SideChain) != false;
+
         int tracks = Math.Min(song.TrackCount, Song.MaxTrackCount);
 
         for (int track = 0; track < tracks; track++)
@@ -2307,7 +2312,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             _synth.Mixer.SetDucking(
                 track,
-                Levels.DuckFor(song.Mix, track, song.TrackCount),
+                ducks ? Levels.DuckFor(song.Mix, track, song.TrackCount) : 0,
                 Levels.KeyFor(song.Mix, track, song.TrackCount),
                 Levels.DuckReleaseFor(song.Mix, track));
         }

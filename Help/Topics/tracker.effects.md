@@ -73,7 +73,8 @@ Seven ship at the moment, each with presets to start from, and every one of them
 A block opens that effect's controls in a window of its own, and its power button
 switches it off without taking it out, so it can be heard in and out. Each block
 prints its first few controls and what they read, so the row tells you the order and
-the settings without opening anything.
+the settings without opening anything. Chain readings in SETTINGS, Tracker switches the
+readings off, and then nothing is read off the plugins for them.
 
 **Drag a block along the row to change where it is in the chain.** A line down the
 edge of a block says which side of it the one in your hand would go in at, and letting

@@ -49,6 +49,12 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// </remarks>
     private readonly IPatchedIn? _patched;
 
+    /// <summary>Whether the patchbay is switched on, or nothing for on.</summary>
+    private readonly Config.Interfaces.IFeatures? _features;
+
+    /// <summary>Whether the picture is built and kept moving.</summary>
+    private bool Drawn => _features?.IsOn(Config.Enums.Feature.Patchbay) != false;
+
     /// <summary>What makes the busses agree with the picture, or nothing where nobody does.</summary>
     /// <remarks>
     /// **The picture is the description and this is what executes it.** Optional, so a patchbay
@@ -79,6 +85,7 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// <param name="flow">Which cables that makes live.</param>
     /// <param name="patched">What of ours is patched into the input, and where that is kept.</param>
     /// <param name="audio">What makes the busses agree with what is drawn.</param>
+    /// <param name="features">Whether the patchbay is switched on, or nothing for on.</param>
     public PatchbayViewModel(
         IInputSource input,
         IOutputChosen? output = null,
@@ -87,8 +94,10 @@ public sealed partial class PatchbayViewModel : ObservableObject
         IPatchGraph? graph = null,
         IPatchFlow? flow = null,
         IPatchedIn? patched = null,
-        IPatchedAudio? audio = null)
+        IPatchedAudio? audio = null,
+        Config.Interfaces.IFeatures? features = null)
     {
+        _features = features;
         _input = input;
         _output = output;
         _places = places;
@@ -102,6 +111,12 @@ public sealed partial class PatchbayViewModel : ObservableObject
 
         if (_input is INotifyPropertyChanged told) told.PropertyChanged += Told;
         if (_output is INotifyPropertyChanged said) said.PropertyChanged += Heard;
+
+        if (features != null)
+            features.Changed += feature =>
+            {
+                if (feature == Config.Enums.Feature.Patchbay) Read();
+            };
 
         Read();
     }
@@ -153,6 +168,9 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// <remarks>
     /// The picked block is looked up again by id rather than kept, since the block object is new
     /// on every reading: kept, the sidebar would go on describing a block nobody can see.
+    ///
+    /// With the patchbay switched off the busses are still made to follow what is patched, since
+    /// that is where the audio goes rather than a picture of it, and the picture is let go.
     /// </remarks>
     public void Read()
     {
@@ -163,10 +181,20 @@ public sealed partial class PatchbayViewModel : ObservableObject
             _flowing?.Tracks,
             _patched?.Sources);
 
+        _audio?.Follow(scene);
+
+        if (!Drawn)
+        {
+            Nodes = Array.Empty<PatchNode>();
+            Links = Array.Empty<PatchLink>();
+            Live = Array.Empty<PatchLink>();
+            Selected = null;
+
+            return;
+        }
+
         Nodes = Laid(scene.Nodes);
         Links = scene.Links;
-
-        _audio?.Follow(scene);
 
         Pulse();
 
@@ -196,7 +224,7 @@ public sealed partial class PatchbayViewModel : ObservableObject
     /// </remarks>
     public void Pulse()
     {
-        if (_flowing == null) return;
+        if (_flowing == null || !Drawn) return;
 
         Live = _flow.Live(Links, _flowing.Signals);
 

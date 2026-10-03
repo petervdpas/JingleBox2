@@ -85,6 +85,7 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// How a machine that is not installed is named, which is the one thing its own kind cannot
     /// say. Left out, the ordinary one.
     /// </param>
+    /// <param name="features">Whether the chain readings are switched on. Left out, they are.</param>
     public PluginInstrumentViewModel(
         TrackerInstrument instrument,
         Func<IPluginInstrument?> live,
@@ -92,8 +93,10 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
         Action? changed = null,
         Func<TrackInstrumentPanel>? designer = null,
         Action? remove = null,
-        SoundDevices.SoundMachines.Interfaces.IMissingSoundMachines? missing = null)
+        SoundDevices.SoundMachines.Interfaces.IMissingSoundMachines? missing = null,
+        Config.Interfaces.IFeatures? features = null)
     {
+        _features = features;
         _machines = machines;
         _missing = missing ?? new SoundDevices.SoundMachines.MissingSoundMachines();
         _instrument = instrument;
@@ -102,6 +105,9 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
         _designer = designer;
         _remove = remove;
     }
+
+    /// <summary>Whether the chain readings are switched on, or nothing for on.</summary>
+    private readonly Config.Interfaces.IFeatures? _features;
 
     /// <summary>What the cross on the block does, or null when the box is not on a track.</summary>
     private readonly Action? _remove;
@@ -223,7 +229,10 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// A plugin instrument prints nothing here, because its settings are its own and are read
     /// through the plugin. Its block says the plugin's name instead.
     /// </remarks>
-    public System.Collections.Generic.IReadOnlyList<ControlReading> Summary => _summary ??= Pick();
+    public System.Collections.Generic.IReadOnlyList<ControlReading> Summary =>
+        _features?.IsOn(Config.Enums.Feature.ChainReadings) != false
+            ? _summary ??= Pick()
+            : System.Array.Empty<ControlReading>();
 
     /// <summary>What was last read off the patch, or null when it has to be read again.</summary>
     private System.Collections.Generic.List<ControlReading>? _summary;
@@ -276,8 +285,6 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// <summary>Reads the printed values again, for when something else moved them.</summary>
     public void Reread()
     {
-        if (_summary is null) return;
-
         _summary = null;
 
         OnPropertyChanged(nameof(Summary));

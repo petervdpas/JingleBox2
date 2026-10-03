@@ -32,6 +32,10 @@ public sealed class HelpText : IHelpText
     public const string SettingsRegistry = "settings.registry";
     /// <summary>What the audio engine runs at, and how far ahead it mixes.</summary>
     public const string SettingsEngine = "settings.engine";
+    /// <summary>Which parts of the tracker are switched on.</summary>
+    public const string SettingsTracker = "settings.tracker";
+    /// <summary>Which parts of the mixer are switched on.</summary>
+    public const string SettingsMixer = "settings.mixer";
     /// <summary>What the log writes down, area by area.</summary>
     public const string SettingsLog = "settings.log";
     /// <summary>Where plugins are looked for, and what happens when one crashes.</summary>

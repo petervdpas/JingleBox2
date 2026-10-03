@@ -144,6 +144,27 @@ public sealed partial class PluginChainViewModel : ObservableObject
     public ISoundEffectInFront? Front { get; }
 
     /// <summary>
+    /// Which parts are switched on, asked by every block on this chain before it reads anything
+    /// off its device. Nothing means everything is on.
+    /// </summary>
+    public Config.Interfaces.IFeatures? Features { get; set; }
+
+    /// <summary>Whether a block on this chain prints its readings, which is whether it reads them at all.</summary>
+    internal bool Reads => Features?.IsOn(Config.Enums.Feature.ChainReadings) != false;
+
+    /// <summary>
+    /// Has every block, the instrument included, read its readings again or let them go, for the
+    /// readings being switched on or off. Unlike <see cref="NotifyChanged"/>, nothing on the chain
+    /// moved, so nothing is said to have changed.
+    /// </summary>
+    public void Reread()
+    {
+        Instrument?.Reread();
+
+        foreach (var device in Devices) device.Reread();
+    }
+
+    /// <summary>
     /// What this view is pointed at, which is where the chain really lives.
     /// </summary>
     /// <remarks>

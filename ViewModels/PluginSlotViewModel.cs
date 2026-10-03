@@ -84,7 +84,8 @@ public sealed partial class PluginSlotViewModel : ObservableObject, Interfaces.I
     /// value off a plugin in another process is a synchronous round trip and this is drawn on
     /// every block of every chain.
     /// </remarks>
-    public System.Collections.Generic.IReadOnlyList<ControlReading> Summary => _summary ??= Pick();
+    public System.Collections.Generic.IReadOnlyList<ControlReading> Summary =>
+        _chain.Reads ? _summary ??= Pick() : System.Array.Empty<ControlReading>();
 
     /// <summary>What was last read off the plugin, or null when it has to be asked again.</summary>
     private System.Collections.Generic.List<ControlReading>? _summary;
@@ -158,12 +159,11 @@ public sealed partial class PluginSlotViewModel : ObservableObject, Interfaces.I
     /// Not a poll. The chain says when something is known to have moved, and only then is the
     /// plugin asked again, because <c>ValueOf</c> on a plugin in another process is a
     /// synchronous round trip and three of those per device per tick is a cost nobody asked for.
-    /// A block nobody has drawn yet is left alone: there is nothing kept to be out of date.
+    /// Told whether or not anything was read, since a block whose readings were switched off and
+    /// on again has nothing kept and a picture showing none.
     /// </remarks>
     public void Reread()
     {
-        if (_summary is null) return;
-
         _summary = null;
 
         OnPropertyChanged(nameof(Summary));

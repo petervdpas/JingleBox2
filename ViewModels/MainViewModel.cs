@@ -1514,7 +1514,8 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         new Config.PatchPlaces(_settings),
         this,
         patched: new Config.PatchedIn(_settings),
-        audio: Wired);
+        audio: Wired,
+        features: Tracker.Features.Switches);
 
     /// <summary>Backing field for <see cref="Wired"/>.</summary>
     private Interfaces.IPatchedAudio? wired;
@@ -1602,7 +1603,13 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         DeskEffect = new PluginChainViewModel(Plugins, _effects, front: _effectInFront)
         {
             Target = _deskChain,
-            Nothing = "Nothing on the master yet, so everything leaves as it is mixed."
+            Nothing = "Nothing on the master yet, so everything leaves as it is mixed.",
+            Features = Tracker.Features.Switches
+        };
+
+        Tracker.Features.Switches.Changed += feature =>
+        {
+            if (feature == Config.Enums.Feature.ChainReadings) DeskEffect.Reread();
         };
 
         var save = _hints.Gathered(
@@ -2497,8 +2504,6 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
         Record.UsePlugins(Plugins, _effects, _effectInFront);
 
-        UseDeskChain();
-
         // The recording input has two faders on two pages and one gain underneath them, so each
         // has to hear the other move. The mixer's writes reach RECORD already, since it writes
         // the recorder's own property and RECORD is bound to it; this is the way back, which was
@@ -2526,6 +2531,9 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         Tracker = new TrackerViewModel(
             audio, rack, Record.Recordings, _machines, settings, _hints, Plugins, waveformService, _effects,
             _effectInFront);
+
+        UseDeskChain();
+
         Machines = new RackViewModel(rack, Tracker, _machines, Record.Recordings, waveformService, Plugins, _effects, _hints);
 
         MachineShelf = new SoundMachineShelfViewModel(_machines);

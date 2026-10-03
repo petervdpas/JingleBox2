@@ -117,7 +117,8 @@ public sealed partial class SoundEffectViewModel : ObservableObject, IChainSlot,
     /// are worth keeping because reading one is a round trip to another process, and these are
     /// not.
     /// </remarks>
-    public IReadOnlyList<ControlReading> Summary => _summary ??= Pick();
+    public IReadOnlyList<ControlReading> Summary =>
+        _chain.Reads ? _summary ??= Pick() : System.Array.Empty<ControlReading>();
 
     /// <inheritdoc cref="Summary"/>
     private IReadOnlyList<ControlReading>? _summary;
@@ -128,8 +129,6 @@ public sealed partial class SoundEffectViewModel : ObservableObject, IChainSlot,
     /// <inheritdoc/>
     public void Reread()
     {
-        if (_summary is null) return;
-
         _summary = null;
 
         OnPropertyChanged(nameof(Summary));

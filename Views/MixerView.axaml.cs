@@ -47,6 +47,8 @@ public partial class MixerView : UserControl
                 if (e.PropertyName == nameof(TrackerViewModel.MixerShowsDesk)) LightDesk(tracker);
             };
 
+            tracker.Features.PropertyChanged += (_, _) => LeaveHiddenTab(tracker.Features.Patchbay);
+
             LightDesk(tracker);
         };
 
@@ -110,6 +112,16 @@ public partial class MixerView : UserControl
         bool scrolls = StripScroll.Extent.Width > StripScroll.Viewport.Width + 0.5;
 
         Strips.Margin = new Thickness(0, 0, 0, scrolls ? BarRoom : 0);
+    }
+
+    /// <summary>
+    /// Goes back to the desk when the tab in front has been switched off, since a hidden tab left
+    /// selected goes on showing its page with no tab over it.
+    /// </summary>
+    /// <param name="patchbay">Whether the patchbay is switched on.</param>
+    private void LeaveHiddenTab(bool patchbay)
+    {
+        if (!patchbay && ReferenceEquals(Tabs.SelectedItem, PatchbayTab)) Tabs.SelectedIndex = 0;
     }
 
     /// <summary>The bar's own height and the gap a card keeps, which is what it is given.</summary>

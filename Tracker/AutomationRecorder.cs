@@ -40,6 +40,9 @@ public sealed class AutomationRecorder : IAutomationRecorder
     /// </remarks>
     private readonly Action<Action> _onto;
 
+    /// <summary>Which timelines are switched on, or nothing for both.</summary>
+    private readonly Config.Interfaces.IFeatures? _features;
+
     /// <summary>Lanes already written to in this pass, so a pass leaves one step per lane.</summary>
     private readonly HashSet<AutomationLane> _touched = new();
 
@@ -53,10 +56,12 @@ public sealed class AutomationRecorder : IAutomationRecorder
     /// <param name="onto">
     /// Where the writing is done, which is not where the deciding is. Null runs it in place.
     /// </param>
+    /// <param name="features">Which timelines are switched on, or nothing for both.</param>
     public AutomationRecorder(Func<Song?> song, Func<bool> running,
                               Func<TrackerPosition> position, Func<int> focused,
-                              Action<Action>? onto = null)
+                              Action<Action>? onto = null, Config.Interfaces.IFeatures? features = null)
     {
+        _features = features;
         _song = song;
         _running = running;
         _position = position;
@@ -98,6 +103,7 @@ public sealed class AutomationRecorder : IAutomationRecorder
         if (!_running()) return false;
 
         if (!AutomationLane.Automatable(mapping.Kind)) return false;
+        if (_features?.Automates(Song.IsSongWide(mapping)) == false) return false;
 
         var song = _song();
         if (song is null) return false;
