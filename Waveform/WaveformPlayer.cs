@@ -1,6 +1,8 @@
-using Avalonia.Threading;
 using JingleBox2.Audio.Interfaces;
+using JingleBox2.Diagnostics;
+using JingleBox2.Diagnostics.Enums;
 using System;
+using System.Diagnostics;
 
 namespace JingleBox2.Waveform;
 
@@ -42,15 +44,18 @@ public sealed class WaveformPlayer : IDisposable
     /// </remarks>
     /// <param name="source">How a recording is made to sound.</param>
     /// <param name="bus">Where it goes.</param>
-    public WaveformPlayer(IRecordingSource source, IOutputBus bus)
+    /// <param name="clock">What calls for each reading of the position. Left out, a dispatcher timer.</param>
+    public WaveformPlayer(IRecordingSource source, IOutputBus bus, Interfaces.IPlayheadClock? clock = null)
     {
         _source = source;
         _bus = bus;
+        _clock = clock ?? new PlayheadClock();
     }
 
     /// <summary>Builds one with nowhere to send a take.</summary>
     private WaveformPlayer()
     {
+        _clock = new PlayheadClock();
     }
 
     /// <summary>
@@ -72,14 +77,23 @@ public sealed class WaveformPlayer : IDisposable
     /// <summary>The channel, or 0 when nothing is playing.</summary>
     private int _channel;
 
-    /// <summary>What reads the position, on the drawing thread. Null when nothing is playing.</summary>
-    private DispatcherTimer? _timer;
+    /// <summary>What calls for each reading of the position, on the drawing thread.</summary>
+    private readonly Interfaces.IPlayheadClock _clock;
 
     /// <summary>Where the region ends, in seconds, or 0 when there is no region.</summary>
     private double _endSeconds;
 
     /// <summary>How long the recording is, which is what a fraction is a fraction of.</summary>
     private double _seconds;
+
+    /// <summary>The clock since playing started, for the log's account of each reading.</summary>
+    private readonly Stopwatch _since = new();
+
+    /// <summary>When the last reading was taken, by <see cref="_since"/>, for how late the next one came.</summary>
+    private double _lastPoll;
+
+    /// <summary>The file playing, by name, for the log.</summary>
+    private string _playing = "";
 
     /// <summary>Whether a region is playing.</summary>
     public bool IsPlaying { get; private set; }
@@ -100,9 +114,8 @@ public sealed class WaveformPlayer : IDisposable
     /// saying something is playing when nothing is and leaving its stop button as the only way out
     /// of a state nobody is in.
     ///
-    /// The position is read on a dispatcher timer rather than a pool one, so whoever is listening
-    /// may touch controls directly. A pool thread raising these would throw inside Avalonia and
-    /// the timer would swallow it.
+    /// The position is read whenever the player's clock calls for it, which in the application is
+    /// a dispatcher timer, so whoever is listening may touch controls directly.
     /// </remarks>
     /// <param name="filePath">The recording.</param>
     /// <param name="startFraction">Where to start, 0 to 1.</param>
@@ -116,15 +129,27 @@ public sealed class WaveformPlayer : IDisposable
     {
         Stop();
 
-        if (totalFrames <= 0 || !Wired) return;
+        _playing = System.IO.Path.GetFileName(filePath);
+
+        if (totalFrames <= 0 || !Wired)
+        {
+            Log.Write(LogArea.Audio, () => "take player: '" + _playing + "' not played: "
+                + (totalFrames <= 0 ? "no frames" : "no source or no open bus"));
+            return;
+        }
 
         _channel = _source!.Open(filePath);
-        if (_channel == 0) return;
+        if (_channel == 0)
+        {
+            Log.Write(LogArea.Audio, () => "take player: '" + _playing + "' would not open");
+            return;
+        }
 
         _seconds = _source.Seconds(_channel);
 
         if (_seconds <= 0)
         {
+            Log.Write(LogArea.Audio, () => "take player: '" + _playing + "' has no length");
             LetGo();
 
             return;
@@ -138,18 +163,22 @@ public sealed class WaveformPlayer : IDisposable
 
         if (!_bus!.Add(_channel))
         {
+            Log.Write(LogArea.Audio, () => "take player: the bus refused '" + _playing + "'");
             LetGo();
 
             return;
         }
 
         IsPlaying = true;
+        _since.Restart();
+        _lastPoll = 0;
+
+        Log.Write(LogArea.Audio, () => "take player: playing '" + _playing + "', " + _seconds.ToString("0.000")
+            + " s long, from " + start.ToString("0.000") + " to " + _endSeconds.ToString("0.000") + " s");
 
         PositionChanged?.Invoke(start / _seconds);
 
-        _timer = new DispatcherTimer { Interval = PollInterval };
-        _timer.Tick += (_, _) => Poll();
-        _timer.Start();
+        _clock.Start(PollInterval, Poll);
     }
 
     /// <summary>Jumps to a fraction of the file, and does nothing when nothing is playing.</summary>
@@ -166,10 +195,17 @@ public sealed class WaveformPlayer : IDisposable
     }
 
     /// <summary>Stops, lets the channel go, and says so. Does nothing twice.</summary>
-    public void Stop()
+    public void Stop() => Stop("asked");
+
+    /// <summary>Stops, and says in the log why, where something was playing.</summary>
+    /// <param name="why">Why it stopped.</param>
+    private void Stop(string why)
     {
-        _timer?.Stop();
-        _timer = null;
+        if (IsPlaying)
+            Log.Write(LogArea.Audio, () => "take player: '" + _playing + "' stopped after "
+                + _since.Elapsed.TotalSeconds.ToString("0.000") + " s: " + why);
+
+        _clock.Stop();
 
         LetGo();
 
@@ -219,7 +255,7 @@ public sealed class WaveformPlayer : IDisposable
 
         _endSeconds = Math.Clamp(endFraction, 0, 1) * _seconds;
 
-        if (_source!.At(_channel) >= _endSeconds) Stop();
+        if (_source!.At(_channel) >= _endSeconds) Stop("the end was moved behind it");
     }
 
     /// <summary>Reads where playback has got to, and stops it at the end of the region.</summary>
@@ -227,17 +263,27 @@ public sealed class WaveformPlayer : IDisposable
     {
         if (_channel == 0 || _seconds <= 0)
         {
-            Stop();
+            Stop("nothing left to read");
             return;
         }
 
         double at = _source!.At(_channel);
+        bool ended = _source.Ended(_channel);
+        double now = _since.Elapsed.TotalSeconds;
+        double gap = now - _lastPoll;
+        _lastPoll = now;
+
+        if (Log.On(LogArea.Audio))
+            Log.Write(LogArea.Audio, () => "take player: '" + _playing + "' at " + at.ToString("0.000")
+                + " s after " + now.ToString("0.000") + " s on the clock, " + (gap * 1000).ToString("0")
+                + " ms since the last reading" + (ended ? ", ended" : "")
+                + ", " + (PositionChanged?.GetInvocationList().Length ?? 0) + " listening");
 
         bool reachedEnd = _endSeconds > 0 && at >= _endSeconds;
 
-        if (reachedEnd || _source.Ended(_channel))
+        if (reachedEnd || ended)
         {
-            Stop();
+            Stop(reachedEnd ? "reached the end of the region" : "the channel ended");
             return;
         }
 

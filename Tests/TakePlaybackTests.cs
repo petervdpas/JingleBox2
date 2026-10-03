@@ -22,14 +22,14 @@ namespace JingleBox2.Tests;
 public sealed class TakePlaybackTests
 {
     /// <summary>What the source and the bus were asked to do, in the order they were asked.</summary>
-    private sealed class Told
+    internal sealed class Told
     {
         /// <summary>Every call, as one word and the channel it was about.</summary>
         public List<string> Did { get; } = new();
     }
 
     /// <summary>A recording that is however long it is told to be, and says what it was asked.</summary>
-    private sealed class Fake : IRecordingSource
+    internal sealed class Fake : IRecordingSource
     {
         /// <summary>Where the calls are written down, shared with the bus.</summary>
         private readonly Told _told;
@@ -99,7 +99,7 @@ public sealed class TakePlaybackTests
     }
 
     /// <summary>A bus that is open or not, and takes a source or refuses it.</summary>
-    private sealed class Bus : IOutputBus
+    internal sealed class Bus : IOutputBus
     {
         /// <summary>Where the calls are written down, shared with the source.</summary>
         private readonly Told _told;

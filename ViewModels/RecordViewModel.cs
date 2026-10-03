@@ -742,7 +742,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         Audio.Routing.Interfaces.IInputSetting? setting = null,
         Audio.Routing.Interfaces.IInputPath? input = null,
         Audio.Routing.Interfaces.IInputArrangement? arrangement = null,
-        Hints.Interfaces.IHintClock? hints = null)
+        Hints.Interfaces.IHintClock? hints = null,
+        Waveform.Interfaces.IPlayheadClock? playhead = null)
     {
         _hints = hints ?? new Hints.HintClock();
 
@@ -751,7 +752,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         _takes = takes;
         _recordings = recordings;
-        _preview = Playing(recordings, takes);
+        _preview = Playing(recordings, takes, playhead);
 
         _routing = routing;
         _input = input ?? new Audio.Routing.InputPath(routing);
@@ -1065,6 +1066,11 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     ///
     /// A folder that is not there yet is not a fault: it is a first run, and the folder appears
     /// when the first take is written.
+    ///
+    /// **A take already on the shelf keeps its row.** Read again, only what arrived is added and
+    /// only what went is taken off: the picked take and the one playing are rows the page and
+    /// the list hold by identity, and a shelf rebuilt from new rows leaves the list with nothing
+    /// picked, which stops the take playing and empties its picture.
     /// </remarks>
     private void LoadRecordings()
     {
@@ -1074,9 +1080,18 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             if (!Directory.Exists(recordingsDir))
                 return;
 
-            Recordings.Clear();
-            foreach (var file in Directory.GetFiles(recordingsDir, "*.wav"))
+            var files = Directory.GetFiles(recordingsDir, "*.wav");
+            var there = new HashSet<string>(files, StringComparer.Ordinal);
+
+            for (int at = Recordings.Count - 1; at >= 0; at--)
+                if (!there.Contains(Recordings[at].FilePath)) Recordings.RemoveAt(at);
+
+            var kept = new HashSet<string>(Recordings.Select(take => take.FilePath), StringComparer.Ordinal);
+
+            foreach (var file in files)
             {
+                if (kept.Contains(file)) continue;
+
                 var info = new FileInfo(file);
                 string name = Path.GetFileNameWithoutExtension(file);
 
@@ -1829,6 +1844,10 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         IsPreviewing = true;
 
         Status = $"Playing '{recording.Name}'";
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () => "RECORD: '" + recording.Name + "' playing, its cursor drawn on "
+            + (ScratchTake != null && ReferenceEquals(_playing, ScratchShown) ? "the scratchpad" : "the take's picture")
+            + (ReferenceEquals(recording, SelectedRecording) ? ", which is the take picked" : ", which is not the take picked"));
     }
 
     /// <summary>
@@ -1841,11 +1860,13 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     /// <param name="recordings">How a recording is made to sound, or nothing.</param>
     /// <param name="takes">The bus a take goes onto, or nothing.</param>
+    /// <param name="playhead">What calls for each reading of where a take has got to, or nothing for a timer.</param>
     private static Waveform.WaveformPlayer Playing(
         JingleBox2.Audio.Interfaces.IRecordingSource? recordings,
-        JingleBox2.Audio.Interfaces.IOutputBus? takes) =>
+        JingleBox2.Audio.Interfaces.IOutputBus? takes,
+        Waveform.Interfaces.IPlayheadClock? playhead) =>
         recordings is { } source && takes is { } bus
-            ? new Waveform.WaveformPlayer(source, bus)
+            ? new Waveform.WaveformPlayer(source, bus, playhead)
             : Waveform.WaveformPlayer.Silent();
 
     /// <summary>The editing window, over this page's own audio where there is any.</summary>

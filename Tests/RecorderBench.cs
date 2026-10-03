@@ -197,7 +197,10 @@ public sealed class RecorderBench
 
         /// <inheritdoc/>
         public Task<SavedTake> WriteTakeAsync(string folder, string fileName, string cleanName) =>
-            Task.FromResult(new SavedTake(string.Empty, null));
+            Task.FromResult(Writes?.Invoke(folder, fileName, cleanName) ?? new SavedTake(string.Empty, null));
+
+        /// <summary>What writing a take does, or nothing to write none.</summary>
+        public Func<string, string, string, SavedTake>? Writes { get; set; }
 
         /// <inheritdoc/>
         public JingleBox2.Audio.Plugins.Interfaces.IAudioInsert? Effect { get; set; }
