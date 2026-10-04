@@ -463,6 +463,13 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     /// </remarks>
     private readonly Sync.Interfaces.IAbletonLink _abletonLink = new Sync.AbletonLink();
 
+    /// <summary>Whether this is a peer in an Ableton Link session, which the footer's link lamp shows.</summary>
+    /// <remarks>
+    /// What the session says after being asked to join or leave, rather than what was chosen, so a
+    /// machine whose build cannot load the library shows the lamp off with Link chosen.
+    /// </remarks>
+    [ObservableProperty] private bool linkOn;
+
     /// <summary>
     /// Makes the other Link programs' tempo, start and stop move this transport, and this one's
     /// tempo move theirs.
@@ -571,6 +578,8 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         _clockFollow.Follow(following);
 
         _abletonLink.Use(midi?.ClockSource == JingleBox2.Midi.Enums.MidiClockSource.AbletonLink);
+
+        LinkOn = _abletonLink.IsOn;
 
         SaidTheEcho(midi);
     }

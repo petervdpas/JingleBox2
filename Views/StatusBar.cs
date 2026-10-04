@@ -99,7 +99,7 @@ public class StatusBar : ThemedControl
     private BarPaint? _paint;
 
     /// <summary>The three small words, laid out once for the paint they were laid out in.</summary>
-    private FormattedText? _io, _mem, _cpu;
+    private FormattedText? _io, _mem, _cpu, _link;
 
     /// <summary>The message as last laid out, and what it was laid out from.</summary>
     private FormattedText? _message;
@@ -129,7 +129,7 @@ public class StatusBar : ThemedControl
             new SolidColorBrush(palette.Muted).ToImmutable(),
             new SolidColorBrush(palette.Text).ToImmutable());
 
-        _io = _mem = _cpu = null;
+        _io = _mem = _cpu = _link = null;
         _message = null;
 
         return _paint;
@@ -147,7 +147,7 @@ public class StatusBar : ThemedControl
     {
         AffectsRender<StatusBar>(TextProperty, KindProperty, FontSizeProperty, BarHeightProperty,
                                  InputLevelProperty, OutputLevelProperty, ShowLevelsProperty,
-                                 CpuLoadProperty, MemoryLoadProperty, ShowLoadProperty);
+                                 CpuLoadProperty, MemoryLoadProperty, ShowLoadProperty, LinkOnProperty);
         AffectsMeasure<StatusBar>(BarHeightProperty);
     }
 
@@ -208,6 +208,15 @@ public class StatusBar : ThemedControl
     public static readonly StyledProperty<double> MemoryLoadProperty =
         AvaloniaProperty.Register<StatusBar, double>(nameof(MemoryLoad));
 
+    /// <summary>Whether this is a peer in an Ableton Link session, drawn as a lamp beside the word link.</summary>
+    /// <remarks>
+    /// Green and lit while it is, red and dark while it is not, in the meters' own safe and hot
+    /// colours so it follows the theme. Always drawn, whichever clock the transport is on, since
+    /// a lamp that only appears once Link is on cannot say that it is off.
+    /// </remarks>
+    public static readonly StyledProperty<bool> LinkOnProperty =
+        AvaloniaProperty.Register<StatusBar, bool>(nameof(LinkOn));
+
     /// <summary>Whether the processor and memory meters are drawn.</summary>
     public static readonly StyledProperty<bool> ShowLoadProperty =
         AvaloniaProperty.Register<StatusBar, bool>(nameof(ShowLoad));
@@ -239,6 +248,13 @@ public class StatusBar : ThemedControl
     {
         get => GetValue(MemoryLoadProperty);
         set => SetValue(MemoryLoadProperty, value);
+    }
+
+    /// <inheritdoc cref="LinkOnProperty"/>
+    public bool LinkOn
+    {
+        get => GetValue(LinkOnProperty);
+        set => SetValue(LinkOnProperty, value);
     }
 
     /// <inheritdoc cref="LevelsCommandProperty"/>
@@ -339,7 +355,8 @@ public class StatusBar : ThemedControl
         if (Text.Length == 0) return;
 
         double meters = (ShowLevels ? MeterWidth * 2 + MeterGap + Inset + LabelRoom : 0)
-                        + (ShowLoad ? LoadRoom + (ShowLevels ? 0 : Inset) : 0);
+                        + (ShowLoad ? LoadRoom + (ShowLevels ? 0 : Inset) : 0)
+                        + LinkRoom + (ShowLevels || ShowLoad ? 0 : Inset);
 
         double room = Math.Max(0, width - Inset * 2 - LampSize - Gap - meters);
         var from = (Text, Kind, FontSize, room, paint);
@@ -382,14 +399,22 @@ public class StatusBar : ThemedControl
     /// <summary>Between the load meters and the levels.</summary>
     private const double GroupGap = 16;
 
+    /// <summary>How much room the word link and its lamp take, the gap to their right included.</summary>
+    private const double LinkRoom = 46;
+
     /// <summary>
-    /// The main input and the main output as two thin columns at the far end, and the computer's
-    /// processors and memory as two more to the left of them, each pair where it is switched on.
+    /// The main input and the main output as two thin columns at the far end, the computer's
+    /// processors and memory as two more to the left of them, each pair where it is switched on,
+    /// and the Ableton Link lamp to the left of everything.
     /// </summary>
     /// <remarks>
     /// Peak rather than average, and coloured by where the peak is rather than by a line drawn
     /// across it: the whole use of a meter this size is to be read without being looked at, and
     /// a colour is the only thing that can be.
+    ///
+    /// The computer's load is the same thin columns to the left of the levels, each with its own
+    /// word since they are two different things rather than a pair. Left of those, always, the
+    /// word link and the Ableton Link lamp.
     /// </remarks>
     private void DrawMeters(DrawingContext context, BarPaint paint, Rect area)
     {
@@ -419,25 +444,36 @@ public class StatusBar : ThemedControl
             right = inputX - LabelRoom - GroupGap;
         }
 
-        if (!ShowLoad) return;
+        if (ShowLoad) right = DrawLoad(right) - GroupGap;
 
-        /* The computer's load, the same thin columns to the left of the levels, each with its own
-           word since they are two different things rather than a pair. */
-        double memoryX = right - MeterWidth;
-        Draw(memoryX, MemoryLoad);
+        var link = _link ??= SmallWord("link", paint);
+        double lampX = right - LampSize;
+        double linkWord = lampX - WordGap - link.Width;
 
-        var mem = _mem ??= SmallWord("mem", paint);
-        double memoryWord = memoryX - WordGap - mem.Width;
-        Word(mem, memoryWord);
+        Word(link, linkWord);
+        Led.DrawLamp(context, new Point(lampX + LampSize / 2, area.Height / 2), LampSize / 2,
+                     LinkOn ? paint.Meter.Safe : paint.Meter.Hot, LinkOn);
 
-        double cpuX = memoryWord - PairGap - MeterWidth;
-        Draw(cpuX, CpuLoad);
+        double DrawLoad(double from)
+        {
+            double memoryX = from - MeterWidth;
+            Draw(memoryX, MemoryLoad);
 
-        var cpu = _cpu ??= SmallWord("cpu", paint);
-        double cpuWord = cpuX - WordGap - cpu.Width;
-        Word(cpu, cpuWord);
+            var mem = _mem ??= SmallWord("mem", paint);
+            double memoryWord = memoryX - WordGap - mem.Width;
+            Word(mem, memoryWord);
 
-        _loadArea = new Rect(cpuWord - 2, 0, memoryX + MeterWidth - cpuWord + 4, area.Height);
+            double cpuX = memoryWord - PairGap - MeterWidth;
+            Draw(cpuX, CpuLoad);
+
+            var cpu = _cpu ??= SmallWord("cpu", paint);
+            double cpuWord = cpuX - WordGap - cpu.Width;
+            Word(cpu, cpuWord);
+
+            _loadArea = new Rect(cpuWord - 2, 0, memoryX + MeterWidth - cpuWord + 4, area.Height);
+
+            return cpuWord;
+        }
 
         void Word(FormattedText letters, double x) =>
             context.DrawText(letters, new Point(x, (area.Height - letters.Height) / 2));

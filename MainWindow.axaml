@@ -18,8 +18,8 @@
 
     <!-- One bar for the whole window. Where you are when nothing is happening, what just
          happened when something is, the main input and output beside it, and the computer's
-         processors and memory beside those. Clicking the levels opens the mixer and clicking
-         the load opens SETTINGS, System. -->
+         processors and memory beside those, and whether Ableton Link is on. Clicking the levels
+         opens the mixer and clicking the load opens SETTINGS, System. -->
     <views:StatusBar DockPanel.Dock="Bottom" Margin="0,10,0,0"
                      ShowLevels="{Binding ShowFooterLevels}"
                      ShowLoad="{Binding ShowFooterLoad}"
@@ -29,6 +29,7 @@
                      OutputLevel="{Binding StatusLine.OutputLevel}"
                      CpuLoad="{Binding Load.GlanceCpu}"
                      MemoryLoad="{Binding Load.GlanceMemory}"
+                     LinkOn="{Binding LinkOn}"
                      LevelsCommand="{Binding ShowMixerCommand}"
                      LoadCommand="{Binding ShowSystemCommand}"
                      ToolTip.Tip="{Binding StatusLine.History}" />
