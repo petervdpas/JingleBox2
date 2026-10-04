@@ -68,7 +68,6 @@ modules:
           - jinglebox2.flatpak
           - bin
           - obj
-          - Releases
       # Every NuGet package the publish needs, so the build runs with no network.
       # Made by packaging/flatpak/build.sh sources.
       - nuget-sources.json
