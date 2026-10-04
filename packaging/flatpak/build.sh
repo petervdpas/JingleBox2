@@ -3,7 +3,8 @@
 # Builds the JingleBox2 Flatpak from this checkout.
 #
 #   packaging/flatpak/build.sh sources   writes nuget-sources.json beside the manifest
-#   packaging/flatpak/build.sh version   writes the newest tag's version beside the manifest
+#   packaging/flatpak/build.sh version   writes the newest tag's version beside the manifest and
+#                                        adds it to the metainfo's releases if it is not there
 #   packaging/flatpak/build.sh build     builds the Flatpak and installs it for this user
 #   packaging/flatpak/build.sh bundle    builds it and writes a single jinglebox2.flatpak file
 #
@@ -91,6 +92,22 @@ version() {
   fi
   printf '%s\n' "$tag" > "$VERSION_FILE"
   echo "OK: building as $tag"
+
+  # The release list in the metainfo is what a software centre shows and what Flathub's checker
+  # reads, and a tag is the only thing that makes a release, so a tag missing from it is added
+  # here, newest first and dated the day the tag was made. Already listed is left alone, so running
+  # this twice adds nothing.
+  local metainfo="$HERE/$APP_ID.metainfo.xml"
+  if ! grep -q "<release version=\"$tag\"" "$metainfo"; then
+    local when
+    when="$(git -C "$ROOT" log -1 --format=%cs "v$tag" 2>/dev/null || git -C "$ROOT" log -1 --format=%cs "$tag")"
+    sed -i "s|^  <releases>\$|  <releases>\n    <release version=\"$tag\" date=\"$when\"/>|" "$metainfo"
+    if grep -q "<release version=\"$tag\"" "$metainfo"; then
+      echo "OK: added $tag ($when) to the releases in $APP_ID.metainfo.xml"
+    else
+      echo "WARNING: could not add $tag to the releases in $APP_ID.metainfo.xml"
+    fi
+  fi
 }
 
 build() {
