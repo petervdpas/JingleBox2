@@ -1,10 +1,10 @@
 # JingleBox2
 
 <p align="center">
-  <img src="Assets/JingleBox2_1024.png" alt="JingleBox2 icon" width="128" height="128" />
+  <img src="docs/screenshots/splash.png" alt="JingleBox2 splash screen" width="480" />
 </p>
 
-**JingleBox2** is a cross-platform audio pad launcher built with **.NET** and **Avalonia UI**, for **radio, streaming and live audio**. Fire jingles from pads, record and trim your own takes, and write beds and stings in a tracker that hosts VST3 and CLAP plugins.
+**JingleBox2 is an audio workstation for radio and live shows.** It fires jingles from a wall of pads, records and edits takes, and writes music in a tracker with its own synths, samplers and drum machines beside VST3 and CLAP plugins. A mixer with automation sits over all of it, and any MIDI controller can drive it by pointing at a control on screen and touching the hardware. It runs on Windows and on Linux, the 64 bit Raspberry Pi included, and is built with .NET and Avalonia UI.
 
 The pages you play on are kept apart from the pages you set things up on, so nothing moves under your hand while you are on air.
 
@@ -16,38 +16,73 @@ The pages you play on are kept apart from the pages you set things up on, so not
 
 ---
 
+## What it does
+
+- **Playout.** Up to 32 pads, fired by mouse, by keyboard or from a MIDI pad controller. Each pad plays a recording or an internet stream, with its own colour, fades, loop and effect chain. A whole set of pads is saved as a profile and switched in one go.
+- **Recording.** Capture any input, and on Linux any program in the PipeWire graph as well. Trim, normalise, name and file each take, run it through an effect chain, and keep the untreated copy beside it.
+- **Music.** A pattern tracker: an order list, loop ranges, up to eight note columns a track, chords recorded live, and a MIDI in and out on every track. A song owns its instruments, so it opens sounding the way it was saved.
+- **Sound devices of its own.** Seven soundmachines ship with it (Zampler, BongaBong, Chopper, Ouroboros, OddSkilla, Operetta and Recording) and seven effects (EchoBox, Sweeper, Roaster, Shifter, Ringer, Widener and Phaser). New ones are laid out in DESIGNER without writing code and handed to somebody else as a zip.
+- **Plugins.** VST3 and CLAP instruments and effects, each running in a process of its own: a plugin that crashes takes itself down and nothing else, which matters when the show is live.
+- **Mixer.** Level, pan, mute, solo, ducking and an insert chain on every track, a master strip with its own chain, and automation lanes for any parameter.
+- **Hardware.** Any MIDI controller works by pointing, with no file needed. Profiles for the Arturia MiniLab 3, KeyLab mkII and KeyStep Pro, the Akai MPD218 and the Korg nanoKONTROL2 add names and a ready layout, Mackie Control surfaces get motor faders and their display, and a set of links is a template file you can save and pass on.
+
+---
+
 ## The pages
 
-**RECORD** captures takes and keeps them on a shelf the rest of the app plays from. Pick an input, watch the meter and the clip light, set the gain, record. On Linux you can capture anything in the audio graph, including another program's output; on Windows you can capture what an output device is playing. Click a take to see its waveform, then play, trim, normalise or rename it, and file it under a category of your own. The shelf can then be narrowed to speech, beds or effects, here and in front of every take picker on a machine. WAV files from anywhere on disc can be imported, and anything that is not already 16-bit is converted on the way in.
+**RECORD** captures takes and keeps them on a shelf the rest of the app plays from. Pick an input, watch the meter and the clip light, set the gain, record. On Linux you can capture anything in the audio graph, including another program's output; on Windows you can capture what an output device is playing. A fresh take waits on a scratchpad until you name it and save it. Click a take to see its waveform, then play, trim, normalise or rename it, and file it under a category of your own. WAV files from anywhere on disc can be imported, and anything that is not already 16-bit is converted on the way in.
 
-**PADS** is where a pad is set up: its name, the recording it plays or the stream URL it opens, its colour, whether it loops, its fades and its level, plus an effect slot that takes the same plugins the tracker uses.
+<p align="center"><img src="docs/screenshots/record.png" alt="RECORD: the input, its gain and the shelf of takes" width="900" /></p>
+
+**PADS** is where a pad is set up: its name, the recording it plays or the stream URL it opens, its colour, whether it loops, its fades and its level, plus an effect chain that takes the same effects and plugins the tracker uses.
+
+<p align="center"><img src="docs/screenshots/pads.png" alt="PADS: one pad being set up, with the profile and the pad wall beside it" width="900" /></p>
 
 **FIRE** is the page you use while the show is running. Large pads, click or MIDI to fire, click again to stop, as many at once as you like. Nothing on this page can be set up by accident, and the transport's only live button is stop.
 
-**TRACKER** writes songs: patterns, an order list, and instruments the song owns rather than borrows. Instruments come off eight machines, Zampler, BongaBong, Chopper, Ouroboros, OddSkilla, Operetta, Lighttower E=mc² and Recording, or from a VST3 or CLAP plugin. Every track has a mixer strip with pan, mute, solo and ducking, and an insert chain. A track plays as many notes at once as it has note columns, one to eight, and the instrument says what becomes of a note when the next one arrives in its column: cut it, let it play its own release under the new note, or leave it holding. Machines are registered in SETTINGS and can be added, removed and imported from a zip.
+<p align="center"><img src="docs/screenshots/fire.png" alt="FIRE: the pads during a show" width="900" /></p>
 
-**DESIGNER** is where a machine's front panel is laid out: drag the knobs, faders, switches, pads and keyboards onto the face and say what each one is wired to. It is a page of its own only when you ask for it in SETTINGS, for when the machine is the work rather than the song; it is inside the tracker either way.
+**TRACKER** writes songs: patterns, an order list, and instruments the song owns rather than borrows. An instrument comes off one of the soundmachines on the rack or from a VST3 or CLAP plugin. A track plays as many notes at once as it has note columns, and the instrument says what becomes of a note when the next one arrives in its column: cut it, let it play its own release under the new note, or leave it holding. Under the pattern sit the track's effect chain and its automation lanes.
 
-**SETTINGS** holds the output device, the engine's sample rate and plugin cushion, the recording input, MIDI devices and what each one drives, control surfaces, the machine registry, plugin folders, the theme, the shortcuts and the log switch.
+<p align="center"><img src="docs/screenshots/tracker.png" alt="TRACKER: a song playing, with the order list, the pattern, a track chain and the song instruments" width="900" /></p>
+
+**MIXER** is the desk: a strip per track with level, pan, mute, solo and ducking, a master strip with its own effect chain, and strips for the pads and the recording input. Beside it, the patchbay draws where the audio goes: what the recorder takes in, how the pads, the takes and the tracks reach the mixer, and which output the mix leaves through.
+
+<p align="center"><img src="docs/screenshots/mixer.png" alt="MIXER: recorder, pads and four tracker strips, with the song and master strips" width="900" /></p>
+
+<p align="center"><img src="docs/screenshots/mixer-patchbay.png" alt="MIXER, Patchbay: the routing from the inputs through the mixer to the output" width="900" /></p>
+
+**DESIGNER** is where the face of a soundmachine or an effect is laid out: drag knobs, faders, switches, pads and keyboards onto it, say what each one is wired to, and write its presets and its help page. It shows along the top when you ask for it in SETTINGS.
+
+<p align="center"><img src="docs/screenshots/designer-oddskilla.png" alt="DESIGNER: the OddSkilla soundmachine being laid out" width="900" /></p>
+
+**SETTINGS** holds the output device, the engine's sample rate and buffer sizes, the recording input, MIDI ports and what each one drives, control surfaces, the device registry, plugin folders, the theme, the shortcuts and the log switch.
+
+<p align="center"><img src="docs/screenshots/settings-audio.png" alt="SETTINGS: the output device and the engine" width="900" /></p>
+
+**MIDI CC** lists every link from a controller to something on screen, one card per controller and target, and imports and exports them as template files.
+
+<p align="center"><img src="docs/screenshots/midi-cc-templates.png" alt="MIDI CC: templates for a MiniLab 3 and an MPD218, one card opened" width="900" /></p>
 
 ---
 
 ## Around the app
 
-- **The transport** at the top of the window belongs to the page you are on: a take on RECORD, the pads on FIRE, the song on TRACKER. The space bar works it. When something is running on a page you have left, the transport keeps showing it but only stop works, and stopping hands it back to the page in front of you.
-- **MIDI** triggers pads and types notes into the tracker. Each device is given a job in SETTINGS, so a controller can drive the pads, the tracker, or both.
+- **The transport** at the top of the window belongs to the page you are on: a take on RECORD, the pads on FIRE, the song on TRACKER. The space bar works it, on every window. When something is running on a page you have left, the transport keeps showing it but only stop works, and stopping hands it back to the page in front of you.
+- **Pointing** is how a controller is mapped. Press Ctrl+Shift+M, rest the pointer on a knob, a fader or a button anywhere in the app, and touch the control on the hardware.
+- **Undo** works on every page that edits something: the pattern, the song, the instruments, the pads, the designer and the recordings shelf.
+- **Help** is built in. Ctrl+H opens it, every page has a badge leading to its own topic, and each device carries a help page of its own.
 - **Themes**: twelve, as six pairs of dark and light. Dark and Light are the plain pair; Neon, Industrial, Orchid, Citrus and Ember each come both ways.
-- **Profiles**: a whole set of pads saved under a name. Built and switched on PADS, and FIRE says which one is loaded.
 
 ---
 
 ## How it works
 
-Audio runs through **BASS** (ManagedBass). Pads are streams the engine owns; the tracker mixes its own voices into one stream and hands the result to the same device.
+Audio runs through **BASS** (ManagedBass). Pads, the tracker and the recording input each play into a bus of their own, and the busses are mixed into one output: a sound card, a PipeWire node on Linux, or an ASIO driver on Windows.
 
 Plugins run **in a process of their own**, one per plugin, and so does the scan. A plugin that crashes takes only itself down: an effect passes its audio through, an instrument goes quiet, and the panel offers to start it again. The child process is this same executable started with `--plugin-host`, talking over a socket with the audio in shared memory.
 
-Machines are laid out rather than coded. Six engines are compiled in and a machine is a face over one of them, described in a `machine.json` the designer writes and drawn by the app: what the description does not draw, nobody draws. `Rack.SoundDevices` is what a soundmachine is and `Rack.Controls` is what it is drawn with. `LICENSE.EXCEPTION` names `Rack.SoundDevices`.
+Sound devices are laid out rather than coded. The engines are compiled in, and a soundmachine or an effect is a face over one of them, described in a `machine.json` or an `effect.json` the designer writes and drawn by the app: what the description does not draw, nobody draws. `Rack.SoundDevices` is what a soundmachine is and `Rack.Controls` is what it is drawn with. `LICENSE.EXCEPTION` names `Rack.SoundDevices`.
 
 **The machine registry** is what this installation has, and it is the only thing that answers that. Two folders and only one of them is yours: beside the program is what ships, a source to take a machine from and never the answer to what is on the rack, and under the application folder is what you have actually registered. Removing a machine is not losing it, since the shipped copy stays where it was.
 
@@ -143,8 +178,8 @@ JingleBox2/
 ├─ Tracker/            # Songs, patterns, the player, and the instruments a song owns
 │  └─ Synth/           # Voices, envelopes, the mixer
 ├─ SoundDevices/       # What is on the rack: the shared rules, and the two worlds
-│  ├─ SoundMachines/   # A box that is played, and becomes an instrument in a song
-│  └─ SoundEffects/    # A box that is not played, and sits on a track's chain
+│  ├─ SoundMachines/   # A device that is played, and becomes an instrument in a song
+│  └─ SoundEffects/    # A device that is not played, and sits on a track's chain
 ├─ Midi/               # Input, routing to pads and to the tracker
 ├─ Music/              # Notes, pitch and keyboards, knowing nothing about patterns
 ├─ Files/              # Where the app keeps things, and writing a file whole
@@ -152,7 +187,7 @@ JingleBox2/
 ├─ Controllers/        # Controller profiles and their Lua codecs
 ├─ Shortcuts/          # What a key can ask for, and who answers
 ├─ Scripting/          # The Lua sandbox
-├─ Rack.SoundDevices/  # What a box on the rack is: the contract an outside one links to
+├─ Rack.SoundDevices/  # What a device on the rack is: the contract an outside one links to
 ├─ Rack.Controls/      # What its face is drawn with: knobs, faders, panels
 ├─ ViewModels/         # MVVM, CommunityToolkit
 ├─ Views/              # Avalonia views, and the app's own drawn controls

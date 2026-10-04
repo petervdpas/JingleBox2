@@ -4471,6 +4471,10 @@ whole exercise and is worth writing down rather than summarising:
   said to a tenth and only when it moves by 0.15, so a device at 108 is heard once as 108.0.
   `IMidiClockFollow.TempoHeard` carries it and `MainViewModel` writes it into `Tracker.Bpm`, an
   ordinary edit with an undo step, since the song really does run at that tempo now
+- **Ableton Link is planned and not built**, as a third answer to whose clock the transport runs
+  on, beside its own and a followed MIDI port. `docs/ableton-link.md` is the plan: why Link rather
+  than network MIDI (which already works through `rtpmidid` with no code), what is already in
+  place, the native library, output latency, and what is still open
 - `Controllers/Profiles/keylab-mkii.json` is the first file here filled in without anybody
   touching the hardware. A KeyLab mkII 49 arrived on 2026-08-29 and answered Arturia's own
   settings protocol for every field of every control, so the whole of User mode came back over
