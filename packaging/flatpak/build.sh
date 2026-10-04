@@ -61,18 +61,35 @@ sources() {
   # The generator restores into a folder of its own and ignores a failed restore, so an empty
   # or short list is checked for here rather than found out by a build that cannot restore.
   #
+  # One runtime at a time, merged after. Given both at once the generator restores them in
+  # parallel over the same project and the same obj folder, and one restore's assets can replace
+  # the other's, so a runtime's packages go missing from the list on some runs and not others.
+  #
   # The output file and the project come first. --runtime takes any number of values, so written
-  # after it they are read as two more runtimes and the generator says both are missing; and
+  # after it they are read as more runtimes and the generator says both are missing; and
   # --dotnet-args takes everything after it, so it stays last. RuntimeIdentifiers is emptied there,
   # the same as in the manifest's publish, so each restore is for the one runtime it is given
   # rather than for the win-x64 the csproj also lists.
-  (cd "$ROOT" && python3 "$WORK/flatpak-dotnet-generator.py" \
-    "$SOURCES" \
-    JingleBox2.csproj \
-    --freedesktop "$FREEDESKTOP" \
-    --dotnet "$DOTNET" \
-    --runtime linux-x64 linux-arm64 \
-    --dotnet-args -p:SelfContained=true -p:RuntimeIdentifiers=)
+  local rid
+  for rid in linux-x64 linux-arm64; do
+    (cd "$ROOT" && python3 "$WORK/flatpak-dotnet-generator.py" \
+      "$WORK/sources-$rid.json" \
+      JingleBox2.csproj \
+      --freedesktop "$FREEDESKTOP" \
+      --dotnet "$DOTNET" \
+      --runtime "$rid" \
+      --dotnet-args -p:SelfContained=true -p:RuntimeIdentifiers=)
+  done
+
+  python3 - "$SOURCES" "$WORK/sources-linux-x64.json" "$WORK/sources-linux-arm64.json" <<'PY'
+import json, sys
+merged = {}
+for path in sys.argv[2:]:
+    for entry in json.load(open(path)):
+        merged[entry["dest-filename"]] = entry
+with open(sys.argv[1], "w", encoding="utf-8") as out:
+    json.dump([merged[k] for k in sorted(merged)], out, indent=4)
+PY
 
   local count
   count="$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))))' "$SOURCES")"
