@@ -60,6 +60,10 @@ jobs:
       # "Access to the path '/github/home/.dotnet' is denied", nothing is restored, and the list
       # comes out empty. /tmp is the sandbox's own and always writable. The SDK is installed
       # system wide here, so flatpak does not need HOME to find it.
+      #
+      # The workspace folder is opened for writing for the same reason: the runner's user made it,
+      # the checkout made everything inside it as root, and the sandbox may write only the second
+      # kind, so restoring the main project could not create its obj folder.
       - name: NuGet sources
         shell: bash
         env:
@@ -69,6 +73,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$HOME"
+          chmod a+rwx "$GITHUB_WORKSPACE"
           bash packaging/flatpak/build.sh sources
 
       - name: Build

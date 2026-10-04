@@ -63,14 +63,16 @@ sources() {
   #
   # The output file and the project come first. --runtime takes any number of values, so written
   # after it they are read as two more runtimes and the generator says both are missing; and
-  # --dotnet-args takes everything after it, so it stays last.
+  # --dotnet-args takes everything after it, so it stays last. RuntimeIdentifiers is emptied there,
+  # the same as in the manifest's publish, so each restore is for the one runtime it is given
+  # rather than for the win-x64 the csproj also lists.
   (cd "$ROOT" && python3 "$WORK/flatpak-dotnet-generator.py" \
     "$SOURCES" \
     JingleBox2.csproj \
     --freedesktop "$FREEDESKTOP" \
     --dotnet "$DOTNET" \
     --runtime linux-x64 linux-arm64 \
-    --dotnet-args -p:SelfContained=true)
+    --dotnet-args -p:SelfContained=true -p:RuntimeIdentifiers=)
 
   local count
   count="$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))))' "$SOURCES")"

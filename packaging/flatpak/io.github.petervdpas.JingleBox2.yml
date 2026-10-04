@@ -74,6 +74,10 @@ modules:
       - nuget-sources.json
     build-commands:
       - find . -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +
+      # RuntimeIdentifiers is emptied for the publish: the csproj lists win-x64 beside the two Linux
+      # ones for the Windows build, and a self-contained restore fetches runtime packages for every
+      # one listed, which offline means NU1101 for a package nuget-sources.json does not have.
+      #
       # The version is the newest tag's, written beside this file by "build.sh version", since
       # there is no git in here to ask. Missing is refused rather than built as a wrong number.
       - test -s packaging/flatpak/version || { echo "packaging/flatpak/version is missing; run build.sh version first"; exit 1; }
@@ -85,6 +89,7 @@ modules:
         --source ./nuget-sources
         -p:PublishSingleFile=false
         -p:IncludeNativeLibrariesForSelfExtract=false
+        -p:RuntimeIdentifiers=
         -p:Version="$(cat packaging/flatpak/version)"
         -o /app/lib/jinglebox2
       - bash .github/scripts/linux-natives.sh /app/lib/jinglebox2 "$RID"
