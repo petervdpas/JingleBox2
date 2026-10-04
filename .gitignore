@@ -26,6 +26,7 @@ TestResults/
 # and a running marker. One was committed once. Nothing in the build or the code reads it.
 /JingleBox2/
 
-# Flatpak build state and bundle
+# Flatpak build state and bundle, and the version build.sh writes from the newest tag
 .flatpak-work/
 jinglebox2.flatpak
+packaging/flatpak/version

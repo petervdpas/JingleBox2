@@ -3,8 +3,14 @@
 # Builds the JingleBox2 Flatpak from this checkout.
 #
 #   packaging/flatpak/build.sh sources   writes nuget-sources.json beside the manifest
+#   packaging/flatpak/build.sh version   writes the newest tag's version beside the manifest
 #   packaging/flatpak/build.sh build     builds the Flatpak and installs it for this user
 #   packaging/flatpak/build.sh bundle    builds it and writes a single jinglebox2.flatpak file
+#
+# There is no git inside a Flatpak build, so the version cannot be read the way the csproj reads
+# it. "version" takes it from the newest tag, here where git is, and writes it to a file the
+# manifest's publish reads. build and bundle do that first, and the CI workflow runs the same
+# step, so a local build and a CI one cannot disagree about which version they are.
 #
 # A Flatpak is built with no network, so every NuGet package the publish needs is listed in
 # nuget-sources.json with its checksum, and flatpak-builder downloads them before the build
@@ -20,6 +26,7 @@ ROOT="$(cd "$HERE/../.." && pwd)"
 APP_ID="io.github.petervdpas.JingleBox2"
 MANIFEST="$HERE/$APP_ID.yml"
 SOURCES="$HERE/nuget-sources.json"
+VERSION_FILE="$HERE/version"
 FREEDESKTOP="25.08"
 DOTNET="10"
 GENERATOR_URL="https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/dotnet/flatpak-dotnet-generator.py"
@@ -71,7 +78,23 @@ sources() {
   echo "OK: $count packages in $SOURCES"
 }
 
+version() {
+  local tag
+  if ! tag="$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null)"; then
+    echo "ERROR: this checkout has no tag, so there is no version to build the Flatpak as"
+    exit 1
+  fi
+  tag="${tag#v}"
+  if ! [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z]+)*$ ]]; then
+    echo "ERROR: the newest tag, $tag, is not a version"
+    exit 1
+  fi
+  printf '%s\n' "$tag" > "$VERSION_FILE"
+  echo "OK: building as $tag"
+}
+
 build() {
+  version
   [ -f "$SOURCES" ] || sources
   sdk
   builder --user --install --force-clean \
@@ -82,6 +105,7 @@ build() {
 }
 
 bundle() {
+  version
   [ -f "$SOURCES" ] || sources
   sdk
   builder --user --force-clean \
@@ -97,10 +121,11 @@ bundle() {
 
 case "${1:-build}" in
   sources) sources ;;
+  version) version ;;
   build) build ;;
   bundle) bundle ;;
   *)
-    echo "usage: $0 [sources|build|bundle]"
+    echo "usage: $0 [sources|version|build|bundle]"
     exit 2
     ;;
 esac

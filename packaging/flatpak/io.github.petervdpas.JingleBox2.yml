@@ -74,6 +74,9 @@ modules:
       - nuget-sources.json
     build-commands:
       - find . -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +
+      # The version is the newest tag's, written beside this file by "build.sh version", since
+      # there is no git in here to ask. Missing is refused rather than built as a wrong number.
+      - test -s packaging/flatpak/version || { echo "packaging/flatpak/version is missing; run build.sh version first"; exit 1; }
       - >-
         dotnet publish JingleBox2.csproj
         -c Release
@@ -82,7 +85,7 @@ modules:
         --source ./nuget-sources
         -p:PublishSingleFile=false
         -p:IncludeNativeLibrariesForSelfExtract=false
-        -p:Version=2.6.8
+        -p:Version="$(cat packaging/flatpak/version)"
         -o /app/lib/jinglebox2
       - bash .github/scripts/linux-natives.sh /app/lib/jinglebox2 "$RID"
       - bash .github/scripts/verify-rack.sh /app/lib/jinglebox2

@@ -29,19 +29,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      # There is no git inside a Flatpak build, so the version is written into the manifest here,
-      # from the newest tag, the way the csproj would have read it.
+      # There is no git inside a Flatpak build, so the newest tag's version is written beside the
+      # manifest here, by the same step a local build runs, and the manifest's publish reads it.
       - name: Version
         id: version
         shell: bash
         run: |
           set -euo pipefail
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          VER="$(git describe --tags --abbrev=0)"
-          VER="${VER#v}"
-          echo "version=$VER" >> "$GITHUB_OUTPUT"
-          sed -i -E "s/-p:Version=[^ ]+/-p:Version=$VER/" packaging/flatpak/io.github.petervdpas.JingleBox2.yml
-          grep -n -- '-p:Version=' packaging/flatpak/io.github.petervdpas.JingleBox2.yml
+          bash packaging/flatpak/build.sh version
+          echo "version=$(cat packaging/flatpak/version)" >> "$GITHUB_OUTPUT"
 
       # Every NuGet package the publish needs, restored by the same .NET SDK the build will use,
       # so the runtime packs it lists are the ones the offline publish asks for.
