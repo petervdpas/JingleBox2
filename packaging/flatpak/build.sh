@@ -60,12 +60,16 @@ sources() {
 
   # The generator restores into a folder of its own and ignores a failed restore, so an empty
   # or short list is checked for here rather than found out by a build that cannot restore.
+  #
+  # The output file and the project come first. --runtime takes any number of values, so written
+  # after it they are read as two more runtimes and the generator says both are missing; and
+  # --dotnet-args takes everything after it, so it stays last.
   (cd "$ROOT" && python3 "$WORK/flatpak-dotnet-generator.py" \
+    "$SOURCES" \
+    JingleBox2.csproj \
     --freedesktop "$FREEDESKTOP" \
     --dotnet "$DOTNET" \
     --runtime linux-x64 linux-arm64 \
-    "$SOURCES" \
-    JingleBox2.csproj \
     --dotnet-args -p:SelfContained=true)
 
   local count

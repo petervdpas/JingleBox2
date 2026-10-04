@@ -1,7 +1,8 @@
 name: winget
 
 # Sends each new release to winget as a pull request against microsoft/winget-pkgs, once the
-# first version is in. The first one is submitted by hand from packaging/winget/.
+# first version is in. The first one is submitted by hand from packaging/winget/manifest, which
+# packaging/winget/update.sh points at any published release.
 #
 # Triggered by the release workflow finishing rather than by the release being published: a
 # release made with the workflow's own token does not start other workflows.
