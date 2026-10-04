@@ -54,13 +54,21 @@ jobs:
 
       # Every NuGet package the publish needs, restored by the same .NET SDK the build will use,
       # so the runtime packs it lists are the ones the offline publish asks for.
+      # HOME is moved for this step alone. The generator runs dotnet restore inside the SDK with
+      # the caller's environment, and .NET writes its first-run folder and NuGet's into HOME. The
+      # container's /github/home belongs to the runner's own user, so inside the sandbox that is
+      # "Access to the path '/github/home/.dotnet' is denied", nothing is restored, and the list
+      # comes out empty. /tmp is the sandbox's own and always writable. The SDK is installed
+      # system wide here, so flatpak does not need HOME to find it.
       - name: NuGet sources
         shell: bash
         env:
           JB_FLATPAK_SCOPE: --system
           JB_FLATPAK_WORK: /tmp/flatpak-work
+          HOME: /tmp/flatpak-home
         run: |
           set -euo pipefail
+          mkdir -p "$HOME"
           bash packaging/flatpak/build.sh sources
 
       - name: Build
