@@ -477,16 +477,29 @@ jobs:
           name: artifacts-deb-${{ matrix.arch }}
           path: dist/*.deb
 
+  # The Flatpak, built by its own workflow, beside the other packages. Nothing waits on it: it is
+  # attached after the release is published, and both halves are optional, so a Flatpak that fails
+  # costs the Flatpak alone. A failed run would also stop winget.yml sending the version to winget.
+  flatpak:
+    name: Flatpak
+    needs: test
+    uses: ./.github/workflows/flatpak.yml
+    with:
+      optional: true
+
   release:
     name: Publish GitHub Release
     needs: [build, rpm_fedora, deb]
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download all artifacts
+      # The packages and nothing else: the test results and the Flatpak bundles are artifacts of
+      # this run as well, and the Flatpak is attached by a job of its own below.
+      - name: Download the packages
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: artifacts-*
 
       - name: Flatten artifacts
         shell: bash
@@ -502,3 +515,26 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: dist/*
           generate_release_notes: true
+
+  flatpak_attach:
+    name: Attach the Flatpak
+    needs: [release, flatpak]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Download the bundles
+        uses: actions/download-artifact@v4
+        with:
+          path: flatpak
+          pattern: flatpak-*
+          merge-multiple: true
+
+      - name: Attach to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ls -la flatpak
+          gh release upload "${{ github.ref_name }}" flatpak/*.flatpak --clobber --repo "${{ github.repository }}"

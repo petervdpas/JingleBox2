@@ -7,7 +7,9 @@ name: winget
 # release made with the workflow's own token does not start other workflows.
 #
 # Needs a repository secret WINGET_TOKEN, a classic personal access token with public_repo, and
-# a fork of microsoft/winget-pkgs under the same account. Without the secret it says so and stops.
+# a fork of microsoft/winget-pkgs under the same account. Without the secret it says so in a
+# warning and sends nothing, and the run is not marked failed: a missing secret is a setup step
+# not taken yet, and a red run on every release would say something is broken when nothing is.
 
 on:
   workflow_run:
@@ -41,13 +43,16 @@ jobs:
             *) echo "ERROR: '$TAG' is not a release tag"; exit 1 ;;
           esac
           if [ "$HAS_TOKEN" != "true" ]; then
-            echo "ERROR: there is no WINGET_TOKEN secret, so nothing can be sent to winget-pkgs"
-            exit 1
+            echo "::warning title=Not sent to winget::there is no WINGET_TOKEN secret, so $TAG was not sent to winget-pkgs"
+            echo "send=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          echo "send=true" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - uses: vedantmgoyal9/winget-releaser@v2
+        if: steps.tag.outputs.send == 'true'
         with:
           identifier: PetervdPas.JingleBox2
           version: ${{ steps.tag.outputs.version }}

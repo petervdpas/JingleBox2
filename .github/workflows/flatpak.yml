@@ -1,17 +1,29 @@
 name: flatpak
 
-# Started by hand from the Actions tab. It builds the Flatpak from the commit it is run on and
-# leaves a jinglebox2-<version>-<arch>.flatpak file on the run's page, to download and install
-# with "flatpak install --user <file>". It is not part of a release until the bundle has been
-# tried on a real machine.
+# Builds the Flatpak from the commit it is run on and leaves a jinglebox2-<version>-<arch>.flatpak
+# file on the run's page, as the artifact flatpak-<arch>, to download and install with
+# "flatpak install --user <file>".
+#
+# Started by hand from the Actions tab, or called by release.yml on a tag, which attaches the two
+# bundles to the release once it is published. Called that way it is optional: it runs beside the
+# other packages, nothing waits on it, and a Flatpak that fails to build does not fail the release
+# run. That last part matters beyond the release page, because winget.yml only sends a version to
+# winget when the release run as a whole succeeded.
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      optional:
+        description: A failed build does not fail the run that called this.
+        type: boolean
+        default: false
 
 jobs:
   flatpak:
     name: Flatpak (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ inputs.optional == true }}
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
@@ -58,3 +70,5 @@ jobs:
           bundle: jinglebox2-${{ steps.version.outputs.version }}-${{ matrix.arch }}.flatpak
           arch: ${{ matrix.arch }}
           cache-key: flatpak-builder-${{ matrix.arch }}-${{ hashFiles('packaging/flatpak/nuget-sources.json') }}
+          # A name the release can ask for exactly, rather than one made from the bundle's.
+          artifact-name: flatpak-${{ matrix.arch }}
