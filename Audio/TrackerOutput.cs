@@ -185,6 +185,9 @@ public sealed class TrackerOutput(IRenderCost? cost = null) : ITrackerOutput
     public int RenderAheadMilliseconds => _aheadMilliseconds;
 
     /// <inheritdoc/>
+    public int LatencyMilliseconds => BufferMs + _aheadMilliseconds;
+
+    /// <inheritdoc/>
     public bool IsRunning => _handle != 0;
 
     /// <summary>

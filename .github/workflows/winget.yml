@@ -1,0 +1,56 @@
+name: winget
+
+# Sends each new release to winget as a pull request against microsoft/winget-pkgs, once the
+# first version is in. The first one is submitted by hand from packaging/winget/.
+#
+# Triggered by the release workflow finishing rather than by the release being published: a
+# release made with the workflow's own token does not start other workflows.
+#
+# Needs a repository secret WINGET_TOKEN, a classic personal access token with public_repo, and
+# a fork of microsoft/winget-pkgs under the same account. Without the secret it says so and stops.
+
+on:
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to send, for example v2.6.8
+        required: true
+
+jobs:
+  winget:
+    name: Submit to winget
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: windows-latest
+
+    steps:
+      - name: Tag
+        id: tag
+        shell: bash
+        env:
+          FROM_INPUT: ${{ github.event.inputs.tag }}
+          FROM_RUN: ${{ github.event.workflow_run.head_branch }}
+          HAS_TOKEN: ${{ secrets.WINGET_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          TAG="${FROM_INPUT:-$FROM_RUN}"
+          case "$TAG" in
+            v[0-9]*) ;;
+            *) echo "ERROR: '$TAG' is not a release tag"; exit 1 ;;
+          esac
+          if [ "$HAS_TOKEN" != "true" ]; then
+            echo "ERROR: there is no WINGET_TOKEN secret, so nothing can be sent to winget-pkgs"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: PetervdPas.JingleBox2
+          version: ${{ steps.tag.outputs.version }}
+          release-tag: ${{ steps.tag.outputs.tag }}
+          installers-regex: 'JingleBox2-Setup-[0-9.]+\.exe$'
+          token: ${{ secrets.WINGET_TOKEN }}

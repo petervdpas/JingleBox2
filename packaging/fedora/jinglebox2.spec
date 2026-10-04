@@ -1,9 +1,9 @@
 Name:           jinglebox2
 Version:        1.0.0
 Release:        1%{?dist}
-Summary:        Lightweight audio pad launcher
+Summary:        Pad launcher, recorder and tracker for radio and live shows
 
-License:        MIT
+License:        GPL-2.0-only AND LicenseRef-BASS
 URL:            https://github.com/petervdpas/JingleBox2
 Source0:        %{name}-%{version}.tar.gz
 
@@ -28,7 +28,10 @@ Requires:       mesa-libGL
 %global appdir /opt/JingleBox2
 
 %description
-JingleBox2 is a lightweight cross-platform audio pad launcher built with .NET and Avalonia UI.
+JingleBox2 fires jingles from a wall of pads, records and edits takes, and writes music
+in a tracker with its own synths, samplers and drum machines beside VST3 and CLAP
+plugins. It plays its audio through BASS, a proprietary library by Un4seen Developments
+that is free of charge for non-commercial use.
 
 %prep
 %autosetup -n %{name}-%{version}
@@ -54,7 +57,7 @@ install -Dpm 0644 packaging/fedora/jinglebox2.desktop %{buildroot}%{_datadir}/ap
 install -Dpm 0644 packaging/fedora/icons/jinglebox2.png %{buildroot}%{_datadir}/icons/hicolor/256x256/apps/jinglebox2.png
 
 %files
-%license LICENSE
+%license LICENSE LICENSE.EXCEPTION
 %{_bindir}/jinglebox2
 %{_datadir}/applications/jinglebox2.desktop
 %{_datadir}/icons/hicolor/256x256/apps/jinglebox2.png

@@ -252,6 +252,31 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// <inheritdoc/>
     public IMidiClockFollow? ClockFollow { get; set; }
 
+    /// <inheritdoc/>
+    public Sync.Interfaces.IAbletonLink? AbletonLink { get; set; }
+
+    /// <summary>Where a pass begins on a Link timeline, which is arithmetic and holds nothing.</summary>
+    private readonly Sync.Interfaces.IAbletonLinkLines _linkLines = new Sync.AbletonLinkLines();
+
+    /// <summary>The Link session, where the transport is running on one, or null.</summary>
+    private Sync.Interfaces.IAbletonLink? OnLink => AbletonLink is { IsOn: true } link ? link : null;
+
+    /// <summary>
+    /// How far ahead of a Link timeline the clock thread starts a line, in microseconds: the
+    /// output's own latency and the hand adjustment on top of it.
+    /// </summary>
+    private long LinkLead(Sync.Interfaces.IAbletonLink link) =>
+        (_synth.LatencyMilliseconds + (long)link.OffsetMilliseconds) * 1000L;
+
+    /// <summary>A moment on Link's clock, as a reading of this pass's stopwatch.</summary>
+    /// <remarks>
+    /// Converted at the moment of asking rather than once at the top of a pass, so the two clocks
+    /// drifting apart over a long set never accumulates: each line is placed against Link's clock
+    /// as it stands when that line is worked out.
+    /// </remarks>
+    private static double OnStopwatch(Stopwatch clock, Sync.Interfaces.IAbletonLink link, long micros) =>
+        clock.Elapsed.TotalSeconds + (micros - link.Now) / 1_000_000.0;
+
     /// <summary>
     /// How many ticks have gone out since this pass began.
     /// </summary>
@@ -484,6 +509,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         Teardown();
         SetState(TrackerTransportState.Paused);
+        OnLink?.Play(false);
     }
 
     /// <inheritdoc/>
@@ -495,6 +521,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
         Position = TrackerPosition.Start;
 
         SetState(TrackerTransportState.Stopped);
+        if (wasRunning) OnLink?.Play(false);
         if (wasRunning) Stopped?.Invoke(this, EventArgs.Empty);
     }
 
@@ -523,6 +550,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
         SetState(TrackerTransportState.Playing);
 
         Said(Position);
+        OnLink?.Play(true);
 
         _clock = new Thread(() => RunClock(token, generation))
         {
@@ -1566,6 +1594,12 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// why every use goes through the clamped timing: even a value caught mid-write can only be
     /// a tempo, never a stall or a division by nought.
     ///
+    /// On an Ableton Link session a line is due when its beat falls on the session's timeline,
+    /// less the output's lead, and <c>linkBeat</c> is the beat of the line about to play there; it
+    /// is not a number while the transport is on any other clock. Whose clock it is, is asked at
+    /// every line, so choosing Link or leaving it is answered on the next line rather than the
+    /// next pass.
+    ///
     /// Running off the end is not the same as being stopped, and only the first is this
     /// thread's business to report. A newer run may already have started, in which case this
     /// thread has none.
@@ -1599,10 +1633,19 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         int lines = 0;
 
+        double linkBeat = double.NaN;
+
+        if (OnLink is { } session)
+        {
+            if (!StartOnLink(session, clock, token, song, out linkBeat)) return;
+            if (generation != Volatile.Read(ref _generation)) return;
+        }
+
         /* The beat each line begins on, counted from where playing began, the same count the
            plugins are told. Summed a line at a time rather than worked out from the number of
            lines, because the lines to a beat can change partway through a song. */
         double beat = 0;
+        double beatsPerLine = 1.0;
 
         while (!token.IsCancellationRequested)
         {
@@ -1618,7 +1661,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             int played = ApplyTick(ticks, 0, 0, song);
 
             Position = position;
-            double beatsPerLine = 1.0 / Math.Max(1, Playing(song).ClampedLinesPerBeat);
+            beatsPerLine = 1.0 / Math.Max(1, Playing(song).ClampedLinesPerBeat);
 
             _mark = new LineMark(position, Stopwatch.GetTimestamp(),
                 (long)(Playing(song).SecondsPerLine * Stopwatch.Frequency), beat, beatsPerLine);
@@ -1653,14 +1696,18 @@ public sealed class TrackerPlayer : ITrackerPlayer
                                          token))
                     return;
             }
-            else if (!WaitUntil(clock, nextLine, token, song))
+            else
             {
-                return;
+                if (OnLink is { } link) nextLine = NextOnLink(link, clock, ref linkBeat, beatsPerLine);
+                else linkBeat = double.NaN;
+
+                if (!WaitUntil(clock, nextLine, token, song)) return;
             }
         }
 
         if (!token.IsCancellationRequested && generation == Volatile.Read(ref _generation))
         {
+            OnLink?.Play(false);
             Hushed();
             MidiOut?.AllOff();
 
@@ -1672,6 +1719,73 @@ public sealed class TrackerPlayer : ITrackerPlayer
             SetState(TrackerTransportState.Stopped);
             Stopped?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    /// <summary>
+    /// Waits for the moment a pass on a Link timeline begins, and starts the pass's stopwatch there.
+    /// </summary>
+    /// <remarks>
+    /// The beat is the one the first line would sound on if it were played now, which is now plus
+    /// however long the output takes, and <see cref="Sync.Interfaces.IAbletonLinkLines.StartBeat"/>
+    /// moves it on to the next quantum where anybody else is in the session. The wait sends no
+    /// MIDI clock: a tick before line nought would put whatever follows it ahead of the music by
+    /// the length of the wait. The stopwatch starts again where the wait ends, so every tick and
+    /// line after it is placed from the moment the music actually began, exactly as on the
+    /// stopwatch's own path.
+    /// </remarks>
+    /// <param name="link">The session.</param>
+    /// <param name="clock">The pass's stopwatch.</param>
+    /// <param name="token">Cancelled when the transport stops.</param>
+    /// <param name="song">The song, for the tempo the wait reads.</param>
+    /// <param name="beat">The beat line nought falls on, or not a number where the session gave none.</param>
+    /// <returns>False when the transport was stopped during the wait.</returns>
+    private bool StartOnLink(Sync.Interfaces.IAbletonLink link, Stopwatch clock, CancellationToken token,
+                             Song song, out double beat)
+    {
+        double quantum = _linkLines.Quantum(link.Quantum);
+        long lead = LinkLead(link);
+
+        beat = _linkLines.StartBeat(link.BeatAt(link.Now + lead, quantum), quantum, link.Peers);
+
+        if (double.IsNaN(beat)) return true;
+
+        double first = OnStopwatch(clock, link, link.TimeAt(beat, quantum) - lead);
+        double startBeat = beat;
+
+        Log.Write(LogArea.Tracker, () => "link: pass begins on beat " + startBeat.ToString("0.###")
+                                         + " with " + link.Peers + " other peer(s), "
+                                         + Math.Max(0, first - clock.Elapsed.TotalSeconds).ToString("0.000")
+                                         + " s from now, running " + lead / 1000 + " ms ahead");
+
+        if (!WaitUntil(clock, first, token, song, ticks: false)) return false;
+
+        clock.Restart();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Moves on to the next line's beat and says when, on the pass's stopwatch, that line is due.
+    /// </summary>
+    /// <remarks>
+    /// A pass that was on another clock until now has no beat yet, and takes the beat of this
+    /// moment so the next line plays at once rather than waiting for a bar: somebody who chose
+    /// Link halfway through a song meant to carry on, not to stall.
+    /// </remarks>
+    /// <param name="link">The session.</param>
+    /// <param name="clock">The pass's stopwatch.</param>
+    /// <param name="beat">The beat of the line just played, moved on to the next one's.</param>
+    /// <param name="beatsPerLine">How far apart two lines are, in beats.</param>
+    private double NextOnLink(Sync.Interfaces.IAbletonLink link, Stopwatch clock, ref double beat, double beatsPerLine)
+    {
+        double quantum = _linkLines.Quantum(link.Quantum);
+        long lead = LinkLead(link);
+
+        beat = double.IsNaN(beat)
+            ? link.BeatAt(link.Now + lead, quantum)
+            : beat + beatsPerLine;
+
+        return OnStopwatch(clock, link, link.TimeAt(beat, quantum) - lead);
     }
 
     /// <summary>
@@ -1707,11 +1821,12 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// <param name="targetSeconds">When the next line is due.</param>
     /// <param name="token">Cancelled when the transport stops.</param>
     /// <param name="song">The song being played, for its tempo.</param>
+    /// <param name="ticks">False to send no clock while waiting, for the wait before a pass begins.</param>
     /// <returns>False when it was cancelled rather than reaching the time.</returns>
-    private bool WaitUntil(Stopwatch clock, double targetSeconds, CancellationToken token, Song song)
+    private bool WaitUntil(Stopwatch clock, double targetSeconds, CancellationToken token, Song song, bool ticks = true)
     {
         var deck = ClockDeck;
-        bool driving = deck?.IsDriving == true;
+        bool driving = ticks && deck?.IsDriving == true;
 
         while (true)
         {
@@ -1778,8 +1893,17 @@ public sealed class TrackerPlayer : ITrackerPlayer
     private double _tempo = double.NaN;
 
     /// <summary>How fast the song is playing: its own timing, at the tempo a lane set where one has.</summary>
+    /// <remarks>
+    /// On a Link session the tempo is the session's, whatever the song or a lane says, since the
+    /// lines are placed on the session's timeline and a tempo worked out from anything else would
+    /// put the ticks sent to the outputs and the length of a line at odds with where the lines
+    /// really fall. A lane still moves it, by putting its tempo to the session: see
+    /// <see cref="PlayAt"/>.
+    /// </remarks>
     private TrackerTiming Playing(Song song)
     {
+        if (OnLink is { } link) return new TrackerTiming(link.Tempo, song.LinesPerBeat);
+
         double tempo = Volatile.Read(ref _tempo);
 
         return double.IsNaN(tempo) ? song.Timing : new TrackerTiming(tempo, song.LinesPerBeat);
@@ -1790,6 +1914,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
     {
         get
         {
+            if (OnLink is { } link && IsPlaying) return link.Tempo;
+
             double tempo = Volatile.Read(ref _tempo);
 
             if (!double.IsNaN(tempo) && IsPlaying) return tempo;
@@ -1807,6 +1933,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
         if (!IsPlaying || double.IsNaN(bpm)) return;
 
         double held = Math.Clamp(bpm, TrackerTiming.MinBpm, TrackerTiming.MaxBpm);
+
+        OnLink?.Propose(held);
 
         if (Interlocked.Exchange(ref _tempo, held) == held) return;
 

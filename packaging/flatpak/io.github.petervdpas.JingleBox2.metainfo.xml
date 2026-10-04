@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.petervdpas.JingleBox2</id>
+  <name>JingleBox2</name>
+  <summary>Pad launcher, recorder and tracker for radio and live shows</summary>
+  <developer id="io.github.petervdpas">
+    <name>Peter van de Pas</name>
+  </developer>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-only AND LicenseRef-proprietary=https://www.un4seen.com/bass.html</project_license>
+
+  <description>
+    <p>
+      JingleBox2 fires jingles from a wall of pads, records and edits takes, and writes music in
+      a tracker with its own synths, samplers and drum machines beside VST3 and CLAP plugins. A
+      mixer with automation sits over all of it, and any MIDI controller can drive it by pointing
+      at a control on screen and touching the hardware.
+    </p>
+    <p>
+      The pages you play on are kept apart from the pages you set things up on, so nothing moves
+      under your hand while you are on air.
+    </p>
+    <ul>
+      <li>Up to 32 pads, each playing a recording or an internet stream, fired by mouse, keyboard or MIDI</li>
+      <li>Recording from any input, and from any program in the PipeWire graph</li>
+      <li>A pattern tracker with chords, an order list, loop ranges and MIDI in and out on every track</li>
+      <li>Seven soundmachines and seven effects of its own, and a designer for building more</li>
+      <li>VST3 and CLAP plugins, each in a process of its own, so a crash takes only that plugin down</li>
+      <li>A mixer with ducking, effect chains, a master strip and automation lanes</li>
+      <li>Profiles for Arturia, Akai and Korg controllers, and Mackie Control surfaces</li>
+    </ul>
+    <p>
+      JingleBox2 plays its audio through BASS, a proprietary library by Un4seen Developments that
+      is free of charge for non-commercial use.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.petervdpas.JingleBox2.desktop</launchable>
+
+  <url type="homepage">https://github.com/petervdpas/JingleBox2</url>
+  <url type="bugtracker">https://github.com/petervdpas/JingleBox2/issues</url>
+  <url type="vcs-browser">https://github.com/petervdpas/JingleBox2</url>
+  <url type="contribute">https://github.com/petervdpas/JingleBox2/blob/master/CONTRIBUTING.md</url>
+
+  <categories>
+    <category>AudioVideo</category>
+    <category>Audio</category>
+    <category>Midi</category>
+  </categories>
+
+  <keywords>
+    <keyword>radio</keyword>
+    <keyword>podcast</keyword>
+    <keyword>soundboard</keyword>
+    <keyword>jingle</keyword>
+    <keyword>tracker</keyword>
+    <keyword>sampler</keyword>
+    <keyword>synthesizer</keyword>
+    <keyword>VST3</keyword>
+    <keyword>CLAP</keyword>
+    <keyword>MIDI</keyword>
+  </keywords>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#E8B4F0</color>
+    <color type="primary" scheme_preference="dark">#2A0A3A</color>
+  </branding>
+
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>FIRE: the pads during a show</caption>
+      <image>https://raw.githubusercontent.com/petervdpas/JingleBox2/master/docs/screenshots/fire.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>TRACKER: a song playing</caption>
+      <image>https://raw.githubusercontent.com/petervdpas/JingleBox2/master/docs/screenshots/tracker.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>MIXER: recorder, pads and tracker strips</caption>
+      <image>https://raw.githubusercontent.com/petervdpas/JingleBox2/master/docs/screenshots/mixer.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>RECORD: the input and the shelf of takes</caption>
+      <image>https://raw.githubusercontent.com/petervdpas/JingleBox2/master/docs/screenshots/record.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>DESIGNER: laying out a soundmachine</caption>
+      <image>https://raw.githubusercontent.com/petervdpas/JingleBox2/master/docs/screenshots/designer-oddskilla.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>PADS: setting a pad up</caption>
+      <image>https://raw.githubusercontent.com/petervdpas/JingleBox2/master/docs/screenshots/pads.png</image>
+    </screenshot>
+  </screenshots>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="2.6.8" date="2026-10-03"/>
+    <release version="2.6.7" date="2026-10-02"/>
+    <release version="2.6.6" date="2026-09-30"/>
+  </releases>
+</component>

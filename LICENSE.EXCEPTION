@@ -1,10 +1,14 @@
-JingleBox2 plugin exception
+JingleBox2 licence exceptions
 
 Copyright (C) 2025-2026 Peter van de Pas
 
 JingleBox2 is licensed under the GNU General Public License, version 2, as
-set out in LICENSE. As the copyright holder, I grant the following additional
-permission, which is part of the licence under which JingleBox2 is offered.
+set out in LICENSE. As the copyright holder, I grant the two additional
+permissions below, which are part of the licence under which JingleBox2 is
+offered.
+
+
+1. Plugins and sound devices
 
 
   As a special exception, you may link or otherwise combine an independent
@@ -33,7 +37,37 @@ permission, which is part of the licence under which JingleBox2 is offered.
   covered by that licence in full.
 
 
+2. The BASS audio library
+
+  As a special exception, you may link or otherwise combine JingleBox2 with
+  the BASS audio library and its add-ons, and distribute the combination,
+  including the libraries' binaries alongside it. You must follow the GNU
+  General Public License in all respects for all of the code in the
+  combination other than those libraries.
+
+  The libraries this covers are the ones published by Un4seen Developments
+  Ltd under the name BASS: bass, bassmix, bass_aac, bassasio and basswasapi,
+  any other BASS add-on JingleBox2 comes to use, and any later version of
+  any of them.
+
+  If you modify JingleBox2, you may extend this exception to your version,
+  but you are not obliged to. If you do not wish to, delete this section
+  from your version.
+
+  This exception gives you permission under JingleBox2's licence only. BASS
+  is not free software and is not covered by the GNU General Public License.
+  It is copyright Un4seen Developments Ltd and is distributed under its own
+  terms, which let a non-commercial entity, such as an individual, use it
+  free of charge in a product that makes no money, through sales, advertising
+  or otherwise. Anyone who distributes JingleBox2, or a version of it, in a
+  way that makes money needs a licence for BASS from Un4seen Developments:
+  see https://www.un4seen.com/bass.html.
+
+  ManagedBass, the .NET wrapper JingleBox2 calls BASS through, is separate
+  free software under the MIT licence.
+
+
 Sounds, presets, recordings and songs are data rather than code. They are not
 covered by the GNU General Public License in the first place, whoever made
-them and whatever is charged for them, and this exception says nothing about
+them and whatever is charged for them, and these exceptions say nothing about
 them either way.

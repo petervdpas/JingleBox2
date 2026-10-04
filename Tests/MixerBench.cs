@@ -34,6 +34,9 @@ internal sealed class MixerBench : ITrackerOutput
     public int RenderAheadMilliseconds => 0;
 
     /// <inheritdoc/>
+    public int LatencyMilliseconds => 0;
+
+    /// <inheritdoc/>
     public long Underruns => 0;
 
     /// <inheritdoc/>

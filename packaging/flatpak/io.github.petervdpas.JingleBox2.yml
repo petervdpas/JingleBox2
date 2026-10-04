@@ -1,0 +1,96 @@
+app-id: io.github.petervdpas.JingleBox2
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.dotnet10
+command: jinglebox2
+
+# Plugins packaged for Flatpak install themselves as this extension, under
+# /app/extensions/Plugins/vst3 and /clap, which is where VST3_PATH and CLAP_PATH point the scan.
+add-extensions:
+  org.freedesktop.LinuxAudio.Plugins:
+    directory: extensions/Plugins
+    version: '25.08'
+    add-ld-path: lib
+    merge-dirs: vst3;clap;lv2;ladspa;vst
+    subdirectories: true
+    no-autodownload: true
+
+finish-args:
+  # The window, and the plugin windows embedded in it, are X11.
+  - --share=ipc
+  - --socket=x11
+  # Sound out through PipeWire or PulseAudio, and the PipeWire graph for recording other programs.
+  - --socket=pulseaudio
+  - --filesystem=xdg-run/pipewire-0
+  # MIDI controllers through the ALSA sequencer, and the GPU.
+  - --device=all
+  # Internet streams on pads, and the check for a newer release.
+  - --share=network
+  # The same application folder a .deb, an RPM or a tarball uses, so moving between them keeps
+  # every recording, song and device. The launcher links it into the sandbox's own config folder.
+  - --filesystem=xdg-config/JingleBox2:create
+  # Plugins installed in the home folder, read only.
+  - --filesystem=~/.vst3:ro
+  - --filesystem=~/.clap:ro
+  - --env=VST3_PATH=/app/extensions/Plugins/vst3
+  - --env=CLAP_PATH=/app/extensions/Plugins/clap
+
+cleanup:
+  - /lib/debug
+
+modules:
+  - name: jinglebox2
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/dotnet10/bin
+      append-ld-library-path: /usr/lib/sdk/dotnet10/lib
+      env:
+        DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+        DOTNET_NOLOGO: 'true'
+        DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+      arch:
+        x86_64:
+          env:
+            RID: linux-x64
+        aarch64:
+          env:
+            RID: linux-arm64
+    sources:
+      # This checkout. A submission to Flathub replaces it with a git source pinned to a tag.
+      - type: dir
+        path: ../..
+        skip:
+          - .git
+          - .claude
+          - .flatpak-work
+          - jinglebox2.flatpak
+          - bin
+          - obj
+          - Releases
+      # Every NuGet package the publish needs, so the build runs with no network.
+      # Made by packaging/flatpak/build.sh sources.
+      - nuget-sources.json
+    build-commands:
+      - find . -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +
+      - >-
+        dotnet publish JingleBox2.csproj
+        -c Release
+        -r "$RID"
+        --self-contained true
+        --source ./nuget-sources
+        -p:PublishSingleFile=false
+        -p:IncludeNativeLibrariesForSelfExtract=false
+        -p:Version=2.6.8
+        -o /app/lib/jinglebox2
+      - bash .github/scripts/linux-natives.sh /app/lib/jinglebox2 "$RID"
+      - bash .github/scripts/verify-rack.sh /app/lib/jinglebox2
+      - install -Dm755 packaging/flatpak/jinglebox2.sh /app/bin/jinglebox2
+      - install -Dm644 packaging/flatpak/io.github.petervdpas.JingleBox2.desktop /app/share/applications/io.github.petervdpas.JingleBox2.desktop
+      - install -Dm644 packaging/flatpak/io.github.petervdpas.JingleBox2.metainfo.xml /app/share/metainfo/io.github.petervdpas.JingleBox2.metainfo.xml
+      - install -Dm644 Assets/JingleBox2.svg /app/share/icons/hicolor/scalable/apps/io.github.petervdpas.JingleBox2.svg
+      - install -Dm644 packaging/fedora/icons/jinglebox2.png /app/share/icons/hicolor/256x256/apps/io.github.petervdpas.JingleBox2.png
+      - install -Dm644 LICENSE /app/share/licenses/io.github.petervdpas.JingleBox2/LICENSE
+      - install -Dm644 LICENSE.EXCEPTION /app/share/licenses/io.github.petervdpas.JingleBox2/LICENSE.EXCEPTION
+      - install -d /app/extensions/Plugins

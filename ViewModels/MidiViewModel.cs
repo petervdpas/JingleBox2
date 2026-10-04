@@ -82,10 +82,15 @@ public sealed partial class MidiViewModel : ObservableObject
     /// What is known about the controllers plugged in. Left out, one of its own; the application
     /// hands the same one to everything, since what a device is doing is remembered in it.
     /// </param>
+    /// <param name="abletonLink">
+    /// The Ableton Link session the transport would run on, shared with the player so the page
+    /// can say whether the library is here and how many peers there are. Left out, one of its own.
+    /// </param>
     public MidiViewModel(Config.Interfaces.ISettingsBlock settings, IMidiService midi,
-        IControllerProfiles? profiles = null)
+        IControllerProfiles? profiles = null, Sync.Interfaces.IAbletonLink? abletonLink = null)
     {
         _profiles = profiles ?? new ControllerProfiles();
+        _abletonLink = abletonLink ?? new Sync.AbletonLink();
         _settings = settings;
         _cfg = settings.Config;
         _midi = midi;
@@ -97,6 +102,9 @@ public sealed partial class MidiViewModel : ObservableObject
         InstantPickup = _cfg.Midi.InstantPickup;
         clockSource = _cfg.Midi.ClockSource;
         clockPort = _cfg.Midi.ClockPort;
+        linkQuantum = new Sync.AbletonLinkLines().Quantum(_cfg.Midi.LinkQuantum);
+        linkStartStop = _cfg.Midi.LinkStartStop;
+        linkOffsetMs = _cfg.Midi.LinkOffsetMs;
 
         RefreshDevices();
 
@@ -320,24 +328,88 @@ public sealed partial class MidiViewModel : ObservableObject
     /// </remarks>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(FollowsClock))]
+    [NotifyPropertyChangedFor(nameof(OwnClock))]
+    [NotifyPropertyChangedFor(nameof(OnAbletonLink))]
     private MidiClockSource clockSource;
 
-    /// <summary>
-    /// The same setting as a tick, which is what the page offers.
-    /// </summary>
+    /// <summary>Whether the transport keeps its own time, as one of the page's three choices.</summary>
     /// <remarks>
-    /// One box rather than two buttons, since there are exactly two answers and the unticked one
-    /// says itself: not following anybody is keeping your own time. It is also what every other
-    /// two-state setting on this page is drawn as.
-    ///
-    /// **Stored as <see cref="MidiClockSource"/> rather than as this bool**, which is not the
-    /// same fact written twice: what is kept has room for a third answer, and a settings file
-    /// holding a word rather than a flag can gain one without anything having to be converted.
+    /// The three are radio buttons over <see cref="ClockSource"/>, each one setting it when it is
+    /// picked and ignoring being unpicked, since one being unpicked is another being picked.
+    /// **Stored as <see cref="MidiClockSource"/> rather than as these**, so a settings file holds a
+    /// word for the answer rather than three flags that could disagree.
     /// </remarks>
+    public bool OwnClock
+    {
+        get => ClockSource == MidiClockSource.Own;
+        set { if (value) ClockSource = MidiClockSource.Own; }
+    }
+
+    /// <summary>Whether the transport follows the clock on a MIDI port, as one of the three choices.</summary>
     public bool FollowsClock
     {
         get => ClockSource == MidiClockSource.Followed;
-        set => ClockSource = value ? MidiClockSource.Followed : MidiClockSource.Own;
+        set { if (value) ClockSource = MidiClockSource.Followed; }
+    }
+
+    /// <summary>Whether the transport is on an Ableton Link session, as one of the three choices.</summary>
+    public bool OnAbletonLink
+    {
+        get => ClockSource == MidiClockSource.AbletonLink;
+        set { if (value) ClockSource = MidiClockSource.AbletonLink; }
+    }
+
+    /// <summary>The session the transport runs on when Link is chosen, shared with the player.</summary>
+    private readonly Sync.Interfaces.IAbletonLink _abletonLink;
+
+    /// <summary>Whether this build carries the Link library, which is what greys the choice.</summary>
+    public bool LinkPresent => _abletonLink.Present;
+
+    /// <summary>Why Link cannot be chosen here, or nothing where it can.</summary>
+    public string? LinkMissing => _abletonLink.Missing;
+
+    /// <summary>How many beats line up with the other Link programs.</summary>
+    [ObservableProperty] private double linkQuantum;
+
+    /// <summary>The quanta offered: a beat, half a bar, a bar of three, a bar of four, two bars and four.</summary>
+    public IReadOnlyList<double> LinkQuanta { get; } = [1, 2, 3, 4, 8, 16];
+
+    /// <summary>Whether play and stop are shared with the other Link programs.</summary>
+    [ObservableProperty] private bool linkStartStop;
+
+    /// <summary>The hand adjustment for this machine's output, in milliseconds.</summary>
+    /// <remarks>A double because that is what the page's stepper deals in; kept whole where it is stored.</remarks>
+    [ObservableProperty] private double linkOffsetMs;
+
+    /// <summary>How many other Link programs are in the session, said on the page.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ClockSaid))]
+    private int linkPeers;
+
+    /// <summary>The quantum moved: stored, and handed to the session.</summary>
+    partial void OnLinkQuantumChanged(double value)
+    {
+        _cfg.Midi.LinkQuantum = value;
+        _abletonLink.Quantum = value;
+        SaveMidi();
+    }
+
+    /// <summary>Sharing start and stop moved: stored, and handed to the session.</summary>
+    partial void OnLinkStartStopChanged(bool value)
+    {
+        _cfg.Midi.LinkStartStop = value;
+        _abletonLink.SharesStartStop = value;
+        SaveMidi();
+    }
+
+    /// <summary>The offset moved: stored, and handed to the session.</summary>
+    partial void OnLinkOffsetMsChanged(double value)
+    {
+        int whole = double.IsFinite(value) ? (int)Math.Round(Math.Clamp(value, -200, 200)) : 0;
+
+        _cfg.Midi.LinkOffsetMs = whole;
+        _abletonLink.OffsetMilliseconds = whole;
+        SaveMidi();
     }
 
     /// <summary>The inputs a clock could be followed from.</summary>
@@ -373,6 +445,22 @@ public sealed partial class MidiViewModel : ObservableObject
                 : "sending clock to " + driven + " output" + (driven == 1 ? "" : "s");
 
             if (ClockSource == MidiClockSource.Own) return "Running on its own clock, " + sending + ".";
+
+            if (ClockSource == MidiClockSource.AbletonLink)
+            {
+                if (!LinkPresent)
+                    return "Set to Ableton Link, which this build cannot load, so it is running on its own clock, "
+                           + sending + ".";
+
+                string peers = LinkPeers switch
+                {
+                    0 => "with nobody else in the session yet",
+                    1 => "with one other program",
+                    _ => "with " + LinkPeers + " other programs"
+                };
+
+                return "On Ableton Link " + peers + ", " + sending + ".";
+            }
 
             return string.IsNullOrWhiteSpace(ClockPort)
                 ? "Set to follow a clock with no port chosen, so it is running on its own, "

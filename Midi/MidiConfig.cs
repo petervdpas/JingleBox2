@@ -88,7 +88,7 @@ public sealed class MidiConfig
     public List<ControlMapping> Controls { get; set; } = new();
 
     /// <summary>
-    /// Whose clock the transport runs on: its own, or one named port's.
+    /// Whose clock the transport runs on: its own, one named port's, or an Ableton Link session's.
     /// </summary>
     /// <remarks>
     /// Nought is its own, so every settings file written before this reads back as the tracker
@@ -106,6 +106,34 @@ public sealed class MidiConfig
     /// again should not make somebody find the port a second time.
     /// </remarks>
     public string? ClockPort { get; set; }
+
+    /// <summary>
+    /// How many beats line up with the other Ableton Link programs, which is a bar of four unless
+    /// somebody says otherwise.
+    /// </summary>
+    /// <remarks>
+    /// Kept while the transport is on another clock, like <see cref="ClockPort"/>, so choosing Link
+    /// again does not lose it.
+    /// </remarks>
+    public double LinkQuantum { get; set; } = Sync.AbletonLinkLines.UsualQuantum;
+
+    /// <summary>Whether play and stop are shared with the other Ableton Link programs.</summary>
+    /// <remarks>
+    /// On by default, since a shared tempo with an unshared start is the half of Link that is
+    /// least often wanted; it is Link's own option, and a peer that has not turned it on neither
+    /// hears nor sends start and stop whatever this says.
+    /// </remarks>
+    public bool LinkStartStop { get; set; } = true;
+
+    /// <summary>
+    /// How much later than the output's own figure the sound really leaves, in milliseconds, for
+    /// lining this machine up by ear with the other Ableton Link programs.
+    /// </summary>
+    /// <remarks>
+    /// Nought means the output's buffer and cushion are the whole of it. Negative is allowed, for
+    /// an output that is quicker than it says.
+    /// </remarks>
+    public int LinkOffsetMs { get; set; }
 
     /// <summary>
     /// Which outputs are sent clock, by name.

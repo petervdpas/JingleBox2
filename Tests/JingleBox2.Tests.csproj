@@ -49,12 +49,14 @@
     <Copy SourceFiles="..\native\linux-x64\libbass.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="..\native\linux-x64\libbass_aac.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('..\native\linux-x64\libbass_aac.so')" />
     <Copy SourceFiles="..\native\linux-x64\libbassmix.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('..\native\linux-x64\libbassmix.so')" />
+    <Copy SourceFiles="..\native\linux-x64\libabl_link.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('..\native\linux-x64\libabl_link.so')" />
   </Target>
 
   <Target Name="CopyBassToTestsWindows" AfterTargets="Build" Condition="'$(OS)' == 'Windows_NT' And Exists('..\native\win-x64\bass.dll')">
     <Copy SourceFiles="..\native\win-x64\bass.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="..\native\win-x64\bass_aac.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('..\native\win-x64\bass_aac.dll')" />
     <Copy SourceFiles="..\native\win-x64\bassmix.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('..\native\win-x64\bassmix.dll')" />
+    <Copy SourceFiles="..\native\win-x64\abl_link.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('..\native\win-x64\abl_link.dll')" />
     <!--
       ASIO, which was the one this list was missing and the one it could least afford to. Three
       of the ASIO tests asserted that there are no drivers at all, and they passed on a machine

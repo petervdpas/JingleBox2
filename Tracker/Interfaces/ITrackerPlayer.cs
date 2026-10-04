@@ -122,11 +122,21 @@ public interface ITrackerPlayer : IDisposable
     /// saved with the song is left alone; stopping and starting again plays at the song's own
     /// until a lane says otherwise. The lines, the MIDI clock sent out and the tempo the plugins
     /// are told all follow it.
+    ///
+    /// On an Ableton Link session it is the session's tempo, whoever set it.
     /// </remarks>
     double PlayingBpm { get; }
 
     /// <summary>Plays at that tempo from the next line, held to what a song allows; nothing while stopped.</summary>
-    /// <remarks>Called from the clock thread by a lane and from the drawing thread by a hand on a knob.</remarks>
+    /// <remarks>
+    /// Called from the clock thread by a lane and from the drawing thread by a hand on a knob.
+    ///
+    /// **On an Ableton Link session it is put to the session**, and every peer follows. That is
+    /// what Live does with its own tempo automation, and the alternative, a lane that moves this
+    /// transport and nobody else's, cannot exist on a shared timeline: the lines are placed where
+    /// the session's beats fall, so a tempo the session does not have is not a tempo anything here
+    /// could play at.
+    /// </remarks>
     /// <param name="bpm">Beats a minute.</param>
     void PlayAt(double bpm);
 
@@ -237,6 +247,25 @@ public interface ITrackerPlayer : IDisposable
     /// here; it is what waiting for a tick that never comes already does.
     /// </remarks>
     Midi.Interfaces.IMidiClockFollow? ClockFollow { get; set; }
+
+    /// <summary>
+    /// An Ableton Link session, when the transport is running on one, or nothing.
+    /// </summary>
+    /// <remarks>
+    /// The third answer to whose clock this is, beside the stopwatch and a followed MIDI port,
+    /// and asked whenever a line is due rather than taken when a pass starts. Where it is on, a
+    /// line is due at the moment its beat falls on the session's timeline, less however long the
+    /// output takes to reach the speaker, and the tempo is the session's: a tempo set here, by a
+    /// hand or by a lane, is put to the session and every peer follows it.
+    ///
+    /// A pass started on it begins at once when alone and on the next quantum when anybody else is
+    /// there, which is <see cref="Sync.Interfaces.IAbletonLinkLines.StartBeat"/>. MIDI clock sent
+    /// to the outputs goes on being sent, at the session's tempo, so a drum machine follows Link
+    /// through this.
+    ///
+    /// Null and a session that is off are the same thing, and both cost one comparison a line.
+    /// </remarks>
+    Sync.Interfaces.IAbletonLink? AbletonLink { get; set; }
 
     /// <summary>Starts a song from that step, walking the order or staying on one pattern.</summary>
     /// <remarks>

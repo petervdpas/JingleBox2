@@ -33,8 +33,12 @@ NATIVE="$OUT/runtimes/$RID/native"
 # what sums the pads, the tracker and the takes into the one stream everything leaves through.
 REQUIRED=(libbass.so libbassmix.so)
 
-# Without this an AAC stream will not decode and everything else is untouched.
-OPTIONAL=(libbass_aac.so)
+# Without each of these one thing goes and everything else is untouched: an AAC stream will not
+# decode, and Ableton Link is offered greyed with a sentence saying why.
+declare -A OPTIONAL=(
+  [libbass_aac.so]="AAC streams will not play"
+  [libabl_link.so]="Ableton Link cannot be chosen"
+)
 
 carry() {
   if [ -f "$NATIVE/$1" ]; then
@@ -55,11 +59,11 @@ for lib in "${REQUIRED[@]}"; do
   fi
 done
 
-for lib in "${OPTIONAL[@]}"; do
+for lib in "${!OPTIONAL[@]}"; do
   if carry "$lib"; then
     echo "OK: $lib is beside the program"
   else
-    echo "WARNING: $lib is missing, so AAC streams will not play"
+    echo "WARNING: $lib is missing, so ${OPTIONAL[$lib]}"
   fi
 done
 

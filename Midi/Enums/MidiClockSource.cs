@@ -4,11 +4,16 @@ namespace JingleBox2.Midi.Enums;
 /// Whose clock the transport runs on.
 /// </summary>
 /// <remarks>
-/// **One setting with two answers, and it has to be chosen rather than inferred.** A machine
-/// either keeps its own time or follows somebody else's, there is no third answer, and the two
-/// are exclusive: a transport cannot be driven by a stopwatch and by arriving ticks at once.
-/// That is why this is an enum on its own rather than a flag alongside the four jobs a port can
-/// be given, which are things any number of ports may do at the same time.
+/// **One setting with three answers, and it has to be chosen rather than inferred.** A machine
+/// keeps its own time, follows a clock arriving on a MIDI port, or shares a timeline with an
+/// Ableton Link session, and the three are exclusive: a transport cannot be placed by a stopwatch,
+/// by arriving ticks and by a shared timeline at once. That is why this is an enum on its own
+/// rather than a flag alongside the four jobs a port can be given, which are things any number of
+/// ports may do at the same time.
+///
+/// It lives with the MIDI settings although Link is not MIDI, because it is one question and that
+/// is where the question is asked: the clock card on the MIDI page, beside the outputs a clock is
+/// sent to.
 ///
 /// **It is deliberately not the same question as which outputs get clock sent to them.** Those
 /// are independent: a machine on its own clock may drive two devices, and one following an
@@ -39,5 +44,16 @@ public enum MidiClockSource
     /// named, or a port that is not plugged in, leaves the transport on its own clock rather than
     /// refusing to play: a cable left in the other room is not a decision to stop working.
     /// </remarks>
-    Followed = 1
+    Followed = 1,
+
+    /// <summary>
+    /// A shared timeline with every Ableton Link program on the network.
+    /// </summary>
+    /// <remarks>
+    /// Choosing it is what joins the network. A machine whose build has no Link library offers it
+    /// greyed and says why, and a settings file naming it there plays on the transport's own
+    /// clock rather than refusing to play, the rule <see cref="Followed"/> keeps for a port that
+    /// is not plugged in.
+    /// </remarks>
+    AbletonLink = 2
 }

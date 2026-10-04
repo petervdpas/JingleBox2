@@ -64,9 +64,13 @@ printf '#!/usr/bin/env bash\nset -euo pipefail\nexec /opt/%s/%s "$@"\n' \
   > "$PKGDIR/usr/bin/$NAME"
 chmod 0755 "$PKGDIR/usr/bin/$NAME"
 
-printf '[Desktop Entry]\nType=Application\nName=JingleBox2\nComment=Audio pad launcher\nExec=/usr/bin/%s\nIcon=%s\nTerminal=false\nCategories=Audio;AudioVideo;\n' \
-  "$NAME" "$NAME" \
+sed -e "s|^Exec=.*|Exec=/usr/bin/$NAME|" -e "s|^Icon=.*|Icon=$NAME|" \
+  packaging/fedora/jinglebox2.desktop \
   > "$PKGDIR/usr/share/applications/$NAME.desktop"
+
+mkdir -p "$PKGDIR/usr/share/doc/$NAME"
+cp -a LICENSE "$PKGDIR/usr/share/doc/$NAME/copyright"
+cp -a LICENSE.EXCEPTION "$PKGDIR/usr/share/doc/$NAME/LICENSE.EXCEPTION"
 
 if [ -f packaging/fedora/icons/jinglebox2.png ]; then
   cp -a packaging/fedora/icons/jinglebox2.png \
@@ -78,7 +82,7 @@ INSTALLED_SIZE="$(du -sk "$PKGDIR/opt/${APP_NAME}" | awk '{print $1}')"
 # Ubuntu 24.04 and Debian 13 renamed the runtime to libasound2t64 and left libasound2 as a
 # virtual package; Raspberry Pi OS is Debian 12 and still has the old name. Either satisfies it,
 # so one package installs on both without a second control file.
-printf 'Package: %s\nVersion: %s\nSection: sound\nPriority: optional\nArchitecture: %s\nMaintainer: JingleBox2 CI <noreply@github.com>\nInstalled-Size: %s\nDepends: libasound2t64 | libasound2\nDescription: JingleBox2\n Lightweight cross-platform audio pad launcher built with .NET and Avalonia UI.\n' \
+printf 'Package: %s\nVersion: %s\nSection: sound\nPriority: optional\nArchitecture: %s\nMaintainer: JingleBox2 CI <noreply@github.com>\nInstalled-Size: %s\nDepends: libasound2t64 | libasound2\nDescription: Pad launcher, recorder and tracker for radio and live shows\n JingleBox2 fires jingles from a wall of pads, records and edits takes, and\n writes music in a tracker with its own synths, samplers and drum machines\n beside VST3 and CLAP plugins. It plays its audio through BASS, a proprietary\n library by Un4seen Developments that is free of charge for non-commercial use.\n' \
   "$NAME" "$VER" "$ARCH" "$INSTALLED_SIZE" \
   > "$PKGDIR/DEBIAN/control"
 

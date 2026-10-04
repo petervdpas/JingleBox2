@@ -226,6 +226,8 @@ Actively developed, and in daily use. The pad launcher, recorder, tracker, plugi
 
 Licensed under the **GNU General Public License v2.0 (GPL-2.0-only)**, the same license the Linux kernel uses. See `LICENSE` for the full text.
 
+JingleBox2 plays its audio through **BASS**, a library by Un4seen Developments that is not free software. Its terms let a non-commercial entity, such as an individual, use it free of charge in a product that makes no money, through sales, advertising or otherwise; anything else needs a licence from [un4seen.com](https://www.un4seen.com/bass.html). `LICENSE.EXCEPTION` gives explicit permission to link JingleBox2 with BASS and to ship its binaries alongside it, so the builds on the releases page are properly licensed. The condition is on whoever distributes software built on BASS: JingleBox2 is given away, so using it costs nothing, and anyone who wants to make money distributing it needs a BASS licence for that.
+
 Instruments and effects are exempt. `LICENSE.EXCEPTION` grants permission to write a module against JingleBox2's plugin interfaces, the machine interface and the protocols it uses to talk to a plugin in its own process, and to distribute that module under whatever terms you like. Sounds, presets, recordings and songs are data and were never covered by the license at all.
 
 ---

@@ -134,6 +134,9 @@ jobs:
           $p5 = "out\${{ matrix.name }}\bassmix.dll"
           if (!(Test-Path $p5)) { throw "bassmix.dll missing: nothing would be summed into one output" }
           else { Write-Host "OK: bassmix.dll present" }
+          $p6 = "out\${{ matrix.name }}\abl_link.dll"
+          if (!(Test-Path $p6)) { Write-Host "WARNING: abl_link.dll missing (Ableton Link cannot be chosen)" }
+          else { Write-Host "OK: abl_link.dll present" }
 
       - name: Publish (Linux)
         if: startsWith(matrix.rid, 'linux')
@@ -326,7 +329,7 @@ jobs:
           cp -a packaging/fedora/jinglebox2.sh "$STAGE/$PKGROOT/packaging/fedora/"
           cp -a packaging/fedora/jinglebox2.desktop "$STAGE/$PKGROOT/packaging/fedora/"
           cp -a packaging/fedora/icons/jinglebox2.png "$STAGE/$PKGROOT/packaging/fedora/icons/"
-          cp -a LICENSE "$STAGE/$PKGROOT/" || true
+          cp -a LICENSE LICENSE.EXCEPTION "$STAGE/$PKGROOT/"
 
           tar -C "$STAGE" -czf "$RPMTOP/SOURCES/$TARBALL" "$PKGROOT"
 

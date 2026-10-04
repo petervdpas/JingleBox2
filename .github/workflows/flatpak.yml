@@ -1,0 +1,63 @@
+name: flatpak
+
+# Started by hand from the Actions tab. It builds the Flatpak from the commit it is run on and
+# leaves a jinglebox2-<version>-<arch>.flatpak file on the run's page, to download and install
+# with "flatpak install --user <file>". It is not part of a release until the bundle has been
+# tried on a real machine.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  flatpak:
+    name: Flatpak (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # There is no git inside a Flatpak build, so the version is written into the manifest here,
+      # from the newest tag, the way the csproj would have read it.
+      - name: Version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          VER="$(git describe --tags --abbrev=0)"
+          VER="${VER#v}"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          sed -i -E "s/-p:Version=[^ ]+/-p:Version=$VER/" packaging/flatpak/io.github.petervdpas.JingleBox2.yml
+          grep -n -- '-p:Version=' packaging/flatpak/io.github.petervdpas.JingleBox2.yml
+
+      # Every NuGet package the publish needs, restored by the same .NET SDK the build will use,
+      # so the runtime packs it lists are the ones the offline publish asks for.
+      - name: NuGet sources
+        shell: bash
+        env:
+          JB_FLATPAK_SCOPE: --system
+          JB_FLATPAK_WORK: /tmp/flatpak-work
+        run: |
+          set -euo pipefail
+          bash packaging/flatpak/build.sh sources
+
+      - name: Build
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: packaging/flatpak/io.github.petervdpas.JingleBox2.yml
+          bundle: jinglebox2-${{ steps.version.outputs.version }}-${{ matrix.arch }}.flatpak
+          arch: ${{ matrix.arch }}
+          cache-key: flatpak-builder-${{ matrix.arch }}-${{ hashFiles('packaging/flatpak/nuget-sources.json') }}

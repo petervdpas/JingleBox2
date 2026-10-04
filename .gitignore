@@ -25,3 +25,7 @@ TestResults/
 # points at this directory writes one here: config.json, controllers, instruments, machines
 # and a running marker. One was committed once. Nothing in the build or the code reads it.
 /JingleBox2/
+
+# Flatpak build state and bundle
+.flatpak-work/
+jinglebox2.flatpak

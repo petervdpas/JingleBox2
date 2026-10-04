@@ -1,23 +1,23 @@
 # Clock
 
-Whether the transport keeps its own time or follows another machine's, and which outputs are sent
-this machine's clock.
+Whether the transport keeps its own time, follows another machine's, or shares an Ableton Link
+session, and which outputs are sent this machine's clock.
 
 ## Two settings, not one
 
 They look like two halves of a master-or-slave switch and they are not, because they are
-independent. Whose clock you run on has exactly two answers and you have to pick one. What you
+independent. Whose clock you run on has exactly three answers and you have to pick one. What you
 send clock to is a list, and it has nothing to do with the first: a machine keeping its own time
 may drive two devices, and a machine following someone else's may pass that clock on to a third.
 
 ## Its own clock
 
-Off is what every song has played on until now: the tracker keeps time with a stopwatch of its
-own and answers to nothing outside. The tempo in the song is the tempo.
+The tracker keeps time with a stopwatch of its own and answers to nothing outside. The tempo in the
+song is the tempo. Every song plays on this unless you choose something else.
 
 ## Following another machine
 
-On, the transport runs on MIDI clock arriving at one port. One port and not several, since a
+The transport runs on MIDI clock arriving at one port. One port and not several, since a
 transport following two clocks is following neither.
 
 With no port chosen, or one that is not plugged in, the transport stays on its own clock rather
@@ -33,6 +33,45 @@ here within a couple of seconds. It changes the song like typing a tempo would, 
 and is saved with the song. A master that sends clock only while it plays, as a KeyStep Pro does,
 leaves the field on its last number while it is stopped.
 
+## Ableton Link
+
+Link shares a tempo, the position in the bar, and optionally play and stop with every Link program
+on the same network: Live, Bitwig, Reason, Traktor, many phone apps, another computer running this.
+There is no master. Anybody can change the tempo and everybody follows, and programs can join and
+leave whenever they like.
+
+Choosing it is what joins the network, and that is the only time anything is sent. On Windows the
+firewall asks about it the first time. The line at the foot of the card says how many other
+programs are in the session.
+
+**It does not carry notes or song positions.** Link lines up beats and bars, so two programs start
+bar one together; it cannot tell another program which pattern or line you are on.
+
+**Starting.** Alone, play starts at once. With anybody else in the session, play waits for the
+next bar so it lands in time with them. How many beats make that bar is **Beats that line up**:
+four for a bar of four, three for a waltz, eight or sixteen to wait for a phrase.
+
+**Play and stop.** With **Share play and stop** ticked, pressing play or stop here starts and stops
+the other programs, and theirs starts and stops this one. It only reaches programs that have it
+switched on too.
+
+**Tempo.** The session's tempo is the song's while you are on Link. A tempo another program sets is
+written into the song's tempo, like a tempo arriving from a followed MIDI clock, so it can be undone
+and is saved. A tempo you type, and a tempo lane, are put to the session and everybody follows.
+
+**Lining up by ear.** This machine starts each line early by as long as its own output takes to
+reach the sound card, its buffer and the mixing cushion in SETTINGS, Engine. What happens after the
+sound card (its converters, a Bluetooth speaker, a long cable) it cannot know. If this machine
+sounds late against the others, raise **Output offset**; if it sounds early, lower it, below nought
+if need be. A few milliseconds at a time is the right size of step.
+
+Link stays tight over wifi where MIDI clock does not, because it shares a timeline rather than
+sending ticks: a late network packet changes how quickly the programs agree, not when a beat
+sounds.
+
+A build without the Link library offers the choice greyed out and says why. A settings file that
+names Link on such a machine plays on its own clock rather than refusing to play.
+
 ## Sending clock
 
 Tick any output to send it this machine's clock. Nothing is sent until you do: clock arriving at a
@@ -47,6 +86,10 @@ one while you play from line 32.
 An output that will not open is left out and said in the log. An output that stops answering later
 is kept and tried again, so a cable knocked out and put back comes good on its own without a trip
 back here.
+
+On Ableton Link the outputs are sent clock at the session's tempo, started and stopped with the
+transport, which is how a drum machine or a synth with only a MIDI clock input follows a Link
+session.
 
 ## Passing a clock on
 

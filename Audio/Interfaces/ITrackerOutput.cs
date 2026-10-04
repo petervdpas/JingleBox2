@@ -79,6 +79,22 @@ public interface ITrackerOutput : IDisposable
     /// <summary>How far ahead the mixer is asked to work, in milliseconds.</summary>
     int RenderAheadMilliseconds { get; }
 
+    /// <summary>
+    /// How long a note started now takes to reach the sound card's output, in milliseconds, as
+    /// far as this side can know it.
+    /// </summary>
+    /// <remarks>
+    /// The cushion the mixer works ahead by plus the buffer the stream is played out of: a note is
+    /// mixed into the first, waits its turn in the second, and is heard after both. What lies past
+    /// the buffer is the card's own and is not counted, which is why Ableton Link's offset is a
+    /// setting of its own. The cushion is the size it is asked to be rather than how full it
+    /// happens to be, since that moves block by block and nothing reports it.
+    ///
+    /// Read by the tracker's clock thread when it runs ahead of a shared timeline, so it is a read
+    /// of two numbers and nothing more.
+    /// </remarks>
+    int LatencyMilliseconds { get; }
+
     /// <summary>How many frames the cushion has failed to supply since the stream opened.</summary>
     long Underruns { get; }
 

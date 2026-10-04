@@ -347,6 +347,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     {
         Tracker.Finished();
         Record.Finished();
+        _abletonLink.Dispose();
     }
 
     /// <summary>The machines you have, as a list to pick from and to open one of.</summary>
@@ -452,6 +453,65 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     private readonly Midi.Interfaces.IMidiClockFollow _clockFollow = new Midi.MidiClockFollow();
 
     /// <summary>
+    /// The Ableton Link session, when the transport is set to run on one.
+    /// </summary>
+    /// <remarks>
+    /// Held here for the reason the follower is: the settings page says whether, the player places
+    /// its lines on it, and the tracker's tempo and transport are told what the other peers do.
+    /// Made at startup and costing nothing until it is chosen, since the native side is only made
+    /// the first time somebody joins.
+    /// </remarks>
+    private readonly Sync.Interfaces.IAbletonLink _abletonLink = new Sync.AbletonLink();
+
+    /// <summary>
+    /// Makes the other Link programs' tempo, start and stop move this transport, and this one's
+    /// tempo move theirs.
+    /// </summary>
+    /// <remarks>
+    /// The same shape as <see cref="WhenTheMasterSays"/>, and for the same reasons. All three
+    /// arrive on Link's own thread and are handed to the drawing thread.
+    ///
+    /// A peer's tempo goes into the song's, as a master's does, so the tempo field says what is
+    /// playing. A tempo set here goes the other way: the song's tempo moved by a hand is put to
+    /// the session. The two cannot chase each other, since the session ignores a tempo it is
+    /// already at and does not announce one this peer proposed.
+    ///
+    /// A start or a stop from a peer goes through the page's own play and stop, so everything that
+    /// hangs off the transport moving happens exactly as when somebody presses the button. Each is
+    /// asked whether it would change anything first, since this peer's own start comes back from
+    /// the session too.
+    /// </remarks>
+    private void WhenTheSessionSays()
+    {
+        bool onIt() => _cfg.Midi?.ClockSource == JingleBox2.Midi.Enums.MidiClockSource.AbletonLink;
+
+        _abletonLink.Quantum = Midi.LinkQuantum;
+        _abletonLink.SharesStartStop = Midi.LinkStartStop;
+        _abletonLink.OffsetMilliseconds = _cfg.Midi?.LinkOffsetMs ?? 0;
+
+        _abletonLink.PeersMoved += peers => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            Midi.LinkPeers = peers);
+
+        _abletonLink.TempoHeard += bpm => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (onIt()) Tracker.Bpm = bpm;
+        });
+
+        _abletonLink.PlayingHeard += playing => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (!onIt()) return;
+
+            if (playing && !Tracker.IsPlaying) Tracker.PlayCommand.Execute(null);
+            else if (!playing && Tracker.IsPlaying) Tracker.StopTransport();
+        });
+
+        Tracker.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(TrackerViewModel.Bpm) && onIt()) _abletonLink.Propose(Tracker.Bpm);
+        };
+    }
+
+    /// <summary>
     /// Makes the master's start, continue and stop move this transport.
     /// </summary>
     /// <remarks>
@@ -509,6 +569,8 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
                          && !string.IsNullOrWhiteSpace(midi?.ClockPort);
 
         _clockFollow.Follow(following);
+
+        _abletonLink.Use(midi?.ClockSource == JingleBox2.Midi.Enums.MidiClockSource.AbletonLink);
 
         SaidTheEcho(midi);
     }
@@ -2475,7 +2537,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
         Layout = new Midi.DefaultLayout(_profiles);
 
-        Midi = new MidiViewModel(settings, midiService, _profiles);
+        Midi = new MidiViewModel(settings, midiService, _profiles, _abletonLink);
 
         Plugins = new PluginLibraryViewModel(settings);
 
@@ -2548,6 +2610,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
 
         Tracker.Player.ClockDeck = _clockDeck;
         Tracker.Player.ClockFollow = _clockFollow;
+        Tracker.Player.AbletonLink = _abletonLink;
 
         Tracker.Player.MidiOut = new TrackMidiOut(midiService);
         Tracker.MidiInputs = () => Midi.Devices.Where(port => port.IsConnected).Select(port => port.Name).ToList();
@@ -2560,6 +2623,7 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
         Midi.Listen();
 
         WhenTheMasterSays();
+        WhenTheSessionSays();
 
         Midi.ClockChanged = DriveTheClock;
 

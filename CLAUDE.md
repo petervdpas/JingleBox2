@@ -80,7 +80,11 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   laying a face out is what the thing is
 - `Themes/` - XAML resource dictionaries: `Base`, which the rest are written over, and six
   pairs of a dark and a light (the plain pair, Citrus, Ember, Industrial, Neon, Orchid)
-- `native/` - BASS audio library binaries for win-x64, linux-x64, linux-arm64
+- `native/` - BASS audio library binaries for win-x64, linux-x64, linux-arm64, and Ableton Link's
+  `abl_link` beside them, built from Link's own source by `native/abletonlink/build.sh`
+- `Sync/` - Ableton Link: the C wrapper's P/Invoke declarations, the session, and where a pass
+  begins on a shared timeline. Every type says `AbletonLink` in full, since a bare link in this
+  codebase is a controller pointed at a knob
 
 ### Data Flow
 
@@ -4471,10 +4475,16 @@ whole exercise and is worth writing down rather than summarising:
   said to a tenth and only when it moves by 0.15, so a device at 108 is heard once as 108.0.
   `IMidiClockFollow.TempoHeard` carries it and `MainViewModel` writes it into `Tracker.Bpm`, an
   ordinary edit with an undo step, since the song really does run at that tempo now
-- **Ableton Link is planned and not built**, as a third answer to whose clock the transport runs
-  on, beside its own and a followed MIDI port. `docs/ableton-link.md` is the plan: why Link rather
-  than network MIDI (which already works through `rtpmidid` with no code), what is already in
-  place, the native library, output latency, and what is still open
+- **Ableton Link is the third answer to whose clock the transport runs on**, beside its own and a
+  followed MIDI port, chosen on the Clock card and off until it is. `docs/ableton-link.md` is the
+  design and the record: why Link rather than network MIDI (which already works through `rtpmidid`
+  with no code), how the library is built, and what has not been heard yet. A line is due where
+  its beat falls on the session's timeline, less the output's buffer and cushion and a hand
+  offset; alone a pass starts at once and with peers on the next quantum; a tempo lane moves the
+  session, as Live's does. **Link's tempo callback fires for this peer's own commits**, so
+  `AbletonLink` does not announce a tempo it proposed, or a lane would edit the song's tempo on
+  every line. Tests never join the network: `AbletonLink.Ready` makes the native instance off it,
+  since a test that joined would move somebody's Live
 - `Controllers/Profiles/keylab-mkii.json` is the first file here filled in without anybody
   touching the hardware. A KeyLab mkII 49 arrived on 2026-08-29 and answered Arturia's own
   settings protocol for every field of every control, so the whole of User mode came back over

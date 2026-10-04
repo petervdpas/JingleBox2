@@ -169,6 +169,18 @@
     <None Include="native/linux-arm64/libbassmix.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-arm64' And Exists('native/linux-arm64/libbassmix.so')">
       <TargetPath>runtimes/linux-arm64/native/libbassmix.so</TargetPath>
     </None>
+    <!--
+      Ableton Link's C wrapper, built from Link's own source by native/abletonlink/build.sh and
+      carried here like BASS. Optional on every platform, like bassasio: absent is the Link choice
+      in SETTINGS greyed with a sentence saying why, and nothing else.
+    -->
+    <None Include="native\win-x64\abl_link.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="Exists('native\win-x64\abl_link.dll') And ('$(RuntimeIdentifier)' == 'win-x64' Or ('$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT'))" />
+    <None Include="native/linux-x64/libabl_link.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-x64' And Exists('native/linux-x64/libabl_link.so')">
+      <TargetPath>runtimes/linux-x64/native/libabl_link.so</TargetPath>
+    </None>
+    <None Include="native/linux-arm64/libabl_link.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-arm64' And Exists('native/linux-arm64/libabl_link.so')">
+      <TargetPath>runtimes/linux-arm64/native/libabl_link.so</TargetPath>
+    </None>
   </ItemGroup>
   <Target Name="SetVersionFromGit" BeforeTargets="GetAssemblyVersion;GenerateNuspec;BeforeCompile" Condition="'$(Version)' == '0.0.0-local'">
     <Exec Command="git describe --tags --abbrev=0" ConsoleToMsBuild="true" StandardOutputImportance="low" IgnoreExitCode="true">
@@ -186,11 +198,13 @@
     <Copy SourceFiles="native\win-x64\basswasapi.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\basswasapi.dll')" />
     <Copy SourceFiles="native\win-x64\bassasio.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bassasio.dll')" />
     <Copy SourceFiles="native\win-x64\bassmix.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bassmix.dll')" />
+    <Copy SourceFiles="native\win-x64\abl_link.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\abl_link.dll')" />
   </Target>
   <Target Name="CopyBassToLinuxOutput" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == '' And '$(OS)' != 'Windows_NT' And Exists('native/linux-x64/libbass.so')">
     <Copy SourceFiles="native/linux-x64/libbass.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="native/linux-x64/libbass_aac.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native/linux-x64/libbass_aac.so')" />
     <Copy SourceFiles="native/linux-x64/libbassmix.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native/linux-x64/libbassmix.so')" />
+    <Copy SourceFiles="native/linux-x64/libabl_link.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native/linux-x64/libabl_link.so')" />
   </Target>
   <Target Name="EnsureBassDllInPublish" AfterTargets="Publish" Condition="'$(RuntimeIdentifier)' == 'win-x64' And Exists('native\win-x64\bass.dll')">
     <Copy SourceFiles="native\win-x64\bass.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
@@ -198,6 +212,7 @@
     <Copy SourceFiles="native\win-x64\basswasapi.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\basswasapi.dll')" />
     <Copy SourceFiles="native\win-x64\bassasio.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bassasio.dll')" />
     <Copy SourceFiles="native\win-x64\bassmix.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bassmix.dll')" />
+    <Copy SourceFiles="native\win-x64\abl_link.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\abl_link.dll')" />
   </Target>
   <!--
     The bridge's own types are internal, since nothing outside this assembly loads a plugin, and
