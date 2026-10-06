@@ -11,6 +11,7 @@ name: winget
 # a fork of microsoft/winget-pkgs under the same account. Without the secret it says so in a
 # warning and sends nothing, and the run is not marked failed: a missing secret is a setup step
 # not taken yet, and a red run on every release would say something is broken when nothing is.
+# The same goes for a package winget-pkgs does not have yet: winget-releaser can only update one.
 
 on:
   workflow_run:
@@ -45,6 +46,11 @@ jobs:
           esac
           if [ "$HAS_TOKEN" != "true" ]; then
             echo "::warning title=Not sent to winget::there is no WINGET_TOKEN secret, so $TAG was not sent to winget-pkgs"
+            echo "send=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! curl -fsIL -o /dev/null "https://github.com/microsoft/winget-pkgs/tree/master/manifests/p/PetervdPas/JingleBox2"; then
+            echo "::warning title=Not sent to winget::PetervdPas.JingleBox2 is not in winget-pkgs yet, so $TAG was not sent; the first version is submitted by hand from packaging/winget/manifest"
             echo "send=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
