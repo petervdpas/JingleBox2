@@ -1939,6 +1939,23 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Cursor = Cursor with { Track = track };
     }
 
+    /// <summary>
+    /// A row in the song's instrument list was clicked: the cursor goes to the track that
+    /// instrument plays.
+    /// </summary>
+    /// <remarks>
+    /// Through <see cref="PickTrack"/>, so it is the same move a click on the mixer makes. An
+    /// instrument on no track leaves the cursor where it is, since there is nowhere it could
+    /// mean.
+    /// </remarks>
+    public void PickInstrument(int instrument)
+    {
+        if (Song.InstrumentAt(instrument) == null) return;
+
+        int track = Song.GetInstrumentTrack(instrument);
+        if (track >= 0) PickTrack(track);
+    }
+
     /// <inheritdoc/>
     /// <remarks>
     /// Only when the one that left is the one that was in front. Closing the window behind the
@@ -2149,7 +2166,17 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Enabled by there being a machine picked; with none it does nothing rather than being
     /// refused.
     /// </remarks>
-    public IRelayCommand AddInstrumentCommand => new RelayCommand(AddInstrument);
+    public IAsyncRelayCommand AddInstrumentCommand => new AsyncRelayCommand(AddInstrument);
+
+    /// <summary>
+    /// How this page asks a yes or no question: a title, the question and the word on the button
+    /// that says yes.
+    /// </summary>
+    /// <remarks>
+    /// The dialog by default. Settable so a test can answer without a window, since what is under
+    /// test is what the answer does rather than the asking.
+    /// </remarks>
+    public Func<string, string, string, Task<bool>> Asks { get; set; } = ConfirmDialog.AskAsync;
 
     /// <summary>Reads the rack again, for a machine or plugin added while the song was open.</summary>
     public IRelayCommand RefreshLibraryCommand => new RelayCommand(RefreshRack);
@@ -5078,13 +5105,35 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     ///
     /// What it does keep is which machine it came off. The rack's id was the one thing saying so,
     /// and two machines can share an engine.
+    ///
+    /// The cursor's track is given it as well, which is the drag onto the track's tab done in the
+    /// same press. A track that already plays something is asked about first, and answering no
+    /// adds the instrument to the list and leaves the track as it was: pushing an instrument off
+    /// the part it is playing is not something a button called Add may do quietly. One undo step
+    /// for both, since to a hand it was one act, and the notes already on that track naming
+    /// another instrument are offered to be pointed at it exactly as a drag offers.
     /// </remarks>
-    private void AddInstrument()
+    private async Task AddInstrument()
     {
         if (PickedMachine is not { } picked)
         {
             Status = "Pick an instrument first.";
             return;
+        }
+
+        int track = Cursor.Track;
+        var playing = track >= 0 && track < Song.TrackCount
+            ? Song.InstrumentAt(Song.GetTrackInstrument(track))
+            : null;
+        bool placed = track >= 0 && track < Song.TrackCount;
+
+        if (playing != null)
+        {
+            placed = await Asks(
+                "Replace the instrument",
+                $"Track {track + 1:00} plays '{playing.Name}'. Put '{picked.Said}' on it instead? "
+                    + $"'{playing.Name}' stays in the song.",
+                "Replace");
         }
 
         Changing("adding an instrument");
@@ -5111,11 +5160,31 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         taken.EnsureId();
 
         Song.Instruments.Add(taken);
+        int index = Song.Instruments.Count - 1;
+
+        if (placed) Song.SetTrackInstrument(track, index);
+
         SyncInstruments();
+        if (placed)
+        {
+            RefreshStrips();
+            PointEffectSlot();
+        }
         MarkDirty("adding an instrument");
 
-        SelectedInstrument = Song.Instruments.Count - 1;
-        Status = $"Added '{taken.Name}' to the song as instrument {SelectedInstrument:00}";
+        SelectedInstrument = index;
+
+        if (!placed)
+        {
+            Status = $"Added '{taken.Name}' to the song as instrument {index:00}";
+            return;
+        }
+
+        Status = playing != null
+            ? $"Added '{taken.Name}' to the song as instrument {index:00}, on track {track + 1:00}. '{playing.Name}' came off it."
+            : $"Added '{taken.Name}' to the song as instrument {index:00}, on track {track + 1:00}";
+
+        await OfferToPointNotesAt(track, index, taken);
     }
 
 

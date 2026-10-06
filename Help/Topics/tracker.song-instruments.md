@@ -6,6 +6,12 @@ Drag one onto a track, anywhere in its column, to put it there, or onto the chai
 the pattern to put it on the track the cursor is in. An instrument sits on
 one track only: to use the same sound twice, add it twice.
 
+Clicking an instrument in the list puts the cursor on the track it plays.
+
+"+ Add" puts the picked instrument in the song and on the track the cursor is in. Where
+that track already plays something you are asked first: yes puts the new one on it and
+leaves the old one in the list, no adds the new one to the list and leaves the track alone.
+
 A song holds a copy of every instrument it uses, so it does not need your library to
 open. It does need the machines those instruments are on: a machine that is not
 registered here makes no sound and has no panel, and the status line names what is

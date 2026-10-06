@@ -568,7 +568,7 @@ public partial class TrackerView : UserControl
     }
 
     /// <summary>
-    /// Picks an instrument up off the list.
+    /// Picks an instrument up off the list, and puts the cursor on the track it plays.
     /// </summary>
     /// <remarks>
     /// Releasing without moving simply ends the drag with no effect, so this does not get in the
@@ -579,6 +579,8 @@ public partial class TrackerView : UserControl
     {
         if (!e.GetCurrentPoint(InstrumentList).Properties.IsLeftButtonPressed) return;
         if (InstrumentList.SelectedItem is not InstrumentSlot slot) return;
+
+        ViewModel?.PickInstrument(slot.Index);
 
         try
         {
