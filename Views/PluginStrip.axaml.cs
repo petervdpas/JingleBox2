@@ -380,11 +380,16 @@ public partial class PluginStrip : UserControl
     /// <remarks>
     /// Read off the button's own row rather than off anything the strip has picked, since a
     /// chain has no selection: a press on a block is about that block.
+    ///
+    /// A block that is switched off opens nothing: what is switched off is out of the sound, and
+    /// a face over it would be knobs that move nothing anybody hears. The buttons say so by
+    /// going grey, and this says it again for whatever reaches it another way.
     /// </remarks>
     private void OnOpenDevice(object? sender, RoutedEventArgs e)
     {
         if (sender is not Control control) return;
         if (TopLevel.GetTopLevel(this) is not Window owner) return;
+        if (control.DataContext is ViewModels.Interfaces.IChainSlot { IsBypassed: true }) return;
 
         if (control.DataContext is PluginSlotViewModel plugin)
         {

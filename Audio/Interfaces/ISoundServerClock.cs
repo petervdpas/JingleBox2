@@ -16,8 +16,24 @@ namespace JingleBox2.Audio.Interfaces;
 public interface ISoundServerClock
 {
     /// <summary>The server's cycle on this machine, or nothing where it cannot be asked.</summary>
-    /// <remarks>Asked once per run and kept, since a server does not change its cycle under a running program.</remarks>
+    /// <remarks>
+    /// Asked the first time and kept, and the same answer for every reader in the process, since
+    /// the page that recommends a buffer and the tracker that opens one have to agree about the
+    /// server they are both talking to. Reading is free after the first time, which is what lets
+    /// a binding read it.
+    /// </remarks>
     ServerClock? Read();
+
+    /// <summary>
+    /// Asks the server again and keeps the new answer for every reader after it.
+    /// </summary>
+    /// <remarks>
+    /// A server's cycle is somebody's setting and can be changed under a running program, by
+    /// forcing PipeWire's quantum for instance, and what is recommended here would otherwise go on
+    /// following the cycle the server had when the program started. This is a round trip to the
+    /// server's own tool, up to a second, so it is for a deliberate press and never for a binding.
+    /// </remarks>
+    ServerClock? ReadAgain();
 
     /// <summary>
     /// The cycle out of what PipeWire prints about its settings, the forced values winning over

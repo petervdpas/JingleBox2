@@ -1148,12 +1148,17 @@ public sealed partial class MainViewModel : ObservableObject, Interfaces.IPageIn
     /// the fast drive curve is switched on. All of it takes effect at once, the same way choosing
     /// them does, except the rate, which takes effect when the application is started again, as
     /// the line under it says.
+    ///
+    /// The sound server is asked its cycle again first, since that is what the buffer and the rate
+    /// are recommended from and it may have been changed since the application started.
     /// </remarks>
     public IRelayCommand ResetAudioCommand => new RelayCommand(ResetAudio);
 
     /// <summary>Does what <see cref="ResetAudioCommand"/> says.</summary>
     private void ResetAudio()
     {
+        _clock.ReadAgain();
+
         _cfg.OutputBufferSize = 0;
         _cfg.OutputUpdatePeriodMs = 0;
         _cfg.OutputUpdateThreads = 0;

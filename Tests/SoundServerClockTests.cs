@@ -65,4 +65,66 @@ public class SoundServerClockTests
 
         Assert.True(read is null || (read.Value.Rate > 0 && read.Value.Quantum > 0));
     }
+
+    /// <summary>The server is asked once, and reading again after that is free.</summary>
+    [Fact]
+    public void The_server_is_asked_once()
+    {
+        int asked = 0;
+        var clock = new SoundServerClock(() => { asked++; return new ServerClock(48000, 1024); });
+
+        clock.Read();
+        clock.Read();
+
+        Assert.Equal(1, asked);
+    }
+
+    /// <summary>
+    /// A quantum changed under a running program is heard once somebody asks again, and every
+    /// read after that has the new one.
+    /// </summary>
+    [Fact]
+    public void Asking_again_hears_a_changed_quantum()
+    {
+        int quantum = 1024;
+        var clock = new SoundServerClock(() => new ServerClock(48000, quantum));
+
+        Assert.Equal(1024, clock.Read()!.Value.Quantum);
+
+        quantum = 256;
+
+        Assert.Equal(1024, clock.Read()!.Value.Quantum);
+        Assert.Equal(256, clock.ReadAgain()!.Value.Quantum);
+        Assert.Equal(256, clock.Read()!.Value.Quantum);
+    }
+
+    /// <summary>A server that falls over while being asked is not known, and the next ask still goes out.</summary>
+    [Fact]
+    public void A_server_that_throws_is_not_known()
+    {
+        bool throws = true;
+        var clock = new SoundServerClock(() => throws ? throw new System.InvalidOperationException() : new ServerClock(48000, 512));
+
+        Assert.Null(clock.Read());
+
+        throws = false;
+
+        Assert.Equal(new ServerClock(48000, 512), clock.ReadAgain());
+    }
+
+    /// <summary>The recommended buffer follows the new answer: two cycles of 256 is 512 frames.</summary>
+    [Fact]
+    public void The_recommendation_follows_the_new_answer()
+    {
+        int quantum = 1024;
+        var clock = new SoundServerClock(() => new ServerClock(48000, quantum));
+        var choices = new AudioChoices();
+
+        Assert.Equal(2048, choices.Recommended(true, clock.Read(), 48000).BufferFrames);
+
+        quantum = 256;
+        clock.ReadAgain();
+
+        Assert.Equal(512, choices.Recommended(true, clock.Read(), 48000).BufferFrames);
+    }
 }

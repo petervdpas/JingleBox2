@@ -516,7 +516,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     private bool Pour(Song live, Song was)
     {
-        TrackEffect.Target = null;
+        LetGoOfChains();
 
         live.TakeFrom(was);
 
@@ -719,7 +719,28 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _effectTrack = -1;
         FollowCursorTrack();
 
+        if (MasterEffect.Target is null)
+            MasterEffect.Target = new TrackPluginTarget(_player, TrackerPlayer.MasterStrip);
+
         MidiPortsMoved?.Invoke();
+    }
+
+    /// <summary>
+    /// Lets go of the plugins on both chains under the pattern and the mixer, ahead of the player
+    /// building them again.
+    /// </summary>
+    /// <remarks>
+    /// The rows on a chain hold the plugins themselves, so a chain rebuilt underneath them leaves
+    /// rows over plugins that have been disposed: the block still reads, and its window asks a
+    /// plugin with no process and is given the host's knobs. Done before the rebuild rather than
+    /// after it, because a window open over a plugin being disposed is a crash inside that
+    /// plugin's own toolkit, and letting go of the rows is what closes their windows.
+    /// <see cref="PointEffectSlot"/> points both again.
+    /// </remarks>
+    private void LetGoOfChains()
+    {
+        TrackEffect.Target = null;
+        MasterEffect.Target = null;
     }
 
     /// <summary>The input ports plugged in now, which a track's MIDI block offers, asked for each time the block is made.</summary>
@@ -1882,12 +1903,33 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         foreach (var box in _instrumentBoxes.Values) box.SyncPatch();
 
         CloseInstrumentBoxes();
+        LetGoOfChains();
 
         _player.LetGoOfPlugins(Song);
+
+        _pluginsPutDown = true;
     }
 
     /// <summary>And picks them up again, for coming back.</summary>
-    public void TakeUpPlugins() => _player.TakeUpPlugins(Song);
+    /// <remarks>
+    /// Only where they really were put down. Coming back to a song that went on playing finds
+    /// every plugin still loaded, and picking them up again would start each one over in a new
+    /// process, seconds apiece, under a running pattern. The chains are pointed again afterwards,
+    /// since the rows were let go of with the plugins.
+    /// </remarks>
+    public void TakeUpPlugins()
+    {
+        if (!_pluginsPutDown) return;
+
+        _pluginsPutDown = false;
+
+        _player.TakeUpPlugins(Song);
+
+        PointEffectSlot();
+    }
+
+    /// <summary>Whether <see cref="LetGoOfPlugins"/> put the song's plugins down and nothing has picked them up since.</summary>
+    private bool _pluginsPutDown;
 
     /// <summary>
     /// The track a hardware control drives when its mapping does not name one.
@@ -5579,6 +5621,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         CloseInstrumentBoxes();
         _player.ClearPlayers();
 
+        LetGoOfChains();
+
         var missing = _player.RestoreChains(Song);
         var lost = Lost(Song);
 
@@ -5643,7 +5687,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     internal void Restore(Song fromDisc)
     {
-        TrackEffect.Target = null;
+        LetGoOfChains();
 
         fromDisc.Normalize();
 

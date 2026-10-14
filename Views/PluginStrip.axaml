@@ -350,6 +350,7 @@
                     <Button Grid.Column="0" Classes="deviceOpen"
                             Content="{Binding Name}"
                             Click="OnOpenDevice"
+                            IsEnabled="{Binding !IsBypassed}"
                             ToolTip.Tip="Open this one's controls in a window" />
 
                     <Border Grid.Column="2" Classes="deviceKind" Margin="0,0,2,0">
@@ -389,12 +390,13 @@
                           Content="."
                           ContentTemplate="{StaticResource WindowIcon}"
                           Click="OnOpenDevice"
+                          IsEnabled="{Binding !IsBypassed}"
                           ToolTip.Tip="Open this one's controls in a window" />
                 </Grid>
 
                 <Border.ContextMenu>
                   <ContextMenu>
-                    <MenuItem Header="Open controls" Click="OnOpenDevice" />
+                    <MenuItem Header="Open controls" Click="OnOpenDevice" IsEnabled="{Binding !IsBypassed}" />
                     <Separator />
                     <MenuItem Header="Move earlier" Command="{Binding MoveLeftCommand}" />
                     <MenuItem Header="Move later" Command="{Binding MoveRightCommand}" />

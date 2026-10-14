@@ -400,9 +400,14 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// A view concern reaching back into the view model would be worse than one event. It is
     /// raised for every device when the view is pointed somewhere else, not only when one is
     /// removed, because a window belonging to the track you have just left is a window over
-    /// somebody else's plugin.
+    /// somebody else's plugin. And for a device switched off, which stays in the chain and is
+    /// out of the sound: a window over it would be knobs that move nothing anybody hears.
     /// </remarks>
     public event System.Action<IChainSlot>? DeviceClosing;
+
+    /// <summary>Lets go of anything showing a device that has just been switched off.</summary>
+    /// <param name="device">The device switched off.</param>
+    internal void SwitchedOff(IChainSlot device) => DeviceClosing?.Invoke(device);
 
     /// <summary>
     /// Raised before the chain is about to gain or lose a plugin.

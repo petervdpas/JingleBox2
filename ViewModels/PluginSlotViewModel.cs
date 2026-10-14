@@ -201,6 +201,8 @@ public sealed partial class PluginSlotViewModel : ObservableObject, Interfaces.I
 
             Device.Bypassed = value;
             OnPropertyChanged();
+            if (value) _chain.SwitchedOff(this);
+
             _chain.NotifyChanged();
         }
     }

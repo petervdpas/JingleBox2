@@ -17,14 +17,75 @@ namespace JingleBox2.Audio;
 /// </remarks>
 public sealed partial class SoundServerClock : ISoundServerClock
 {
-    /// <summary>What the server said, asked the first time anybody wants it.</summary>
-    private static readonly Lazy<ServerClock?> Asked = new(Ask);
+    /// <summary>What the real server said, shared by every instance that asks it.</summary>
+    private static readonly Kept Shared = new(Ask);
+
+    /// <summary>The answer this instance reads: the shared one, or its own where it was handed a server to ask.</summary>
+    private readonly Kept _kept;
 
     /// <summary>How long the server's tool is given to answer.</summary>
     private const int AskMilliseconds = 1000;
 
+    /// <summary>Reads the real server, or the one handed in.</summary>
+    /// <param name="ask">
+    /// How to ask a server, for a test that has none. Left out, the real one is asked and the
+    /// answer is shared with every other instance in the process.
+    /// </param>
+    public SoundServerClock(Func<ServerClock?>? ask = null)
+    {
+        _kept = ask == null ? Shared : new Kept(ask);
+    }
+
     /// <inheritdoc/>
-    public ServerClock? Read() => Asked.Value;
+    public ServerClock? Read() => _kept.Read();
+
+    /// <inheritdoc/>
+    public ServerClock? ReadAgain() => _kept.ReadAgain();
+
+    /// <summary>An answer asked for once and kept until somebody asks again.</summary>
+    /// <param name="ask">How the server is asked.</param>
+    private sealed class Kept(Func<ServerClock?> ask)
+    {
+        /// <summary>Guards the answer, since the tracker and the settings page read it from different moments.</summary>
+        private readonly object _gate = new();
+
+        /// <summary>Whether the server has been asked at all.</summary>
+        private bool _asked;
+
+        /// <summary>What it said.</summary>
+        private ServerClock? _answer;
+
+        /// <summary>The kept answer, asking the first time.</summary>
+        public ServerClock? Read()
+        {
+            lock (_gate)
+            {
+                if (!_asked) Take();
+
+                return _answer;
+            }
+        }
+
+        /// <summary>Asks again and keeps what comes back.</summary>
+        public ServerClock? ReadAgain()
+        {
+            lock (_gate)
+            {
+                Take();
+
+                return _answer;
+            }
+        }
+
+        /// <summary>Asks and keeps the answer. A server that cannot be asked is nothing, never a fault.</summary>
+        private void Take()
+        {
+            try { _answer = ask(); }
+            catch (Exception) { _answer = null; }
+
+            _asked = true;
+        }
+    }
 
     /// <inheritdoc/>
     public ServerClock? FromPipeWire(string settings)

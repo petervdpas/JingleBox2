@@ -25,6 +25,9 @@ public class OutputRateTests
         public ServerClock? Read() => said;
 
         /// <inheritdoc/>
+        public ServerClock? ReadAgain() => said;
+
+        /// <inheritdoc/>
         public ServerClock? FromPipeWire(string settings) => said;
     }
 

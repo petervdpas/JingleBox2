@@ -176,6 +176,8 @@ public sealed partial class SoundEffectViewModel : ObservableObject, IChainSlot,
 
             OnPropertyChanged();
 
+            if (value) _chain.SwitchedOff(this);
+
             _chain.NotifyChanged();
         }
     }
