@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.28.0.schema.json
 
 PackageIdentifier: PetervdPas.JingleBox2
 PackageVersion: 2.6.25
@@ -19,4 +19,4 @@ Installers:
   InstallerUrl: https://github.com/petervdpas/JingleBox2/releases/download/v2.6.25/JingleBox2-Setup-2.6.25.exe
   InstallerSha256: 36E684A259B84267AED3FCE4BBE4FA05B1B7083D27BA6A395F9A4E2F519F1FB6
 ManifestType: installer
-ManifestVersion: 1.10.0
+ManifestVersion: 1.28.0

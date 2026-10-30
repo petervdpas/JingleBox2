@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.28.0.schema.json
 
 PackageIdentifier: PetervdPas.JingleBox2
 PackageVersion: 2.6.25
@@ -31,4 +31,4 @@ Tags:
 - midi
 ReleaseNotesUrl: https://github.com/petervdpas/JingleBox2/releases/tag/v2.6.25
 ManifestType: defaultLocale
-ManifestVersion: 1.10.0
+ManifestVersion: 1.28.0
