@@ -5,7 +5,9 @@ name: winget
 # Two ways, decided by whether winget-pkgs has the package yet. Once it has, winget-releaser works
 # the manifest out from the release itself. Before that, winget-releaser cannot help, since it can
 # only update a package that exists, so the committed manifest in packaging/winget/manifest is
-# submitted with wingetcreate instead. That manifest has to name the release being sent:
+# put on a branch of the fork and offered as a pull request through GitHub's own API. Not with
+# wingetcreate: its newest release knows manifest schemas up to 1.12, and winget-pkgs refuses
+# anything older than 1.28. That manifest has to name the release being sent:
 # packaging/winget/update.sh points it at one, and a manifest naming another version is refused
 # rather than submitted.
 #
@@ -68,21 +70,37 @@ jobs:
 
       - name: Submit the first version
         if: steps.tag.outputs.send == 'new'
-        shell: pwsh
+        shell: bash
         env:
           VERSION: ${{ steps.tag.outputs.version }}
-          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          $dir = 'packaging/winget/manifest'
-          $named = (Select-String -Path "$dir/PetervdPas.JingleBox2.yaml" -Pattern '^PackageVersion:\s*(\S+)').Matches[0].Groups[1].Value
-          if ($named -ne $env:VERSION) {
-            Write-Output "::error title=Not sent to winget::the manifest in $dir names $named, not $env:VERSION; run packaging/winget/update.sh v$env:VERSION, push, and run this again"
+          set -euo pipefail
+          DIR=packaging/winget/manifest
+          NAMED="$(sed -n 's/^PackageVersion:[[:space:]]*//p' "$DIR/PetervdPas.JingleBox2.yaml" | tr -d '\r')"
+          if [ "$NAMED" != "$VERSION" ]; then
+            echo "::error title=Not sent to winget::the manifest in $DIR names $NAMED, not $VERSION; run packaging/winget/update.sh v$VERSION, push, and run this again"
             exit 1
-          }
-          Invoke-WebRequest -Uri https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
-          .\wingetcreate.exe submit --token $env:WINGET_TOKEN $dir
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          fi
+          OWNER="$(gh api user --jq .login)"
+          FORK="$OWNER/winget-pkgs"
+          BRANCH="PetervdPas.JingleBox2-$VERSION"
+          TARGET="manifests/p/PetervdPas/JingleBox2/$VERSION"
+          gh api -X POST "repos/$FORK/merge-upstream" -f branch=master > /dev/null
+          BASE="$(gh api "repos/$FORK/git/ref/heads/master" --jq .object.sha)"
+          gh api -X DELETE "repos/$FORK/git/refs/heads/$BRANCH" > /dev/null 2>&1 || true
+          gh api -X POST "repos/$FORK/git/refs" -f ref="refs/heads/$BRANCH" -f sha="$BASE" > /dev/null
+          for f in "$DIR"/*.yaml; do
+            name="$(basename "$f")"
+            gh api -X PUT "repos/$FORK/contents/$TARGET/$name" \
+              -f message="New package: PetervdPas.JingleBox2 version $VERSION" \
+              -f branch="$BRANCH" \
+              -f content="$(tr -d '\r' < "$f" | base64 -w0)" > /dev/null
+            echo "added $TARGET/$name"
+          done
+          gh pr create -R microsoft/winget-pkgs --base master --head "$OWNER:$BRANCH" \
+            --title "New package: PetervdPas.JingleBox2 version $VERSION" \
+            --body "New package PetervdPas.JingleBox2, version $VERSION, from https://github.com/petervdpas/JingleBox2/releases/tag/v$VERSION"
 
       - uses: vedantmgoyal9/winget-releaser@v2
         if: steps.tag.outputs.send == 'update'
