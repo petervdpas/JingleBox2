@@ -7,18 +7,12 @@
 #   packaging/winget/update.sh            the newest tag
 #   packaging/winget/update.sh v2.6.14    that release
 #
-# The folder is the one a first submission is made from, by hand, once:
-#
-#   winget install --manifest packaging\winget\manifest
-#   wingetcreate submit packaging\winget\manifest
-#
-# With no --token, wingetcreate signs in to GitHub in the browser and keeps the login itself, which
-# also keeps a token out of the shell's history. The token the workflow needs is a classic one
-# with public_repo, kept as the repository secret WINGET_TOKEN.
-#
-# After winget-pkgs has the package, .github/workflows/winget.yml sends every release on its own
-# and works the manifest out from the release itself, so this is only for that first submission
-# and for trying a release from its manifest.
+# The folder is what the first version is submitted from. .github/workflows/winget.yml does that
+# itself while winget-pkgs does not have the package yet: point the manifest at the release, push,
+# and run that workflow from the Actions tab with the release's tag. It refuses a manifest naming
+# a different version. Once winget-pkgs has the package, the same workflow sends every release on
+# its own and works the manifest out from the release, so this script is only for that first
+# submission and for trying a release from its manifest.
 #
 # The SHA256 is the one GitHub keeps for the uploaded file. Where an older release has none, the
 # installer is downloaded and hashed instead. A release that is not published yet, or has no

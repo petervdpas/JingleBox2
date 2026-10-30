@@ -1,8 +1,13 @@
 name: winget
 
-# Sends each new release to winget as a pull request against microsoft/winget-pkgs, once the
-# first version is in. The first one is submitted by hand from packaging/winget/manifest, which
-# packaging/winget/update.sh points at any published release.
+# Sends each release to winget as a pull request against microsoft/winget-pkgs.
+#
+# Two ways, decided by whether winget-pkgs has the package yet. Once it has, winget-releaser works
+# the manifest out from the release itself. Before that, winget-releaser cannot help, since it can
+# only update a package that exists, so the committed manifest in packaging/winget/manifest is
+# submitted with wingetcreate instead. That manifest has to name the release being sent:
+# packaging/winget/update.sh points it at one, and a manifest naming another version is refused
+# rather than submitted.
 #
 # Triggered by the release workflow finishing rather than by the release being published: a
 # release made with the workflow's own token does not start other workflows.
@@ -11,7 +16,6 @@ name: winget
 # a fork of microsoft/winget-pkgs under the same account. Without the secret it says so in a
 # warning and sends nothing, and the run is not marked failed: a missing secret is a setup step
 # not taken yet, and a red run on every release would say something is broken when nothing is.
-# The same goes for a package winget-pkgs does not have yet: winget-releaser can only update one.
 
 on:
   workflow_run:
@@ -49,17 +53,39 @@ jobs:
             echo "send=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if ! curl -fsIL -o /dev/null "https://github.com/microsoft/winget-pkgs/tree/master/manifests/p/PetervdPas/JingleBox2"; then
-            echo "::warning title=Not sent to winget::PetervdPas.JingleBox2 is not in winget-pkgs yet, so $TAG was not sent; the first version is submitted by hand from packaging/winget/manifest"
-            echo "send=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          if curl -fsIL -o /dev/null "https://github.com/microsoft/winget-pkgs/tree/master/manifests/p/PetervdPas/JingleBox2"; then
+            echo "send=update" >> "$GITHUB_OUTPUT"
+          else
+            echo "send=new" >> "$GITHUB_OUTPUT"
           fi
-          echo "send=true" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
+      - uses: actions/checkout@v4
+        if: steps.tag.outputs.send == 'new'
+        with:
+          ref: master
+
+      - name: Submit the first version
+        if: steps.tag.outputs.send == 'new'
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = 'packaging/winget/manifest'
+          $named = (Select-String -Path "$dir/PetervdPas.JingleBox2.yaml" -Pattern '^PackageVersion:\s*(\S+)').Matches[0].Groups[1].Value
+          if ($named -ne $env:VERSION) {
+            Write-Output "::error title=Not sent to winget::the manifest in $dir names $named, not $env:VERSION; run packaging/winget/update.sh v$env:VERSION, push, and run this again"
+            exit 1
+          }
+          Invoke-WebRequest -Uri https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          .\wingetcreate.exe submit --token $env:WINGET_TOKEN $dir
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - uses: vedantmgoyal9/winget-releaser@v2
-        if: steps.tag.outputs.send == 'true'
+        if: steps.tag.outputs.send == 'update'
         with:
           identifier: PetervdPas.JingleBox2
           version: ${{ steps.tag.outputs.version }}
